@@ -415,6 +415,8 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
@@ -456,8 +458,8 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bcurrent[NC * NS][VS];
     s_t bdirection[NC * NS][VS];
     s_t boutput[NC * NS][VS];
@@ -521,6 +523,8 @@ static SFEM_INLINE int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa
 extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -554,10 +558,10 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_team(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, (const double *)p_w, (const double *)p_c, direction_stride, (const double *)p_w_direction, (const double *)p_c_direction, out_stride, (double *)p_w_out, (double *)p_c_out);
+        return sfem::codegen::two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, (const double *)p_w, (const double *)p_c, direction_stride, (const double *)p_w_direction, (const double *)p_c_direction, out_stride, (double *)p_w_out, (double *)p_c_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, (const float *)p_w, (const float *)p_c, direction_stride, (const float *)p_w_direction, (const float *)p_c_direction, out_stride, (float *)p_w_out, (float *)p_c_out);
+        return sfem::codegen::two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, (const float *)p_w, (const float *)p_c, direction_stride, (const float *)p_w_direction, (const float *)p_c_direction, out_stride, (float *)p_w_out, (float *)p_c_out);
     }
     default:
       break;
@@ -609,7 +613,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    const int err = two_phase_flow_form_2_p_w_p_w_tri3_jacobian_action_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;

@@ -759,9 +759,10 @@ namespace sfem {
   int GeneratedLinearElasticity::team_apply(const Team &team,
                       const real_t *const x,
                       const real_t *const h,
-                      real_t *const out) {
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->team_apply(team, x, h, out) != SFEM_SUCCESS) {
+                      real_t *const out,
+                      const ElementScope scope) {
+    if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+      if (term->team_apply(team, x, h, out, scope) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
       team.barrier();
@@ -769,6 +770,7 @@ namespace sfem {
     auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
@@ -794,13 +796,13 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if ((impl_->apply_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
-          return linear_elasticity_apply_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+          return linear_elasticity_apply_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
         }
-        return linear_elasticity_apply_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
+        return linear_elasticity_apply_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, h + 0, h + 1, 2, out + 0, out + 1);
       }
       else if (dim == 3) {
         if (impl_->apply_uses_affine || domain.element_type == smesh::TET4) {
-          if (impl_->space->has_packed_mesh()) {
+          if (scope == ElementScope::ALL && impl_->space->has_packed_mesh()) {
             auto packed = impl_->space->packed_mesh();
             const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
             if (packed_block >= 0) {
@@ -818,9 +820,9 @@ namespace sfem {
               return linear_elasticity_apply_packed_3d_a_msoa_team(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
             }
           }
-          return linear_elasticity_apply_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+          return linear_elasticity_apply_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
         }
-        if (impl_->space->has_packed_mesh()) {
+        if (scope == ElementScope::ALL && impl_->space->has_packed_mesh()) {
           auto packed = impl_->space->packed_mesh();
           const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
           if (packed_block >= 0) {
@@ -838,7 +840,7 @@ namespace sfem {
             return linear_elasticity_apply_packed_3d_i_msoa_team(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
           }
         }
-        return linear_elasticity_apply_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+        return linear_elasticity_apply_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
       }
       SFEM_ERROR("linear_elasticity apply does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -849,7 +851,9 @@ namespace sfem {
                       const real_t *const h,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::apply");
-    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) { return team_apply(team, x, h, out); });
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
   }
 
   bool GeneratedLinearElasticity::team_supported() const {
@@ -1378,7 +1382,7 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->team_apply(team, impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+      if (term->team_apply(team, impl_->inexact.state, h, out, ElementScope::ALL) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
       team.barrier();

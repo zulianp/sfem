@@ -548,6 +548,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -580,6 +582,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_mso
 extern "C" int two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -756,6 +760,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -793,6 +799,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -830,6 +838,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa
 extern "C" int two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -953,6 +963,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -985,6 +997,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_mso
 extern "C" int two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1161,6 +1175,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1198,6 +1214,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1235,6 +1253,8 @@ extern "C" int two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_msoa
 extern "C" int two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1354,6 +1374,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1384,6 +1406,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_mso
 extern "C" int two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1552,6 +1576,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1587,6 +1613,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1622,6 +1650,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa
 extern "C" int two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1739,6 +1769,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1769,6 +1801,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_mso
 extern "C" int two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1937,6 +1971,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1972,6 +2008,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2007,6 +2045,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_i_msoa
 extern "C" int two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2138,6 +2178,8 @@ extern "C" int two_phase_flow_quad4_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2175,6 +2217,8 @@ extern "C" int two_phase_flow_proteus_quad4_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2371,6 +2415,8 @@ extern "C" int two_phase_flow_tet10_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2413,6 +2459,8 @@ extern "C" int two_phase_flow_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -2455,6 +2503,8 @@ extern "C" int two_phase_flow_proteus_hex8_jacobian_action_i_msoa_team(
 extern "C" int two_phase_flow_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -3153,6 +3203,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3188,9 +3240,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_c_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::QUAD4:
-      return two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3288,6 +3340,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3328,11 +3382,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_c_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::TET10:
-      return two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3421,6 +3475,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3456,9 +3512,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_w_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::QUAD4:
-      return two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_w_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3556,6 +3612,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3596,11 +3654,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_c_p_w_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::TET10:
-      return two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3687,6 +3745,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3720,9 +3780,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::QUAD4:
-      return two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_c_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3818,6 +3878,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3856,11 +3918,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_c_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::TET10:
-      return two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -3947,6 +4009,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3980,9 +4044,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::QUAD4:
-      return two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_w_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -4078,6 +4142,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -4116,11 +4182,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_form_2_p_w_p_w_jacobian_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::PROTEUS_HEX8:
-      return two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::TET10:
-      return two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -4214,6 +4280,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_i_mso
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -4254,9 +4322,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_2d_i_mso
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return two_phase_flow_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::QUAD4:
-      return two_phase_flow_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }
@@ -4359,6 +4427,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_3d_i_mso
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -4404,11 +4474,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int two_phase_flow_jacobian_action_3d_i_mso
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return two_phase_flow_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::PROTEUS_HEX8:
-      return two_phase_flow_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     case smesh::TET10:
-      return two_phase_flow_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+      return two_phase_flow_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
     default:
       break;
   }

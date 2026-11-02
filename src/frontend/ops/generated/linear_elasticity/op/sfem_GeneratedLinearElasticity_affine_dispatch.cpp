@@ -31,6 +31,8 @@ extern "C" int linear_elasticity_tri3_apply_a_msoa(
 extern "C" int linear_elasticity_tri3_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -224,6 +226,8 @@ extern "C" int linear_elasticity_tet4_apply_a_msoa_aos_unit(
 extern "C" int linear_elasticity_hex27_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -250,6 +254,8 @@ extern "C" int linear_elasticity_hex27_apply_a_msoa_team(
 extern "C" int linear_elasticity_hex8_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -276,6 +282,8 @@ extern "C" int linear_elasticity_hex8_apply_a_msoa_team(
 extern "C" int linear_elasticity_proteus_hex27_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -302,6 +310,8 @@ extern "C" int linear_elasticity_proteus_hex27_apply_a_msoa_team(
 extern "C" int linear_elasticity_proteus_hex8_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -328,6 +338,8 @@ extern "C" int linear_elasticity_proteus_hex8_apply_a_msoa_team(
 extern "C" int linear_elasticity_tet10_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -354,6 +366,8 @@ extern "C" int linear_elasticity_tet10_apply_a_msoa_team(
 extern "C" int linear_elasticity_tet4_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -877,6 +891,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_a_msoa_team(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -899,7 +915,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_2d_a_msoa_team(
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return linear_elasticity_tri3_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+      return linear_elasticity_tri3_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
     default:
       break;
   }
@@ -995,6 +1011,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_a_msoa_team(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -1024,17 +1042,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_apply_3d_a_msoa_team(
           : real_type;
   switch (element_type) {
     case smesh::HEX27:
-      return linear_elasticity_hex27_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_hex27_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
-      return linear_elasticity_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX27:
-      return linear_elasticity_proteus_hex27_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_proteus_hex27_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
-      return linear_elasticity_proteus_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_proteus_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
-      return linear_elasticity_tet10_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_tet10_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET4:
-      return linear_elasticity_tet4_apply_a_msoa_team((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return linear_elasticity_tet4_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     default:
       break;
   }

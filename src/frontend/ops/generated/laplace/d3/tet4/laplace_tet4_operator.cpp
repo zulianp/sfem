@@ -877,6 +877,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_met0,
@@ -893,7 +895,7 @@ static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
 ) {
 
   #pragma omp for schedule(static)
-  for (ptrdiff_t element = 0; element < nelements; ++element) {
+  for (ptrdiff_t element = element_begin; element < element_end; ++element) {
     const idx_t ev0 = elements[0][element];
     const idx_t ev1 = elements[1][element];
     const idx_t ev2 = elements[2][element];
@@ -937,6 +939,8 @@ static SFEM_INLINE int laplace_tet4_apply_a_msoa_impl(
 extern "C" int laplace_tet4_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_met0,
@@ -953,10 +957,10 @@ extern "C" int laplace_tet4_apply_a_msoa_team(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+        return sfem::codegen::laplace_tet4_apply_a_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
     }
     default:
       break;
@@ -991,7 +995,7 @@ extern "C" int laplace_tet4_apply_a_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = laplace_tet4_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
+    const int err = laplace_tet4_apply_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;

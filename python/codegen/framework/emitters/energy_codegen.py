@@ -10,6 +10,7 @@ from codegen.framework.emitters.kernel_prologue import (
     resolve_kernel_constants,
 )
 from codegen.framework.plans.conventions import (
+    with_team_element_range,
     PREFIXES,
     abi_geometry_name,
     generated_include,
@@ -5042,11 +5043,14 @@ def _mesh_operator_parameters(
         )
     )
 
-    impl_params = (
-        tuple(base_params)
-        + tuple(material_params)
-        + tuple(field_params)
-        + tuple(output_params)
+    impl_params = tuple(
+        with_team_element_range(
+            tuple(base_params)
+            + tuple(material_params)
+            + tuple(field_params)
+            + tuple(output_params),
+            current_target(),
+        )
     )
     wrapper_params = tuple(
         param.replace("g_t", "geom_t").replace("g_t", "geom_t")

@@ -1109,6 +1109,8 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
@@ -1153,8 +1155,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bcurrent[NC * NS][VS];
     s_t bprevious[NC * NS][VS];
     s_t bdirection[NC * NS][VS];
@@ -1221,6 +1223,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_
 extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -1257,10 +1261,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_tea
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_impl<double, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_impl<float, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
     }
     default:
       break;
@@ -1315,7 +1319,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    const int err = mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;
@@ -1330,6 +1334,8 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1366,8 +1372,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q11<s_t>::q_weight();
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bcoordinates[3 * NS][VS];
     s_t badjugate_data[9][NQ * VS];
     s_t bdeterminant[NQ * VS];
@@ -1519,6 +1525,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_
 extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -1546,10 +1554,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_tea
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_impl<double>(nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, (const double *)u2_direction, out_stride, (double *)u0_out, (double *)u1_out, (double *)u2_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_impl<float>(nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, (const float *)u2_direction, out_stride, (float *)u0_out, (float *)u1_out, (float *)u2_out);
     }
     default:
       break;
@@ -1595,7 +1603,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    const int err = mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;

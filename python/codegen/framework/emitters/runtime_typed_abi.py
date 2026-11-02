@@ -24,7 +24,11 @@ now go through this module so the two boundaries cannot disagree about what a
 runtime-typed parameter looks like.
 """
 
-from codegen.framework.plans.conventions import ABI_TEAM_TAIL
+from codegen.framework.plans.conventions import (
+    ABI_TEAM_TAIL,
+    TEAM_ELEMENT_RANGE_PARAMETERS,
+    WHOLE_MESH_ELEMENT_RANGE,
+)
 from codegen.framework.targets import current_target
 
 import re
@@ -207,6 +211,10 @@ def _team_region_entry_point_lines(public_name, declared, indent, parameter_line
     in which every thread calls the `_team` twin.  The check comes first so a bad
     scalar is reported once rather than by every thread."""
     target = current_target()
+    # The twin of a kernel walking the mesh takes an element range; this name takes the mesh.
+    whole = dict(zip(TEAM_ELEMENT_RANGE_PARAMETERS, WHOLE_MESH_ELEMENT_RANGE))
+    forwarded = [whole.get(param, parameter_name(param)) for param in declared]
+    declared = [param for param in declared if param not in whole]
     lines = _entry_point_head(public_name, declared, parameter_lines)
     lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
     for scalar_type in RUNTIME_SCALAR_TYPES:
@@ -225,7 +233,7 @@ def _team_region_entry_point_lines(public_name, declared, indent, parameter_line
             % (
                 indent,
                 entry_point_name(public_name + ABI_TEAM_TAIL),
-                ", ".join(parameter_name(param) for param in declared),
+                ", ".join(forwarded),
             ),
             "%s  if (err != SFEM_SUCCESS) {" % indent,
             target.atomic_write_pragma(),

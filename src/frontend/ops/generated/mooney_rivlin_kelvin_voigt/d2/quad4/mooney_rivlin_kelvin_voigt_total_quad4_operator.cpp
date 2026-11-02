@@ -61,6 +61,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_
 extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -145,6 +147,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_a_
 extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -290,6 +294,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa(
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -317,7 +323,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa_tea
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_residual_i_maos(
@@ -410,6 +416,8 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_a_msoa(
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -441,7 +449,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_a_msoa_tea
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_a_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
 }
 
 extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_residual_a_msoa(

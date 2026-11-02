@@ -39,10 +39,12 @@ namespace {
         f->add_constraint(conds);
     }
 
-    int build_laplacian_function(const std::shared_ptr<sfem::Mesh> &mesh, std::shared_ptr<sfem::Function> &function) {
+    int build_laplacian_function(const std::shared_ptr<sfem::Mesh> &mesh,
+                                 std::shared_ptr<sfem::Function>   &function,
+                                 const char                        *op_name) {
         auto space   = sfem::FunctionSpace::create(mesh, 1);
         function     = sfem::Function::create(space);
-        auto laplace = sfem::create_op(space, "Laplacian", sfem::EXECUTION_SPACE_HOST);
+        auto laplace = sfem::create_op(space, op_name, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(laplace != nullptr);
         SFEM_TEST_ASSERT(laplace->initialize() == SFEM_SUCCESS);
         function->add_operator(laplace);
@@ -50,7 +52,7 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
-    int test_parallel_cg() {
+    int run_parallel_cg(const char *op_name) {
         auto comm = sfem::Communicator::world();
 
         bool verbose = smesh::Env::read("SFEM_VERBOSE", false);
@@ -71,7 +73,7 @@ namespace {
         }
 
         std::shared_ptr<sfem::Function> parallel_function;
-        SFEM_TEST_ASSERT(build_laplacian_function(parallel_mesh, parallel_function) == SFEM_TEST_SUCCESS);
+        SFEM_TEST_ASSERT(build_laplacian_function(parallel_mesh, parallel_function, op_name) == SFEM_TEST_SUCCESS);
 
         auto parallel_op = sfem::create_parallel_matrix_free_operator(parallel_function, nullptr, sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(parallel_op != nullptr);
@@ -106,11 +108,14 @@ namespace {
         parallel_cg->set_rtol(1e-10);
         parallel_cg->set_atol(1e-12);
 
+        double solve_seconds = 0;
         {
             comm->barrier();
             SFEM_TRACE_SCOPE("parallel_cg::apply");
+            const double tick = smesh::time_seconds();
             SFEM_TEST_ASSERT(parallel_cg->apply(parallel_rhs->data(), parallel_x->data()) == SFEM_SUCCESS);
             comm->barrier();
+            solve_seconds = smesh::time_seconds() - tick;
         }
 
         SFEM_TEST_ASSERT(parallel_cg->iterations() > 0);
@@ -126,22 +131,31 @@ namespace {
         const ptrdiff_t global_n_dofs = comm->sum(parallel_op->rows());
 
         if (comm->rank() == 0 && verbose) {
-            printf("ParallelCGTest: iterations=%d max_err=%g (nprocs=%d), ndofs=%ld\n",
+            printf("ParallelCGTest %s: iterations=%d max_err=%g (nprocs=%d), ndofs=%ld, %.4f s (%.1f us/it)\n",
+                   op_name,
                    parallel_cg->iterations(),
                    (double)global_err,
                    comm->size(),
-                   (ptrdiff_t)global_n_dofs);
+                   (ptrdiff_t)global_n_dofs,
+                   solve_seconds,
+                   1e6 * solve_seconds / std::max(1, parallel_cg->iterations()));
         }
 
         comm->barrier();
         return SFEM_TEST_SUCCESS;
     }
 
+    int test_parallel_cg() { return run_parallel_cg("Laplacian"); }
+
+    // The generated operator's team form under MPI (create_parallel_matrix_free_operator).
+    int test_parallel_cg_generated_laplace() { return run_parallel_cg("GeneratedLaplace"); }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_parallel_cg);
+    SFEM_RUN_TEST(test_parallel_cg_generated_laplace);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

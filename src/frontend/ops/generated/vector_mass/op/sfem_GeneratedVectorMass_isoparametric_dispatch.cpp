@@ -144,6 +144,8 @@ extern "C" int vector_mass_quad4_jacobian_action_i_msoa(
 extern "C" int vector_mass_proteus_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -158,6 +160,8 @@ extern "C" int vector_mass_proteus_quad4_jacobian_action_i_msoa_team(
 extern "C" int vector_mass_quad4_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -302,6 +306,8 @@ extern "C" int vector_mass_tet10_jacobian_action_i_msoa(
 extern "C" int vector_mass_hex27_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -318,6 +324,8 @@ extern "C" int vector_mass_hex27_jacobian_action_i_msoa_team(
 extern "C" int vector_mass_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -334,6 +342,8 @@ extern "C" int vector_mass_hex8_jacobian_action_i_msoa_team(
 extern "C" int vector_mass_proteus_hex27_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -350,6 +360,8 @@ extern "C" int vector_mass_proteus_hex27_jacobian_action_i_msoa_team(
 extern "C" int vector_mass_proteus_hex8_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -366,6 +378,8 @@ extern "C" int vector_mass_proteus_hex8_jacobian_action_i_msoa_team(
 extern "C" int vector_mass_tet10_jacobian_action_i_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -692,6 +706,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_jacobian_action_2d_i_msoa_t
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -709,9 +725,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_jacobian_action_2d_i_msoa_t
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return vector_mass_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+      return vector_mass_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
     case smesh::QUAD4:
-      return vector_mass_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+      return vector_mass_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
     default:
       break;
   }
@@ -795,6 +811,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_jacobian_action_3d_i_msoa_t
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -814,15 +832,15 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int vector_mass_jacobian_action_3d_i_msoa_t
           : real_type;
   switch (element_type) {
     case smesh::HEX27:
-      return vector_mass_hex27_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+      return vector_mass_hex27_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     case smesh::HEX8:
-      return vector_mass_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+      return vector_mass_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     case smesh::PROTEUS_HEX27:
-      return vector_mass_proteus_hex27_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+      return vector_mass_proteus_hex27_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     case smesh::PROTEUS_HEX8:
-      return vector_mass_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+      return vector_mass_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     case smesh::TET10:
-      return vector_mass_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+      return vector_mass_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
     default:
       break;
   }

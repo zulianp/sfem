@@ -553,7 +553,8 @@ _HEADER_TEAM_METHODS = {
     int team_apply(const Team &team,
                    const real_t *const x,
                    const real_t *const h,
-                   real_t *const out) override;""",
+                   real_t *const out,
+                   const ElementScope scope) override;""",
 }
 
 
@@ -567,8 +568,10 @@ def _hyperelastic_apply_head(op, team, publishes_inexact):
                       const real_t *const h,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%s::apply");""" % (op, op),
+            "apply_term_condition": "auto term = time_scheme_term(impl_->time_scheme)",
             "apply_term_call": "term->apply(x, h, out)",
             "apply_term_barrier": "",
+            "apply_domain_range": "",
             "apply_team_methods": "",
         }
     prepare_inexact = _TEAM_PREPARE_INEXACT[bool(publishes_inexact)]
@@ -576,15 +579,23 @@ def _hyperelastic_apply_head(op, team, publishes_inexact):
         "apply_head": """  int %s::team_apply(const Team &team,
                       const real_t *const x,
                       const real_t *const h,
-                      real_t *const out) {""" % op,
-        "apply_term_call": "term->team_apply(team, x, h, out)",
+                      real_t *const out,
+                      const ElementScope scope) {""" % op,
+        # The inertia is nodal: applied once, with the elements away from the interface.
+        "apply_term_condition": (
+            "auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA"
+        ),
+        "apply_term_call": "term->team_apply(team, x, h, out, scope)",
         "apply_term_barrier": "\n      team.barrier();",
+        "apply_domain_range": "\n      const ElementRange range = element_range(*mesh, *domain.block, scope);",
         "apply_team_methods": """
   int %(op)s::apply(const real_t *const x,
                       const real_t *const h,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
-    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) { return team_apply(team, x, h, out); });
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
   }
 
   bool %(op)s::team_supported() const {
@@ -619,6 +630,13 @@ _TEAM_PREPARE_INEXACT = {
 }
 
 
+#: What a team product adds to the plain one's calls: the domain's elements in the scope it
+#: was asked for (`ElementScope`), after the element count of a kernel walking the mesh;
+#: the packed traversal, which walks packs, only for the whole mesh.
+_TEAM_RANGE_ARGUMENTS = ("range.begin", "range.end")
+_TEAM_PACKED_GUARD = "scope == ElementScope::ALL && "
+
+
 def _team_product(plain, team, what):
     """Whether an operator's product is published for a team: its body with the `_team`
     twins (`team`) against the plain one.  The twins are found by name, and a missing name
@@ -628,6 +646,7 @@ def _team_product(plain, team, what):
     if team == plain:
         return False
     stripped = team.replace(ABI_TEAM_TAIL + "(", "(")
+    stripped = stripped.replace(", %s" % ", ".join(_TEAM_RANGE_ARGUMENTS), "").replace(_TEAM_PACKED_GUARD, "")
     if stripped != plain:
         import difflib
 
@@ -1217,7 +1236,7 @@ _INEXACT_APPLY_METHODS = {
 _INEXACT_TEAM_INERTIA = {
     False: "",
     True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->team_apply(team, impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+      if (term->team_apply(team, impl_->inexact.state, h, out, ElementScope::ALL) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
       team.barrier();
@@ -1955,14 +1974,14 @@ namespace sfem {
   }
 
 %(apply_head)s
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
+    if (%(apply_term_condition)s) {
       if (%(apply_term_call)s != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }%(apply_term_barrier)s
     }
     auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &domain) {%(apply_domain_range)s
       const geom_t *const *adjugate = nullptr;
 %(apply_adjugate_aos_declaration)s      const geom_t *determinant = nullptr;
 %(metric_declaration)s            if (%(apply_affine_condition)s) {
@@ -10912,6 +10931,9 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         current_args = ([str(n_components)] + ["x + %d" % d for d in range(n_components)]) if uses_current else []
         direction_args = ([str(n_components)] + ["h + %d" % d for d in range(n_components)]) if uses_direction else []
         output_args = [str(n_components)] + ["out + %d" % d for d in range(n_components)]
+        team = tail == ABI_TEAM_TAIL
+        element_range_args = list(_TEAM_RANGE_ARGUMENTS) if team else []
+        packed_guard = _TEAM_PACKED_GUARD if team else ""
         affine = "%s_apply_%dd_a_msoa%s" % (material_name, dim, tail)
         isop = "%s_apply_%dd_i_msoa%s" % (material_name, dim, tail)
         packed = "%s_apply_packed_%dd_i_msoa%s" % (material_name, dim, tail)
@@ -10933,7 +10955,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
             if _c_abi_function_exists(kernel_sources, packed_affine, public_only=True):
                 lines.extend(
                     [
-                        "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                        "%s    if (%simpl_->space->has_packed_mesh()) {" % (indent, packed_guard),
                         "%s      auto packed = impl_->space->packed_mesh();" % indent,
                         "%s      const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
                         "%s      if (packed_block >= 0) {" % indent,
@@ -10978,6 +11000,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "domain.element_type",
                             "real_type",
                             "domain.block->n_elements()",
+                            *element_range_args,
                             "mesh->n_nodes()",
                             "element_connectivity(domain)",
                             *_affine_geometry_call_args(kernel_sources, callee, dim),
@@ -10996,7 +11019,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         if _c_abi_function_exists(kernel_sources, packed, public_only=True):
             lines.extend(
                 [
-                    "%s  if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s  if (%simpl_->space->has_packed_mesh()) {" % (indent, packed_guard),
                     "%s    auto packed = impl_->space->packed_mesh();" % indent,
                     "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
                     "%s    if (packed_block >= 0) {" % indent,
@@ -11040,6 +11063,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "domain.element_type",
                             "real_type",
                             "domain.block->n_elements()",
+                            *element_range_args,
                             "mesh->n_nodes()",
                             "element_connectivity(domain)",
                             "points",

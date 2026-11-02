@@ -329,7 +329,9 @@ namespace sfem {
     int InertiaPotential::team_apply(const Team &team,
                                      const real_t *const,
                                      const real_t *const SFEM_RESTRICT h,
-                                     real_t *const SFEM_RESTRICT       out) {
+                                     real_t *const SFEM_RESTRICT       out,
+                                     const ElementScope                scope) {
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
         // out += alpha m h on the calling thread's rows, as apply's scal and xypaz compute it.
         const real_t *const SFEM_RESTRICT mass  = impl_->mass->data();
         const real_t                      alpha = impl_->alpha;
