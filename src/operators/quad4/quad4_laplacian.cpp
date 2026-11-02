@@ -2,15 +2,15 @@
 
 #include "quad4_laplacian_inline_cpu.hpp"
 
-int quad4_laplacian_apply(const ptrdiff_t                   nelements,
-                          const ptrdiff_t                   nnodes,
-                          idx_t **const SFEM_RESTRICT       elements,
-                          geom_t **const SFEM_RESTRICT      points,
-                          const real_t *const SFEM_RESTRICT u,
-                          real_t *const SFEM_RESTRICT       values) {
+int quad4_laplacian_apply_team(const ptrdiff_t                   nelements,
+                               const ptrdiff_t                   nnodes,
+                               idx_t **const SFEM_RESTRICT       elements,
+                               geom_t **const SFEM_RESTRICT      points,
+                               const real_t *const SFEM_RESTRICT u,
+                               real_t *const SFEM_RESTRICT       values) {
     (void)nnodes;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         const idx_t ev[4] = {elements[0][e], elements[1][e], elements[2][e], elements[3][e]};
         real_t      element_vector[4];
@@ -23,6 +23,26 @@ int quad4_laplacian_apply(const ptrdiff_t                   nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around quad4_laplacian_apply_team.
+int quad4_laplacian_apply(const ptrdiff_t                   nelements,
+                          const ptrdiff_t                   nnodes,
+                          idx_t **const SFEM_RESTRICT       elements,
+                          geom_t **const SFEM_RESTRICT      points,
+                          const real_t *const SFEM_RESTRICT u,
+                          real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = quad4_laplacian_apply_team(nelements, nnodes, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int quad4_laplacian_diag(const ptrdiff_t              nelements,
                          const ptrdiff_t              nnodes,

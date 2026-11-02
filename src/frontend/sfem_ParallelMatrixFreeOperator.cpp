@@ -4,16 +4,11 @@
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_logger.hpp"
-#include "smesh_env.hpp"
 #include "smesh_exchange.hpp"
 #include "smesh_mesh.hpp"
 
 #include <algorithm>
-#include <cstring>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 namespace sfem {
 
@@ -91,10 +86,6 @@ namespace sfem {
 
         real_t *const       x_mut       = const_cast<real_t *>(x);
         const real_t *const state_local = impl_->state ? impl_->state->data() : nullptr;
-        auto                mesh        = impl_->function->space()->mesh();
-
-        // SFEM_PARALLEL_MF_LEGACY=1: original blocking gather + full ALL apply (no ElementScope overlap).
-        const bool legacy = smesh::Env::read<int>("SFEM_PARALLEL_MF_LEGACY", 0) != 0;
 
         // -------------------------------------------------------------------------
         // DEVICE (not implemented): x/y are already on device (allocation-sized).
@@ -108,58 +99,20 @@ namespace sfem {
         // Prerequisites: device pack/unpack in Exchange; CUDA-aware MPI build.
         // -------------------------------------------------------------------------
 
+        // A function without a team form (create_parallel_matrix_free_operator takes the team
+        // one): the elements away from the interface while the ghost and aura values travel,
+        // then the others.
         std::fill(x_mut + impl_->owned_dofs, x_mut + impl_->local_dofs, real_t(0));
         std::fill(y, y + impl_->local_dofs, real_t(0));
-
-        if (legacy) {
-            if (impl_->exchange->gather(x_mut, impl_->block_size) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
-            return impl_->function->apply(state_local, x_mut, y);
-        }
 
         if (impl_->exchange->gather_begin(x_mut, impl_->block_size) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
-
-#ifdef _OPENMP
-        if (omp_get_max_threads() > 1) {
-            int err = SFEM_SUCCESS;
-#pragma omp parallel reduction(| : err)
-            {
-                const int tid = omp_get_thread_num();
-                const int nt  = omp_get_num_threads();
-                if (tid == 0) {
-                    if (impl_->exchange->gather_wait() != SFEM_SUCCESS) {
-                        err = SFEM_FAILURE;
-                    }
-                } else {
-                    const int  n_workers = nt - 1;
-                    const auto flat_chunk =
-                            static_chunk(count_block_elements(*mesh, ElementScope::OWNED_NOT_SHARED), tid - 1, n_workers);
-                    if (impl_->function->apply_scope_flat_range(
-                                state_local,
-                                x_mut,
-                                y,
-                                ElementScope::OWNED_NOT_SHARED,
-                                flat_chunk.begin,
-                                flat_chunk.end) != SFEM_SUCCESS) {
-                        err = SFEM_FAILURE;
-                    }
-                }
-            }
-            if (err != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
-        } else
-#endif
-        {
-            if (impl_->function->apply(state_local, x_mut, y, ElementScope::OWNED_NOT_SHARED) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
-            if (impl_->exchange->gather_wait() != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
+        if (impl_->function->apply(state_local, x_mut, y, ElementScope::OWNED_NOT_SHARED) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        if (impl_->exchange->gather_wait() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
         }
 
         if (impl_->function->apply(state_local, x_mut, y, ElementScope::SHARED_AND_AURA) != SFEM_SUCCESS) {

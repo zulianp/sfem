@@ -381,17 +381,6 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        /// Apply on a flat element subrange within @p scope (parallel overlap). Default: unsupported.
-        virtual int apply_scope_flat_range(const real_t *const /*x*/,
-                                           const real_t *const /*h*/,
-                                           real_t *const /*out*/,
-                                           const ElementScope /*scope*/,
-                                           const ptrdiff_t /*flat_begin*/,
-                                           const ptrdiff_t /*flat_end*/) {
-            SFEM_ERROR("%s does not support scoped flat-range apply\n", name());
-            return SFEM_FAILURE;
-        }
-
         /**
          * @brief Whether this operator's 0-form is a potential that may be summed.
          *
@@ -607,14 +596,6 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
         int value(const real_t * /*x*/, real_t *const /*out*/, const ElementScope) override { return SFEM_SUCCESS; }
-        int apply_scope_flat_range(const real_t *const /*x*/,
-                                   const real_t *const /*h*/,
-                                   real_t *const /*out*/,
-                                   const ElementScope /*scope*/,
-                                   const ptrdiff_t /*flat_begin*/,
-                                   const ptrdiff_t /*flat_end*/) override {
-            return SFEM_SUCCESS;
-        }
         std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
         std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> & /*space*/) override { return std::make_shared<NoOp>(); }
         bool                is_no_op() const override { return true; }

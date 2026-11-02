@@ -73,4 +73,8 @@ static inline void sfem_team_barrier(void) {
 }
 #endif
 
+/// The kernel `name` a dispatcher instantiated for a team calls: `name##_team` inside the caller's
+/// region (TEAM), `name` (one region around it) outside one. One switch serves both.
+#define SFEM_TEAM_KERNEL(TEAM, name) ((TEAM) ? name##_team : name)
+
 #endif  // SFEM_TEAM_H

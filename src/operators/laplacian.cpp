@@ -1,5 +1,7 @@
 #include "laplacian.hpp"
 
+#include "sfem_team.h"
+
 #include "tet10_laplacian.hpp"
 #include "tet4_laplacian.hpp"
 #include "tri3_laplacian.hpp"
@@ -94,23 +96,24 @@ int laplacian_assemble_value(smesh::ElemType                   element_type,
     return SFEM_FAILURE;
 }
 
-int laplacian_apply(smesh::ElemType                   element_type,
-                    const ptrdiff_t                   nelements,
-                    const ptrdiff_t                   nnodes,
-                    idx_t **const SFEM_RESTRICT       elements,
-                    geom_t **const SFEM_RESTRICT      points,
-                    const real_t *const SFEM_RESTRICT u,
-                    real_t *const SFEM_RESTRICT       values) {
+template <bool TEAM>
+static int laplacian_apply_dispatch(smesh::ElemType                   element_type,
+                                    const ptrdiff_t                   nelements,
+                                    const ptrdiff_t                   nnodes,
+                                    idx_t **const SFEM_RESTRICT       elements,
+                                    geom_t **const SFEM_RESTRICT      points,
+                                    const real_t *const SFEM_RESTRICT u,
+                                    real_t *const SFEM_RESTRICT       values) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
         if (smesh::is_hex_ss_family(element_type)) {
-            return sshex8_laplacian_apply(level, nelements, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, sshex8_laplacian_apply)(level, nelements, elements, points, u, values);
         }
         if (smesh::is_quad_ss_family(element_type)) {
-            return ssquad4_laplacian_apply(level, nelements, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, ssquad4_laplacian_apply)(level, nelements, elements, points, u, values);
         }
         if (smesh::is_tet_ss_family(element_type)) {
-            return sstet4_laplacian_apply_points(level, nelements, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, sstet4_laplacian_apply_points)(level, nelements, elements, points, u, values);
         }
 
         return laplacian_error_unsupported("laplacian_apply", element_type);
@@ -118,28 +121,28 @@ int laplacian_apply(smesh::ElemType                   element_type,
 
     switch (element_type) {
         case smesh::TRI3: {
-            return tri3_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tri3_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::TRI6: {
-            return tri6_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tri6_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::TET4: {
-            return tet4_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tet4_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::TET10: {
-            return tet10_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tet10_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::MACRO_TET4: {
-            return macro_tet4_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, macro_tet4_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::MACRO_TRI3: {
-            return macro_tri3_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, macro_tri3_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::HEX8: {
-            return hex8_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, hex8_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         case smesh::QUAD4: {
-            return quad4_laplacian_apply(nelements, nnodes, elements, points, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, quad4_laplacian_apply)(nelements, nnodes, elements, points, u, values);
         }
         default: {
             return laplacian_error_unsupported("laplacian_apply", element_type);
@@ -147,6 +150,26 @@ int laplacian_apply(smesh::ElemType                   element_type,
     }
 
     return SFEM_FAILURE;
+}
+
+int laplacian_apply(smesh::ElemType                   element_type,
+                    const ptrdiff_t                   nelements,
+                    const ptrdiff_t                   nnodes,
+                    idx_t **const SFEM_RESTRICT       elements,
+                    geom_t **const SFEM_RESTRICT      points,
+                    const real_t *const SFEM_RESTRICT u,
+                    real_t *const SFEM_RESTRICT       values) {
+    return laplacian_apply_dispatch<false>(element_type, nelements, nnodes, elements, points, u, values);
+}
+
+int laplacian_apply_team(smesh::ElemType                   element_type,
+                         const ptrdiff_t                   nelements,
+                         const ptrdiff_t                   nnodes,
+                         idx_t **const SFEM_RESTRICT       elements,
+                         geom_t **const SFEM_RESTRICT      points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT       values) {
+    return laplacian_apply_dispatch<true>(element_type, nelements, nnodes, elements, points, u, values);
 }
 
 int laplacian_assemble_gradient(smesh::ElemType                   element_type,
@@ -255,18 +278,23 @@ int laplacian_diag(smesh::ElemType              element_type,
     return SFEM_FAILURE;
 }
 
-int laplacian_apply_opt(smesh::ElemType                       element_type,
-                        const ptrdiff_t                       nelements,
-                        idx_t **const SFEM_RESTRICT           elements,
-                        const jacobian_t *const SFEM_RESTRICT fff,
-                        const real_t *const SFEM_RESTRICT     u,
-                        real_t *const SFEM_RESTRICT           values) {
+template <bool TEAM>
+static int laplacian_apply_opt_dispatch(smesh::ElemType                       element_type,
+                                        const ptrdiff_t                       nelements,
+                                        idx_t **const SFEM_RESTRICT           elements,
+                                        const jacobian_t *const SFEM_RESTRICT fff,
+                                        const real_t *const SFEM_RESTRICT     u,
+                                        real_t *const SFEM_RESTRICT           values) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
         if (smesh::is_hex_ss_family(element_type)) {
-            return affine_sshex8_laplacian_stencil_apply_fff(level, nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, affine_sshex8_laplacian_stencil_apply_fff)(level, nelements, elements, fff, u, values);
         }
         if (smesh::is_tet_ss_family(element_type)) {
+            // The stencil is built for the call: by every thread of a team it would be built,
+            // and applied, once per thread. A team takes a stencil built beforehand
+            // (sstet4_laplacian_apply_stencil_global_range).
+            if constexpr (TEAM) return laplacian_error_unsupported("laplacian_apply_opt_team", element_type);
             sstet4_laplacian_stencil_t *stencil = nullptr;
             int err = sstet4_laplacian_stencil_create(level, nelements, fff, &stencil);
             if (err != SFEM_SUCCESS) {
@@ -283,25 +311,25 @@ int laplacian_apply_opt(smesh::ElemType                       element_type,
 
     switch (element_type) {
         case smesh::TRI3: {
-            return tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tri3_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::TRI6: {
-            return tri6_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tri6_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::TET4: {
-            return tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tet4_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::HEX8: {
-            return hex8_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, hex8_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::TET10: {
-            return tet10_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, tet10_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::MACRO_TET4: {
-            return macro_tet4_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, macro_tet4_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         case smesh::MACRO_TRI3: {
-            return macro_tri3_laplacian_apply_opt(nelements, elements, fff, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, macro_tri3_laplacian_apply_opt)(nelements, elements, fff, u, values);
         }
         default: {
             return laplacian_error_unsupported("laplacian_apply_opt", element_type);
@@ -309,6 +337,24 @@ int laplacian_apply_opt(smesh::ElemType                       element_type,
     }
 
     return SFEM_FAILURE;
+}
+
+int laplacian_apply_opt(smesh::ElemType                       element_type,
+                        const ptrdiff_t                       nelements,
+                        idx_t **const SFEM_RESTRICT           elements,
+                        const jacobian_t *const SFEM_RESTRICT fff,
+                        const real_t *const SFEM_RESTRICT     u,
+                        real_t *const SFEM_RESTRICT           values) {
+    return laplacian_apply_opt_dispatch<false>(element_type, nelements, elements, fff, u, values);
+}
+
+int laplacian_apply_opt_team(smesh::ElemType                       element_type,
+                             const ptrdiff_t                       nelements,
+                             idx_t **const SFEM_RESTRICT           elements,
+                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const real_t *const SFEM_RESTRICT     u,
+                             real_t *const SFEM_RESTRICT           values) {
+    return laplacian_apply_opt_dispatch<true>(element_type, nelements, elements, fff, u, values);
 }
 
 int laplacian_crs_sym(smesh::ElemType                    element_type,

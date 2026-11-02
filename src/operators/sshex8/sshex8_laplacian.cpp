@@ -36,12 +36,12 @@ void print_matrix(int r, int c, const accumulator_t *const m) {
     }
 }
 
-int sshex8_laplacian_apply(const int                         level,
-                           const ptrdiff_t                   nelements,
-                           idx_t **const SFEM_RESTRICT       elements,
-                           geom_t **const SFEM_RESTRICT      points,
-                           const real_t *const SFEM_RESTRICT u,
-                           real_t *const SFEM_RESTRICT       values) {
+int sshex8_laplacian_apply_team(const int                         level,
+                                const ptrdiff_t                   nelements,
+                                idx_t **const SFEM_RESTRICT       elements,
+                                geom_t **const SFEM_RESTRICT      points,
+                                const real_t *const SFEM_RESTRICT u,
+                                real_t *const SFEM_RESTRICT       values) {
     const int nxe = sshex8_nxe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
@@ -62,7 +62,6 @@ int sshex8_laplacian_apply(const int                         level,
     const scalar_t *qz   = q6_z;
     const scalar_t *qw   = q6_w;
 
-#pragma omp parallel
     {
         // Allocation per thread
         scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
@@ -176,6 +175,26 @@ int sshex8_laplacian_apply(const int                         level,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sshex8_laplacian_apply_team.
+int sshex8_laplacian_apply(const int                         level,
+                           const ptrdiff_t                   nelements,
+                           idx_t **const SFEM_RESTRICT       elements,
+                           geom_t **const SFEM_RESTRICT      points,
+                           const real_t *const SFEM_RESTRICT u,
+                           real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_laplacian_apply_team(level, nelements, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int affine_sshex8_laplacian_apply(const int                         level,
                                   const ptrdiff_t                   nelements,
@@ -676,15 +695,14 @@ int sshex8_laplacian_element_matrix_cartesian(int                           leve
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
-                                              const ptrdiff_t                       nelements,
-                                              idx_t **const SFEM_RESTRICT           elements,
-                                              const jacobian_t *const SFEM_RESTRICT g_fff,
-                                              const real_t *const SFEM_RESTRICT     u,
-                                              real_t *const SFEM_RESTRICT           values) {
+int affine_sshex8_laplacian_stencil_apply_fff_team(const int                             level,
+                                                   const ptrdiff_t                       nelements,
+                                                   idx_t **const SFEM_RESTRICT           elements,
+                                                   const jacobian_t *const SFEM_RESTRICT g_fff,
+                                                   const real_t *const SFEM_RESTRICT     u,
+                                                   real_t *const SFEM_RESTRICT           values) {
     const int nxe = sshex8_nxe(level);
 
-#pragma omp parallel
     {
         // Allocation per thread
         scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
@@ -742,6 +760,26 @@ int affine_sshex8_laplacian_stencil_apply_fff(const int                         
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around affine_sshex8_laplacian_stencil_apply_fff_team.
+int affine_sshex8_laplacian_stencil_apply_fff(const int                             level,
+                                              const ptrdiff_t                       nelements,
+                                              idx_t **const SFEM_RESTRICT           elements,
+                                              const jacobian_t *const SFEM_RESTRICT g_fff,
+                                              const real_t *const SFEM_RESTRICT     u,
+                                              real_t *const SFEM_RESTRICT           values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = affine_sshex8_laplacian_stencil_apply_fff_team(level, nelements, elements, g_fff, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int affine_sshex8_laplacian_substructuring_inner_fff(const int                             level,
                                                      const ptrdiff_t                       nelements,

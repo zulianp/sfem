@@ -273,14 +273,6 @@ namespace sfem {
     private:
         friend class ParallelMatrixFreeOperator;
 
-        /// Flat subrange within @p scope (parallel overlap); block layout resolved inside ops.
-        int apply_scope_flat_range(const real_t *const x,
-                                   const real_t *const h,
-                                   real_t *const       out,
-                                   const ElementScope  scope,
-                                   const ptrdiff_t     flat_begin,
-                                   const ptrdiff_t     flat_end);
-
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

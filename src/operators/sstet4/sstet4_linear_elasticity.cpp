@@ -274,19 +274,19 @@ static void sstet4_linear_elasticity_stencil_free_members(sstet4_linear_elastici
     stencil->weights         = nullptr;
 }
 
-int sstet4_linear_elasticity_apply_points(const int                         level,
-                                          const ptrdiff_t                   nelements,
-                                          idx_t **const SFEM_RESTRICT       elements,
-                                          geom_t **const SFEM_RESTRICT      points,
-                                          const real_t                      mu,
-                                          const real_t                      lambda,
-                                          const real_t *const SFEM_RESTRICT u,
-                                          real_t *const SFEM_RESTRICT       values) {
+int sstet4_linear_elasticity_apply_points_team(const int                         level,
+                                               const ptrdiff_t                   nelements,
+                                               idx_t **const SFEM_RESTRICT       elements,
+                                               geom_t **const SFEM_RESTRICT      points,
+                                               const real_t                      mu,
+                                               const real_t                      lambda,
+                                               const real_t *const SFEM_RESTRICT u,
+                                               real_t *const SFEM_RESTRICT       values) {
     if (!elements || !points || !u || !values || level < 1 || nelements < 0) {
         return SFEM_FAILURE;
     }
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         smesh::sstet4_transfer::for_each_microtet(level, [&](const int *const lev) {
             const idx_t   gv[4] = {elements[lev[0]][e], elements[lev[1]][e], elements[lev[2]][e], elements[lev[3]][e]};
@@ -331,6 +331,28 @@ int sstet4_linear_elasticity_apply_points(const int                         leve
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sstet4_linear_elasticity_apply_points_team.
+int sstet4_linear_elasticity_apply_points(const int                         level,
+                                          const ptrdiff_t                   nelements,
+                                          idx_t **const SFEM_RESTRICT       elements,
+                                          geom_t **const SFEM_RESTRICT      points,
+                                          const real_t                      mu,
+                                          const real_t                      lambda,
+                                          const real_t *const SFEM_RESTRICT u,
+                                          real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sstet4_linear_elasticity_apply_points_team(level, nelements, elements, points, mu, lambda, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int sstet4_linear_elasticity_diag_points(const int                    level,
                                          const ptrdiff_t              nelements,

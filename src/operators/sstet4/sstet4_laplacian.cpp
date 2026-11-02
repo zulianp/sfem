@@ -827,13 +827,13 @@ static SFEM_INLINE void sstet4_for_each_microtet_fff(const int                  
     }
 }
 
-int sstet4_laplacian_apply_points(const int                         level,
-                                  const ptrdiff_t                   nelements,
-                                  idx_t **const SFEM_RESTRICT       elements,
-                                  geom_t **const SFEM_RESTRICT      points,
-                                  const real_t *const SFEM_RESTRICT u,
-                                  real_t *const SFEM_RESTRICT       values) {
-#pragma omp parallel for schedule(static)
+int sstet4_laplacian_apply_points_team(const int                         level,
+                                       const ptrdiff_t                   nelements,
+                                       idx_t **const SFEM_RESTRICT       elements,
+                                       geom_t **const SFEM_RESTRICT      points,
+                                       const real_t *const SFEM_RESTRICT u,
+                                       real_t *const SFEM_RESTRICT       values) {
+#pragma omp for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         smesh::sstet4_transfer::for_each_microtet(level, [&](const int *const lev) {
             idx_t gv[4] = {elements[lev[0]][e], elements[lev[1]][e], elements[lev[2]][e], elements[lev[3]][e]};
@@ -862,6 +862,26 @@ int sstet4_laplacian_apply_points(const int                         level,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sstet4_laplacian_apply_points_team.
+int sstet4_laplacian_apply_points(const int                         level,
+                                  const ptrdiff_t                   nelements,
+                                  idx_t **const SFEM_RESTRICT       elements,
+                                  geom_t **const SFEM_RESTRICT      points,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sstet4_laplacian_apply_points_team(level, nelements, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int sstet4_laplacian_diag_points(const int                    level,
                                  const ptrdiff_t              nelements,
@@ -1156,12 +1176,12 @@ int sstet4_laplacian_apply_stencil_global_vectorized(const sstet4_laplacian_sten
     return sstet4_laplacian_apply_stencil_global_range_vectorized(stencil, 0, nelements, elements, u, values);
 }
 
-int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t *const stencil,
-                                                const ptrdiff_t                         element_offset,
-                                                const ptrdiff_t                         nelements,
-                                                idx_t **const SFEM_RESTRICT             elements,
-                                                const real_t *const SFEM_RESTRICT       u,
-                                                real_t *const SFEM_RESTRICT             values) {
+int sstet4_laplacian_apply_stencil_global_range_team(const sstet4_laplacian_stencil_t *const stencil,
+                                                     const ptrdiff_t                         element_offset,
+                                                     const ptrdiff_t                         nelements,
+                                                     idx_t **const SFEM_RESTRICT             elements,
+                                                     const real_t *const SFEM_RESTRICT       u,
+                                                     real_t *const SFEM_RESTRICT             values) {
     if (!stencil || !elements || !u || !values || element_offset < 0 || nelements < 0 ||
         element_offset + nelements > stencil->nelements) {
         return SFEM_FAILURE;
@@ -1170,7 +1190,7 @@ int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t
     const int nxe          = stencil->nrows;
     const int stencil_size = nxe * SSTET4_LAPLACIAN_MAX_STENCIL;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         const scalar_t *const stencil_weights =
                 &stencil->weights[stencil->element_stencil[element_offset + e] * stencil_size];
@@ -1191,6 +1211,26 @@ int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sstet4_laplacian_apply_stencil_global_range_team.
+int sstet4_laplacian_apply_stencil_global_range(const sstet4_laplacian_stencil_t *const stencil,
+                                                const ptrdiff_t                         element_offset,
+                                                const ptrdiff_t                         nelements,
+                                                idx_t **const SFEM_RESTRICT             elements,
+                                                const real_t *const SFEM_RESTRICT       u,
+                                                real_t *const SFEM_RESTRICT             values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sstet4_laplacian_apply_stencil_global_range_team(stencil, element_offset, nelements, elements, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int sstet4_laplacian_apply_stencil_global_range_vectorized(const sstet4_laplacian_stencil_t *const stencil,
                                                            const ptrdiff_t                         element_offset,

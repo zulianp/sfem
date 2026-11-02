@@ -72,20 +72,20 @@ static const scalar_t *hex8_q2_weight_1d() {
 
 }  // namespace
 
-int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
-                                 const ptrdiff_t              nnodes,
-                                 idx_t **const SFEM_RESTRICT  elements,
-                                 geom_t **const SFEM_RESTRICT points,
-                                 const real_t                 mu,
-                                 const real_t                 lambda,
-                                 const ptrdiff_t              u_stride,
-                                 const real_t *const          ux,
-                                 const real_t *const          uy,
-                                 const real_t *const          uz,
-                                 const ptrdiff_t              out_stride,
-                                 real_t *const                outx,
-                                 real_t *const                outy,
-                                 real_t *const                outz) {
+int hex8_linear_elasticity_apply_team(const ptrdiff_t              nelements,
+                                      const ptrdiff_t              nnodes,
+                                      idx_t **const SFEM_RESTRICT  elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t                 mu,
+                                      const real_t                 lambda,
+                                      const ptrdiff_t              u_stride,
+                                      const real_t *const          ux,
+                                      const real_t *const          uy,
+                                      const real_t *const          uz,
+                                      const ptrdiff_t              out_stride,
+                                      real_t *const                outx,
+                                      real_t *const                outy,
+                                      real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     int SFEM_HEX8_QUADRATURE_ORDER = 2;
@@ -106,7 +106,7 @@ int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
             qw   = line_q6_w;
         }
 
-#pragma omp parallel for
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t         ev[8];
             scalar_t      element_ux[8];
@@ -193,7 +193,7 @@ int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
     const geom_t *const SFEM_RESTRICT y = points[1];
     const geom_t *const SFEM_RESTRICT z = points[2];
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
 
@@ -311,6 +311,34 @@ int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_linear_elasticity_apply_team.
+int hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 const real_t                 mu,
+                                 const real_t                 lambda,
+                                 const ptrdiff_t              u_stride,
+                                 const real_t *const          ux,
+                                 const real_t *const          uy,
+                                 const real_t *const          uz,
+                                 const ptrdiff_t              out_stride,
+                                 real_t *const                outx,
+                                 real_t *const                outy,
+                                 real_t *const                outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_linear_elasticity_apply_team(nelements, nnodes, elements, points, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int affine_hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
                                         const ptrdiff_t              nnodes,
@@ -444,21 +472,21 @@ int affine_hex8_linear_elasticity_apply(const ptrdiff_t              nelements,
     return SFEM_SUCCESS;
 }
 
-int affine_hex8_linear_elasticity_apply_adjugate(const ptrdiff_t                       nelements,
-                                                 const ptrdiff_t                       nnodes,
-                                                 idx_t **const SFEM_RESTRICT           elements,
-                                                 const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
-                                                 const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
-                                                 const real_t                          mu,
-                                                 const real_t                          lambda,
-                                                 const ptrdiff_t                       u_stride,
-                                                 const real_t *const                   ux,
-                                                 const real_t *const                   uy,
-                                                 const real_t *const                   uz,
-                                                 const ptrdiff_t                       out_stride,
-                                                 real_t *const                         outx,
-                                                 real_t *const                         outy,
-                                                 real_t *const                         outz) {
+int affine_hex8_linear_elasticity_apply_adjugate_team(const ptrdiff_t                       nelements,
+                                                      const ptrdiff_t                       nnodes,
+                                                      idx_t **const SFEM_RESTRICT           elements,
+                                                      const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+                                                      const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+                                                      const real_t                          mu,
+                                                      const real_t                          lambda,
+                                                      const ptrdiff_t                       u_stride,
+                                                      const real_t *const                   ux,
+                                                      const real_t *const                   uy,
+                                                      const real_t *const                   uz,
+                                                      const ptrdiff_t                       out_stride,
+                                                      real_t *const                         outx,
+                                                      real_t *const                         outy,
+                                                      real_t *const                         outz) {
     SFEM_UNUSED(nnodes);
 
     const Hex8AffineQ2GradTable *const table = hex8_affine_q2_grad_table();
@@ -466,7 +494,7 @@ int affine_hex8_linear_elasticity_apply_adjugate(const ptrdiff_t                
     const scalar_t                     mu_s  = (scalar_t)mu;
     const scalar_t                     lambda_s = (scalar_t)lambda;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t e0 = 0; e0 < nelements; e0 += VS) {
         const int ne = (int)MIN((ptrdiff_t)VS, nelements - e0);
 
@@ -611,21 +639,50 @@ int affine_hex8_linear_elasticity_apply_adjugate(const ptrdiff_t                
     return SFEM_SUCCESS;
 }
 
-int affine_hex8_linear_elasticity_apply_adjugate_soa(const ptrdiff_t                              nelements,
-                                                     const ptrdiff_t                              nnodes,
-                                                     idx_t **const SFEM_RESTRICT                  elements,
-                                                     const jacobian_t *const SFEM_RESTRICT *const adjugate,
-                                                     const geom_t *const SFEM_RESTRICT            jacobian_determinant,
-                                                     const real_t                                 mu,
-                                                     const real_t                                 lambda,
-                                                     const ptrdiff_t                              u_stride,
-                                                     const real_t *const                          ux,
-                                                     const real_t *const                          uy,
-                                                     const real_t *const                          uz,
-                                                     const ptrdiff_t                              out_stride,
-                                                     real_t *const                                outx,
-                                                     real_t *const                                outy,
-                                                     real_t *const                                outz) {
+// The plain entry point: one region around affine_hex8_linear_elasticity_apply_adjugate_team.
+int affine_hex8_linear_elasticity_apply_adjugate(const ptrdiff_t                       nelements,
+                                                 const ptrdiff_t                       nnodes,
+                                                 idx_t **const SFEM_RESTRICT           elements,
+                                                 const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+                                                 const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+                                                 const real_t                          mu,
+                                                 const real_t                          lambda,
+                                                 const ptrdiff_t                       u_stride,
+                                                 const real_t *const                   ux,
+                                                 const real_t *const                   uy,
+                                                 const real_t *const                   uz,
+                                                 const ptrdiff_t                       out_stride,
+                                                 real_t *const                         outx,
+                                                 real_t *const                         outy,
+                                                 real_t *const                         outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = affine_hex8_linear_elasticity_apply_adjugate_team(nelements, nnodes, elements, g_jacobian_adjugate, g_jacobian_determinant, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
+
+int affine_hex8_linear_elasticity_apply_adjugate_soa_team(const ptrdiff_t                              nelements,
+                                                          const ptrdiff_t                              nnodes,
+                                                          idx_t **const SFEM_RESTRICT                  elements,
+                                                          const jacobian_t *const SFEM_RESTRICT *const adjugate,
+                                                          const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                                          const real_t                                 mu,
+                                                          const real_t                                 lambda,
+                                                          const ptrdiff_t                              u_stride,
+                                                          const real_t *const                          ux,
+                                                          const real_t *const                          uy,
+                                                          const real_t *const                          uz,
+                                                          const ptrdiff_t                              out_stride,
+                                                          real_t *const                                outx,
+                                                          real_t *const                                outy,
+                                                          real_t *const                                outz) {
     SFEM_UNUSED(nnodes);
 
     // VTK HEX8 → proteus/tensor lexicographic node order used by sum-factorization.
@@ -653,7 +710,7 @@ int affine_hex8_linear_elasticity_apply_adjugate_soa(const ptrdiff_t            
     const jacobian_t *const SFEM_RESTRICT adj7 = adjugate[7];
     const jacobian_t *const SFEM_RESTRICT adj8 = adjugate[8];
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
 
@@ -774,6 +831,35 @@ int affine_hex8_linear_elasticity_apply_adjugate_soa(const ptrdiff_t            
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around affine_hex8_linear_elasticity_apply_adjugate_soa_team.
+int affine_hex8_linear_elasticity_apply_adjugate_soa(const ptrdiff_t                              nelements,
+                                                     const ptrdiff_t                              nnodes,
+                                                     idx_t **const SFEM_RESTRICT                  elements,
+                                                     const jacobian_t *const SFEM_RESTRICT *const adjugate,
+                                                     const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                                     const real_t                                 mu,
+                                                     const real_t                                 lambda,
+                                                     const ptrdiff_t                              u_stride,
+                                                     const real_t *const                          ux,
+                                                     const real_t *const                          uy,
+                                                     const real_t *const                          uz,
+                                                     const ptrdiff_t                              out_stride,
+                                                     real_t *const                                outx,
+                                                     real_t *const                                outy,
+                                                     real_t *const                                outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = affine_hex8_linear_elasticity_apply_adjugate_soa_team(nelements, nnodes, elements, adjugate, jacobian_determinant, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int affine_hex8_linear_elasticity_bsr(const ptrdiff_t                    nelements,
                                       const ptrdiff_t                    nnodes,
