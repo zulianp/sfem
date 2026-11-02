@@ -42,9 +42,11 @@ namespace sfem {
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
 
+        /// A distributed operator makes the solve distributed (SolveSpan).
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
             op_            = op;
+            span_          = SolveSpan<T>::of(*op);
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>& op) override {
@@ -99,7 +101,7 @@ namespace sfem {
         bool hit_max_it() const { return iterations_ >= max_it; }
 
         void monitor(const int iter, const T residual, const T residual0) {
-            if (!verbose) return;
+            if (!verbose || !span_.root()) return;
             const T rel = (residual0 > 0) ? (residual / residual0) : residual;
             if (iter == max_it || iter % 100 == 0 || converged(residual, residual0)) {
                 std::cout << iter << ": residual abs: " << residual << ", rel: " << rel << " (rtol = " << rtol
@@ -120,7 +122,10 @@ namespace sfem {
             const bool precond = left_preconditioner_op || right_preconditioner_op;
 
             T* w[7];
-            for (auto& v : w) v = blas->allocate(n);
+            for (auto& v : w) {
+                v = blas->allocate(span_.size(n));
+                blas->zeros(span_.size(n), v);
+            }
 
             auto team_op   = std::dynamic_pointer_cast<TeamOperator<T>>(op_);
             auto team_prec = std::dynamic_pointer_cast<TeamOperator<T>>(prec_);
@@ -131,14 +136,14 @@ namespace sfem {
                 T* const buffer = team_reduction_buffer(team_sums_, n);
 #pragma omp parallel
                 {
-                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n));
+                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n), span_.ranks());
                     const Team          team = team_op->team();
                     TeamExec<T>         e(team, sums);
                     const int r = precond ? run_precond(e, *team_op, *team_prec, b, x, w) : run_basic(e, *team_op, b, x, w);
                     if (team.leader()) info = r;
                 }
             } else {
-                BlasExec<T> e(*blas, n);
+                BlasExec<T> e(*blas, n, span_.allocation, span_.ranks());
                 info = precond ? run_precond(e, apply_op, right_preconditioner_op, b, x, w) : run_basic(e, apply_op, b, x, w);
             }
 
@@ -161,6 +166,7 @@ namespace sfem {
     private:
         std::shared_ptr<Operator<T>> op_, prec_;
         std::vector<T>               team_sums_;
+        SolveSpan<T>                 span_;
 
         template <class E>
         void say(E& e, const int iter, const T residual, const T residual0) {
