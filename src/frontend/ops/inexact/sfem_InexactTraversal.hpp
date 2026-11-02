@@ -16,12 +16,15 @@
 namespace sfem {
     namespace inexact {
 
-        /// Unordered traversal, atomic scatter: `out += A h` over the elements of one block. The
-        /// threads write anywhere, so it ends on a barrier.
+        /// Unordered traversal, atomic scatter: `out += A h` over the elements [element_begin,
+        /// element_end) of one block. The threads share its store blocks (VS elements each); a
+        /// block the range cuts is walked in the part inside it. The threads write anywhere, so it
+        /// ends on a barrier.
         template <class Store, typename tau>
         void team_apply_atomic(const Team               &team,
                                const Store              &st,
-                               const ptrdiff_t           nelements,
+                               const ptrdiff_t           element_begin,
+                               const ptrdiff_t           element_end,
                                const idx_t *const *const elements,
                                const ptrdiff_t           stride,
                                const real_t *const RSTR  h,
@@ -31,10 +34,13 @@ namespace sfem {
             static constexpr int N  = El::N;
             static constexpr int D  = El::DIM;
 
-            ptrdiff_t first, last;
-            team.share(nelements, VS, &first, &last);
-            for (ptrdiff_t evb = first; evb < last; evb += VS) {
-                const int ne = (int)std::min<ptrdiff_t>(VS, nelements - evb);
+            const ptrdiff_t block0 = element_begin / VS;
+            ptrdiff_t       first, last;
+            team.share(element_end > element_begin ? (element_end + VS - 1) / VS - block0 : 0, 1, &first, &last);
+            first = std::max(element_begin, (block0 + first) * VS);
+            last  = std::min(element_end, (block0 + last) * VS);
+            for (ptrdiff_t evb = first; evb < last; evb = (evb / VS + 1) * VS) {
+                const int ne = (int)(std::min<ptrdiff_t>((evb / VS + 1) * VS, last) - evb);
                 idx_t     bev[N][VS];
                 real_t    bh[D][N][VS];
                 for (int s = 0; s < N; ++s) {

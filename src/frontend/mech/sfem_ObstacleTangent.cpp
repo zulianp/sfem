@@ -145,10 +145,13 @@ namespace sfem {
                 if (auto material_team = std::dynamic_pointer_cast<TeamOperator<real_t>>(material)) {
                     // Each thread zeroes its rows and, once all have (the material writes anyone's),
                     // adds the material's product; the curvature and the shift are its own rows.
-                    team_product = make_team_op<real_t>(
+                    // Distributed, the rows are the owned ones and the vectors span the local dofs.
+                    auto            parallel = std::dynamic_pointer_cast<ParallelOperator<real_t>>(material);
+                    const ptrdiff_t rows     = parallel ? parallel->rows() : ndofs;
+                    team_product             = make_team_op<real_t>(
                             f->space()->mesh()->comm(),
-                            ndofs,
-                            ndofs,
+                            rows,
+                            rows,
                             ndofs,
                             ndofs,
                             false,
@@ -229,8 +232,8 @@ namespace sfem {
                        op_type::MATRIX_FREE);
             return nullptr;
         }
-        if (f->space()->mesh()->comm()->size() > 1) {
-            SFEM_ERROR("ObstacleTangent: format %s runs on one process; use %s\n", options.format.c_str(), op_type::BSR);
+        if (f->space()->mesh()->comm()->size() > 1 && es != EXECUTION_SPACE_HOST) {
+            SFEM_ERROR("ObstacleTangent: format %s runs distributed on the host only; use %s\n", options.format.c_str(), op_type::BSR);
             return nullptr;
         }
         if (options.format == op_type::INEXACT) {

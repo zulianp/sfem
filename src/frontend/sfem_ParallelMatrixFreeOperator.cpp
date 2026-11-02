@@ -183,69 +183,46 @@ namespace sfem {
 
     std::ptrdiff_t ParallelMatrixFreeOperator::col_allocation_size() const { return impl_->local_dofs; }
 
-    namespace {
+    std::shared_ptr<ParallelOperator<real_t>> create_distributed_team_operator(const std::shared_ptr<Function> &function,
+                                                                               ScopedTeamApply                  apply,
+                                                                               std::function<int()>             prepare) {
+        auto space = function->space();
+        auto mesh  = space->mesh();
+        auto dist  = mesh->distributed();
+        assert_mesh_supports_distributed_element_scopes(*mesh);
 
-        /// y += A x on the owned rows of a distributed mesh, by the threads of the caller's region,
-        /// A over every local element (aura included, so that the owned rows need no reduction).
-        /// Thread 0 sends x's owned values and posts the receives of its ghost and aura values,
-        /// the team applies the elements away from the interface, thread 0 waits for the
-        /// messages, and once every thread sees them the team applies the others. The state's
-        /// ghost and aura values are gathered before each solve's region (prepare).
-        std::shared_ptr<ParallelOperator<real_t>> distributed_team_matrix_free_operator(const std::shared_ptr<Function> &function,
-                                                                                        const std::shared_ptr<Buffer<real_t>> &state) {
-            auto space = function->space();
-            auto mesh  = space->mesh();
-            auto dist  = mesh->distributed();
-            assert_mesh_supports_distributed_element_scopes(*mesh);
-
-            const int       bs       = space->block_size();
-            const ptrdiff_t owned    = dist->n_nodes_owned() * bs;
-            const ptrdiff_t local    = dist->n_nodes_local() * bs;
-            auto            exchange = smesh::Exchange::create_nodal(mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
-            if (state && state->size() != static_cast<size_t>(local)) {
-                SFEM_ERROR("create_parallel_matrix_free_operator: state size %ld != col_allocation_size %ld "
-                           "(owned+ghosts+aura)\n",
-                           (long)state->size(),
-                           (long)local);
-                return nullptr;
-            }
-
-            return make_team_op<real_t>(
-                    mesh->comm(),
-                    owned,
-                    owned,
-                    local,
-                    local,
-                    false,
-                    [=](const Team &team, const real_t *const x, real_t *const y) {
-                        real_t *const       x_mut = const_cast<real_t *>(x);
-                        const real_t *const s     = state ? state->data() : nullptr;
-                        if (team.tid == 0) {
-                            // The rows beyond the owned ones are scratch: the scatter adds into them.
-                            std::fill(x_mut + owned, x_mut + local, real_t(0));
-                            std::fill(y + owned, y + local, real_t(0));
-                            if (exchange->gather_begin(x_mut, bs) != SFEM_SUCCESS) {
-                                SFEM_ERROR("ParallelMatrixFreeOperator: the gather of x did not start\n");
-                            }
+        const int       bs    = space->block_size();
+        const ptrdiff_t owned = dist->n_nodes_owned() * bs;
+        const ptrdiff_t local = dist->n_nodes_local() * bs;
+        return make_team_op<real_t>(
+                mesh->comm(),
+                owned,
+                owned,
+                local,
+                local,
+                false,
+                [=](const Team &team, const real_t *const x, real_t *const y) {
+                    real_t *const x_mut = const_cast<real_t *>(x);
+                    if (team.tid == 0) {
+                        // The rows beyond the owned ones are scratch: the scatter adds into them.
+                        std::fill(y + owned, y + local, real_t(0));
+                        if (space->synchronize_begin(x_mut, EXECUTION_SPACE_HOST) != SFEM_SUCCESS) {
+                            SFEM_ERROR("distributed team operator: the gather of x did not start\n");
                         }
-                        team.barrier();
-                        function->team_apply(team, s, x, y, ElementScope::OWNED_NOT_SHARED);
-                        if (team.tid == 0 && exchange->gather_wait() != SFEM_SUCCESS) {
-                            SFEM_ERROR("ParallelMatrixFreeOperator: the gather of x did not complete\n");
-                        }
-                        team.barrier();
-                        function->team_apply(team, s, x, y, ElementScope::SHARED_AND_AURA);
-                        team.barrier();
-                        function->team_copy_constrained_dofs(team, x, y);
-                    },
-                    [=] {
-                        const int err = function->team_prepare();
-                        if (err != SFEM_SUCCESS || !state) return err;
-                        return exchange->gather(state->data(), bs);
-                    });
-        }
+                    }
+                    team.barrier();
+                    apply(team, x, y, ElementScope::OWNED_NOT_SHARED);
+                    if (team.tid == 0 && space->synchronize_end(EXECUTION_SPACE_HOST) != SFEM_SUCCESS) {
+                        SFEM_ERROR("distributed team operator: the gather of x did not complete\n");
+                    }
+                    team.barrier();
+                    apply(team, x, y, ElementScope::SHARED_AND_AURA);
+                    team.barrier();
+                    function->team_copy_constrained_dofs(team, x, y);
+                },
+                std::move(prepare));
+    }
 
-    }  // namespace
 
     std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(const std::shared_ptr<Function> &function,
                                                                                    const std::shared_ptr<Buffer<real_t>> &state,
@@ -254,7 +231,22 @@ namespace sfem {
         auto mesh  = space->mesh();
 
         if (mesh->comm()->size() > 1 && execution_space == EXECUTION_SPACE_HOST && function->team_supported()) {
-            return distributed_team_matrix_free_operator(function, state);
+            if (state && state->size() != static_cast<size_t>(mesh->distributed()->n_nodes_local() * space->block_size())) {
+                SFEM_ERROR("create_parallel_matrix_free_operator: state size %ld != col_allocation_size (owned+ghosts+aura)\n",
+                           (long)state->size());
+                return nullptr;
+            }
+            // The state's ghost and aura values, gathered before each solve's region.
+            return create_distributed_team_operator(
+                    function,
+                    [function, state](const Team &team, const real_t *const x, real_t *const y, const ElementScope scope) {
+                        function->team_apply(team, state ? state->data() : nullptr, x, y, scope);
+                    },
+                    [function, state, space] {
+                        const int err = function->team_prepare();
+                        if (err != SFEM_SUCCESS || !state) return err;
+                        return space->synchronize(state->data(), EXECUTION_SPACE_HOST);
+                    });
         }
 
         if (mesh->comm()->size() == 1 && execution_space == EXECUTION_SPACE_HOST && function->team_supported()) {

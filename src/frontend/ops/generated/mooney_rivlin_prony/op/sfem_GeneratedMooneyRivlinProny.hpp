@@ -67,7 +67,10 @@ namespace sfem {
     int inexact_apply(const real_t *const h, real_t *const out) override;
     std::size_t inexact_bytes() const override;
     int inexact_diag(real_t *const diag) override;
-    int team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) override;
+    int team_inexact_apply(const Team &team,
+                           const real_t *const h,
+                           real_t *const out,
+                           const ElementScope scope) override;
     void begin_step(const real_t t, const real_t dt) override;
     void advance(const real_t *const x) override;
     void reset_history(const real_t *const x) override;

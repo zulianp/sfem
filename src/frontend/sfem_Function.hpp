@@ -177,7 +177,10 @@ namespace sfem {
                        const ElementScope  scope = ElementScope::ALL);
         /// copy_constrained_dofs on the calling thread's rows.
         void team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest);
-        int team_inexact_apply(const Team &team, const real_t *const h, real_t *const out);
+        int team_inexact_apply(const Team         &team,
+                               const real_t *const h,
+                               real_t *const       out,
+                               const ElementScope  scope = ElementScope::ALL);
         /**
          * @brief The sum of the operators' potentials at each trial step.
          *

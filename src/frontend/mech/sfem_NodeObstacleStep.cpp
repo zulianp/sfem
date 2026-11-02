@@ -119,7 +119,10 @@ namespace sfem {
             if (!power) {
                 power        = std::make_shared<PowerMethod<real_t>>();
                 auto b       = blas;
-                power->norm2 = [b](const std::ptrdiff_t n, const real_t *const v) { return b->norm2(n, v); };
+                // Over the owned rows of every rank: each rank stops at the same iteration, as the
+                // product's halo exchange needs.
+                auto owned   = reductions.get();
+                power->norm2 = [owned](const std::ptrdiff_t, const real_t *const v) { return owned->norm2(v); };
                 power->scal  = [b](const std::ptrdiff_t n, const real_t alpha, real_t *const v) { b->scal(n, alpha, v); };
                 power->zeros = [b](const std::size_t n, real_t *const v) { b->zeros(n, v); };
                 eigen_vector = create_buffer<real_t>(ndofs, f->execution_space());

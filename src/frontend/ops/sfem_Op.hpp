@@ -180,8 +180,12 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        /// `inexact_apply` by the threads of the caller's region (team_supported).
-        virtual int team_inexact_apply(const Team & /*team*/, const real_t *const /*h*/, real_t *const /*out*/) {
+        /// `inexact_apply` by the threads of the caller's region (team_supported), over `scope`
+        /// as team_apply.
+        virtual int team_inexact_apply(const Team & /*team*/,
+                                       const real_t *const /*h*/,
+                                       real_t *const /*out*/,
+                                       const ElementScope /*scope*/) {
             SFEM_ERROR("%s has no team inexact apply\n", name());
             return SFEM_FAILURE;
         }

@@ -108,16 +108,22 @@ namespace sfem {
                            const real_t *const              h,
                            real_t *const                    out) const = 0;
 
-        /// The same, by the threads of a region: on return the calling thread's share of the rows,
-        /// team's of the space's `stride` n entries, is complete. The host's.
+        /// The same, by the threads of a region, over the elements [element_begin, element_end)
+        /// (a distributed product's interior or interface, sfem_ElementScope.hpp): on return the
+        /// calling thread's share of the rows, team's of the space's `stride` n entries, is
+        /// complete. The packed traversal walks the whole block, so a part of it goes atomic.
+        /// The host's.
         virtual void team_apply(const Team                      &team,
                                 const ptrdiff_t                  nelements,
+                                const ptrdiff_t                  element_begin,
+                                const ptrdiff_t                  element_end,
                                 const idx_t *const *const        elements,
                                 const inexact::PackedView *const packed,
                                 const ptrdiff_t                  stride,
                                 const real_t *const              h,
                                 real_t *const                    out) const {
-            (void)team, (void)nelements, (void)elements, (void)packed, (void)stride, (void)h, (void)out;
+            (void)team, (void)nelements, (void)element_begin, (void)element_end, (void)elements, (void)packed, (void)stride,
+                    (void)h, (void)out;
             SFEM_ERROR("inexact: this store has no team apply\n");
         }
 
