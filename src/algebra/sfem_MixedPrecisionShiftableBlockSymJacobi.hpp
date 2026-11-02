@@ -121,6 +121,22 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        /// The sparse update (shift(block_diag, scaling)) from inside a region by every thread of it,
+        /// ending on the loop's barrier.
+        bool team_shift_capable() const override {
+            return this->execution_space() == EXECUTION_SPACE_HOST && enable_sparse_update_ && block_size == 3;
+        }
+        void team_shift(const std::shared_ptr<SparseBlockVector<HP>>& block_diag, const SharedBuffer<HP>& scaling) override {
+            block_sym_jacobi_sparse_update_team<HP, LP>(block_diag->idx()->size(),
+                                                    block_diag->idx()->data(),
+                                                    diag->data(),
+                                                    block_diag->data()->data(),
+                                                    scaling->data(),
+                                                    constraints_mask->data(),
+                                                    (LP)relaxation_parameter,
+                                                    inv_diag->data());
+        }
+
         /* Operator */
         int apply(const HP* const x, HP* const y) override {
             SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::apply");

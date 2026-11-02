@@ -24,6 +24,7 @@
 #include "sfem_ContactSurface.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_Obstacle.hpp"
+#include "sfem_TeamOperator.hpp"
 
 #ifdef SFEM_ENABLE_SRESAMPLE
 #include "sfem_SDFObstacle.hpp"
@@ -813,8 +814,20 @@ namespace sfem {
         return init();
     }
 
+    // On the host both are team operators (a solver or smoother over them runs in one region):
+    // the projection over the thread's share of the contact rows, the distribution with the rows
+    // split among the region's threads, ending on the loop's barrier (its rows are any thread's).
+    // Each reads the contact state as it stands at the product.
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op() {
         auto space = impl_->space;
+        if (impl_->execution_space == EXECUTION_SPACE_HOST) {
+            return make_team_lambda_op<real_t>(this->n_constrained_dofs(),
+                                               space->n_dofs(),
+                                               false,
+                                               [this](const Team &team, const real_t *const h, real_t *const out) {
+                                                   team_normal_project(team.begin, team.end, h, out);
+                                               });
+        }
         return make_op<real_t>(
                 this->n_constrained_dofs(),
                 space->n_dofs(),
@@ -824,11 +837,37 @@ namespace sfem {
 
     std::shared_ptr<Operator<real_t>> ContactConditions::linear_constraints_op_transpose() {
         auto space = impl_->space;
+        if (impl_->execution_space == EXECUTION_SPACE_HOST) {
+            return make_team_lambda_op<real_t>(space->n_dofs(),
+                                               this->n_constrained_dofs(),
+                                               false,
+                                               [this](const Team &, const real_t *const f, real_t *const out) {
+                                                   team_distribute_contact_forces(f, out);
+                                               });
+        }
         return make_op<real_t>(
                 space->n_dofs(),
                 this->n_constrained_dofs(),
                 [=](const real_t *const f, real_t *const out) { distribute_contact_forces(f, out); },
                 impl_->execution_space);
+    }
+
+    void ContactConditions::team_normal_project(const ptrdiff_t begin, const ptrdiff_t end, const real_t *const h, real_t *const out) {
+        const int dim = impl_->space->mesh()->spatial_dimension();
+        obstacle_normal_project_range(
+                dim, begin, end, impl_->contact_surface->node_mapping()->data(), impl_->normals->data(), h, out);
+    }
+
+    void ContactConditions::team_distribute_contact_forces(const real_t *const f, real_t *const out) {
+        const ptrdiff_t n   = impl_->contact_surface->node_mapping()->size();
+        const int       dim = impl_->space->mesh()->spatial_dimension();
+        obstacle_distribute_contact_forces_team(dim,
+                                                n,
+                                                impl_->contact_surface->node_mapping()->data(),
+                                                impl_->normals->data(),
+                                                impl_->mass_vector->data(),
+                                                f,
+                                                out);
     }
 
     int ContactConditions::signed_distance(real_t *const g) {
