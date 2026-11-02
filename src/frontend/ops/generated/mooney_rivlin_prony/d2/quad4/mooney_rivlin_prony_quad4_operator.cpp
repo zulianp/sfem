@@ -24,6 +24,8 @@ extern "C" int mooney_rivlin_prony_proteus_quad4_apply_i_msoa(
 extern "C" int mooney_rivlin_prony_proteus_quad4_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -159,6 +161,8 @@ extern "C" int mooney_rivlin_prony_quad4_apply_i_msoa(
 extern "C" int mooney_rivlin_prony_quad4_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -183,7 +187,7 @@ extern "C" int mooney_rivlin_prony_quad4_apply_i_msoa_team(
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_prony_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    return mooney_rivlin_prony_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int mooney_rivlin_prony_quad4_gradient_i_msoa(

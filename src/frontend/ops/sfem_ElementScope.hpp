@@ -105,14 +105,8 @@ namespace sfem {
 
     /// Block-local [begin, end) for @p scope. Distributed ranges come from that block's
     /// owned-not-shared / owned / local counts (SoA order: ONS | shared | aura).
-    inline ElementRange element_range(const smesh::Mesh &mesh, const smesh::block_idx_t block_idx, const ElementScope scope) {
-        if (static_cast<size_t>(block_idx) >= mesh.n_blocks()) {
-            SFEM_ERROR("element_range: block index %d out of range (n_blocks=%ld).\n",
-                       (int)block_idx,
-                       (long)mesh.n_blocks());
-        }
-
-        const ptrdiff_t n = mesh.n_elements(block_idx);
+    inline ElementRange element_range(const smesh::Mesh &mesh, const smesh::Mesh::Block &block, const ElementScope scope) {
+        const ptrdiff_t n = block.n_elements();
 
         if (!mesh_is_distributed(mesh)) {
             switch (scope) {
@@ -125,8 +119,7 @@ namespace sfem {
             return {0, 0};
         }
 
-        const auto      block   = mesh.block(block_idx);
-        const ptrdiff_t n_ons   = block->n_elements_owned_not_shared();
+        const ptrdiff_t n_ons   = block.n_elements_owned_not_shared();
         const ptrdiff_t n_local = n;
         switch (scope) {
             case ElementScope::ALL:
@@ -137,6 +130,15 @@ namespace sfem {
                 return {n_ons, n_local};
         }
         return {0, 0};
+    }
+
+    inline ElementRange element_range(const smesh::Mesh &mesh, const smesh::block_idx_t block_idx, const ElementScope scope) {
+        if (static_cast<size_t>(block_idx) >= mesh.n_blocks()) {
+            SFEM_ERROR("element_range: block index %d out of range (n_blocks=%ld).\n",
+                       (int)block_idx,
+                       (long)mesh.n_blocks());
+        }
+        return element_range(mesh, *mesh.block(block_idx), scope);
     }
 
     inline std::vector<BlockElementSlice> block_element_slices(const smesh::Mesh &mesh, const ElementScope scope) {

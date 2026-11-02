@@ -2199,6 +2199,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
@@ -2230,8 +2232,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     idx_t ev[VS * NS];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
@@ -2330,6 +2332,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
 extern "C" int linear_elasticity_proteus_hex8_apply_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -2355,10 +2359,10 @@ extern "C" int linear_elasticity_proteus_hex8_apply_a_msoa_team(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        return sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        return sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
     default:
       break;
@@ -2402,7 +2406,7 @@ extern "C" int linear_elasticity_proteus_hex8_apply_a_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = linear_elasticity_proteus_hex8_apply_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    const int err = linear_elasticity_proteus_hex8_apply_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;
@@ -2988,6 +2992,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
@@ -3014,8 +3020,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     idx_t ev[VS * NS];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
@@ -3122,6 +3128,8 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
 extern "C" int linear_elasticity_proteus_hex8_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -3138,10 +3146,10 @@ extern "C" int linear_elasticity_proteus_hex8_apply_i_msoa_team(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        return sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        return sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
     default:
       break;
@@ -3176,7 +3184,7 @@ extern "C" int linear_elasticity_proteus_hex8_apply_i_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = linear_elasticity_proteus_hex8_apply_i_msoa_team(scalar_bytes, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    const int err = linear_elasticity_proteus_hex8_apply_i_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, points, lmbda, mu, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;

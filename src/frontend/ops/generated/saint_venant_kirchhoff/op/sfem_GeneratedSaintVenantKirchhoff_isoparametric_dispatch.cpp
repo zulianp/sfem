@@ -66,6 +66,8 @@ extern "C" int saint_venant_kirchhoff_tri6_apply_i_msoa(
 extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -84,6 +86,8 @@ extern "C" int saint_venant_kirchhoff_proteus_quad4_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_quad4_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -102,6 +106,8 @@ extern "C" int saint_venant_kirchhoff_quad4_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_tri6_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -246,6 +252,8 @@ extern "C" int saint_venant_kirchhoff_tet10_apply_i_msoa(
 extern "C" int saint_venant_kirchhoff_hex27_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -267,6 +275,8 @@ extern "C" int saint_venant_kirchhoff_hex27_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_hex8_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -288,6 +298,8 @@ extern "C" int saint_venant_kirchhoff_hex8_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_proteus_hex27_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -309,6 +321,8 @@ extern "C" int saint_venant_kirchhoff_proteus_hex27_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_proteus_hex64_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -330,6 +344,8 @@ extern "C" int saint_venant_kirchhoff_proteus_hex64_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_proteus_hex8_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -351,6 +367,8 @@ extern "C" int saint_venant_kirchhoff_proteus_hex8_apply_i_msoa_team(
 extern "C" int saint_venant_kirchhoff_tet10_apply_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -882,6 +900,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_apply_2d_i_msoa_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -903,11 +923,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_apply_2d_i_msoa_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return saint_venant_kirchhoff_proteus_quad4_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+      return saint_venant_kirchhoff_proteus_quad4_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::QUAD4:
-      return saint_venant_kirchhoff_quad4_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+      return saint_venant_kirchhoff_quad4_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
     case smesh::TRI6:
-      return saint_venant_kirchhoff_tri6_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+      return saint_venant_kirchhoff_tri6_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
     default:
       break;
   }
@@ -965,6 +985,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_apply_3d_i_msoa_
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -989,17 +1011,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int saint_venant_kirchhoff_apply_3d_i_msoa_
           : real_type;
   switch (element_type) {
     case smesh::HEX27:
-      return saint_venant_kirchhoff_hex27_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_hex27_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
-      return saint_venant_kirchhoff_hex8_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_hex8_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX27:
-      return saint_venant_kirchhoff_proteus_hex27_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_proteus_hex27_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX64:
-      return saint_venant_kirchhoff_proteus_hex64_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_proteus_hex64_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
-      return saint_venant_kirchhoff_proteus_hex8_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_proteus_hex8_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
-      return saint_venant_kirchhoff_tet10_apply_i_msoa_team((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+      return saint_venant_kirchhoff_tet10_apply_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     default:
       break;
   }

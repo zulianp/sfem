@@ -41,6 +41,8 @@ extern "C" int vector_mass_proteus_hex27_jacobian_action_i_msoa(
 extern "C" int vector_mass_proteus_hex27_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -99,6 +101,8 @@ extern "C" int vector_mass_proteus_hex27_jacobian_action_a_msoa(
 extern "C" int vector_mass_proteus_hex27_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_det0,
@@ -272,6 +276,8 @@ extern "C" int vector_mass_hex27_jacobian_action_i_msoa(
 extern "C" int vector_mass_hex27_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -314,7 +320,7 @@ extern "C" int vector_mass_hex27_jacobian_action_i_msoa_team(
         elements[14],
         elements[6]
     };
-    return vector_mass_proteus_hex27_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return vector_mass_proteus_hex27_jacobian_action_i_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, points, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int vector_mass_hex27_residual_i_maos(
@@ -458,6 +464,8 @@ extern "C" int vector_mass_hex27_jacobian_action_a_msoa(
 extern "C" int vector_mass_hex27_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_det0,
@@ -500,7 +508,7 @@ extern "C" int vector_mass_hex27_jacobian_action_a_msoa_team(
         elements[14],
         elements[6]
     };
-    return vector_mass_proteus_hex27_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, g_det0, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return vector_mass_proteus_hex27_jacobian_action_a_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, g_det0, density, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
 extern "C" int vector_mass_hex27_residual_a_msoa(

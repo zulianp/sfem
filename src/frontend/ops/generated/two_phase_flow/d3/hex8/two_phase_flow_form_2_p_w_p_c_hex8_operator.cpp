@@ -49,6 +49,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -128,6 +130,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa
 extern "C" int two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -251,6 +255,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
@@ -293,7 +299,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa_team(
         elements[7],
         elements[6]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa(
@@ -356,6 +362,8 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa(
 extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa_team(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_adj0,
@@ -407,7 +415,7 @@ extern "C" int two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa_team(
         elements[7],
         elements[6]
     };
-    return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
+    return two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out);
 }
 
 extern "C" const sfem::codegen::KernelDiagnostics * two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_esoa_diagnostics(

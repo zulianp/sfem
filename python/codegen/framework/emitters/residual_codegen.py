@@ -12,6 +12,8 @@ from codegen.framework.emitters.kernel_prologue import (
     retag_constants,
 )
 from codegen.framework.plans.conventions import (
+    with_team_element_range,
+    with_team_element_range_arguments,
     PREFIXES,
     abi_geometry_name,
     abi_mesh_fragment,
@@ -8136,6 +8138,7 @@ def _mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     for index, param in enumerate(params):
         lines.append(
             "    %s%s" % (param, "," if index + 1 < len(params) else "")
@@ -8413,6 +8416,7 @@ def _mesh_operator_source(
     )
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -10226,6 +10230,7 @@ def _isoparametric_mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -10431,6 +10436,7 @@ def _isoparametric_mesh_operator_source(
     call_args = ["nelements", "nnodes", "elements", "points"]
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,

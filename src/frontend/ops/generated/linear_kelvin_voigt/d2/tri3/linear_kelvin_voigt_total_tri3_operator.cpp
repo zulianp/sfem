@@ -565,6 +565,8 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
@@ -590,8 +592,8 @@ static SFEM_INLINE int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_imp
   static constexpr int VS = 16;
 
 #pragma omp for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bdirection[NC * NS][VS];
     s_t boutput[NC * NS][VS];
     const s_t *const direction_components[NC] = {u0_direction, u1_direction};
@@ -652,6 +654,8 @@ static SFEM_INLINE int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_imp
 extern "C" int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -673,10 +677,10 @@ extern "C" int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
@@ -716,7 +720,7 @@ extern "C" int linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa(
   int ret = SFEM_SUCCESS;
 #pragma omp parallel
   {
-    const int err = linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team(scalar_bytes, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    const int err = linear_kelvin_voigt_total_tri3_jacobian_action_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
     if (err != SFEM_SUCCESS) {
 #pragma omp atomic write
       ret = err;

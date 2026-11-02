@@ -677,17 +677,24 @@ namespace sfem {
 
     // An operator's last phase may still write other threads' rows when the next begins:
     // each waits for the one before. The constraints' copy writes the calling thread's own.
-    int Function::team_apply(const Team &team, const real_t *const x, const real_t *const h, real_t *const out) {
+    int Function::team_apply(const Team         &team,
+                             const real_t *const x,
+                             const real_t *const h,
+                             real_t *const       out,
+                             const ElementScope  scope) {
         int applied = 0;
         for (auto &op : impl_->ops) {
             if (!op->residual_depends_on_state()) continue;
             if (applied++ > 0) team.barrier();
-            if (op->team_apply(team, x, h, out) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (op->team_apply(team, x, h, out, scope) != SFEM_SUCCESS) return SFEM_FAILURE;
         }
-        if (impl_->handle_constraints) {
-            for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, h, out);
-        }
+        if (scope == ElementScope::ALL) team_copy_constrained_dofs(team, h, out);
         return SFEM_SUCCESS;
+    }
+
+    void Function::team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest) {
+        if (!impl_->handle_constraints) return;
+        for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, src, dest);
     }
 
     int Function::team_inexact_apply(const Team &team, const real_t *const h, real_t *const out) {
@@ -696,12 +703,10 @@ namespace sfem {
             if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
             if (applied++ > 0) team.barrier();
             const int status = op->inexact_supported() ? op->team_inexact_apply(team, h, out)
-                                                       : op->team_apply(team, nullptr, h, out);
+                                                       : op->team_apply(team, nullptr, h, out, ElementScope::ALL);
             if (status != SFEM_SUCCESS) return SFEM_FAILURE;
         }
-        if (impl_->handle_constraints) {
-            for (auto &c : impl_->constraints) c->team_copy_constrained_dofs(team, h, out);
-        }
+        team_copy_constrained_dofs(team, h, out);
         return SFEM_SUCCESS;
     }
 

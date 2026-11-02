@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from enum import Enum
 
+from codegen.framework.plans.conventions import TEAM_ELEMENT_RANGE_ARGUMENTS
 from codegen.framework.ir.kernel_ast import (
     BlockNode,
     BufferDeclNode,
@@ -101,6 +102,24 @@ class TargetPlatform:
     def running_in_a_team(self):
         """This target for a body that runs on its caller's region (`team_body`)."""
         return dataclass_replace(self, team_body=True)
+
+    def walks_an_element_range(self):
+        """Whether the mesh pass being emitted walks its caller's element range.
+
+        A team body does, on a target with regions: its `_team` twin takes
+        [`element_begin`, `element_end`) (TEAM_ELEMENT_RANGE_PARAMETERS) and the
+        plain entry point passes the whole mesh, so that a distributed operator
+        applies the elements away from its interface while the halo is in flight
+        and the others after (sfem_ElementScope.hpp).  The elements stay
+        indexed by their number in the block: the range moves no array.
+        """
+        return self.team_body and self.team_region_pragma() is not None
+
+    def mesh_element_bounds(self):
+        """The first element of the mesh pass, and the end of it."""
+        if self.walks_an_element_range():
+            return TEAM_ELEMENT_RANGE_ARGUMENTS
+        return ("0", "nelements")
 
     def holding_one_element(self):
         """This target with the block taken away.
@@ -410,20 +429,21 @@ class TargetPlatform:
         `emitters/ast_printer.mesh_loop_lines` spells it.
         """
         tile_iterator = iterator("evb", "ptrdiff_t")
+        first, end = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.TILE,
                     tile_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
-                        expr_ref("nelements", "element_count"),
+                        expr_ref(first, "first_element"),
+                        expr_ref(end, "element_count"),
                     ),
                     add_assign_increment(tile_iterator, expr_ref("VS", "vector_width")),
                 )
             ),
             BufferDeclNode(
-                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, nelements - evb)"
+                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, %s - evb)" % end
             ),
         )
 
@@ -439,13 +459,16 @@ class TargetPlatform:
         decides is how the pass is opened, not what it counts.
         """
         element_iterator = iterator(index, "ptrdiff_t")
+        first = "0"
+        if extent == "nelements":
+            first, extent = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.KERNEL,
                     element_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
+                        expr_ref(first, "first_element"),
                         expr_ref(extent, "element_count"),
                     ),
                     pre_increment(element_iterator),

@@ -168,11 +168,14 @@ namespace sfem {
         /// allocate (states, caches, scratch). The plain products call it themselves.
         virtual int team_prepare() { return SFEM_SUCCESS; }
 
-        /// `apply` by the threads of the caller's region (team_supported).
+        /// `apply` by the threads of the caller's region (team_supported), over the elements of
+        /// `scope` (sfem_ElementScope.hpp): a nodal term goes with every scope but
+        /// SHARED_AND_AURA, so that the two halves of a distributed product add up to ALL.
         virtual int team_apply(const Team & /*team*/,
                                const real_t *const /*x*/,
                                const real_t *const /*h*/,
-                               real_t *const /*out*/) {
+                               real_t *const /*out*/,
+                               const ElementScope /*scope*/) {
             SFEM_ERROR("%s has no team apply\n", name());
             return SFEM_FAILURE;
         }
