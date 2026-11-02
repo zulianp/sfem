@@ -2,6 +2,7 @@
 
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_TeamOperator.hpp"
 #include "smesh_exchange.hpp"
 #include "smesh_prolongation.hpp"
 #include "smesh_restrict.hpp"
@@ -93,34 +94,43 @@ namespace sfem {
             return mesh_is_mpi(mesh) ? block->n_elements_owned() : block->n_elements();
         }
 
-        std::shared_ptr<Operator<real_t>> wrap_prolongation_coarse_gather(const std::shared_ptr<FunctionSpace>    &from_space,
-                                                                          const std::shared_ptr<FunctionSpace>    &to_space,
-                                                                          const ExecutionSpace                     es,
-                                                                          const std::shared_ptr<Operator<real_t>> &op) {
-            auto from_mesh = from_space->mesh();
-            if (!mesh_is_mpi(from_mesh)) {
-                return op;
-            }
-            if (es == EXECUTION_SPACE_DEVICE) {
-                SFEM_ERROR("create_hierarchical_prolongation: distributed DEVICE apply is not implemented\n");
-                return op;
-            }
+        // Every owned fine node is incident to an owned macro (Restrict dual). Assignment
+        // interpolant must not scatter_add: neighbor writes of the same node can disagree
+        // when coarse ghosts are incomplete, and averaging then corrupts the owner value.
+        // The coarse vector's ghost and aura entries are gathered first, on a distributed mesh.
 
-            // Every owned fine node is incident to an owned macro (Restrict dual). Assignment
-            // interpolant must not scatter_add: neighbor writes of the same node can disagree
-            // when coarse ghosts are incomplete, and averaging then corrupts the owner value.
-            auto      ex = smesh::Exchange::create_nodal(from_mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+        // The host prolongation: `kernels`, the smesh _team kernels run by every thread of the
+        // region, once the team's leader has gathered the coarse vector.
+        std::shared_ptr<Operator<real_t>> host_prolongation(const std::shared_ptr<FunctionSpace>                     &from_space,
+                                                            const std::shared_ptr<FunctionSpace>                     &to_space,
+                                                            std::function<void(const real_t *const, real_t *const)> kernels) {
+            auto                             from_mesh = from_space->mesh();
+            std::shared_ptr<smesh::Exchange> ex;
+            if (mesh_is_mpi(from_mesh)) {
+                ex = smesh::Exchange::create_nodal(from_mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+            }
             const int bs = from_space->block_size();
-            (void)to_space;
-            return make_op<real_t>(
-                    op->rows(),
-                    op->cols(),
-                    [=](const real_t *const from, real_t *const to) {
-                        ex->gather(const_cast<real_t *>(from), bs);
-                        op->apply(from, to);
-                    },
-                    es);
+            return make_team_lambda_op<real_t>(to_space->n_dofs(),
+                                               from_space->n_dofs(),
+                                               mesh_is_mpi(to_space->mesh()),
+                                               [=](const Team &team, const real_t *const from, real_t *const to) {
+                                                   if (ex) {
+                                                       if (team.leader()) ex->gather(const_cast<real_t *>(from), bs);
+                                                       team.barrier();
+                                                   }
+                                                   kernels(from, to);
+                                               });
         }
+
+#ifdef SFEM_ENABLE_CUDA
+        std::shared_ptr<Operator<real_t>> device_prolongation(const std::shared_ptr<FunctionSpace>    &from_space,
+                                                              const std::shared_ptr<Operator<real_t>> &op) {
+            if (mesh_is_mpi(from_space->mesh())) {
+                SFEM_ERROR("create_hierarchical_prolongation: distributed DEVICE apply is not implemented\n");
+            }
+            return op;
+        }
+#endif
 
     }  // namespace
 
@@ -164,11 +174,7 @@ namespace sfem {
                     SFEM_ERROR("create_hierarchical_prolongation: DEVICE SS transfer is implemented for HEX-family only\n");
                 }
                 if (from_ss) {
-                    return wrap_prolongation_coarse_gather(
-                            from_space,
-                            to_space,
-                            es,
-                            make_op<real_t>(
+                    return device_prolongation(from_space, make_op<real_t>(
                                     to_space->n_dofs(),
                                     from_space->n_dofs(),
                                     [=](const real_t *const from, real_t *const to) {
@@ -212,10 +218,7 @@ namespace sfem {
                                     context));
                 }
 
-                return wrap_prolongation_coarse_gather(from_space,
-                                                       to_space,
-                                                       es,
-                                                       make_op<real_t>(
+                return device_prolongation(from_space, make_op<real_t>(
                                                                to_space->n_dofs(),
                                                                from_space->n_dofs(),
                                                                [=](const real_t *const from, real_t *const to) {
@@ -257,11 +260,7 @@ namespace sfem {
             auto elements = to_space->mesh()->block(0)->device_elements_SoA();
 
             const ptrdiff_t n_elements = to_space->mesh()->n_elements(0);
-            return wrap_prolongation_coarse_gather(
-                    from_space,
-                    to_space,
-                    es,
-                    make_op<real_t>(
+            return device_prolongation(from_space, make_op<real_t>(
                             to_space->n_dofs(),
                             from_space->n_dofs(),
                             [=](const real_t *const from, real_t *const to) {
@@ -289,16 +288,7 @@ namespace sfem {
                     const bool mpi_from =
                             from_mesh && from_mesh->is_distributed() && from_mesh->comm() && from_mesh->comm()->size() > 1;
                     if (mpi_from && ss_all_hex_family(*to_space->mesh())) {
-                        return wrap_prolongation_coarse_gather(
-                                from_space,
-                                to_space,
-                                es,
-                                make_op<real_t>(
-                                        to_space->n_dofs(),
-                                        from_space->n_dofs(),
-                                        [=](const real_t *const from, real_t *const to) {
-                                            SFEM_TRACE_SCOPE("sshex8_prolongate_from_hex8");
-
+                        return host_prolongation(from_space, to_space, [=](const real_t *const from, real_t *const to) {
                                             auto     &from_m   = *from_space->mesh();
                                             auto     &to_ssm   = *to_space->mesh();
                                             const int to_level = smesh::semistructured_level(to_ssm);
@@ -313,7 +303,7 @@ namespace sfem {
                                                 }
                                                 idx_t *from_sshex[8];
                                                 smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), from_sshex);
-                                                smesh::sshex8_prolongate(ne,
+                                                smesh::sshex8_prolongate_team(ne,
                                                                          1,
                                                                          1,
                                                                          from_sshex,
@@ -324,20 +314,10 @@ namespace sfem {
                                                                          from,
                                                                          to);
                                             }
-                                        },
-                                        EXECUTION_SPACE_HOST));
+                                        });
                     }
 
-                    return wrap_prolongation_coarse_gather(
-                            from_space,
-                            to_space,
-                            es,
-                            make_op<real_t>(
-                                    to_space->n_dofs(),
-                                    from_space->n_dofs(),
-                                    [=](const real_t *const from, real_t *const to) {
-                                        SFEM_TRACE_SCOPE("ss_hierarchical_prolongation");
-
+                    return host_prolongation(from_space, to_space, [=](const real_t *const from, real_t *const to) {
                                         auto     &ssm   = *to_space->mesh();
                                         const int level = smesh::semistructured_level(ssm);
                                         for (size_t b = 0; b < ssm.n_blocks(); ++b) {
@@ -348,18 +328,17 @@ namespace sfem {
                                             }
                                             const auto fam = ss_block_family(ssm, b);
                                             if (fam == smesh::HEX8) {
-                                                smesh::sshex8_hierarchical_prolongation(
+                                                smesh::sshex8_hierarchical_prolongation_team(
                                                         level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
                                             } else if (fam == smesh::QUAD4) {
-                                                smesh::ssquad4_hierarchical_prolongation(
+                                                smesh::ssquad4_hierarchical_prolongation_team(
                                                         level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
                                             } else {
-                                                smesh::sstet4_hierarchical_prolongation(
+                                                smesh::sstet4_hierarchical_prolongation_team(
                                                         level, ne, to_b->elements()->data(), from_space->block_size(), from, to);
                                             }
                                         }
-                                    },
-                                    EXECUTION_SPACE_HOST));
+                                    });
                 }
 
                 // Homogeneous HEX SS level 1 is converted to unstructured HEX8 in
@@ -369,16 +348,7 @@ namespace sfem {
                 assert(smesh::semistructured_level(*from_space->mesh()) >= 1);
                 assert(!ss_all_hex_family(*from_space->mesh()) || smesh::semistructured_level(*from_space->mesh()) > 1);
 
-                return wrap_prolongation_coarse_gather(
-                        from_space,
-                        to_space,
-                        es,
-                        make_op<real_t>(
-                                to_space->n_dofs(),
-                                from_space->n_dofs(),
-                                [=](const real_t *const from, real_t *const to) {
-                                    SFEM_TRACE_SCOPE("ss_prolongate");
-
+                return host_prolongation(from_space, to_space, [=](const real_t *const from, real_t *const to) {
                                     auto     &from_ssm   = *from_space->mesh();
                                     auto     &to_ssm     = *to_space->mesh();
                                     const int from_level = smesh::semistructured_level(from_ssm);
@@ -394,7 +364,7 @@ namespace sfem {
                                         }
                                         const auto fam = ss_block_family(from_ssm, b);
                                         if (fam == smesh::HEX8) {
-                                            smesh::sshex8_prolongate(ne,
+                                            smesh::sshex8_prolongate_team(ne,
                                                                      from_level,
                                                                      1,
                                                                      from_b->elements()->data(),
@@ -405,7 +375,7 @@ namespace sfem {
                                                                      from,
                                                                      to);
                                         } else if (fam == smesh::QUAD4) {
-                                            smesh::ssquad4_prolongate(ne,
+                                            smesh::ssquad4_prolongate_team(ne,
                                                                       from_level,
                                                                       1,
                                                                       from_b->elements()->data(),
@@ -416,7 +386,7 @@ namespace sfem {
                                                                       from,
                                                                       to);
                                         } else {
-                                            smesh::sstet4_prolongate(ne,
+                                            smesh::sstet4_prolongate_team(ne,
                                                                      from_level,
                                                                      1,
                                                                      from_b->elements()->data(),
@@ -428,21 +398,11 @@ namespace sfem {
                                                                      to);
                                         }
                                     }
-                                },
-                                EXECUTION_SPACE_HOST));
+                                });
             }
 
-            return wrap_prolongation_coarse_gather(
-                    from_space,
-                    to_space,
-                    es,
-                    make_op<real_t>(
-                            to_space->n_dofs(),
-                            from_space->n_dofs(),
-                            [=](const real_t *const from, real_t *const to) {
-                                SFEM_TRACE_SCOPE("hierarchical_prolongation");
-
-                                smesh::hierarchical_prolongation(
+            return host_prolongation(from_space, to_space, [=](const real_t *const from, real_t *const to) {
+                                smesh::hierarchical_prolongation_team(
                                         from_space->element_type(),
                                         to_space->element_type(),
                                         transfer_nelements(to_space->mesh(), to_space->mesh()->block(0)),
@@ -450,8 +410,7 @@ namespace sfem {
                                         from_space->block_size(),
                                         from,
                                         to);
-                            },
-                            EXECUTION_SPACE_HOST));
+                            });
         }
     }
 
@@ -467,6 +426,13 @@ namespace sfem {
                                                                       const std::shared_ptr<FunctionSpace> &to_space,
                                                                       const ExecutionSpace                  es) {
         auto op = smesh::Restrict<real_t>::create(from_space->mesh(), to_space->mesh(), es, from_space->block_size());
+        if (es == EXECUTION_SPACE_HOST) {
+            // Its kernels shared by the region's threads, its exchanges the master thread's.
+            return make_team_lambda_op<real_t>(from_space->n_dofs(),
+                                               to_space->n_dofs(),
+                                               mesh_is_mpi(to_space->mesh()),
+                                               [op](const Team &, const real_t *const from, real_t *const to) { op->team_apply(from, to); });
+        }
         return make_op<real_t>(
                 from_space->n_dofs(),
                 to_space->n_dofs(),

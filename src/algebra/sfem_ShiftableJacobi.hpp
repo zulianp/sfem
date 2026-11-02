@@ -85,7 +85,7 @@ namespace sfem {
     }
 
     template <typename T>
-    class ShiftableBlockSymJacobi final : public ShiftableOperator<T> {
+    class ShiftableBlockSymJacobi final : public ShiftableOperator<T>, public TeamOperator<T> {
     public:
         /// In the execution context, on the dim x dim symmetric diagonal blocks diag.
         static std::shared_ptr<ShiftableBlockSymJacobi<T>> create(const int                   dim,
@@ -196,10 +196,32 @@ namespace sfem {
         /* Operator */
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::apply");
+            if (team_capable()) return team_region_apply<T>(*this, x, y);
             const ptrdiff_t n_blocks = inv_diag->size() / (block_size * block_size);
             impl.apply(n_blocks, inv_diag->data(), x, y);
             return SFEM_SUCCESS;
         }
+
+        /// y += D^{-1} x on the calling thread's rows, whole blocks (team chunks start at multiples
+        /// of 12 entries), as the OpenMP kernel computes it: it reads x there only.
+        void team_apply(const Team& team, const T* const x, T* const y) const override {
+            static_assert(team_chunk_align % 3 == 0, "a team share is whole blocks of 3");
+            const T* const inv = inv_diag->data();
+            for (ptrdiff_t i = team.begin / 3; i < team.end / 3; i++) {
+                const T* const xi = &x[i * 3];
+                T* const       yi = &y[i * 3];
+                const T* const di = &inv[i * 3 * 3];
+
+                for (int d1 = 0; d1 < 3; d1++) {
+                    for (int d2 = 0; d2 < 3; d2++) {
+                        yi[d1] += di[d1 * 3 + d2] * xi[d2];
+                    }
+                }
+            }
+        }
+        Team team() const override { return Team::current(inv_diag->size() / block_size); }
+        bool input_in_share() const override { return true; }
+        bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST && block_size == 3; }
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }

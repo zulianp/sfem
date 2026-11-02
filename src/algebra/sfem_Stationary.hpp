@@ -67,34 +67,36 @@ namespace sfem {
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("StationaryIteration::apply");
             ensure_workspace();
-            if (team_capable()) {
-                team_reduction_buffer(team_sums_, n_dofs);
-                return team_region_apply<T>(*this, b, x);
-            }
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
             BlasExec<T> e(*blas, n_dofs, workspace->size(), span_.ranks());
-            run(e, *op, *preconditioner, b, x);
+            run(e, *op, *preconditioner, b, x, use_arg_as_first_residual);
             return SFEM_SUCCESS;
         }
 
         // As a team operator (a smoother in a region): where the operator and the preconditioner
-        // have team forms, on one rank of the host.
+        // have team forms, on the host.
         Team team() const override { return team_op()->team(); }
         bool team_capable() const override {
             auto A = team_op();
             auto P = team_prec();
-            return A && P && A->team_capable() && P->team_capable() && n_alloc <= n_dofs &&
-                   this->execution_space() == EXECUTION_SPACE_HOST;
+            return A && P && A->team_capable() && P->team_capable() && this->execution_space() == EXECUTION_SPACE_HOST;
         }
+        // It reads beyond the calling thread's rows only in a product, after its barrier.
+        bool input_in_share() const override { return true; }
         int prepare() override {
             ensure_workspace();
+            team_reduction_buffer(team_sums_, n_dofs);
             if (auto A = team_op(); A && A->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
             auto P = team_prec();
             return P ? P->prepare() : SFEM_SUCCESS;
         }
         void team_apply(const Team& team, const T* const b, T* const x) const override {
+            team_solve(team, b, x, use_arg_as_first_residual);
+        }
+        void team_solve(const Team& team, const T* const b, T* const x, const bool zero_guess) const override {
             TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
             TeamExec<T>         e(team, sums);
-            run(e, *team_op(), *team_prec(), b, x);
+            run(e, *team_op(), *team_prec(), b, x, zero_guess);
         }
         inline std::ptrdiff_t rows() const override { return n_dofs; }
         inline std::ptrdiff_t cols() const override { return n_dofs; }
@@ -154,11 +156,11 @@ namespace sfem {
         std::shared_ptr<TeamOperator<T>> team_prec() const { return std::dynamic_pointer_cast<TeamOperator<T>>(preconditioner); }
 
         /// x += P (b - A x), max_it times, written once for its executor (sfem_SolverExec.hpp);
-        /// P accumulates into x.
+        /// P accumulates into x. With x zero on entry (zero_guess) the first residual is b.
         template <class E, class Op, class Prec>
-        void run(E& e, Op& A, Prec& P, const T* const b, T* const x) const {
+        void run(E& e, Op& A, Prec& P, const T* const b, T* const x, const bool zero_guess) const {
             int it = 0;
-            if (use_arg_as_first_residual) {
+            if (zero_guess) {
                 it = 1;
                 e.apply(P, b, x, true);
             }

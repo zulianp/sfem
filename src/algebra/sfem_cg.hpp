@@ -22,7 +22,7 @@
 namespace sfem {
 
     template <typename T>
-    class ConjugateGradient final : public MatrixFreeLinearSolver<T> {
+    class ConjugateGradient final : public MatrixFreeLinearSolver<T>, public TeamOperator<T> {
     public:
         /// Built for the execution space es, on op.
         static std::shared_ptr<ConjugateGradient<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
@@ -167,23 +167,11 @@ namespace sfem {
             }
             ensure_workspace(n, preconditioner_op != nullptr);
 
-            auto team_op   = std::dynamic_pointer_cast<TeamOperator<T>>(apply_op);
-            auto team_prec = std::dynamic_pointer_cast<TeamOperator<T>>(preconditioner_op);
-            if (team_op && team_op->team_capable() && (!preconditioner_op || (team_prec && team_prec->team_capable())) &&
-                this->execution_space() == EXECUTION_SPACE_HOST) {
-                if (team_op->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
-                if (team_prec && team_prec->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
-                T* const buffer = team_reduction_buffer(team_sums_, n);
-                int      info   = SFEM_FAILURE;
+            if (team_capable()) {
+                if (prepare_team(n) != SFEM_SUCCESS) return SFEM_FAILURE;
 #pragma omp parallel
-                {
-                    TeamReduction<T, 1> sums(buffer, team_chunk_count(n), span_.ranks());
-                    const Team          team = team_op->team();
-                    TeamExec<T>         e(team, sums);
-                    const int r = preconditioner_op ? run_precond(e, *team_op, *team_prec, n, b, x) : run_basic(e, *team_op, n, b, x);
-                    if (team.leader()) info = r;
-                }
-                return info;
+                team_run(team(), n, b, x);
+                return team_info_;
             }
 
             BlasExec<T> e(*blas, n, span_.allocation, span_.ranks());
@@ -202,6 +190,27 @@ namespace sfem {
 
         void set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
 
+        // As a team operator (a coarse solver in a region): where the operator (and the
+        // preconditioner) have team forms, on the host.
+        Team team() const override { return team_op()->team(); }
+        bool team_capable() const override {
+            auto A = team_op();
+            auto M = team_prec();
+            return A && A->team_capable() && (!preconditioner_op || (M && M->team_capable())) &&
+                   this->execution_space() == EXECUTION_SPACE_HOST;
+        }
+        // It reads beyond the calling thread's rows only in a product, after its barrier.
+        bool input_in_share() const override { return true; }
+        int  prepare() override {
+            if (!good()) return SFEM_FAILURE;
+            ensure_workspace(n_dofs, preconditioner_op != nullptr);
+            return prepare_team(n_dofs);
+        }
+        // A solver's run changes what it reports (iterations, curvature), the team leader's to write.
+        void team_apply(const Team& team, const T* const b, T* const x) const override {
+            const_cast<ConjugateGradient*>(this)->team_run(team, n_dofs, b, x);
+        }
+
         ~ConjugateGradient() { destroy_workspace(); }
 
     private:
@@ -212,8 +221,30 @@ namespace sfem {
         T*        work_p_{nullptr};
         T*        work_Ap_{nullptr};
         ptrdiff_t work_n_{-1};
-        // The sums of a run in one region (TeamReduction).
+        // The sums of a run in one region (TeamReduction), and its outcome (the leader's).
         std::vector<T> team_sums_;
+        int            team_info_{SFEM_FAILURE};
+
+        // The operator and the preconditioner in team form (the fields are public, set directly).
+        std::shared_ptr<TeamOperator<T>> team_op() const { return std::dynamic_pointer_cast<TeamOperator<T>>(apply_op); }
+        std::shared_ptr<TeamOperator<T>> team_prec() const { return std::dynamic_pointer_cast<TeamOperator<T>>(preconditioner_op); }
+
+        int prepare_team(const ptrdiff_t n) {
+            if (team_op()->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (preconditioner_op && team_prec()->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+            team_reduction_buffer(team_sums_, n);
+            return SFEM_SUCCESS;
+        }
+
+        // The whole run by every thread of the region, each with its team.
+        void team_run(const Team& team, const ptrdiff_t n, const T* const b, T* const x) {
+            if (team.leader()) negative_curvature_ = false;
+            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n), span_.ranks());
+            TeamExec<T>         e(team, sums);
+            auto&               A = *team_op();
+            const int r = preconditioner_op ? run_precond(e, A, *team_prec(), n, b, x) : run_basic(e, A, n, b, x);
+            if (team.leader()) team_info_ = r;
+        }
 
         bool use_fusion() const { return fusion && impl.good(); }
 

@@ -2,11 +2,14 @@
 #define SFEM_TEAM_OPERATOR_HPP
 
 #include <cassert>
+#include <functional>
+#include <memory>
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 
+#include "sfem_Operator.hpp"
 #include "sfem_Team.hpp"
 #include "sfem_base.hpp"
 
@@ -28,6 +31,14 @@ namespace sfem {
 
         /// From inside a region, every thread with its own team().
         virtual void team_apply(const Team& team, const T* const x, T* const y) const = 0;
+
+        /// team_apply of a solver (y the solution, x the right-hand side) told per call whether y is
+        /// zero on entry, which a smoother can use to skip its first product: inside a region the
+        /// hint cannot be the solver's state (MatrixFreeLinearSolver::set_initial_guess_zero). An
+        /// operator that cannot use it applies as usual.
+        virtual void team_solve(const Team& team, const T* const x, T* const y, const bool /*zero_guess*/) const {
+            team_apply(team, x, y);
+        }
 
         /// Inside a region, the calling thread's share of the rows.
         virtual Team team() const = 0;
@@ -54,6 +65,48 @@ namespace sfem {
 #pragma omp parallel
         op.team_apply(op.team(), x, y);
         return SFEM_SUCCESS;
+    }
+
+    /// A host operator given by its team form, a function of the team (rows: the entries its teams
+    /// split; under MPI, `reserve_first`, thread 0 takes none). Applied from outside a region, one
+    /// region around it.
+    template <typename T>
+    class TeamLambdaOperator final : public Operator<T>, public TeamOperator<T> {
+    public:
+        using TeamApply = std::function<void(const Team&, const T* const, T* const)>;
+        using Prepare   = std::function<int()>;
+
+        TeamLambdaOperator(const std::ptrdiff_t rows,
+                           const std::ptrdiff_t cols,
+                           const bool           reserve_first,
+                           TeamApply            team_apply,
+                           Prepare              prepare = {})
+            : rows_(rows), cols_(cols), reserve_first_(reserve_first), team_apply_(std::move(team_apply)), prepare_(std::move(prepare)) {}
+
+        int  apply(const T* const x, T* const y) override { return team_region_apply<T>(*this, x, y); }
+        Team team() const override { return Team::current(rows_, reserve_first_); }
+        void team_apply(const Team& team, const T* const x, T* const y) const override { team_apply_(team, x, y); }
+        int  prepare() override { return prepare_ ? prepare_() : SFEM_SUCCESS; }
+
+        std::ptrdiff_t   rows() const override { return rows_; }
+        std::ptrdiff_t   cols() const override { return cols_; }
+        ExecutionContext execution_context() const override { return EXECUTION_SPACE_HOST; }
+
+    private:
+        std::ptrdiff_t rows_{0};
+        std::ptrdiff_t cols_{0};
+        bool           reserve_first_{false};
+        TeamApply      team_apply_;
+        Prepare        prepare_;
+    };
+
+    template <typename T>
+    inline std::shared_ptr<TeamLambdaOperator<T>> make_team_lambda_op(const std::ptrdiff_t                       rows,
+                                                                      const std::ptrdiff_t                       cols,
+                                                                      const bool                                 reserve_first,
+                                                                      typename TeamLambdaOperator<T>::TeamApply  team_apply,
+                                                                      typename TeamLambdaOperator<T>::Prepare    prepare = {}) {
+        return std::make_shared<TeamLambdaOperator<T>>(rows, cols, reserve_first, std::move(team_apply), std::move(prepare));
     }
 
 }  // namespace sfem

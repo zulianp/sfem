@@ -735,6 +735,15 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int DirichletConditions::team_apply_zero(const Team &team, real_t *const x) {
+        const ptrdiff_t *const dofs = impl_->sorted_dofs.data();
+        const ptrdiff_t        n    = (ptrdiff_t)impl_->sorted_dofs.size();
+        const ptrdiff_t        b    = std::lower_bound(dofs, dofs + n, team.begin) - dofs;
+        const ptrdiff_t        e    = std::lower_bound(dofs, dofs + n, team.end) - dofs;
+        for (ptrdiff_t k = b; k < e; ++k) x[dofs[k]] = 0;
+        return SFEM_SUCCESS;
+    }
+
     int DirichletConditions::hessian_crs(const real_t *const  /*x*/,
                                          const count_t *const rowptr,
                                          const idx_t *const   colidx,

@@ -35,6 +35,11 @@ public:
         SFEM_ERROR("this constraint has no team copy");
         return SFEM_FAILURE;
     }
+    /// apply_zero on the constrained dofs in the calling thread's rows, as the team copy.
+    virtual int team_apply_zero(const Team & /*team*/, real_t *const /*x*/) {
+        SFEM_ERROR("this constraint has no team zero");
+        return SFEM_FAILURE;
+    }
     virtual int mask(mask_t *mask) = 0;
 
     virtual int hessian_crs(const real_t *const  x,
