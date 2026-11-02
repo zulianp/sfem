@@ -17,44 +17,6 @@
 
 namespace sfem {
 
-    namespace {
-
-        // A transfer into f's space (n dofs, from cols), then f's constrained dofs zeroed: on the
-        // host in team form where the transfer and the constraints have one (the constrained dofs
-        // in the calling thread's rows), otherwise vector by vector.
-        std::shared_ptr<Operator<real_t>> constrained_transfer(const std::shared_ptr<Operator<real_t>> &transfer,
-                                                               const std::shared_ptr<Function>         &f,
-                                                               const std::ptrdiff_t                     cols,
-                                                               const ExecutionSpace                     es) {
-            const std::ptrdiff_t rows          = f->space()->n_dofs();
-            auto                 team_transfer = std::dynamic_pointer_cast<TeamOperator<real_t>>(transfer);
-            if (es == EXECUTION_SPACE_HOST && team_transfer && f->team_constraints_supported()) {
-                return make_team_lambda_op<real_t>(
-                        rows,
-                        cols,
-                        mesh_is_mpi(f->space()->mesh()),
-                        [team_transfer, f](const Team &team, const real_t *const from, real_t *const to) {
-                            team_transfer->team_apply(team, from, to);
-                            f->team_apply_zero_constraints(team, to);
-                        },
-                        [team_transfer, f]() {
-                            if (team_transfer->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
-                            return f->team_prepare_constraints();
-                        });
-            }
-
-            return sfem::make_op<real_t>(
-                    rows,
-                    cols,
-                    [transfer, f](const real_t *const from, real_t *const to) {
-                        transfer->apply(from, to);
-                        f->apply_zero_constraints(to);
-                    },
-                    es);
-        }
-
-    }  // namespace
-
     std::shared_ptr<MultigridData> create_gmg_data(const std::shared_ptr<Function> &f) {
         SFEM_TRACE_SCOPE("create_gmg_data");
 
@@ -114,14 +76,14 @@ namespace sfem {
         auto create_r = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
             auto fine   = data->functions[i];
             auto coarse = data->functions[i + 1];
-            return constrained_transfer(
+            return create_constrained_transfer(
                     sfem::create_hierarchical_restriction(fine->space(), coarse->space(), es), coarse, fine->space()->n_dofs(), es);
         };
 
         auto create_p = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
             auto coarse = data->functions[i];
             auto fine   = data->functions[i - 1];
-            return constrained_transfer(
+            return create_constrained_transfer(
                     sfem::create_hierarchical_prolongation(coarse->space(), fine->space(), es), fine, coarse->space()->n_dofs(), es);
         };
 

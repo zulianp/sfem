@@ -15,6 +15,7 @@
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_ParallelOperator.hpp"
+#include "sfem_SolverExec.hpp"
 #include "sfem_ShiftedPenaltyKernels_openmp.hpp"
 #include "sfem_BLAS_openmp.hpp"
 #include "sfem_operator_factory.hpp"
@@ -1201,7 +1202,8 @@ namespace sfem {
                 maybe_linearize();
                 penalty_pseudo_galerkin_assembly();
 
-                int ret = cycle(coarser_level(finest_level()));
+                int ret = team_cycle(coarser_level(finest_level()));
+                if (ret < 0) ret = cycle(coarser_level(finest_level()));
                 trap_finite("coarse:x", mem_coarse->solution->data(), operator_[coarser_level(finest_level())]->rows());
 
                 if (ret == CYCLE_FAILURE && is_root_rank()) {
@@ -1262,7 +1264,128 @@ namespace sfem {
             return CYCLE_CONTINUE;
         }
 
-        CycleReturnCode cycle(const int level) {
+        // The linear cycle from `top` down in one region, where every level's operator, smoother
+        // and transfers have a team form (the host, no debug traps): its return code, or -1 and
+        // nothing done. The smoothers are shifted once, before the region: the shift is the same at
+        // every visit of a cycle. The cycle is cycle()'s, each level's rows split among the
+        // region's threads (thread 0 takes none under MPI).
+        int team_cycle(const int top) {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::team_cycle");
+            if (this->execution_space() != EXECUTION_SPACE_HOST || debug) return -1;
+            const int n = n_levels();
+            team_cycle_.resize(n);
+            for (int l = top; l < n; l++) {
+                auto& tl = team_cycle_[l];
+                auto  sop = shifted_op(l);
+                if (!std::dynamic_pointer_cast<TeamOperator<T>>(sop)) return -1;
+                auto smoother = smoother_[l];
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(l), level_op_x_op_weights(l));
+                } else {
+                    smoother->set_op_and_diag_shift(sop, memory_[l]->diag);
+                }
+                tl.op       = std::dynamic_pointer_cast<TeamOperator<T>>(sop);
+                tl.smoother = std::dynamic_pointer_cast<TeamOperator<T>>(smoother);
+                tl.restriction  = l != coarsest_level() ? std::dynamic_pointer_cast<TeamOperator<T>>(restriction_[l]) : nullptr;
+                tl.prolongation = l != coarsest_level() ? std::dynamic_pointer_cast<TeamOperator<T>>(prolongation_[coarser_level(l)]) : nullptr;
+                if (!tl.smoother || !tl.smoother->team_capable()) return -1;
+                if (l != coarsest_level() && (!tl.restriction || !tl.restriction->team_capable() || !tl.prolongation ||
+                                              !tl.prolongation->team_capable())) {
+                    return -1;
+                }
+            }
+            for (int l = top; l < n; l++) {
+                auto& tl = team_cycle_[l];
+                for (auto op : {tl.op, tl.smoother, tl.restriction, tl.prolongation}) {
+                    if (op && op->prepare() != SFEM_SUCCESS) SFEM_ERROR("ShiftedPenaltyMultigrid: a level's team part failed its checks\n");
+                }
+                team_reduction_buffer(tl.sums, level_owned(l));
+            }
+
+            const bool distributed = parallel_comm() != nullptr;
+#pragma omp parallel
+            {
+                const sfem_team_t ct = sfem_team_current(distributed);
+                team_cycle_level(top, ct.tid, ct.threads, distributed);
+            }
+
+            // As cycle(): only a cycle that is the coarse solve itself reports its failure.
+            const int coarse = coarsest_level();
+            return top == coarse && team_cycle_[coarse].smoother->team_status() != SFEM_SUCCESS ? CYCLE_FAILURE : CYCLE_CONTINUE;
+        }
+
+        // One level of team_cycle on every thread of the region.
+        void team_cycle_level(const int level, const int tid, const int threads, const bool distributed) {
+            auto&               tl = team_cycle_[level];
+            const ptrdiff_t     owned = level_owned(level);
+            const ptrdiff_t     alloc = level_alloc(level);
+            const Team          team  = Team::of(owned, tid, threads, distributed);
+            TeamReduction<T, 1> sums(tl.sums.data(), team_chunk_count(owned));
+            TeamExec<T>         e(team, sums);
+
+            auto     mem = memory_[level];
+            T* const x   = mem->solution->data();
+            T* const b   = mem->rhs->data();
+            T* const w   = mem->work->data();
+            // The entries past the owned rows (ghosts and aura), the leader's.
+            auto zero_rest = [&](T* const v, const ptrdiff_t n_owned, const ptrdiff_t n_alloc) {
+                if (team.leader()) team_blas::zeros(n_owned, n_alloc, v);
+            };
+
+            if (coarsest_level() == level) {
+                e.zeros(x);
+                zero_rest(x, owned, alloc);
+                tl.smoother->team_apply(team, b, x);
+                // The solver's leader is this one: its status is in.
+                if (team.leader() && tl.smoother->team_status() != SFEM_SUCCESS && is_root_rank()) {
+                    fflush(stdout);
+                    fflush(stderr);
+                    fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother_[level]->iterations());
+                }
+                return;
+            }
+
+            const int       coarse  = coarser_level(level);
+            auto            mc      = memory_[coarse];
+            const ptrdiff_t c_owned = level_owned(coarse);
+            const ptrdiff_t c_alloc = level_alloc(coarse);
+            const Team      tc      = Team::of(c_owned, tid, threads, distributed);
+            TeamExec<T>     ec(tc, sums);
+            T* const        x_c = mc->solution->data();
+            T* const        b_c = mc->rhs->data();
+            auto*           ex  = level_exchange(level);
+
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
+                tl.smoother->team_apply(team, b, x);
+
+                // Compute residual
+                zero_rest(w, owned, alloc);
+                e.apply(*tl.op, x, w, false);
+                e.axpby(1, b, -1, w);
+
+                // Restriction
+                zero_rest(b_c, c_owned, c_alloc);
+                ec.apply(*tl.restriction, w, b_c, false);
+                ec.zeros(x_c);
+                zero_rest(x_c, c_owned, c_alloc);
+
+                team_cycle_level(coarse, tid, threads, distributed);
+
+                // Prolongation, the coarse space correction (owned); ghosts via gather.
+                zero_rest(w, owned, alloc);
+                e.apply(*tl.prolongation, x_c, w, false);
+                e.axpby(1, w, 1, x);
+                if (distributed && ex) {
+                    e.barrier();
+                    if (team.leader()) ex->gather(x, nodal_block_size_);
+                    e.barrier();
+                }
+
+                tl.smoother->team_apply(team, b, x);
+            }
+        }
+
+                CycleReturnCode cycle(const int level) {
             SFEM_TRACE_SCOPE_VARIANT("ShiftedPenaltyMultigrid::cycle(%d)", level);
 
             auto mem      = memory_[level];
@@ -1423,6 +1546,12 @@ namespace sfem {
         std::vector<std::function<void(const Team&, T* const)>> team_apply_zero_constraints_;
         std::vector<std::function<int()>>                  team_prepare_zero_constraints_;
         SharedBuffer<T>                                    team_projection_, team_penalty_residual_;  // contact rows
+        // Each level's parts in team form and its executor's sums (team_cycle).
+        struct TeamCycleLevel {
+            std::shared_ptr<TeamOperator<T>> op, smoother, restriction, prolongation;
+            std::vector<T>                   sums;
+        };
+        std::vector<TeamCycleLevel> team_cycle_;
         std::function<void(const T* const)>                update_constraints_;
         EvalMaterialResidualFn                             eval_material_residual_;
         LinearizeFn                                        linearize_;
