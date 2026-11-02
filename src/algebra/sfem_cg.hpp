@@ -163,7 +163,8 @@ namespace sfem {
 
             auto team_op   = std::dynamic_pointer_cast<TeamOperator<T>>(apply_op);
             auto team_prec = std::dynamic_pointer_cast<TeamOperator<T>>(preconditioner_op);
-            if (team_op && (!preconditioner_op || team_prec) && this->execution_space() == EXECUTION_SPACE_HOST) {
+            if (team_op && team_op->team_capable() && (!preconditioner_op || (team_prec && team_prec->team_capable())) &&
+                this->execution_space() == EXECUTION_SPACE_HOST) {
                 if (team_op->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
                 if (team_prec && team_prec->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
                 T* const buffer = team_reduction_buffer(team_sums_, n);
