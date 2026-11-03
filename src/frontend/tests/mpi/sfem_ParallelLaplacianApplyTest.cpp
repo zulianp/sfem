@@ -425,6 +425,23 @@ namespace {
                 serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "NeoHookeanOgden", 3, real_t(0.01));
     }
 
+    // The hand-written vector Laplacian in team form, three components.
+    int test_parallel_vector_laplacian_apply_hex8_cube() {
+        auto            comm = sfem::Communicator::world();
+        const ptrdiff_t nx = 8, ny = 6, nz = 4;
+        auto serial   = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
+        auto parallel = sfem::Mesh::create_hex8_cube(comm, nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
+        return check_parallel_laplacian_apply(serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "VectorLaplacian", 3);
+    }
+
+    int test_parallel_vector_laplacian_apply_checkerboard() {
+        auto            comm = sfem::Communicator::world();
+        const ptrdiff_t nx = 16, ny = 12, nz = 8;
+        auto            serial   = sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), nx, ny, nz);
+        auto            parallel = sfem::Mesh::create_hex8_checkerboard_cube(comm, nx, ny, nz);
+        return check_parallel_laplacian_apply(serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "VectorLaplacian", 3);
+    }
+
     int test_element_scope_identity_checkerboard() {
         auto            comm = sfem::Communicator::world();
         const ptrdiff_t nx = 8, ny = 6, nz = 4;
@@ -484,6 +501,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_mass_apply_checkerboard);
     SFEM_RUN_TEST(test_parallel_neohookean_ogden_apply_hex8_cube);
     SFEM_RUN_TEST(test_parallel_neohookean_ogden_apply_hex8_tet4);
+    SFEM_RUN_TEST(test_parallel_vector_laplacian_apply_hex8_cube);
+    SFEM_RUN_TEST(test_parallel_vector_laplacian_apply_checkerboard);
     SFEM_RUN_TEST(test_element_scope_identity_checkerboard);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
