@@ -55,6 +55,13 @@ int sstet4_linear_elasticity_apply_stencil(const sstet4_linear_elasticity_stenci
                                            const real_t *const SFEM_RESTRICT                u,
                                            real_t *const SFEM_RESTRICT                      values);
 
+int sstet4_linear_elasticity_apply_stencil_global_vectorized_team(
+        const sstet4_linear_elasticity_stencil_t *const stencil,
+        const ptrdiff_t                                  nelements,
+        idx_t **const SFEM_RESTRICT                      elements,
+        const real_t *const SFEM_RESTRICT                u,
+        real_t *const SFEM_RESTRICT                      values);
+
 int sstet4_linear_elasticity_apply_stencil_global_vectorized(
         const sstet4_linear_elasticity_stencil_t *const stencil,
         const ptrdiff_t                                  nelements,

@@ -24,6 +24,21 @@ public:
     int hessian_diag(const real_t *const, real_t *const out) override;
     int gradient(const real_t *const x, real_t *const out) override;
     int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+    bool team_supported() const override;
+    int team_apply(const Team &team,
+                   const real_t *const x,
+                   const real_t *const h,
+                   real_t *const out,
+                   const ElementScope scope) override;
+    /// out += A h: by the threads of the caller's region (TEAM) or opening its own.
+    template <bool TEAM>
+    int apply_block(const real_t *const h, real_t *const out);
+    /// Outside any region: the block's connectivity, the points and the level that apply_block reads.
+    int team_prepare() override;
+    BlockElements block_view;
+    ptrdiff_t interior_start{0};
+    geom_t **points{nullptr};
+    int level{0};
     int value(const real_t *x, real_t *const out) override;
     std::shared_ptr<Op> clone() const override;
 };
