@@ -312,31 +312,29 @@ void classical_lapl(const scalar_t* const               fff,
 }
 
 
-extern "C" int spectral_hex_laplacian_apply(const int                         order,
+extern "C" int spectral_hex_laplacian_apply_team(const int                         order,
                                             const ptrdiff_t                   nelements,
                                             const ptrdiff_t                   nnodes,
                                             idx_t** const SFEM_RESTRICT       elements,
                                             geom_t** const SFEM_RESTRICT      points,
                                             const real_t* const SFEM_RESTRICT u,
                                             real_t* const SFEM_RESTRICT       values) {
-    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
-
     int SFEM_USE_GLL = 0;
     SFEM_READ_ENV(SFEM_USE_GLL, atoi);
 
     if (SFEM_USE_GLL) {
         switch (order) {
             case 2: {
-                return spectral_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_team_tpl<2>(nelements, nnodes, elements, points, u, values);
             }
             case 4: {
-                return spectral_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_team_tpl<4>(nelements, nnodes, elements, points, u, values);
             }
             case 8: {
-                return spectral_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_team_tpl<8>(nelements, nnodes, elements, points, u, values);
             }
             case 16: {
-                return spectral_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
+                return spectral_hex_laplacian_apply_team_tpl<16>(nelements, nnodes, elements, points, u, values);
             }
             default: {
                 SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
@@ -346,16 +344,16 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
     } else {
         switch (order) {
             case 2: {
-                return lagrange_hex_laplacian_apply_tpl<2>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_team_tpl<2>(nelements, nnodes, elements, points, u, values);
             }
             case 4: {
-                return lagrange_hex_laplacian_apply_tpl<4>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_team_tpl<4>(nelements, nnodes, elements, points, u, values);
             }
             case 8: {
-                return lagrange_hex_laplacian_apply_tpl<8>(nelements, nnodes, elements, points, u, values);
+                return lagrange_hex_laplacian_apply_team_tpl<8>(nelements, nnodes, elements, points, u, values);
             }
             // case 16: {
-            //     return lagrange_hex_laplacian_apply_tpl<16>(nelements, nnodes, elements, points, u, values);
+            //     return lagrange_hex_laplacian_apply_team_tpl<16>(nelements, nnodes, elements, points, u, values);
             // }
             default: {
                 SFEM_ERROR("spectral_hex_laplacian_apply Unsupported order!");
@@ -364,4 +362,26 @@ extern "C" int spectral_hex_laplacian_apply(const int                         or
     }
 
     return SFEM_SUCCESS;
+}
+
+// The plain entry point: one region around spectral_hex_laplacian_apply_team.
+extern "C" int spectral_hex_laplacian_apply(const int                         order,
+                                            const ptrdiff_t                   nelements,
+                                            const ptrdiff_t                   nnodes,
+                                            idx_t** const SFEM_RESTRICT       elements,
+                                            geom_t** const SFEM_RESTRICT      points,
+                                            const real_t* const SFEM_RESTRICT u,
+                                            real_t* const SFEM_RESTRICT       values) {
+    SFEM_TRACE_SCOPE("spectral_hex_laplacian_apply");
+
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = spectral_hex_laplacian_apply_team(order, nelements, nnodes, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
 }

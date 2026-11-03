@@ -97,6 +97,13 @@ namespace sfem {
         int gradient(const real_t *const x, real_t *const out) override;
 
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+        bool team_supported() const override;
+        int  team_prepare() override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
 
         int value(const real_t *x, real_t *const out) override;
         int value_steps(const real_t       *x,
@@ -118,6 +125,9 @@ namespace sfem {
         std::vector<struct Condition> &conditions();
 
     private:
+        /// out += the follower pressures' H(x) h, by the threads of the caller's region.
+        int apply_follower_pressure(const real_t *const x, const real_t *const h, real_t *const out);
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
