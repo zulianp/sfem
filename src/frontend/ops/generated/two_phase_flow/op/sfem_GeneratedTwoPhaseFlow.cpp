@@ -687,10 +687,12 @@ namespace sfem {
     });
   }
 
-  int GeneratedTwoPhaseFlow::apply(const real_t *const state,
+  int GeneratedTwoPhaseFlow::team_apply(const Team &team,
+                      const real_t *const state,
                       const real_t *const direction,
-                      real_t *const out) {
-    SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::apply");
+                      real_t *const out,
+                      const ElementScope scope) {
+    (void)team;
     const real_t *const current = state ? state : impl_->current;
     if (!current) {
       SFEM_ERROR("GeneratedTwoPhaseFlow requires a current state\n");
@@ -700,6 +702,7 @@ namespace sfem {
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
@@ -735,9 +738,9 @@ namespace sfem {
           real_t *const RSTR p_w_out = out + 0;
           real_t *const RSTR p_c_out = out + 1;
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TRI3) {
-          return two_phase_flow_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+          return two_phase_flow_jacobian_action_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
         }
-        return two_phase_flow_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+        return two_phase_flow_jacobian_action_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 2;
@@ -748,13 +751,31 @@ namespace sfem {
           real_t *const RSTR p_w_out = out + 0;
           real_t *const RSTR p_c_out = out + 1;
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4) {
-          return two_phase_flow_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+          return two_phase_flow_jacobian_action_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
         }
-        return two_phase_flow_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
+        return two_phase_flow_jacobian_action_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], storage[5], storage[6], storage[7], storage[8], storage[9], storage[10], storage[11], storage[12], storage[13], storage[14], storage[15], storage[16], storage[17], storage[18], storage[19], storage[20], storage[21], storage[22], storage[23], storage[24], storage[25], FIELD_STRIDE, p_w_data, p_c_data, FIELD_STRIDE, p_w_direction_data, p_c_direction_data, FIELD_STRIDE, p_w_out, p_c_out);
       }
       SFEM_ERROR("two_phase_flow jacobian_action does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
     });
+  }
+
+  int GeneratedTwoPhaseFlow::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedTwoPhaseFlow::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
+  }
+
+  bool GeneratedTwoPhaseFlow::team_supported() const {
+    return true;
+  }
+
+  int GeneratedTwoPhaseFlow::team_prepare() {
+    impl_->domains->prepare_views();
+    return SFEM_SUCCESS;
   }
 
   void GeneratedTwoPhaseFlow::set_field(const char *name,

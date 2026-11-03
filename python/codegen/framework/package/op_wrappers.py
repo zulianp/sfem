@@ -3228,21 +3228,46 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         "      ",
         mixed_order=mixed_order,
     )
-    action_dispatch_body = _residual_apply_dispatch_body(
-        dispatch_stem,
-        "jacobian_action",
-        "jacobian_action_uses_affine",
-        "current",
-        kernel_sources,
-        {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
-        parameter_names_by_dim,
-        fields_by_dim,
-        block_size_by_dim,
-        action_affine_metric_aos_elements_by_dim,
-        action_affine_metric_aos_unit_elements_by_dim,
-        "      ",
-        mixed_order=mixed_order,
+    # The product is published for a team when its kernels have `_team` twins: the same
+    # dispatch, the twins called (`_team_product`).  The packed Laplacian fast path applies
+    # another operator, which opens its own region, so it has no team form.
+    action_dispatch_bodies = tuple(
+        _residual_apply_dispatch_body(
+            dispatch_stem,
+            "jacobian_action",
+            "jacobian_action_uses_affine",
+            "current",
+            kernel_sources,
+            {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
+            parameter_names_by_dim,
+            fields_by_dim,
+            block_size_by_dim,
+            action_affine_metric_aos_elements_by_dim,
+            action_affine_metric_aos_unit_elements_by_dim,
+            "      ",
+            mixed_order=mixed_order,
+            tail=tail,
+        )
+        for tail in ("", ABI_TEAM_TAIL)
     )
+    # A material whose kernels have no `_team` twins (navier_stokes) has no team form; one
+    # that has them must call them all (`_team_product`).
+    has_team_twins = any(
+        _c_abi_function_exists(
+            kernel_sources,
+            "%s_jacobian_action_%dd_%s_msoa%s" % (dispatch_stem, dim, geometry, ABI_TEAM_TAIL),
+            public_only=True,
+        )
+        for dim in dependencies_by_dim
+        for geometry in ("a", "i")
+    )
+    team = (
+        current_target().team_region_pragma() is not None
+        and not use_laplace_packed_fast_path
+        and has_team_twins
+        and _team_product(*action_dispatch_bodies, what=material.name)
+    )
+    action_dispatch_body = action_dispatch_bodies[team]
     template = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 %(laplace_packed_include)s
@@ -3558,14 +3583,14 @@ namespace sfem {
     });
   }
 
-  int %(op)s::apply(const real_t *const %(apply_state_parameter)s,
+  int %(op)s::%(apply_method)s(%(apply_team_parameter)sconst real_t *const %(apply_state_parameter)s,
                       const real_t *const %(apply_direction_parameter)s,
-                      real_t *const %(apply_out_parameter)s) {
-    SFEM_TRACE_SCOPE("%(op)s::apply");
+                      real_t *const %(apply_out_parameter)s%(apply_scope_parameter)s) {
+%(apply_trace)s
 %(apply_current_alias)s%(apply_state_check)s%(scheme_apply_term)s
     auto mesh = impl_->space->mesh();
 %(apply_points_alias)s%(laplace_packed_apply_fast_path)s
-    return impl_->domains->iterate([&](const OpDomain &domain) {
+    return impl_->domains->iterate([&](const OpDomain &domain) {%(apply_domain_range)s
 %(apply_affine_geometry)s      real_t storage[MAX_PARAMETERS];
       parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
@@ -3574,7 +3599,7 @@ namespace sfem {
 %(action_dispatch_body)s
     });
   }
-
+%(apply_team_methods)s
   void %(op)s::set_field(const char *name,
                            const std::shared_ptr<Buffer<real_t>> &values,
                            const int component) {
@@ -3735,10 +3760,13 @@ namespace sfem {
         "set_time_scheme_method": _COUPLED_SET_TIME_SCHEME[holds_scheme]
         % {"op": _op_class_name(material)},
         "scheme_gradient_term": _RESIDUAL_SCHEME_GRADIENT[holds_scheme],
-        "scheme_apply_term": _RESIDUAL_SCHEME_APPLY[holds_scheme],
+        "scheme_apply_term": (_RESIDUAL_SCHEME_TEAM_APPLY if team else _RESIDUAL_SCHEME_APPLY)[holds_scheme],
         "scheme_parameter": _COUPLED_SCHEME_PARAMETER[holds_scheme],
         "scheme_argument": _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
+        **_residual_apply_head(
+            _op_class_name(material), team, holds_scheme, bool(_inexact_units(kernel_sources))
+        ),
         "inexact_include": _inexact_includes(material, kernel_sources),
         "inexact_impl_field": _inexact_impl_field(material, kernel_sources),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
@@ -3963,6 +3991,7 @@ namespace sfem {
             affine_cache="jacobian",
             holds_scheme=holds_scheme,
             previous_state="impl_->previous_state()" if holds_scheme else "impl_->previous",
+            team=team,
         ),
     )
     # A volume forcing publishes the stepped 0-form too, now that the energy
@@ -3973,7 +4002,7 @@ namespace sfem {
     return _header(material, True, publishes_value_steps=emits_linear_work,
                    node_wise=not emits_linear_work, state_independent=emits_linear_work,
                    linear=_tangent_is_constant(form_collections),
-                   publishes_inexact=bool(_inexact_units(kernel_sources))), source
+                   publishes_inexact=bool(_inexact_units(kernel_sources)), team=team), source
 
 
 _GRAPH_ROWS = {
@@ -6374,6 +6403,81 @@ _RESIDUAL_SCHEME_APPLY = {
     False: "",
     True: "\n" + _COUPLED_SCHEME_APPLY[True],
 }
+
+#: The scheme's term in the residual template's team product.  It is nodal: applied once,
+#: with the elements away from the interface, and waited for, since the kernels after it
+#: write other threads' rows.
+_RESIDUAL_SCHEME_TEAM_APPLY = {
+    False: "",
+    True: """
+    if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+      if (term->team_apply(team, state, direction, out, scope) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+      team.barrier();
+    }
+""",
+}
+
+
+def _residual_apply_head(op, team, holds_scheme, publishes_inexact):
+    """The pieces of the residual `apply` that differ for a team: the method's head, the
+    domain's elements in the scope asked for, and the methods a team operator adds -- the
+    plain `apply` one region around `team_apply` (`_hyperelastic_apply_head`)."""
+    if not team:
+        return {
+            "apply_method": "apply",
+            "apply_team_parameter": "",
+            "apply_scope_parameter": "",
+            "apply_trace": '    SFEM_TRACE_SCOPE("%s::apply");' % op,
+            "apply_domain_range": "",
+            "apply_team_methods": "",
+        }
+    term_supported = (
+        """    auto term = time_scheme_term(impl_->time_scheme);
+    return !term || term->team_supported();"""
+        if holds_scheme
+        else "    return true;"
+    )
+    term_prepare = (
+        """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+    }
+"""
+        if holds_scheme
+        else ""
+    )
+    return {
+        "apply_method": "team_apply",
+        "apply_team_parameter": "const Team &team,\n                      ",
+        "apply_scope_parameter": ",\n                      const ElementScope scope",
+        "apply_trace": "    (void)team;",
+        "apply_domain_range": "\n      const ElementRange range = element_range(*mesh, *domain.block, scope);",
+        "apply_team_methods": """
+  int %(op)s::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
+  }
+
+  bool %(op)s::team_supported() const {
+%(term_supported)s
+  }
+
+  int %(op)s::team_prepare() {
+    impl_->domains->prepare_views();
+%(term_prepare)s%(prepare_inexact)s    return SFEM_SUCCESS;
+  }
+""" % {
+            "op": op,
+            "term_supported": term_supported,
+            "term_prepare": term_prepare,
+            "prepare_inexact": _TEAM_PREPARE_INEXACT[bool(publishes_inexact)],
+        },
+    }
 
 _COUPLED_SCHEME_HESSIAN_BSR = {
     False: "",
@@ -10056,7 +10160,13 @@ def _residual_apply_dispatch_body(
     affine_aos_unit_elements_by_dim,
     indent,
     mixed_order=False,
+    tail="",
 ):
+    # `tail` names the kernels' `_team` twins (ABI_TEAM_TAIL): the same dispatch for the
+    # threads of a caller's region, the domain's elements in its scope after their count and
+    # the packed traversals, which walk packs, for the whole mesh only (`_team_product`).
+    team = tail == ABI_TEAM_TAIL
+    packed_guard = _TEAM_PACKED_GUARD if team else ""
     lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
     for dim in (2, 3):
         dependencies = dependencies_by_dim.get(dim)
@@ -10080,6 +10190,7 @@ def _residual_apply_dispatch_body(
             "domain.element_type",
             "real_type",
             "domain.block->n_elements()",
+            *(_TEAM_RANGE_ARGUMENTS if team else ()),
             "mesh->n_nodes()",
             "element_connectivity(domain)",
         ]
@@ -10141,23 +10252,26 @@ def _residual_apply_dispatch_body(
         storage_args = list(
             _dependency_storage_args(dependencies.parameters, parameter_index)
         )
-        affine_soa = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
-        affine_aos = "%s_%s_%dd_a_msoa_aos" % (material_name, operation, dim)
-        affine_aos_unit = "%s_%s_%dd_a_msoa_aos_unit" % (
+        affine_soa = "%s_%s_%dd_a_msoa%s" % (material_name, operation, dim, tail)
+        affine_aos = "%s_%s_%dd_a_msoa_aos%s" % (material_name, operation, dim, tail)
+        affine_aos_unit = "%s_%s_%dd_a_msoa_aos_unit%s" % (
             material_name,
             operation,
             dim,
+            tail,
         )
-        isop = "%s_%s_%dd_i_msoa" % (material_name, operation, dim)
-        packed_affine = "%s_%s_packed_%dd_a_msoa" % (
+        isop = "%s_%s_%dd_i_msoa%s" % (material_name, operation, dim, tail)
+        packed_affine = "%s_%s_packed_%dd_a_msoa%s" % (
             material_name,
             operation,
             dim,
+            tail,
         )
-        packed = "%s_%s_packed_%dd_i_msoa" % (
+        packed = "%s_%s_packed_%dd_i_msoa%s" % (
             material_name,
             operation,
             dim,
+            tail,
         )
         aos_condition = _element_condition(
             "domain.element_type", affine_aos_elements_by_dim.get(dim, ())
@@ -10188,7 +10302,7 @@ def _residual_apply_dispatch_body(
             )
             lines.extend(
                 [
-                    "%s    if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s    if (%simpl_->space->has_packed_mesh()) {" % (indent, packed_guard),
                     "%s      auto packed = impl_->space->packed_mesh();" % indent,
                     "%s      const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
                     "%s      if (packed_block >= 0) {" % indent,
@@ -10228,7 +10342,8 @@ def _residual_apply_dispatch_body(
                             ),
                             "%s        }" % indent,
                         ]
-                        if material_name == "laplace"
+                        if not team
+                        and material_name == "laplace"
                         and operation == "jacobian_action"
                         and dim == 3
                         and _c_abi_function_exists(
@@ -10287,7 +10402,8 @@ def _residual_apply_dispatch_body(
                             ),
                             "%s        }" % indent,
                         ]
-                        if material_name == "laplace"
+                        if not team
+                        and material_name == "laplace"
                         and operation == "jacobian_action"
                         and dim == 3
                         and _c_abi_function_exists(
@@ -10322,7 +10438,8 @@ def _residual_apply_dispatch_body(
                             ),
                             "%s        }" % indent,
                         ]
-                        if material_name == "laplace"
+                        if not team
+                        and material_name == "laplace"
                         and operation == "jacobian_action"
                         and dim == 3
                         and _c_abi_function_exists(
@@ -10434,7 +10551,7 @@ def _residual_apply_dispatch_body(
         ):
             lines.extend(
                 [
-                    "%s  if (impl_->space->has_packed_mesh()) {" % indent,
+                    "%s  if (%simpl_->space->has_packed_mesh()) {" % (indent, packed_guard),
                     "%s    auto packed = impl_->space->packed_mesh();" % indent,
                     "%s    const int packed_block = packed_block_id_for_domain(*packed, *domain.block);" % indent,
                     "%s    if (packed_block >= 0) {" % indent,

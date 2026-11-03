@@ -631,15 +631,18 @@ namespace sfem {
     });
   }
 
-  int GeneratedVectorMass::apply(const real_t *const /*state*/,
+  int GeneratedVectorMass::team_apply(const Team &team,
+                      const real_t *const /*state*/,
                       const real_t *const direction,
-                      real_t *const out) {
-    SFEM_TRACE_SCOPE("GeneratedVectorMass::apply");
+                      real_t *const out,
+                      const ElementScope scope) {
+    (void)team;
 
     auto mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
@@ -668,22 +671,40 @@ namespace sfem {
           const real_t *const RSTR u_direction_data[2] = {direction + 0, direction + 1};
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TRI3) {
-          return vector_mass_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
+          return vector_mass_jacobian_action_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
         }
-        return vector_mass_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
+        return vector_mass_jacobian_action_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 3;
           const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4) {
-          return vector_mass_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+          return vector_mass_jacobian_action_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
         }
-        return vector_mass_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+        return vector_mass_jacobian_action_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
       }
       SFEM_ERROR("vector_mass jacobian_action does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
     });
+  }
+
+  int GeneratedVectorMass::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedVectorMass::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
+  }
+
+  bool GeneratedVectorMass::team_supported() const {
+    return true;
+  }
+
+  int GeneratedVectorMass::team_prepare() {
+    impl_->domains->prepare_views();
+    return SFEM_SUCCESS;
   }
 
   void GeneratedVectorMass::set_field(const char *name,
