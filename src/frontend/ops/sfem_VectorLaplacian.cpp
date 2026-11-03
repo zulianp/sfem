@@ -34,19 +34,20 @@ namespace sfem {
         template <bool TEAM>
         int vector_laplacian_dispatch_apply(const OpDomain &domain,
                                             smesh::Mesh    &mesh,
+                                            geom_t **const  points,
+                                            const jacobian_t *const fff,
                                             const int       block_size,
                                             idx_t **const   elements,
                                             const ptrdiff_t begin,
                                             const ptrdiff_t ne,
                                             real_t **const SFEM_RESTRICT vec_in,
                                             real_t **const SFEM_RESTRICT vec_out) {
-            if (domain.user_data) {
-                auto                fff      = std::static_pointer_cast<smesh::FFF>(domain.user_data);
+            if (fff) {
                 constexpr ptrdiff_t fff_size = 6;
                 return SFEM_TEAM_KERNEL(TEAM, vector_laplacian_apply_opt)(domain.element_type,
                                                                           ne,
                                                                           elements,
-                                                                          fff->fff_AoS()->data() + begin * fff_size,
+                                                                          fff + begin * fff_size,
                                                                           block_size,
                                                                           block_size,
                                                                           vec_in,
@@ -57,7 +58,7 @@ namespace sfem {
                                                                   ne,
                                                                   mesh.n_nodes(),
                                                                   elements,
-                                                                  mesh.points()->data(),
+                                                                  points,
                                                                   block_size,
                                                                   block_size,
                                                                   vec_in,
@@ -85,15 +86,25 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
 
         // Each block's element columns from its first SHARED_AND_AURA element on, made outside any
-        // region on a distributed mesh (prepare_interface): a scoped product builds no view.
+        // region on a distributed mesh (prepare): a scoped product builds no view.
         struct InterfaceColumns {
             ptrdiff_t            begin{0};
             std::vector<idx_t *> columns;
         };
         std::map<const smesh::Mesh::Block *, InterfaceColumns> interface;
 
-        void prepare_interface() {
+        // The points and each domain's FFF as raw pointers, taken outside any region with the
+        // interface columns: the threads of a team product copy no shared buffer.
+        geom_t                                                   **points{nullptr};
+        std::map<const smesh::Mesh::Block *, const jacobian_t *> fff;
+
+        void prepare() {
             auto mesh = space->mesh();
+            points    = mesh->points()->data();
+            for (const auto &kv : domains->domains()) {
+                if (!kv.second.user_data) continue;
+                fff[kv.second.block.get()] = static_cast<smesh::FFF *>(kv.second.user_data.get())->fff_AoS()->data();
+            }
             if (!mesh_is_distributed(*mesh)) return;
             for (const auto &kv : domains->domains()) {
                 const auto *block = kv.second.block.get();
@@ -111,8 +122,8 @@ namespace sfem {
         /// out += A h over the domain's elements of `scope`.
         template <bool TEAM>
         int apply_domain(const OpDomain &domain, const real_t *const h, real_t *const out, const ElementScope scope) {
-            auto               mesh  = space->mesh();
-            const ElementRange range = element_range(*mesh, *domain.block, scope);
+            smesh::Mesh       &mesh  = *space->mesh();
+            const ElementRange range = element_range(mesh, *domain.block, scope);
             if (range.empty()) return SFEM_SUCCESS;
 
             idx_t **elements = domain.block->elements()->data();
@@ -136,8 +147,17 @@ namespace sfem {
                 vec_in[d]  = const_cast<real_t *>(&h[d]);
                 vec_out[d] = &out[d];
             }
-            return vector_laplacian_dispatch_apply<TEAM>(
-                    domain, *mesh, block_size, elements, range.begin, range.size(), vec_in, vec_out);
+            const auto it_fff = fff.find(domain.block.get());
+            return vector_laplacian_dispatch_apply<TEAM>(domain,
+                                                         mesh,
+                                                         points,
+                                                         it_fff == fff.end() ? nullptr : it_fff->second,
+                                                         block_size,
+                                                         elements,
+                                                         range.begin,
+                                                         range.size(),
+                                                         vec_in,
+                                                         vec_out);
         }
     };
 
@@ -267,7 +287,7 @@ namespace sfem {
     }
 
     int VectorLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
-        impl_->prepare_interface();
+        impl_->prepare();
         return impl_->iterate([&](const OpDomain &domain) { return impl_->apply_domain<false>(domain, h, out, scope); });
     }
 
@@ -280,7 +300,7 @@ namespace sfem {
     }
 
     int VectorLaplacian::team_prepare() {
-        impl_->prepare_interface();
+        impl_->prepare();
         return SFEM_SUCCESS;
     }
 

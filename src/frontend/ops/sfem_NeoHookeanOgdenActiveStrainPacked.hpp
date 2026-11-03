@@ -50,6 +50,7 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
 
         bool team_supported() const override;
+        int  team_prepare() override;
         int  team_apply(const Team         &team,
                         const real_t *const x,
                         const real_t *const h,
