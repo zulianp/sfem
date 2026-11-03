@@ -3,13 +3,13 @@
 #include "quad4_laplacian_inline_cpu.hpp"
 #include "smesh_ssquad4.hpp"
 
-int ssquad4_laplacian_apply(const int                         level,
-                            const ptrdiff_t                   nelements,
-                            idx_t **const SFEM_RESTRICT       elements,
-                            geom_t **const SFEM_RESTRICT      points,
-                            const real_t *const SFEM_RESTRICT u,
-                            real_t *const SFEM_RESTRICT       values) {
-#pragma omp parallel for schedule(static)
+int ssquad4_laplacian_apply_team(const int                         level,
+                                 const ptrdiff_t                   nelements,
+                                 idx_t **const SFEM_RESTRICT       elements,
+                                 geom_t **const SFEM_RESTRICT      points,
+                                 const real_t *const SFEM_RESTRICT u,
+                                 real_t *const SFEM_RESTRICT       values) {
+#pragma omp for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
         for (int yi = 0; yi < level; ++yi) {
             for (int xi = 0; xi < level; ++xi) {
@@ -29,6 +29,26 @@ int ssquad4_laplacian_apply(const int                         level,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around ssquad4_laplacian_apply_team.
+int ssquad4_laplacian_apply(const int                         level,
+                            const ptrdiff_t                   nelements,
+                            idx_t **const SFEM_RESTRICT       elements,
+                            geom_t **const SFEM_RESTRICT      points,
+                            const real_t *const SFEM_RESTRICT u,
+                            real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = ssquad4_laplacian_apply_team(level, nelements, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int ssquad4_laplacian_diag(const int                    level,
                            const ptrdiff_t              nelements,

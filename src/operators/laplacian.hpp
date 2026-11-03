@@ -27,6 +27,15 @@ int laplacian_apply(smesh::ElemType element_type,
                     const real_t *const SFEM_RESTRICT u,
                     real_t *const SFEM_RESTRICT values);
 
+/// In the caller's parallel region (sfem_team.h): every thread calls it.
+int laplacian_apply_team(smesh::ElemType element_type,
+                         const ptrdiff_t nelements,
+                         const ptrdiff_t nnodes,
+                         idx_t **const SFEM_RESTRICT elements,
+                         geom_t **const SFEM_RESTRICT points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT values);
+
 int laplacian_assemble_gradient(smesh::ElemType element_type,
                                 const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
@@ -58,6 +67,14 @@ int laplacian_apply_opt(smesh::ElemType element_type,
                         const jacobian_t *const SFEM_RESTRICT fff,
                         const real_t *const SFEM_RESTRICT u,
                         real_t *const SFEM_RESTRICT values);
+
+/// In the caller's parallel region (sfem_team.h): every thread calls it.
+int laplacian_apply_opt_team(smesh::ElemType element_type,
+                             const ptrdiff_t nelements,
+                             idx_t **const SFEM_RESTRICT elements,
+                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const real_t *const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT values);
 
 int laplacian_crs_sym(smesh::ElemType element_type,
                       const ptrdiff_t nelements,

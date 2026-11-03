@@ -6,8 +6,9 @@
 // The mesh is the unit cube: n^3 hexahedra, n^3 cubes of tetrahedra (TET10 promoted), or n^3 macro
 // elements of degree 2.  The state is a smooth deformation (no element inverts), the increment white
 // noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call,
-// MDOF/s, the bytes the operator holds per dof (BSR: its values and column indices), and its relative
-// l2 distance to the exact apply.
+// MDOF/s, the bytes the operator holds per dof (BSR: its values and column indices), its relative
+// l2 distance to the exact apply, and a digest of its output's bits (two builds or thread counts
+// that compute the same bits print the same digest).
 // The rows reproduce the format tables of spikes/inexact_apply_compare/qp/RESULTS_QP.md from the
 // library alone.
 
@@ -62,6 +63,14 @@ namespace {
     std::vector<real_t> on_host(const sfem::SharedBuffer<real_t> &b, const sfem::ExecutionSpace es) {
         auto host = es == sfem::EXECUTION_SPACE_DEVICE ? smesh::to_host(b) : b;
         return std::vector<real_t>(host->data(), host->data() + host->size());
+    }
+
+    // FNV-1a over the bytes.
+    unsigned long long digest(const std::vector<real_t> &v) {
+        unsigned long long      h = 1469598103934665603ull;
+        const unsigned char    *p = reinterpret_cast<const unsigned char *>(v.data());
+        for (size_t i = 0; i < v.size() * sizeof(real_t); ++i) h = (h ^ p[i]) * 1099511628211ull;
+        return h;
     }
 
     double relative_difference(const std::vector<real_t> &a, const std::vector<real_t> &b) {
@@ -140,12 +149,12 @@ int main(int argc, char *argv[]) {
 #endif
     printf("bench_inexact %s %s n=%d: %ld elements, %ld dofs, %s, %d threads, %d repeats\n", material.c_str(),
            element.c_str(), n, (long)fs->mesh()->n_elements(), (long)ndofs, es_name ? es_name : "host", threads, repeats);
-    printf("%-26s %10s %10s %9s %9s %10s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "rel diff");
+    printf("%-26s %10s %10s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "rel diff", "digest");
 
     auto row = [&](const char *name, const double setup, const double apply, const double bytes, const std::vector<real_t> &out,
                    const std::vector<real_t> &exact) {
-        printf("%-26s %10.3f %10.4f %9.1f %9.1f %10.2e\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply, bytes / ndofs,
-               exact.empty() ? 0.0 : relative_difference(out, exact));
+        printf("%-26s %10.3f %10.4f %9.1f %9.1f %10.2e %016llx\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply,
+               bytes / ndofs, exact.empty() ? 0.0 : relative_difference(out, exact), digest(out));
     };
 
     // The exact apply (matrix-free): the reference.

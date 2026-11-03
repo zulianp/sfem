@@ -23,6 +23,22 @@ extern "C" int laplace_tri3_apply_a_msoa(
         const ptrdiff_t out_stride,
         void *const RSTR outx
 );
+extern "C" int laplace_tri3_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
 extern "C" int laplace_hex8_apply_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -89,6 +105,94 @@ extern "C" int laplace_tet10_apply_a_msoa(
 extern "C" int laplace_tet4_apply_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_hex8_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_proteus_hex8_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_tet10_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_tet4_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const RSTR g_met0,
@@ -408,6 +512,37 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_a_msoa(
       "laplace_apply_2d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI3:
+      return laplace_tri3_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, hx, out_stride, outx);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "laplace_apply_2d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -478,6 +613,82 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_a_met_msoa(
   }
   return sfem::codegen::unsupported_dispatch(
       "laplace_apply_3d_a_met_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8:
+      return laplace_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    case smesh::PROTEUS_HEX8:
+      return laplace_proteus_hex8_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    case smesh::TET10:
+      return laplace_tet10_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "laplace_apply_3d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_apply_3d_a_met_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_met0,
+        const geom_t *const RSTR g_met1,
+        const geom_t *const RSTR g_met2,
+        const geom_t *const RSTR g_met3,
+        const geom_t *const RSTR g_met4,
+        const geom_t *const RSTR g_met5,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TET4:
+      return laplace_tet4_apply_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, h_stride, hx, out_stride, outx);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "laplace_apply_3d_a_met_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_gradient_2d_a_msoa(

@@ -24,6 +24,11 @@ now go through this module so the two boundaries cannot disagree about what a
 runtime-typed parameter looks like.
 """
 
+from codegen.framework.plans.conventions import (
+    ABI_TEAM_TAIL,
+    TEAM_ELEMENT_RANGE_PARAMETERS,
+    WHOLE_MESH_ELEMENT_RANGE,
+)
 from codegen.framework.targets import current_target
 
 import re
@@ -188,8 +193,63 @@ def entry_point_name(public_name):
     return current_target().entry_point_name(public_name)
 
 
+def _entry_point_head(name, declared, parameter_lines):
+    lines = ['extern "C" int %s(' % entry_point_name(name)]
+    if parameter_lines is None:
+        lines.extend(
+            "    %s%s" % (param, "," if index + 1 < len(declared) else "")
+            for index, param in enumerate(declared)
+        )
+    else:
+        lines.extend(parameter_lines(declared))
+    lines.append(") {")
+    return lines
+
+
+def _team_region_entry_point_lines(public_name, declared, indent, parameter_lines):
+    """The plain entry point of a team kernel: its scalar checked, then one region
+    in which every thread calls the `_team` twin.  The check comes first so a bad
+    scalar is reported once rather than by every thread."""
+    target = current_target()
+    # The twin of a kernel walking the mesh takes an element range; this name takes the mesh.
+    whole = dict(zip(TEAM_ELEMENT_RANGE_PARAMETERS, WHOLE_MESH_ELEMENT_RANGE))
+    forwarded = [whole.get(param, parameter_name(param)) for param in declared]
+    declared = [param for param in declared if param not in whole]
+    lines = _entry_point_head(public_name, declared, parameter_lines)
+    lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
+    for scalar_type in RUNTIME_SCALAR_TYPES:
+        lines.append("%s  case (int)sizeof(%s):" % (indent, scalar_type))
+    lines.extend(
+        [
+            "%s    break;" % indent,
+            "%s  default:" % indent,
+            '%s    return sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
+            % (indent, public_name, RUNTIME_TYPE_ARGUMENT),
+            "%s}" % indent,
+            "%sint ret = SFEM_SUCCESS;" % indent,
+            target.team_region_pragma(),
+            "%s{" % indent,
+            "%s  const int err = %s(%s);"
+            % (
+                indent,
+                entry_point_name(public_name + ABI_TEAM_TAIL),
+                ", ".join(forwarded),
+            ),
+            "%s  if (err != SFEM_SUCCESS) {" % indent,
+            target.atomic_write_pragma(),
+            "%s    ret = err;" % indent,
+            "%s  }" % indent,
+            "%s}" % indent,
+            "%sreturn ret;" % indent,
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
 def runtime_typed_entry_point_lines(
-    public_name, params, call, indent="  ", parameter_lines=None
+    public_name, params, call, indent="  ", parameter_lines=None, team=None
 ):
     """One `extern "C"` entry point that selects its scalar at run time.
 
@@ -202,17 +262,21 @@ def runtime_typed_entry_point_lines(
 
     `parameter_lines` formats the declaration, defaulting to one parameter per
     line at four spaces; a caller with its own indentation passes its own.
+
+    `team`: the template is a team body (`TargetPlatform.team_body`), by default
+    when the bound target says so.  The selection is then published as the
+    `_team` twin (ABI_TEAM_TAIL), the call from inside a region, and the plain
+    name opens the region around it -- on a target that has regions; elsewhere
+    the plain entry point is the only one.
     """
-    lines = ['extern "C" int %s(' % entry_point_name(public_name)]
     declared = runtime_typed_parameters(params) + current_target().entry_point_suffix_parameters()
-    if parameter_lines is None:
-        lines.extend(
-            "    %s%s" % (param, "," if index + 1 < len(declared) else "")
-            for index, param in enumerate(declared)
-        )
-    else:
-        lines.extend(parameter_lines(declared))
-    lines.append(") {")
+    team = current_target().team_body if team is None else team
+    team = team and current_target().team_region_pragma() is not None
+    if team and has_values(params):
+        raise ValueError("%s: a team entry point selects one scalar, not a matrix value type" % public_name)
+    # The `_team` twin first: the region-opening name calls it, and not every
+    # source that defines both includes the header declaring them.
+    lines = _entry_point_head(public_name + ABI_TEAM_TAIL if team else public_name, declared, parameter_lines)
     lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
     values = has_values(params)
     for scalar_type in RUNTIME_SCALAR_TYPES:
@@ -261,4 +325,6 @@ def runtime_typed_entry_point_lines(
             "",
         ]
     )
+    if team:
+        lines.extend(_team_region_entry_point_lines(public_name, declared, indent, parameter_lines))
     return lines

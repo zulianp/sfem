@@ -487,6 +487,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int neohookean_ogden_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const RSTR g_adj0,
@@ -509,9 +511,9 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_a_msoa_impl(
   static constexpr int NC = 2;
   static constexpr int NS = 3;
 
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+#pragma omp for schedule(static)
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
@@ -600,6 +602,43 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
+extern "C" int neohookean_ogden_tri3_apply_a_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::neohookean_ogden_tri3_apply_a_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::neohookean_ogden_tri3_apply_a_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+}
+
 extern "C" int neohookean_ogden_tri3_apply_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -623,16 +662,22 @@ extern "C" int neohookean_ogden_tri3_apply_a_msoa(
         void *const RSTR outy
 ) {
   switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        return sfem::codegen::neohookean_ogden_tri3_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-    }
-    case (int)sizeof(float): {
-        return sfem::codegen::neohookean_ogden_tri3_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-    }
-    default:
+    case (int)sizeof(double):
+    case (int)sizeof(float):
       break;
+    default:
+      return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri3_apply_a_msoa", -1, (int)scalar_bytes);
   }
-  return sfem::codegen::unsupported_dispatch("neohookean_ogden_tri3_apply_a_msoa", -1, (int)scalar_bytes);
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = neohookean_ogden_tri3_apply_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

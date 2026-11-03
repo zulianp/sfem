@@ -7,6 +7,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_MatrixFreeLinearSolver.hpp"
 #include "sfem_BLAS_openmp.hpp"
+#include "sfem_TeamOperator.hpp"
 
 #include "sfem_ShiftableBlockSymJacobiKernels_openmp.hpp"
 #include "smesh_env.hpp"
@@ -14,7 +15,7 @@
 namespace sfem {
 
     template <typename T>
-    class ShiftableJacobi final : public ShiftableOperator<T> {
+    class ShiftableJacobi final : public ShiftableOperator<T>, public TeamOperator<T> {
     public:
         /// For the execution space es, on the diagonal diag.
         static std::shared_ptr<ShiftableJacobi<T>> create(const SharedBuffer<T> &diag, const ExecutionSpace es);
@@ -56,10 +57,19 @@ namespace sfem {
         /* Operator */
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("ShiftableJacobi::apply");
-
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
             blas->xypaz(inv_diag->size(), inv_diag->data(), b, 1, x);
             return SFEM_SUCCESS;
         }
+
+        /// x += D^{-1} b on the calling thread's rows, as xypaz computes it: it reads b there only.
+        void team_apply(const Team& team, const T* const b, T* const x) const override {
+            const T* const d = inv_diag->data();
+            for (ptrdiff_t i = team.begin; i < team.end; i++) x[i] = d[i] * b[i] + 1 * x[i];
+        }
+        Team team() const override { return Team::current(rows()); }
+        bool input_in_share() const override { return true; }
+        bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST; }
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
@@ -75,7 +85,7 @@ namespace sfem {
     }
 
     template <typename T>
-    class ShiftableBlockSymJacobi final : public ShiftableOperator<T> {
+    class ShiftableBlockSymJacobi final : public ShiftableOperator<T>, public TeamOperator<T> {
     public:
         /// In the execution context, on the dim x dim symmetric diagonal blocks diag.
         static std::shared_ptr<ShiftableBlockSymJacobi<T>> create(const int                   dim,
@@ -183,13 +193,41 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        /// The sparse update (shift(block_diag, scaling)) from inside a region by every thread of it,
+        /// ending on the loop's barrier.
+        bool team_shift_capable() const override {
+            return this->execution_space() == EXECUTION_SPACE_HOST && enable_sparse_update_ && block_size == 3;
+        }
+        void team_shift(const std::shared_ptr<SparseBlockVector<T>>& block_diag, const SharedBuffer<T>& scaling) override {
+            block_sym_jacobi_sparse_update_team<T, T>(block_diag->idx()->size(),
+                                                    block_diag->idx()->data(),
+                                                    diag->data(),
+                                                    block_diag->data()->data(),
+                                                    scaling->data(),
+                                                    constraints_mask->data(),
+                                                    (T)relaxation_parameter,
+                                                    inv_diag->data());
+        }
+
         /* Operator */
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("ShiftableBlockSymJacobi::apply");
+            if (team_capable()) return team_region_apply<T>(*this, x, y);
             const ptrdiff_t n_blocks = inv_diag->size() / (block_size * block_size);
             impl.apply(n_blocks, inv_diag->data(), x, y);
             return SFEM_SUCCESS;
         }
+
+        /// y += D^{-1} x on the calling thread's rows, whole blocks (team chunks start at multiples
+        /// of 12 entries), as the OpenMP kernel computes it: it reads x there only.
+        void team_apply(const Team& team, const T* const x, T* const y) const override {
+            static_assert(team_chunk_align % 3 == 0, "a team share is whole blocks of 3");
+            const T* const inv = inv_diag->data();
+            for (ptrdiff_t i = team.begin / 3; i < team.end / 3; i++) block_sym_jacobi_apply_block(i, inv, x, y);
+        }
+        Team team() const override { return Team::current(inv_diag->size() / block_size); }
+        bool input_in_share() const override { return true; }
+        bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST && block_size == 3; }
 
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }

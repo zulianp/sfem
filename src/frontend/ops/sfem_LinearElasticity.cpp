@@ -1,6 +1,7 @@
 #include "sfem_LinearElasticity.hpp"
 
 #include "linear_elasticity.hpp"
+#include "sfem_team.h"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_GeneratedLinearElasticity_c_abi.hpp"
 #include "sfem_MultiDomainOp.hpp"
@@ -311,6 +312,10 @@ namespace sfem {
                     values);
         }
 
+        /// out += A h over the domain's elements in `range_in`: by the threads of the caller's
+        /// region (TEAM, team_supported: no buffer made per call) or opening its own. The kernels'
+        /// trace scopes are the plain path's: none may open inside a region.
+        template <bool TEAM>
         int linear_elasticity_dispatch_domain_vector(const OpDomain     &domain,
                                                      smesh::Mesh        &mesh,
                                                      const real_t        mu,
@@ -333,6 +338,8 @@ namespace sfem {
             idx_t **const       view         = element_soa_view(elems, nxe, range.begin, stack_view, heap_view);
 
             if (is_quad_ss_linear_elasticity(element_type)) {
+                // The micro quadrilaterals are expanded for the call.
+                if constexpr (TEAM) return SFEM_FAILURE;
                 return linear_elasticity_quad_ss_apply_aos(element_type,
                                                            ne,
                                                            mesh.n_nodes(),
@@ -347,7 +354,6 @@ namespace sfem {
                 auto             jac = std::static_pointer_cast<smesh::JacobianAdjugateAndDeterminant>(domain.user_data);
                 const geom_t    *det = jac->jacobian_determinant()->data() + range.begin;
                 if (element_type == smesh::HEX8) {
-                    SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_soa");
                     jacobian_t *adj_rows[9];
                     auto        adj = jac->jacobian_adjugate_SoA()->data();
                     if (range.begin != 0) {
@@ -356,7 +362,7 @@ namespace sfem {
                         }
                         adj = adj_rows;
                     }
-                    return linear_elasticity_apply_adjugate_soa(element_type,
+                    return SFEM_TEAM_KERNEL(TEAM, linear_elasticity_apply_adjugate_soa)(element_type,
                                                                 ne,
                                                                 mesh.n_nodes(),
                                                                 view,
@@ -368,9 +374,8 @@ namespace sfem {
                                                                 h,
                                                                 out);
                 }
-                SFEM_TRACE_SCOPE("linear_elasticity_apply_adjugate_aos");
                 constexpr ptrdiff_t adjugate_size = 9;
-                return linear_elasticity_apply_adjugate_aos(element_type,
+                return SFEM_TEAM_KERNEL(TEAM, linear_elasticity_apply_adjugate_aos)(element_type,
                                                             ne,
                                                             mesh.n_nodes(),
                                                             view,
@@ -382,7 +387,7 @@ namespace sfem {
                                                             h,
                                                             out);
             }
-            return linear_elasticity_apply_aos(element_type,
+            return SFEM_TEAM_KERNEL(TEAM, linear_elasticity_apply_aos)(element_type,
                                                ne,
                                                mesh.n_nodes(),
                                                view,
@@ -765,7 +770,39 @@ namespace sfem {
     int LinearElasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("LinearElasticity::apply");
         SFEM_OP_CAPTURE();
-        return apply(x, h, out, ElementScope::ALL);
+        if (!team_supported()) return apply(x, h, out, ElementScope::ALL);
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
+
+    // Without a buffer made per call: every element but the semi-structured quadrilaterals,
+    // whose micro elements are expanded for each product.
+    bool LinearElasticity::team_supported() const {
+        for (const auto &kv : impl_->domains->domains()) {
+            if (is_quad_ss_linear_elasticity(kv.second.element_type)) return false;
+        }
+        return true;
+    }
+
+    int LinearElasticity::team_prepare() {
+        impl_->domains->prepare_views();
+        return SFEM_SUCCESS;
+    }
+
+    int LinearElasticity::team_apply(const Team &team,
+                                     const real_t *const /*x*/,
+                                     const real_t *const h,
+                                     real_t *const       out,
+                                     const ElementScope  scope) {
+        (void)team;
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) {
+            auto lambda = domain.parameters->require_real_value("lambda");
+            auto mu     = domain.parameters->require_real_value("mu");
+            return linear_elasticity_dispatch_domain_vector<true>(
+                    domain, *mesh, mu, lambda, h, out, domain_element_range(*mesh, domain, scope));
+        });
     }
 
     int LinearElasticity::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
@@ -775,7 +812,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
-            return linear_elasticity_dispatch_domain_vector(
+            return linear_elasticity_dispatch_domain_vector<false>(
                     domain, *mesh, mu, lambda, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
@@ -788,41 +825,9 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) {
             auto lambda = domain.parameters->require_real_value("lambda");
             auto mu     = domain.parameters->require_real_value("mu");
-            return linear_elasticity_dispatch_domain_vector(
+            return linear_elasticity_dispatch_domain_vector<false>(
                     domain, *mesh, mu, lambda, h, out, domain_element_range(*mesh, domain, scope));
         });
-    }
-
-    int LinearElasticity::apply_scope_flat_range(const real_t *const /*x*/,
-                                                 const real_t *const h,
-                                                 real_t *const       out,
-                                                 const ElementScope  scope,
-                                                 const ptrdiff_t     flat_begin,
-                                                 const ptrdiff_t     flat_end) {
-        SFEM_TRACE_SCOPE("LinearElasticity::apply_scope_flat_range");
-        SFEM_OP_CAPTURE();
-
-        if (flat_end <= flat_begin) {
-            return SFEM_SUCCESS;
-        }
-
-        auto mesh = impl_->space->mesh();
-        int  err  = SFEM_SUCCESS;
-        for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
-            const smesh::block_idx_t block = slice.block;
-            const ElementRange       range = slice.range;
-            if (impl_->iterate([&](const OpDomain &domain) {
-                    if (block_id_for_domain(*mesh, *domain.block) != block) {
-                        return SFEM_SUCCESS;
-                    }
-                    auto lambda = domain.parameters->require_real_value("lambda");
-                    auto mu     = domain.parameters->require_real_value("mu");
-                    return linear_elasticity_dispatch_domain_vector(domain, *mesh, mu, lambda, h, out, range);
-                }) != SFEM_SUCCESS) {
-                err = SFEM_FAILURE;
-            }
-        }
-        return err;
     }
 
     int LinearElasticity::value(const real_t *x, real_t *const out) {

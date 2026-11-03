@@ -763,26 +763,6 @@ namespace sfem {
             });
         }
 
-        int apply_scope_flat_range(const real_t *const /*x*/,
-                                   const real_t *const h,
-                                   real_t *const       out,
-                                   const ElementScope  scope,
-                                   const ptrdiff_t     flat_begin,
-                                   const ptrdiff_t     flat_end) override {
-            if (flat_end <= flat_begin) {
-                return SFEM_SUCCESS;
-            }
-
-            auto mesh = space->mesh();
-            int  err  = SFEM_SUCCESS;
-            for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
-                if (gpu_laplacian_apply_block(*mesh, slice.block, slice.range, h, out) != SFEM_SUCCESS) {
-                    err = SFEM_FAILURE;
-                }
-            }
-            return err;
-        }
-
         int gpu_laplacian_block_vector(const OpDomain &domain, const real_t *const in, real_t *const out, const ElementRange range) {
             auto op_data = std::static_pointer_cast<GPULaplacianOpData>(domain.user_data);
             if (range.empty()) {

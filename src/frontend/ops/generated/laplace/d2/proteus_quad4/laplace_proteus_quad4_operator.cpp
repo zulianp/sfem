@@ -505,6 +505,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
@@ -524,9 +526,9 @@ static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+#pragma omp for schedule(static)
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     idx_t ev[VS * NS];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
@@ -622,6 +624,33 @@ static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
+extern "C" int laplace_proteus_quad4_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
 extern "C" int laplace_proteus_quad4_apply_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -635,16 +664,22 @@ extern "C" int laplace_proteus_quad4_apply_i_msoa(
         void *const RSTR outx
 ) {
   switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-    }
-    case (int)sizeof(float): {
-        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-    }
-    default:
+    case (int)sizeof(double):
+    case (int)sizeof(float):
       break;
+    default:
+      return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
   }
-  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = laplace_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, points, kappa, h_stride, hx, out_stride, outx);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 

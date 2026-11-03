@@ -82,7 +82,10 @@ output: {probes: [{type: contact}]}
         iterations[0] = iterations[1] = 0;
         serial->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[0] += it.iteration > 0; });
         dist->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[1] += it.iteration > 0; });
-        if (serial->run() != SFEM_SUCCESS || dist->run() != SFEM_SUCCESS) return SFEM_FAILURE;
+        // Every rank reaches every collective below: a failure on one rank is reported by all.
+        const char *failed = nullptr;
+        if (serial->run() != SFEM_SUCCESS) failed = "the serial run";
+        if (dist->run() != SFEM_SUCCESS) failed = "the distributed run";
 
         auto                 sm = serial->function()->space()->mesh();
         const geom_t *const *sp = sm->points()->data();
@@ -99,14 +102,19 @@ output: {probes: [{type: contact}]}
 #endif
         const real_t *ud = dsol->data();
         real_t               worst = 0, scale = 0;
-        for (ptrdiff_t i = 0; i < owned; ++i) {
+        for (ptrdiff_t i = 0; i < owned && !failed; ++i) {
             auto found = at.find(key(dp[0][i], dp[1][i], dp[2][i]));
-            if (found == at.end()) return SFEM_FAILURE;
+            if (found == at.end()) {
+                failed = "an owned node absent from the serial mesh";
+                break;
+            }
             for (int d = 0; d < 3; ++d) {
                 worst = std::max(worst, std::abs(ud[i * 3 + d] - us[found->second * 3 + d]));
                 scale = std::max(scale, std::abs(us[found->second * 3 + d]));
             }
         }
+        if (failed) printf("  rank %d: %s failed\n", world->rank(), failed);
+        if (world->max(real_t(failed ? 1 : 0)) > 0) return SFEM_FAILURE;
         *relative = world->max(worst) / world->max(scale);
         return SFEM_SUCCESS;
     }
@@ -141,6 +149,35 @@ int test_release_matches_serial() {
     }
     SFEM_TEST_ASSERT(relative < 1e-8);
     SFEM_TEST_ASSERT(its[0] == its[1]);
+    return SFEM_TEST_SUCCESS;
+}
+
+// The QP's tangent stored per element (INEXACT): the distributed product in team form, its
+// interior elements while the halo is in flight (create_distributed_team_operator). A point store
+// in double and the assembled block store in half precision, each against the serial solve with
+// the same store.
+int test_inexact_matches_serial() {
+    const struct {
+        const char *store;
+        real_t      tolerance;
+    } stores[] = {{"{store: points, encoding: f64}", real_t(1e-8)}, {"{store: bsr, encoding: f16}", real_t(1e-5)}};
+    for (const auto &st : stores) {
+        real_t relative = 1;
+        int    its[2]   = {0, 0};
+        SFEM_TEST_ASSERT(compare({"solver.linear.format=INEXACT", std::string("solver.linear.inexact=") + st.store},
+                                 &relative,
+                                 its) == SFEM_SUCCESS);
+        if (sfem::Communicator::world()->rank() == 0) {
+            printf("  inexact %s: %d ranks against one, %.3g relative, %d and %d Newton\n",
+                   st.store,
+                   sfem::Communicator::world()->size(),
+                   (double)relative,
+                   its[1],
+                   its[0]);
+        }
+        SFEM_TEST_ASSERT(relative < st.tolerance);
+        SFEM_TEST_ASSERT(its[0] == its[1]);
+    }
     return SFEM_TEST_SUCCESS;
 }
 
@@ -457,6 +494,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_utopia_scheme_matches_serial);
     SFEM_RUN_TEST(test_release_matches_serial);
+    SFEM_RUN_TEST(test_inexact_matches_serial);
     SFEM_RUN_TEST(test_block_read_and_output_match_serial);
     SFEM_RUN_TEST(test_strokes_match_serial);
 #ifdef SFEM_ENABLE_CUDA

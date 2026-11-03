@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from enum import Enum
 
+from codegen.framework.plans.conventions import TEAM_ELEMENT_RANGE_ARGUMENTS
 from codegen.framework.ir.kernel_ast import (
     BlockNode,
     BufferDeclNode,
@@ -89,6 +90,36 @@ class TargetPlatform:
     #: constant, no `[VS]` extent, no work-item loop, no slot to index and the
     #: scalar rendering of the shared micro-kernels.
     work_item_holds_a_block: bool = True
+    #: Whether the kernel body being emitted runs on the threads of a parallel
+    #: region its caller opened (a solver's region, sfem_TeamOperator.hpp) rather
+    #: than opening one.  Its loops are then shared out by worksharing constructs
+    #: that bind to that region -- `omp for` without `parallel` -- and a block
+    #: that would open a region is one every thread runs.  The kernel's entry
+    #: point opens the region itself (`team_region_pragma`) for a caller outside
+    #: one, and its `_team` twin is the call from inside.
+    team_body: bool = False
+
+    def running_in_a_team(self):
+        """This target for a body that runs on its caller's region (`team_body`)."""
+        return dataclass_replace(self, team_body=True)
+
+    def walks_an_element_range(self):
+        """Whether the mesh pass being emitted walks its caller's element range.
+
+        A team body does, on a target with regions: its `_team` twin takes
+        [`element_begin`, `element_end`) (TEAM_ELEMENT_RANGE_PARAMETERS) and the
+        plain entry point passes the whole mesh, so that a distributed operator
+        applies the elements away from its interface while the halo is in flight
+        and the others after (sfem_ElementScope.hpp).  The elements stay
+        indexed by their number in the block: the range moves no array.
+        """
+        return self.team_body and self.team_region_pragma() is not None
+
+    def mesh_element_bounds(self):
+        """The first element of the mesh pass, and the end of it."""
+        if self.walks_an_element_range():
+            return TEAM_ELEMENT_RANGE_ARGUMENTS
+        return ("0", "nelements")
 
     def holding_one_element(self):
         """This target with the block taken away.
@@ -151,6 +182,17 @@ class TargetPlatform:
 
     def worksharing_for_pragma(self, schedule=None):
         """The pragma sharing a loop's iterations inside an open region."""
+        return None
+
+    def team_region_pragma(self):
+        """The pragma a team kernel's entry point opens its region with, or `None`.
+
+        Not `parallel_region_pragma`: that one answers for the body being
+        emitted, which in a team body opens none.
+        """
+        return None
+
+    def atomic_write_pragma(self):
         return None
 
     def vectorize_pragma(self):
@@ -387,20 +429,21 @@ class TargetPlatform:
         `emitters/ast_printer.mesh_loop_lines` spells it.
         """
         tile_iterator = iterator("evb", "ptrdiff_t")
+        first, end = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.TILE,
                     tile_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
-                        expr_ref("nelements", "element_count"),
+                        expr_ref(first, "first_element"),
+                        expr_ref(end, "element_count"),
                     ),
                     add_assign_increment(tile_iterator, expr_ref("VS", "vector_width")),
                 )
             ),
             BufferDeclNode(
-                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, nelements - evb)"
+                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, %s - evb)" % end
             ),
         )
 
@@ -416,13 +459,16 @@ class TargetPlatform:
         decides is how the pass is opened, not what it counts.
         """
         element_iterator = iterator(index, "ptrdiff_t")
+        first = "0"
+        if extent == "nelements":
+            first, extent = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.KERNEL,
                     element_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
+                        expr_ref(first, "first_element"),
                         expr_ref(extent, "element_count"),
                     ),
                     pre_increment(element_iterator),
@@ -742,6 +788,12 @@ class OpenMPTarget(TargetPlatform):
         return "RSTR"
 
     def parallel_for_pragma(self, schedule=None, reduction=None):
+        if self.team_body:
+            # A reduction into the body's locals would be private to each thread
+            # of the caller's region; a team body takes none.
+            if reduction:
+                raise ValueError("a team body takes no reduction clause (%s)" % reduction)
+            return self.worksharing_for_pragma(schedule)
         pragma = "#pragma omp parallel for"
         if schedule:
             pragma += " schedule(%s)" % str(schedule)
@@ -750,7 +802,13 @@ class OpenMPTarget(TargetPlatform):
         return pragma
 
     def parallel_region_pragma(self):
+        return None if self.team_body else "#pragma omp parallel"
+
+    def team_region_pragma(self):
         return "#pragma omp parallel"
+
+    def atomic_write_pragma(self):
+        return "#pragma omp atomic write"
 
     def worksharing_for_pragma(self, schedule=None):
         pragma = "#pragma omp for"

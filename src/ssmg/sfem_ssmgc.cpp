@@ -12,7 +12,6 @@
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_parallel_cg.hpp"
 #include "smesh_env.hpp"
 #include "smesh_ssedge_restriction.hpp"
 #include "smesh_ssquad4.hpp"
@@ -839,7 +838,7 @@ namespace sfem {
             auto linear_op = sfem::create_linear_operator(coarse_op_type.c_str(), f_coarse, nullptr, es);
             operators.push_back(linear_op);
 
-            // Coarse-grid solver. MPI uses ParallelCG on matrix-free A; serial uses CG on BSR.
+            // Coarse-grid solver: CG, distributed under MPI, on the coarse operator.
             // Both get the same block-Jacobi PC so the coarse correction matches serial rates.
             std::shared_ptr<sfem::Operator<real_t>> sj_coarse;
             if (enable_coarse_space_preconditioner && block_size == 3) {
@@ -858,19 +857,10 @@ namespace sfem {
                 }
             }
 
+            // Distributed where the coarse operator is (ConjugateGradient::set_op).
             std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> coarse_solver;
-            auto coarse_pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(linear_op);
-            if (coarse_pop && coarse_pop->comm() && coarse_pop->comm()->size() > 1) {
-                auto pcg = sfem::create_parallel_cg<real_t>(coarse_pop);
-                pcg->set_max_it(max_coarse_it);
-                pcg->verbose = coarse_solver_verbose;
-                pcg->set_rtol(coarse_rtol);
-                if (sj_coarse) {
-                    pcg->set_preconditioner_op(sj_coarse);
-                }
-                coarse_solver = pcg;
-            } else {
-                auto cg = sfem::create_cg<real_t>(operators.back(), es);
+            {
+                auto cg = sfem::create_cg<real_t>(linear_op, es);
                 cg->set_max_it(max_coarse_it);
                 cg->verbose = coarse_solver_verbose;
                 cg->set_rtol(coarse_rtol);
@@ -897,17 +887,25 @@ namespace sfem {
                 SFEM_TRACE_SCOPE("create_ssgmg::construct");
                 // Construct actual multigrid
 
-                auto restriction_unconstr =
-                        sfem::create_hierarchical_restriction(levels[0]->function->space(), levels[1]->function->space(), es);
-                auto f_coarse    = levels[1]->function;
-                auto restriction = sfem::make_op<real_t>(
-                        restriction_unconstr->rows(),
-                        restriction_unconstr->cols(),
-                        [=](const real_t *const from, real_t *const to) {
-                            restriction_unconstr->apply(from, to);
-                            f_coarse->apply_zero_constraints(to);
-                        },
-                        es);
+                // A transfer, then the constrained dofs of the space it maps into zeroed.
+                auto restriction_between = [&](const int fine, const int coarse) {
+                    return sfem::create_constrained_transfer(
+                            sfem::create_hierarchical_restriction(
+                                    levels[fine]->function->space(), levels[coarse]->function->space(), es),
+                            levels[coarse]->function,
+                            levels[fine]->function->space()->n_dofs(),
+                            es);
+                };
+                auto prolongation_between = [&](const int coarse, const int fine) {
+                    return sfem::create_constrained_transfer(
+                            sfem::create_hierarchical_prolongation(
+                                    levels[coarse]->function->space(), levels[fine]->function->space(), es),
+                            levels[fine]->function,
+                            levels[coarse]->function->space()->n_dofs(),
+                            es);
+                };
+
+                auto restriction = restriction_between(0, 1);
 
                 mg->add_level(operators[0], smoothers_or_solver[0], nullptr, restriction);
 
@@ -915,44 +913,13 @@ namespace sfem {
                 // Intermediate levels
                 // ----------------------------------
                 for (int i = 1; i < nlevels - 1; i++) {
-                    auto restriction_unconstr = sfem::create_hierarchical_restriction(
-                            levels[i]->function->space(), levels[i + 1]->function->space(), es);
-                    auto f_coarse    = levels[i + 1]->function;
-                    auto restriction = sfem::make_op<real_t>(
-                            restriction_unconstr->rows(),
-                            restriction_unconstr->cols(),
-                            [=](const real_t *const from, real_t *const to) {
-                                restriction_unconstr->apply(from, to);
-                                f_coarse->apply_zero_constraints(to);
-                            },
-                            es);
-
-                    auto prolong_unconstr = sfem::create_hierarchical_prolongation(
-                            levels[i]->function->space(), levels[i - 1]->function->space(), es);
-
-                    auto prolongation = sfem::make_op<real_t>(
-                            prolong_unconstr->rows(),
-                            prolong_unconstr->cols(),
-                            [prolong_unconstr, f = levels[i - 1]->function](const real_t *const from, real_t *const to) {
-                                prolong_unconstr->apply(from, to);
-                                f->apply_zero_constraints(to);
-                            },
-                            es);
+                    auto restriction  = restriction_between(i, i + 1);
+                    auto prolongation = prolongation_between(i, i - 1);
 
                     mg->add_level(operators[i], smoothers_or_solver[i], prolongation, restriction);
                 }
 
-                auto prolong_unconstr = sfem::create_hierarchical_prolongation(
-                        levels.back()->function->space(), levels[nlevels - 2]->function->space(), es);
-
-                auto prolongation = sfem::make_op<real_t>(
-                        prolong_unconstr->rows(),
-                        prolong_unconstr->cols(),
-                        [prolong_unconstr, f = levels[nlevels - 2]->function](const real_t *const from, real_t *const to) {
-                            prolong_unconstr->apply(from, to);
-                            f->apply_zero_constraints(to);
-                        },
-                        es);
+                auto prolongation = prolongation_between(nlevels - 1, nlevels - 2);
 
                 // ----------------------------------
                 // Coarse level
@@ -980,7 +947,13 @@ namespace sfem {
                 }
                 mg->add_level_exchange(ex);
                 auto f = levels[i]->function;
-                mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); });
+                if (es == EXECUTION_SPACE_HOST && f->team_constraints_supported()) {
+                    mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); },
+                                                         [f](const Team &team, real_t *const x) { f->team_apply_zero_constraints(team, x); },
+                                                         [f] { return f->team_prepare_constraints(); });
+                } else {
+                    mg->add_level_apply_zero_constraints([f](real_t *const x) { f->apply_zero_constraints(x); });
+                }
             }
 
             if (nonlinear) {

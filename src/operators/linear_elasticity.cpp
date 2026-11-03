@@ -1,5 +1,7 @@
 #include "linear_elasticity.hpp"
 
+#include "sfem_team.h"
+
 #include "hex8_linear_elasticity.hpp"
 #include "sfem_defs.hpp"
 #include "sshex8_linear_elasticity.hpp"
@@ -257,19 +259,20 @@ int linear_elasticity_assemble_diag_aos(const smesh::ElemType        element_typ
     return SFEM_FAILURE;
 }
 
-int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
-                                const ptrdiff_t                   nelements,
-                                const ptrdiff_t                   nnodes,
-                                idx_t **const SFEM_RESTRICT       elements,
-                                geom_t **const SFEM_RESTRICT      points,
-                                const real_t                      mu,
-                                const real_t                      lambda,
-                                const real_t *const SFEM_RESTRICT u,
-                                real_t *const SFEM_RESTRICT       values) {
+template <bool TEAM>
+static int linear_elasticity_apply_aos_dispatch(const smesh::ElemType             element_type,
+                                                const ptrdiff_t                   nelements,
+                                                const ptrdiff_t                   nnodes,
+                                                idx_t **const SFEM_RESTRICT       elements,
+                                                geom_t **const SFEM_RESTRICT      points,
+                                                const real_t                      mu,
+                                                const real_t                      lambda,
+                                                const real_t *const SFEM_RESTRICT u,
+                                                real_t *const SFEM_RESTRICT       values) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
         if (smesh::is_hex_ss_family(element_type)) {
-            return sshex8_linear_elasticity_apply(level,
+            return SFEM_TEAM_KERNEL(TEAM, sshex8_linear_elasticity_apply)(level,
                                                   nelements,
                                                   nnodes,
                                                   elements,
@@ -286,18 +289,18 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                                   &values[2]);
         }
         if (smesh::is_tet_ss_family(element_type)) {
-            return sstet4_linear_elasticity_apply_points(level, nelements, elements, points, mu, lambda, u, values);
+            return SFEM_TEAM_KERNEL(TEAM, sstet4_linear_elasticity_apply_points)(level, nelements, elements, points, mu, lambda, u, values);
         }
         return linear_elasticity_ss_not_implemented("linear_elasticity_apply_aos", element_type);
     }
 
     switch (element_type) {
         case smesh::TRI3: {
-            return tri3_linear_elasticity_apply(
+            return SFEM_TEAM_KERNEL(TEAM, tri3_linear_elasticity_apply)(
                     nelements, nnodes, elements, points, mu, lambda, 2, &u[0], &u[1], 2, &values[0], &values[1]);
         }
         case smesh::TET4: {
-            return tet4_linear_elasticity_apply(nelements,
+            return SFEM_TEAM_KERNEL(TEAM, tet4_linear_elasticity_apply)(nelements,
                                                 nnodes,
                                                 elements,
                                                 points,
@@ -313,7 +316,7 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                                 &values[2]);
         }
         case smesh::HEX8: {
-            return hex8_linear_elasticity_apply(nelements,
+            return SFEM_TEAM_KERNEL(TEAM, hex8_linear_elasticity_apply)(nelements,
                                                 nnodes,
                                                 elements,
                                                 points,
@@ -329,7 +332,7 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                                 &values[2]);
         }
         case smesh::MACRO_TET4: {
-            return macro_tet4_linear_elasticity_apply(nelements,
+            return SFEM_TEAM_KERNEL(TEAM, macro_tet4_linear_elasticity_apply)(nelements,
                                                       nnodes,
                                                       elements,
                                                       points,
@@ -345,7 +348,7 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
                                                       &values[2]);
         }
         case smesh::TET10: {
-            return tet10_linear_elasticity_apply(nelements,
+            return SFEM_TEAM_KERNEL(TEAM, tet10_linear_elasticity_apply)(nelements,
                                                  nnodes,
                                                  elements,
                                                  points,
@@ -371,21 +374,46 @@ int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
     return SFEM_FAILURE;
 }
 
-int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 element_type,
-                                         const ptrdiff_t                       nelements,
-                                         const ptrdiff_t                       nnodes,
-                                         idx_t **const SFEM_RESTRICT           elements,
-                                         geom_t **const SFEM_RESTRICT          points,
-                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
-                                         const geom_t *const SFEM_RESTRICT     jacobian_determinant,
-                                         const real_t                          mu,
-                                         const real_t                          lambda,
-                                         const real_t *const SFEM_RESTRICT     u,
-                                         real_t *const SFEM_RESTRICT           values) {
+int linear_elasticity_apply_aos(const smesh::ElemType             element_type,
+                                const ptrdiff_t                   nelements,
+                                const ptrdiff_t                   nnodes,
+                                idx_t **const SFEM_RESTRICT       elements,
+                                geom_t **const SFEM_RESTRICT      points,
+                                const real_t                      mu,
+                                const real_t                      lambda,
+                                const real_t *const SFEM_RESTRICT u,
+                                real_t *const SFEM_RESTRICT       values) {
+    return linear_elasticity_apply_aos_dispatch<false>(element_type, nelements, nnodes, elements, points, mu, lambda, u, values);
+}
+
+int linear_elasticity_apply_aos_team(const smesh::ElemType             element_type,
+                                     const ptrdiff_t                   nelements,
+                                     const ptrdiff_t                   nnodes,
+                                     idx_t **const SFEM_RESTRICT       elements,
+                                     geom_t **const SFEM_RESTRICT      points,
+                                     const real_t                      mu,
+                                     const real_t                      lambda,
+                                     const real_t *const SFEM_RESTRICT u,
+                                     real_t *const SFEM_RESTRICT       values) {
+    return linear_elasticity_apply_aos_dispatch<true>(element_type, nelements, nnodes, elements, points, mu, lambda, u, values);
+}
+
+template <bool TEAM>
+static int linear_elasticity_apply_adjugate_aos_dispatch(const smesh::ElemType                 element_type,
+                                                         const ptrdiff_t                       nelements,
+                                                         const ptrdiff_t                       nnodes,
+                                                         idx_t **const SFEM_RESTRICT           elements,
+                                                         geom_t **const SFEM_RESTRICT          points,
+                                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT     jacobian_determinant,
+                                                         const real_t                          mu,
+                                                         const real_t                          lambda,
+                                                         const real_t *const SFEM_RESTRICT     u,
+                                                         real_t *const SFEM_RESTRICT           values) {
     // Affine kernels only: HEX8 uses corner adjugate; semistructured hex uses macro-element adjugate at (1/2,1/2,1/2).
 
     if (element_type == smesh::HEX8) {
-        return affine_hex8_linear_elasticity_apply_adjugate(nelements,
+        return SFEM_TEAM_KERNEL(TEAM, affine_hex8_linear_elasticity_apply_adjugate)(nelements,
                                                             nnodes,
                                                             elements,
                                                             jacobian_adjugate,
@@ -407,7 +435,7 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
             return linear_elasticity_ss_not_implemented("linear_elasticity_apply_adjugate_aos", element_type);
         }
         const int level = smesh::semistructured_level(element_type);
-        return affine_sshex8_linear_elasticity_apply_macro_adjugate(level,
+        return SFEM_TEAM_KERNEL(TEAM, affine_sshex8_linear_elasticity_apply_macro_adjugate)(level,
                                                                     nelements,
                                                                     nnodes,
                                                                     elements,
@@ -430,21 +458,50 @@ int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 e
     return SFEM_FAILURE;
 }
 
-int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                        element_type,
-                                         const ptrdiff_t                              nelements,
-                                         const ptrdiff_t                              nnodes,
-                                         idx_t **const SFEM_RESTRICT                  elements,
-                                         geom_t **const SFEM_RESTRICT                 points,
-                                         const jacobian_t *const SFEM_RESTRICT *const jacobian_adjugate,
-                                         const geom_t *const SFEM_RESTRICT            jacobian_determinant,
-                                         const real_t                                 mu,
-                                         const real_t                                 lambda,
-                                         const real_t *const SFEM_RESTRICT            u,
-                                         real_t *const SFEM_RESTRICT                  values) {
+int linear_elasticity_apply_adjugate_aos(const smesh::ElemType                 element_type,
+                                         const ptrdiff_t                       nelements,
+                                         const ptrdiff_t                       nnodes,
+                                         idx_t **const SFEM_RESTRICT           elements,
+                                         geom_t **const SFEM_RESTRICT          points,
+                                         const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT     jacobian_determinant,
+                                         const real_t                          mu,
+                                         const real_t                          lambda,
+                                         const real_t *const SFEM_RESTRICT     u,
+                                         real_t *const SFEM_RESTRICT           values) {
+    return linear_elasticity_apply_adjugate_aos_dispatch<false>(element_type, nelements, nnodes, elements, points, jacobian_adjugate, jacobian_determinant, mu, lambda, u, values);
+}
+
+int linear_elasticity_apply_adjugate_aos_team(const smesh::ElemType                 element_type,
+                                              const ptrdiff_t                       nelements,
+                                              const ptrdiff_t                       nnodes,
+                                              idx_t **const SFEM_RESTRICT           elements,
+                                              geom_t **const SFEM_RESTRICT          points,
+                                              const jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                              const geom_t *const SFEM_RESTRICT     jacobian_determinant,
+                                              const real_t                          mu,
+                                              const real_t                          lambda,
+                                              const real_t *const SFEM_RESTRICT     u,
+                                              real_t *const SFEM_RESTRICT           values) {
+    return linear_elasticity_apply_adjugate_aos_dispatch<true>(element_type, nelements, nnodes, elements, points, jacobian_adjugate, jacobian_determinant, mu, lambda, u, values);
+}
+
+template <bool TEAM>
+static int linear_elasticity_apply_adjugate_soa_dispatch(const smesh::ElemType                        element_type,
+                                                         const ptrdiff_t                              nelements,
+                                                         const ptrdiff_t                              nnodes,
+                                                         idx_t **const SFEM_RESTRICT                  elements,
+                                                         geom_t **const SFEM_RESTRICT                 points,
+                                                         const jacobian_t *const SFEM_RESTRICT *const jacobian_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                                         const real_t                                 mu,
+                                                         const real_t                                 lambda,
+                                                         const real_t *const SFEM_RESTRICT            u,
+                                                         real_t *const SFEM_RESTRICT                  values) {
     SFEM_UNUSED(points);
 
     if (element_type == smesh::HEX8) {
-        return affine_hex8_linear_elasticity_apply_adjugate_soa(nelements,
+        return SFEM_TEAM_KERNEL(TEAM, affine_hex8_linear_elasticity_apply_adjugate_soa)(nelements,
                                                                 nnodes,
                                                                 elements,
                                                                 jacobian_adjugate,
@@ -463,6 +520,34 @@ int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                  
 
     SFEM_ERROR("linear_elasticity_apply_adjugate_soa not implemented for type %s\n", type_to_string(element_type));
     return SFEM_FAILURE;
+}
+
+int linear_elasticity_apply_adjugate_soa(const smesh::ElemType                        element_type,
+                                         const ptrdiff_t                              nelements,
+                                         const ptrdiff_t                              nnodes,
+                                         idx_t **const SFEM_RESTRICT                  elements,
+                                         geom_t **const SFEM_RESTRICT                 points,
+                                         const jacobian_t *const SFEM_RESTRICT *const jacobian_adjugate,
+                                         const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                         const real_t                                 mu,
+                                         const real_t                                 lambda,
+                                         const real_t *const SFEM_RESTRICT            u,
+                                         real_t *const SFEM_RESTRICT                  values) {
+    return linear_elasticity_apply_adjugate_soa_dispatch<false>(element_type, nelements, nnodes, elements, points, jacobian_adjugate, jacobian_determinant, mu, lambda, u, values);
+}
+
+int linear_elasticity_apply_adjugate_soa_team(const smesh::ElemType                        element_type,
+                                              const ptrdiff_t                              nelements,
+                                              const ptrdiff_t                              nnodes,
+                                              idx_t **const SFEM_RESTRICT                  elements,
+                                              geom_t **const SFEM_RESTRICT                 points,
+                                              const jacobian_t *const SFEM_RESTRICT *const jacobian_adjugate,
+                                              const geom_t *const SFEM_RESTRICT            jacobian_determinant,
+                                              const real_t                                 mu,
+                                              const real_t                                 lambda,
+                                              const real_t *const SFEM_RESTRICT            u,
+                                              real_t *const SFEM_RESTRICT                  values) {
+    return linear_elasticity_apply_adjugate_soa_dispatch<true>(element_type, nelements, nnodes, elements, points, jacobian_adjugate, jacobian_determinant, mu, lambda, u, values);
 }
 
 int linear_elasticity_crs_soa(const smesh::ElemType              element_type,

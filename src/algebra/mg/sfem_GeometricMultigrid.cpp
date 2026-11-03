@@ -8,8 +8,8 @@
 #include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_Stationary.hpp"
+#include "sfem_TeamOperator.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_parallel_cg.hpp"
 #include "smesh_env.hpp"
 #include "smesh_semistructured.hpp"
 
@@ -74,33 +74,17 @@ namespace sfem {
         }
 
         auto create_r = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
-            auto restriction_unconstr =
-                    sfem::create_hierarchical_restriction(data->functions[i]->space(), data->functions[i + 1]->space(), es);
-            auto f_coarse = data->functions[i + 1];
-
-            auto restriction = sfem::make_op<real_t>(
-                    restriction_unconstr->rows(),
-                    restriction_unconstr->cols(),
-                    [=](const real_t *const from, real_t *const to) {
-                        restriction_unconstr->apply(from, to);
-                        f_coarse->apply_zero_constraints(to);
-                    },
-                    es);
-            return restriction;
+            auto fine   = data->functions[i];
+            auto coarse = data->functions[i + 1];
+            return create_constrained_transfer(
+                    sfem::create_hierarchical_restriction(fine->space(), coarse->space(), es), coarse, fine->space()->n_dofs(), es);
         };
 
         auto create_p = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
-            auto prolong_unconstr =
-                    sfem::create_hierarchical_prolongation(data->functions[i]->space(), data->functions[i - 1]->space(), es);
-            auto prolongation = sfem::make_op<real_t>(
-                    prolong_unconstr->rows(),
-                    prolong_unconstr->cols(),
-                    [prolong_unconstr, f = data->functions[i - 1]](const real_t *const from, real_t *const to) {
-                        prolong_unconstr->apply(from, to);
-                        f->apply_zero_constraints(to);
-                    },
-                    es);
-            return prolongation;
+            auto coarse = data->functions[i];
+            auto fine   = data->functions[i - 1];
+            return create_constrained_transfer(
+                    sfem::create_hierarchical_prolongation(coarse->space(), fine->space(), es), fine, coarse->space()->n_dofs(), es);
         };
 
         data->prolongations.push_back(nullptr);
@@ -197,16 +181,9 @@ namespace sfem {
             smoothers.push_back(smoother);
         }
 
+        // Distributed where the coarse operator is (ConjugateGradient::set_op).
         std::shared_ptr<MatrixFreeLinearSolver<real_t>> coarse_solver;
-        auto coarse_pop = std::dynamic_pointer_cast<ParallelOperator<real_t>>(ops.back());
-        if (coarse_pop && coarse_pop->comm() && coarse_pop->comm()->size() > 1) {
-            auto pcg = sfem::create_parallel_cg<real_t>(coarse_pop);
-            pcg->set_max_it(10000);
-            pcg->verbose = false;
-            pcg->set_rtol(1e-10);
-            pcg->set_atol(1e-14);
-            coarse_solver = pcg;
-        } else {
+        {
             auto cg = sfem::create_cg<real_t>(ops.back(), es);
             cg->set_max_it(10000);
             cg->verbose = false;

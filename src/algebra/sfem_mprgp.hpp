@@ -59,9 +59,9 @@ namespace sfem {
         SharedBuffer<T> norm_weight_;
 
         std::function<void(const T* const, T* const)> apply_op;
-        // The operator in team form (TeamParallelOperator, on the host), if it has one: then runs
-        // of CG steps take one parallel region (team_cg_steps).
-        std::shared_ptr<TeamParallelOperator<T>> team_op_;
+        // The operator in team form (TeamOperator, on the host), if it has one: then the whole
+        // iteration takes one parallel region (team_solve).
+        std::shared_ptr<TeamOperator<T>> team_op_;
         // Whether apply_op writes y = A x whole rather than adding to y: then y is not zeroed
         // before each product.
         bool op_overwrites_{false};
@@ -126,7 +126,7 @@ namespace sfem {
                 op->apply(x, y);
                 order_after(this->blas->context(), op->execution_context());
             };
-            team_op_ = std::dynamic_pointer_cast<TeamParallelOperator<T>>(op);
+            team_op_ = std::dynamic_pointer_cast<TeamOperator<T>>(op);
             n_dofs = op->rows();
             comm_.reset();
             n_alloc_ = -1;
@@ -341,118 +341,150 @@ namespace sfem {
             this->blas->axpby(n_dofs, -1, b, 1, g);
         }
 
-        /// CG steps in one parallel region, as many in a row as the loop of apply() takes: its CG
-        /// branch and the test after it, thread by thread over the operator's Team. Each pass takes
-        /// the calling thread's chunks, and every thread, after a barrier, combines all of them in
-        /// index order and takes the same decisions; under MPI thread 0, which has no rows,
-        /// completes the sums over the ranks. Three barriers a step on one rank: in the operator,
-        /// after the curvature and after the step; under MPI the operator's halo and each sum over
-        /// the ranks take one more. The chunks' sums alternate between two halves of `work`: a
-        /// thread still reading one half is never overwritten.
-        MPRGPExit team_cg_steps(T* const     x,
-                                T* const     g,
-                                T* const     p,
-                                T* const     Ap,
-                                T* const     gf,
-                                T* const     work,
-                                const T      norm_gp0,
-                                Gradients*   grads,
-                                int*         count_cg_steps,
-                                bool*        converged) {
-            using Pass                 = OpenMPMPRGPKernels<T>;
-            const T* const w           = norm_weight_ ? norm_weight_->data() : nullptr;
-            T* const       part[2]     = {work, work + 4 * blas_max_chunk_count};
-            const T        no_curv[4]  = {0, 0, 0, infty};
-            const T        no_step[4]  = {0, 0, 0, 0};
-            const auto     type        = smesh::TypeToEnum<T>::value();
-            T              by_ranks[4] = {0, 0, 0, 0};
-            MPRGPExit      exit        = MPRGPExit::PROPORTIONING;
+        /// The whole iteration in one parallel region, thread by thread over the operator's Team:
+        /// the CG, expansion and proportioning steps and the test after each, in the order of
+        /// apply()'s loop. Each pass takes the calling thread's chunks, and every thread, after a
+        /// barrier, combines all of them in index order (TeamReduction) and takes the same
+        /// decisions; under MPI thread 0, which has no rows, completes the sums over the ranks. A
+        /// product zeroes the thread's rows unless the operator overwrites them and waits for every
+        /// thread's input (one barrier); the updates of x, g, p are each thread's own rows, with the
+        /// expressions of the pass-by-pass kernels. The record, the gradients and the counts are
+        /// written back by the leader. False on a direction with no curvature that no bound stops.
+        bool team_solve(const T* const b,
+                        T* const       x,
+                        T* const       g,
+                        T* const       p,
+                        T* const       Ap,
+                        T* const       gf,
+                        T* const       work,
+                        const T        norm_gp0,
+                        Gradients*     grads,
+                        int*           counts,
+                        bool*          converged) {
+            using Pass                = OpenMPMPRGPKernels<T>;
+            const T* const w          = norm_weight_ ? norm_weight_->data() : nullptr;
+            const T        no_curv[4] = {0, 0, 0, infty};
+            const T        no_step[4] = {0, 0, 0, 0};
+            bool           bounded    = true;
 #pragma omp parallel
             {
-                const Team      team = team_op_->team();
-                MPRGPControl<T> c    = record_;
-                Gradients       gr   = *grads;
-                int             it = iterations_, steps = *count_cg_steps;
-                bool            done = false;
-                MPRGPExit       why  = MPRGPExit::PROPORTIONING;
-                // The ranks' sums, by thread 0, then for every thread.
-                auto over_ranks = [&](T (&v)[4], const bool min_last) {
-                    if (!comm_) return;
-                    if (team.tid == 0) {
-                        if (min_last) {
-                            comm_->sum_and_min_last(v, 4, type);
-                        } else {
-                            comm_->sum(v, 4, type);
-                        }
-                        for (int k = 0; k < 4; k++) by_ranks[k] = v[k];
-                    }
-                    team.barrier();
-                    for (int k = 0; k < 4; k++) v[k] = by_ranks[k];
-                };
+                const Team          team = team_op_->team();
+                typename Pass::Sums sums(work, blas_max_chunk_count, comm_.get());
+                MPRGPControl<T>     c    = record_;
+                Gradients           gr   = *grads;
+                int                 it   = iterations_;
+                int                 n_cg = counts[0], n_expansion = counts[1], n_proportioning = counts[2];
+                bool                done = false, unbounded = false;
+                const ptrdiff_t     i0 = team.begin, i1 = team.end;
                 with_mprgp_bounds(lb(), ub(), [&](const auto bounds) {
-                    while (gr.norm_gc <= this->gamma * gr.norm_gf) {
+                    auto product = [&](const T* const in, T* const out) {
                         if (!op_overwrites_) {
-                            for (ptrdiff_t i = team.begin; i < team.end; i++) Ap[i] = 0;
+                            for (ptrdiff_t i = i0; i < i1; i++) out[i] = 0;
                         }
-                        if (!team_op_->input_in_share()) team.barrier();
-                        team_op_->team_apply(team, p, Ap);
-
-                        T v[4];
-                        Pass::team_sums(team, no_curv, part[0], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
-                            Pass::curvature_sums(bounds, b, e, x, g, p, Ap, infty, s);
-                        });
                         team.barrier();
-                        Pass::combine(team.chunks, part[0], no_curv, true, v);
-                        over_ranks(v, true);
+                        team_op_->team_apply(team, in, out);
+                    };
+                    auto curvature = [&](const T* const d, const T* const Ad, const MPRGPDecision decision) {
+                        T v[4];
+                        sums.sum(team, no_curv, true, [&](const ptrdiff_t bb, const ptrdiff_t ee, T (&s)[4]) {
+                            Pass::curvature_sums(bounds, bb, ee, x, g, d, Ad, infty, s);
+                        }, v);
                         c.dAd        = v[0];
                         c.dd         = v[1];
                         c.gd         = v[2];
                         c.alpha_feas = v[3];
-                        mprgp_decide(c, MPRGPDecision::CG, params_);
-                        if (c.move != T(MPRGPMove::STEP)) {
-                            why = MPRGPExit::NOT_A_STEP;
-                            break;
-                        }
-
-                        Pass::team_sums(team, no_step, part[1], [&](const ptrdiff_t b, const ptrdiff_t e, T (&s)[4]) {
-                            Pass::step_sums(bounds, b, e, p, Ap, c.alpha, x, g, gf, eps, w, s);
-                        });
-                        team.barrier();
-                        Pass::combine(team.chunks, part[1], no_step, false, v);
-                        over_ranks(v, false);
+                        mprgp_decide(c, decision, params_);
+                    };
+                    // As step(): along d only where the record's move is a step; gfo the free gradient.
+                    auto step = [&](const T* const d, const T* const Ad, T* const gfo, const bool cg) {
+                        if (d && c.move != T(MPRGPMove::STEP)) return;
+                        T v[4];
+                        sums.sum(team, no_step, false, [&](const ptrdiff_t bb, const ptrdiff_t ee, T (&s)[4]) {
+                            Pass::step_sums(bounds, bb, ee, d, Ad, c.alpha, x, g, gfo, eps, w, s);
+                        }, v);
                         c.Adgf = v[0];
                         c.gf2  = v[1];
                         c.gc2  = v[2];
                         c.gp2  = v[3];
-                        mprgp_after_cg_step(c);
-                        Pass::direction(team.begin, team.end, gf, c.beta, p);
+                        if (cg) mprgp_after_cg_step(c);
+                    };
+                    while (true) {
+                        if (gr.norm_gc <= this->gamma * gr.norm_gf) {
+                            product(p, Ap);
+                            curvature(p, Ap, MPRGPDecision::CG);
+                            if (c.move == T(MPRGPMove::UNBOUNDED)) {
+                                unbounded = true;
+                                if (team.leader())
+                                    fprintf(stderr,
+                                            "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n",
+                                            (double)c.dAd);
+                                break;
+                            }
+                            if (c.move == T(MPRGPMove::STEP)) {
+                                step(p, Ap, gf, true);
+                                Pass::direction(i0, i1, gf, c.beta, p);
+                                n_cg++;
+                            } else {
+                                // To the bound along p, then a projected step along the free gradient
+                                // there (expansion_step); p restarts from the free gradient.
+                                const T alpha_feas = c.alpha, alpha_cg = c.alpha_cg, alpha_bar = params_.alpha_bar;
+                                if (alpha_cg < infty && expansion_type_ == Expansion::PROJECTED_CG) {
+                                    for (ptrdiff_t i = i0; i < i1; i++) {
+                                        x[i] = -alpha_feas * p[i] + 1 * x[i];
+                                        x[i] = -alpha_cg * p[i] + 1 * x[i];
+                                        x[i] = bounds.project(i, x[i]);
+                                    }
+                                } else {
+                                    for (ptrdiff_t i = i0; i < i1; i++) {
+                                        const T xi = x[i] - alpha_feas * p[i];
+                                        const T gi = g[i] - alpha_feas * Ap[i];
+                                        x[i]       = bounds.project(i, xi - alpha_bar * bounds.free(i, xi, gi));
+                                    }
+                                }
+                                product(x, g);
+                                for (ptrdiff_t i = i0; i < i1; i++) g[i] = -1 * b[i] + 1 * g[i];
+                                step(nullptr, nullptr, p, false);
+                                n_expansion++;
+                            }
+                        } else {
+                            // A step along the chopped gradient (proportioning_step).
+                            for (ptrdiff_t i = i0; i < i1; i++) gf[i] = bounds.chopped(i, x[i], g[i], eps);
+                            product(gf, Ap);
+                            curvature(gf, Ap, MPRGPDecision::PROPORTIONING);
+                            step(gf, Ap, p, false);
+                            if (c.move == T(MPRGPMove::UNBOUNDED)) {
+                                unbounded = true;
+                                if (team.leader())
+                                    fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                                break;
+                            }
+                            n_proportioning++;
+                        }
                         gr = gradients(c);
-                        steps++;
 
                         const T rel_norm_gp = gr.norm_gp / norm_gp0;
                         done                = gr.norm_gp < atol || rel_norm_gp < rtol;
-                        if (team.tid == 0) monitor(it, gr.norm_gp, rel_norm_gp);
-                        if (++it >= max_it || done) {
-                            why = MPRGPExit::DONE;
-                            break;
-                        }
+                        if (team.leader()) monitor(it, gr.norm_gp, rel_norm_gp);
+                        if (++it >= max_it || done) break;
                     }
                 });
-                if (team.tid == 0) {
-                    record_         = c;
-                    *grads          = gr;
-                    iterations_     = it;
-                    *count_cg_steps = steps;
-                    *converged      = done;
-                    exit            = why;
+                if (team.leader()) {
+                    record_     = c;
+                    *grads      = gr;
+                    iterations_ = it;
+                    counts[0]   = n_cg;
+                    counts[1]   = n_expansion;
+                    counts[2]   = n_proportioning;
+                    *converged  = done;
+                    bounded     = !unbounded;
                 }
             }
             impl.write_control(record_, control_);
-            return exit;
+            return bounded;
         }
 
-        /// The CG steps in a row in the execution space (MPRGPKernels::cg_run), as team_cg_steps takes
-        /// them on the host; false where they cannot be taken there, nothing done.
+        /// The CG steps in a row in the execution space (MPRGPKernels::cg_run), the device's; false
+        /// where they cannot be taken there, nothing done.
         bool device_cg_steps(T* const x, T* const g, T* const p, T* const Ap, T* const gf, T* const work, const T norm_gp0,
                              Gradients* grads, int* count_cg_steps, bool* converged, MPRGPExit* exit) {
             // Across ranks only where the device completes the sums (one node, NCCL).
@@ -512,6 +544,10 @@ namespace sfem {
 
             bool converged = false;
 
+            // The team operator's checks and scratch, before the runs of CG steps take its
+            // products inside their regions (each plain product prepares itself).
+            if (team_op_ && team_op_->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+
             ensure_workspace();
             T* g        = workspace_[0];  // Gradient
             T* p        = workspace_[1];
@@ -560,15 +596,18 @@ namespace sfem {
 
             iterations_ = 0;
 
-            while (!converged) {
+            if (team_op_) {
+                // The whole iteration in one region.
+                int counts[3] = {0, 0, 0};
+                team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
+                count_cg_steps            = counts[0];
+                count_expansion_steps     = counts[1];
+                count_proportioning_steps = counts[2];
+            }
+
+            while (!team_op_ && !converged) {
                 if (grads.norm_gc <= this->gamma * grads.norm_gf) {
-                    if (team_op_) {
-                        // The CG steps in a row in one region; back here at the first that is no
-                        // step, for the expansion below.
-                        const MPRGPExit exit = team_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged);
-                        if (exit == MPRGPExit::DONE) break;
-                        if (exit == MPRGPExit::PROPORTIONING) continue;
-                    } else if (MPRGPExit exit = MPRGPExit::NOT_A_STEP;
+                    if (MPRGPExit exit = MPRGPExit::NOT_A_STEP;
                                device_cg_steps(x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, &count_cg_steps, &converged, &exit)) {
                         if (exit == MPRGPExit::DONE) break;
                         if (exit == MPRGPExit::PROPORTIONING) continue;

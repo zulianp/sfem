@@ -49,14 +49,29 @@ namespace sfem {
                        const ptrdiff_t           stride,
                        const real_t *const       h,
                        real_t *const             out) const override {
-                if (packed && options_.traversal != InexactOptions::Traversal::ATOMIC) {
-                    apply_packed<Store, tau>(store_, *packed, nelements, stride, h, out);
-                    return;
-                }
-                if (options_.traversal == InexactOptions::Traversal::PACKED) {
+                if (!packed && options_.traversal == InexactOptions::Traversal::PACKED) {
                     SFEM_ERROR("inexact: traversal packed asked for, but the space has no packed mesh\n");
                 }
-                apply_atomic<Store, tau>(store_, nelements, elements, stride, h, out);
+                const ptrdiff_t rows = packed ? packed->n_nodes * stride : 0;
+#pragma omp parallel
+                team_apply(Team::current(rows), nelements, 0, nelements, elements, packed, stride, h, out);
+            }
+
+            void team_apply(const Team               &team,
+                            const ptrdiff_t           nelements,
+                            const ptrdiff_t           element_begin,
+                            const ptrdiff_t           element_end,
+                            const idx_t *const *const elements,
+                            const PackedView *const   packed,
+                            const ptrdiff_t           stride,
+                            const real_t *const       h,
+                            real_t *const             out) const override {
+                const bool whole = element_begin == 0 && element_end == nelements;
+                if (whole && packed && options_.traversal != InexactOptions::Traversal::ATOMIC) {
+                    team_apply_packed<Store, tau>(team, store_, *packed, nelements, stride, h, out);
+                } else {
+                    team_apply_atomic<Store, tau>(team, store_, element_begin, element_end, elements, stride, h, out);
+                }
             }
 
             void diagonal(const ptrdiff_t           nelements,
@@ -221,6 +236,9 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
+            /// apply_bsr by the threads of a region (BsrStore::team_apply); inexact_update first.
+            void team_apply_bsr(const Team &team, const real_t *const h, real_t *const out) const { bsr->team_apply(team, h, out); }
+
             /// One packed block as the traversal reads it, with this state's ghost buffer.
             template <class PackedMesh>
             PackedView packed_view(const PackedMesh &mesh, const int block, const int components) {
@@ -237,6 +255,7 @@ namespace sfem {
                 view.ghost_reduce_ptr    = mesh.ghost_reduce_ptr(block)->data();
                 view.ghost_reduce_idx    = mesh.ghost_reduce_idx(block)->data();
                 view.ghost_reduce_dest   = mesh.ghost_reduce_dest(block)->data();
+                view.n_nodes             = mesh.mesh()->n_nodes();
                 const std::size_t slots  = (std::size_t)components * std::max<ptrdiff_t>(1, view.n_ghost_entries);
                 auto             &buffer = ghost[block];
                 if (!buffer || buffer->size() < slots) buffer = create_host_buffer<real_t>(slots);

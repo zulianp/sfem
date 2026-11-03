@@ -56,15 +56,25 @@ namespace sfem {
             }
 
             void apply(const real_t *const x, real_t *const y) const override {
-                quant_.template apply<float, true>(x, y);
-                const ptrdiff_t n = (ptrdiff_t)rows_.size();
-#pragma omp parallel for
-                for (ptrdiff_t r = 0; r < n; ++r) {
-                    const ptrdiff_t     i = rows_[(size_t)r];
-                    const float *const  R = &blocks_[(size_t)r * 9];
-                    const real_t *const xi = &x[i * 3];
-                    for (int a = 0; a < 3; ++a) y[i * 3 + a] += R[a * 3 + 0] * xi[0] + R[a * 3 + 1] * xi[1] + R[a * 3 + 2] * xi[2];
-                }
+#pragma omp parallel
+                team_apply(Team::current(n_ * 3), x, y);
+            }
+
+            /// The quantized product, each row's correction added by the thread that completed it.
+            void team_apply(const Team &team, const real_t *const x, real_t *const y) const override {
+                const idx_t *const rows = rows_.data();
+                const ptrdiff_t    n    = (ptrdiff_t)rows_.size();
+                quant_.template team_apply<float, true>(team, x, y, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    // The corrected rows are in row order.
+                    const ptrdiff_t first = std::lower_bound(rows, rows + n, (idx_t)b) - rows;
+                    const ptrdiff_t last  = std::lower_bound(rows, rows + n, (idx_t)e) - rows;
+                    for (ptrdiff_t r = first; r < last; ++r) {
+                        const ptrdiff_t     i  = rows[r];
+                        const float *const  R  = &blocks_[(size_t)r * 9];
+                        const real_t *const xi = &x[i * 3];
+                        for (int a = 0; a < 3; ++a) y[i * 3 + a] += R[a * 3 + 0] * xi[0] + R[a * 3 + 1] * xi[1] + R[a * 3 + 2] * xi[2];
+                    }
+                });
             }
 
             /// What the store holds: its structure and records, the corrections, and the single-precision

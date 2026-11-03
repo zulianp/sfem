@@ -260,8 +260,8 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: loop, the parallel-region pairs and the three non-BSR matrix scatters
     #: described above.
     BUDGET = {
-        "residual_codegen.py": 8,
-        "energy_codegen.py": 9,
+        "residual_codegen.py": 3,
+        "energy_codegen.py": 7,
     }
 
     def _literal_pragmas(self, name):
@@ -333,6 +333,35 @@ class MeshLoweringAccessorTest(unittest.TestCase):
             target.mesh_launch_lines("k", "double, geom_t", ("a", "b")),
             ("  return sfem::codegen::k<double, geom_t>(a, b);",),
         )
+
+    def test_a_team_body_walks_its_callers_element_range(self):
+        # The `_team` twin of a kernel walking the mesh is given the elements to walk; the
+        # plain name passes the whole mesh (`runtime_typed_entry_point_lines`).
+        from codegen.framework.plans.conventions import with_team_element_range
+
+        target = OpenMPTarget().running_in_a_team()
+        loop, extent = mesh_loop_lines(target)
+        self.assertEqual(loop, "  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {")
+        self.assertEqual(
+            extent, "    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);"
+        )
+        params = ["const ptrdiff_t nelements", "const ptrdiff_t nnodes"]
+        self.assertEqual(
+            with_team_element_range(params, target),
+            [
+                "const ptrdiff_t nelements",
+                "const ptrdiff_t element_begin",
+                "const ptrdiff_t element_end",
+                "const ptrdiff_t nnodes",
+            ],
+        )
+        # A kernel walking packs, and every kernel outside a team, keeps its parameters.
+        packed = ["const ptrdiff_t n_packs", "const ptrdiff_t nelements"]
+        self.assertEqual(with_team_element_range(packed, target), packed)
+        self.assertEqual(with_team_element_range(params, OpenMPTarget()), params)
+        # A target without regions has no twin: its team body walks the mesh.
+        cuda = CUDATarget().running_in_a_team()
+        self.assertEqual(with_team_element_range(params, cuda), params)
 
     def test_cuda_walks_the_mesh_with_a_grid_of_threads(self):
         target = CUDATarget()

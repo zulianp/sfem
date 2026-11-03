@@ -8,6 +8,13 @@
 extern "C" {
 #endif
 
+int macro_tri3_laplacian_apply_team(const ptrdiff_t nelements,
+                                     const ptrdiff_t nnodes,
+                                     idx_t **const SFEM_RESTRICT elems,
+                                     geom_t **const SFEM_RESTRICT xyz,
+                                     const real_t *const SFEM_RESTRICT u,
+                                     real_t *const SFEM_RESTRICT values);
+
 int macro_tri3_laplacian_apply(const ptrdiff_t nelements,
                                 const ptrdiff_t nnodes,
                                 idx_t **const SFEM_RESTRICT elems,
@@ -36,6 +43,12 @@ int macro_tri3_laplacian_crs_opt(const ptrdiff_t nelements,
                                                const count_t *const SFEM_RESTRICT rowptr,
                                                const idx_t *const SFEM_RESTRICT colidx,
                                                real_t *const SFEM_RESTRICT values);
+
+int macro_tri3_laplacian_apply_opt_team(const ptrdiff_t nelements,
+                                        idx_t **const SFEM_RESTRICT elements,
+                                        const jacobian_t *const SFEM_RESTRICT fff,
+                                        const real_t *const SFEM_RESTRICT u,
+                                        real_t *const SFEM_RESTRICT values);
 
 int macro_tri3_laplacian_apply_opt(const ptrdiff_t nelements,
                                    idx_t **const SFEM_RESTRICT elements,

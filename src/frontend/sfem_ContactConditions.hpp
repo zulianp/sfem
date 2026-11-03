@@ -119,6 +119,10 @@ namespace sfem {
 
         int normal_project(const real_t *const h, real_t *const out);
         int distribute_contact_forces(const real_t *const f, real_t *const out);
+        /// normal_project on the contact rows [begin, end) (host; a thread's share, in or out of a region).
+        void team_normal_project(const ptrdiff_t begin, const ptrdiff_t end, const real_t *const h, real_t *const out);
+        /// distribute_contact_forces from inside a region by all its threads (host), ending on a barrier.
+        void team_distribute_contact_forces(const real_t *const f, real_t *const out);
 
         ptrdiff_t n_constrained_dofs() const;
 

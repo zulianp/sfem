@@ -569,6 +569,8 @@ namespace codegen {
 template <typename s_t, typename g_t, int VS>
 static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
         const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
         const ptrdiff_t,
         idx_t **const RSTR elements,
         const g_t *const *const RSTR points,
@@ -594,9 +596,9 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
 
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+#pragma omp for schedule(static)
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
@@ -725,6 +727,39 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
+extern "C" int saint_venant_kirchhoff_tri6_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::saint_venant_kirchhoff_tri6_apply_i_msoa_impl<double, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::saint_venant_kirchhoff_tri6_apply_i_msoa_impl<float, geom_t, 16>(nelements, element_begin, element_end, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("saint_venant_kirchhoff_tri6_apply_i_msoa", -1, (int)scalar_bytes);
+}
+
 extern "C" int saint_venant_kirchhoff_tri6_apply_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -744,16 +779,22 @@ extern "C" int saint_venant_kirchhoff_tri6_apply_i_msoa(
         void *const RSTR outy
 ) {
   switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        return sfem::codegen::saint_venant_kirchhoff_tri6_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-    }
-    case (int)sizeof(float): {
-        return sfem::codegen::saint_venant_kirchhoff_tri6_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-    }
-    default:
+    case (int)sizeof(double):
+    case (int)sizeof(float):
       break;
+    default:
+      return sfem::codegen::unsupported_dispatch("saint_venant_kirchhoff_tri6_apply_i_msoa", -1, (int)scalar_bytes);
   }
-  return sfem::codegen::unsupported_dispatch("saint_venant_kirchhoff_tri6_apply_i_msoa", -1, (int)scalar_bytes);
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = saint_venant_kirchhoff_tri6_apply_i_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 
