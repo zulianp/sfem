@@ -77,7 +77,7 @@ namespace sfem {
         /// caller's region (TEAM) or opening its own.
         template <bool TEAM>
         int neo_apply_domain(const OpDomain     &domain,
-                             smesh::Mesh        &mesh,
+                             const ptrdiff_t     n_nodes,
                              geom_t **const      points,
                              const real_t        mu,
                              const real_t        lambda,
@@ -129,7 +129,7 @@ namespace sfem {
             return SFEM_TEAM_KERNEL(TEAM, neohookean_ogden_apply_aos)(
                     domain.element_type,
                     ne,
-                    mesh.n_nodes(),
+                    n_nodes,
                     columns_from(range, domain.block->elements(), ua->interface_block_elements, ua->interface_begin),
                     points,
                     mu,
@@ -148,8 +148,9 @@ namespace sfem {
         real_t                         mu{1}, lambda{1};
         bool                           use_affine_approximation{true};
 
-        /// The mesh's points, taken by team_prepare for the team product.
-        geom_t **points{nullptr};
+        /// The mesh's points and their number, taken by team_prepare for the team product.
+        geom_t  **points{nullptr};
+        ptrdiff_t n_nodes{0};
 
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
@@ -265,7 +266,7 @@ namespace sfem {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neo_apply_domain<false>(domain,
-                                           *mesh,
+                                           mesh->n_nodes(),
                                            mesh->points()->data(),
                                            domain.parameters->get_real_value("mu", impl_->mu),
                                            domain.parameters->get_real_value("lambda", impl_->lambda),
@@ -300,7 +301,7 @@ namespace sfem {
         smesh::Mesh &mesh = *impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neo_apply_domain<true>(domain,
-                                          mesh,
+                                          impl_->n_nodes,
                                           impl_->points,
                                           domain.parameters->get_real_value("mu", impl_->mu),
                                           domain.parameters->get_real_value("lambda", impl_->lambda),
@@ -312,7 +313,8 @@ namespace sfem {
     }
 
     int NeoHookeanOgden::team_prepare() {
-        impl_->points = impl_->space->mesh()->points()->data();
+        impl_->points  = impl_->space->mesh()->points()->data();
+        impl_->n_nodes = impl_->space->mesh()->n_nodes();
         return SFEM_SUCCESS;
     }
 
