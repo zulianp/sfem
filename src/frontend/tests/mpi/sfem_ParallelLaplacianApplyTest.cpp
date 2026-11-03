@@ -104,8 +104,9 @@ namespace {
                                        const std::shared_ptr<sfem::Mesh> &parallel_mesh,
                                        const sfem::ExecutionSpace         es,
                                        const bool                         bench,
-                                       const char                        *op_name = "Laplacian",
-                                       const int                          bs      = 1) {
+                                       const char                        *op_name     = "Laplacian",
+                                       const int                          bs          = 1,
+                                       const real_t                       state_scale = 0) {
         auto comm = sfem::Communicator::world();
 
         SFEM_TEST_ASSERT(serial_mesh != nullptr);
@@ -146,7 +147,22 @@ namespace {
         serial_function->add_operator(serial_laplacian);
         parallel_function->add_operator(parallel_laplacian);
 
-        auto parallel_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_function, nullptr, es);
+        // A nonlinear operator's product is at a state: a smooth displacement on every local node,
+        // ghosts and aura included, from the coordinates on both meshes.
+        std::shared_ptr<sfem::Buffer<real_t>> serial_u, parallel_u;
+        if (state_scale != 0) {
+            serial_u   = sfem::create_host_buffer<real_t>(serial_space->n_dofs());
+            parallel_u = sfem::create_host_buffer<real_t>(parallel_space->n_dofs());
+            fill_nodal_field(serial_mesh, serial_u->data(), serial_space->n_dofs() / bs, bs);
+            fill_nodal_field(parallel_mesh, parallel_u->data(), parallel_space->n_dofs() / bs, bs);
+            for (ptrdiff_t i = 0; i < serial_space->n_dofs(); ++i) serial_u->data()[i] *= state_scale;
+            for (ptrdiff_t i = 0; i < parallel_space->n_dofs(); ++i) parallel_u->data()[i] *= state_scale;
+            SFEM_TEST_ASSERT(serial_laplacian->update(serial_u->data()) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(parallel_laplacian->update(parallel_u->data()) == SFEM_SUCCESS);
+        }
+        const real_t *const serial_state = serial_u ? serial_u->data() : nullptr;
+
+        auto parallel_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, parallel_function, parallel_u, es);
         SFEM_TEST_ASSERT(parallel_op != nullptr);
 
         auto *pop = dynamic_cast<sfem::ParallelOperator<real_t> *>(parallel_op.get());
@@ -171,7 +187,7 @@ namespace {
         fill_nodal_field(serial_mesh, serial_h->data(), n_serial_dofs / bs, bs);
         std::fill(serial_y->data(), serial_y->data() + n_serial_dofs, real_t(0));
 
-        SFEM_TEST_ASSERT(serial_function->apply(nullptr, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(serial_function->apply(serial_state, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
 
         auto parallel_h_host = sfem::create_host_buffer<real_t>(n_x_alloc);
         auto parallel_y_host = sfem::create_host_buffer<real_t>(n_y_alloc);
@@ -256,13 +272,13 @@ namespace {
         if (comm->rank() == 0) {
             for (int r = 0; r < warmup_reps; ++r) {
                 std::fill(serial_y->data(), serial_y->data() + n_serial_dofs, real_t(0));
-                SFEM_TEST_ASSERT(serial_function->apply(nullptr, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(serial_function->apply(serial_state, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
             }
 
             const double tick = smesh::time_seconds();
             for (int r = 0; r < bench_reps; ++r) {
                 std::fill(serial_y->data(), serial_y->data() + n_serial_dofs, real_t(0));
-                SFEM_TEST_ASSERT(serial_function->apply(nullptr, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
+                SFEM_TEST_ASSERT(serial_function->apply(serial_state, serial_h->data(), serial_y->data()) == SFEM_SUCCESS);
             }
             serial_elapsed = smesh::time_seconds() - tick;
         }
@@ -389,6 +405,26 @@ namespace {
         return check_parallel_laplacian_apply(serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "Mass", 1);
     }
 
+    // The hand-written Neo-Hookean (Ogden) in team form at a state: the partial assembly on HEX8,
+    // the product at the state on TET4.
+    int test_parallel_neohookean_ogden_apply_hex8_cube() {
+        auto            comm = sfem::Communicator::world();
+        const ptrdiff_t nx = 8, ny = 6, nz = 4;
+        auto serial   = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
+        auto parallel = sfem::Mesh::create_hex8_cube(comm, nx, ny, nz, -1, -0.5, 0.25, 1, 1.5, 2.0);
+        return check_parallel_laplacian_apply(
+                serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "NeoHookeanOgden", 3, real_t(0.01));
+    }
+
+    int test_parallel_neohookean_ogden_apply_hex8_tet4() {
+        auto            comm = sfem::Communicator::world();
+        const ptrdiff_t nx = 8, ny = 6, nz = 4;
+        auto            serial   = sfem::Mesh::create_hex8_tet4_cube(sfem::Communicator::self(), nx, ny, nz);
+        auto            parallel = sfem::Mesh::create_hex8_tet4_cube(comm, nx, ny, nz);
+        return check_parallel_laplacian_apply(
+                serial, parallel, sfem::EXECUTION_SPACE_HOST, false, "NeoHookeanOgden", 3, real_t(0.01));
+    }
+
     int test_element_scope_identity_checkerboard() {
         auto            comm = sfem::Communicator::world();
         const ptrdiff_t nx = 8, ny = 6, nz = 4;
@@ -446,6 +482,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_parallel_generated_linear_elasticity_apply_hex8_tet4);
     SFEM_RUN_TEST(test_parallel_mass_apply_hex8_cube);
     SFEM_RUN_TEST(test_parallel_mass_apply_checkerboard);
+    SFEM_RUN_TEST(test_parallel_neohookean_ogden_apply_hex8_cube);
+    SFEM_RUN_TEST(test_parallel_neohookean_ogden_apply_hex8_tet4);
     SFEM_RUN_TEST(test_element_scope_identity_checkerboard);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

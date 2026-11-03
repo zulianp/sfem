@@ -81,6 +81,18 @@ int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
                                const real_t *const SFEM_RESTRICT h,
                                real_t *const SFEM_RESTRICT       values);
 
+/// neohookean_ogden_apply_aos by the threads of the caller's region (orphaned `omp for`).
+int neohookean_ogden_apply_aos_team(const smesh::ElemType               element_type,
+                               const ptrdiff_t                   nelements,
+                               const ptrdiff_t                   nnodes,
+                               idx_t **const SFEM_RESTRICT       elements,
+                               geom_t **const SFEM_RESTRICT      points,
+                               const real_t                      mu,
+                               const real_t                      lambda,
+                               const real_t *const SFEM_RESTRICT u,
+                               const real_t *const SFEM_RESTRICT h,
+                               real_t *const SFEM_RESTRICT       values);
+
 int neohookean_ogden_gradient_aos(const smesh::ElemType               element_type,
                                   const ptrdiff_t                   nelements,
                                   const ptrdiff_t                   nnodes,
@@ -141,7 +153,38 @@ int neohookean_ogden_partial_assembly_apply(const smesh::ElemType               
                                             real_t *const                              outy,
                                             real_t *const                              outz);
 
+/// neohookean_ogden_partial_assembly_apply by the threads of the caller's region (orphaned `omp for`).
+int neohookean_ogden_partial_assembly_apply_team(const smesh::ElemType                        element_type,
+                                            const ptrdiff_t                            nelements,
+                                            const ptrdiff_t                            stride,
+                                            idx_t **const SFEM_RESTRICT                elements,
+                                            const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                            const ptrdiff_t                            h_stride,
+                                            const real_t *const                        hx,
+                                            const real_t *const                        hy,
+                                            const real_t *const                        hz,
+                                            const ptrdiff_t                            out_stride,
+                                            real_t *const                              outx,
+                                            real_t *const                              outy,
+                                            real_t *const                              outz);
+
 int neohookean_ogden_compressed_partial_assembly_apply(const smesh::ElemType                     element_type,
+                                                       const ptrdiff_t                         nelements,
+                                                       const ptrdiff_t                         stride,
+                                                       idx_t **const SFEM_RESTRICT             elements,
+                                                       const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                       const scaling_t *const SFEM_RESTRICT    scaling,
+                                                       const ptrdiff_t                         h_stride,
+                                                       const real_t *const                     hx,
+                                                       const real_t *const                     hy,
+                                                       const real_t *const                     hz,
+                                                       const ptrdiff_t                         out_stride,
+                                                       real_t *const                           outx,
+                                                       real_t *const                           outy,
+                                                       real_t *const                           outz);
+
+/// neohookean_ogden_compressed_partial_assembly_apply by the threads of the caller's region (orphaned `omp for`).
+int neohookean_ogden_compressed_partial_assembly_apply_team(const smesh::ElemType                     element_type,
                                                        const ptrdiff_t                         nelements,
                                                        const ptrdiff_t                         stride,
                                                        idx_t **const SFEM_RESTRICT             elements,

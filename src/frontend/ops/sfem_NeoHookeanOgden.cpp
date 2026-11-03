@@ -1,6 +1,7 @@
 #include "sfem_NeoHookeanOgden.hpp"
 
 #include "neohookean_ogden.hpp"
+#include "sfem_team.h"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"
@@ -60,6 +61,82 @@ namespace sfem {
                 default:
                     return TET4_S_IKMN_SIZE;
             }
+        }
+
+        /// The element columns of `range`: the stored ones from element 0, the interface ones made at
+        /// initialize from the first SHARED_AND_AURA element; nullptr for any other start.
+        idx_t **columns_from(const ElementRange range, SharedBuffer<idx_t *> &stored, std::vector<idx_t *> &interface,
+                             const ptrdiff_t interface_begin) {
+            if (range.begin == 0) return stored->data();
+            if (range.begin == interface_begin && !interface.empty()) return interface.data();
+            SFEM_ERROR("NeoHookeanOgden: no element columns from element %ld\n", (long)range.begin);
+            return nullptr;
+        }
+
+        /// out += H(x) h over the elements of `range` in the domain's block: by the threads of the
+        /// caller's region (TEAM) or opening its own.
+        template <bool TEAM>
+        int neo_apply_domain(const OpDomain     &domain,
+                             smesh::Mesh        &mesh,
+                             const real_t        mu,
+                             const real_t        lambda,
+                             const real_t *const x,
+                             const real_t *const h,
+                             real_t *const       out,
+                             const ElementRange  range) {
+            if (range.empty()) return SFEM_SUCCESS;
+
+            auto            ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
+            const ptrdiff_t ne = range.size();
+
+            if (ua->partial_assembly_buffer) {
+                idx_t **const   elements = columns_from(range, ua->elements, ua->interface_elements, ua->interface_begin);
+                const ptrdiff_t offset   = range.begin * neohookean_partial_assembly_metric_cols(domain.element_type);
+                if (ua->use_compression) {
+                    return SFEM_TEAM_KERNEL(TEAM, neohookean_ogden_compressed_partial_assembly_apply)(
+                            domain.element_type,
+                            ne,
+                            ua->elements_stride,
+                            elements,
+                            ua->partial_assembly_compressed->data() + offset,
+                            ua->compression_scaling->data() + range.begin,
+                            3,
+                            &h[0],
+                            &h[1],
+                            &h[2],
+                            3,
+                            &out[0],
+                            &out[1],
+                            &out[2]);
+                }
+
+                return SFEM_TEAM_KERNEL(TEAM, neohookean_ogden_partial_assembly_apply)(domain.element_type,
+                                                                                       ne,
+                                                                                       ua->elements_stride,
+                                                                                       elements,
+                                                                                       ua->partial_assembly_buffer->data() + offset,
+                                                                                       3,
+                                                                                       &h[0],
+                                                                                       &h[1],
+                                                                                       &h[2],
+                                                                                       3,
+                                                                                       &out[0],
+                                                                                       &out[1],
+                                                                                       &out[2]);
+            }
+
+            SharedBuffer<idx_t *> block_elements = domain.block->elements();
+            return SFEM_TEAM_KERNEL(TEAM, neohookean_ogden_apply_aos)(
+                    domain.element_type,
+                    ne,
+                    mesh.n_nodes(),
+                    columns_from(range, block_elements, ua->interface_block_elements, ua->interface_begin),
+                    mesh.points()->data(),
+                    mu,
+                    lambda,
+                    x,
+                    h,
+                    out);
         }
 
     }  // namespace
@@ -175,54 +252,57 @@ namespace sfem {
 
     int NeoHookeanOgden::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("NeoHookeanOgden::apply");
+        if (!team_supported()) return apply(x, h, out, ElementScope::ALL);
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
 
+    int NeoHookeanOgden::apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
-            auto ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
+            return neo_apply_domain<false>(domain,
+                                           *mesh,
+                                           domain.parameters->get_real_value("mu", impl_->mu),
+                                           domain.parameters->get_real_value("lambda", impl_->lambda),
+                                           x,
+                                           h,
+                                           out,
+                                           element_range(*mesh, *domain.block, scope));
+        });
+    }
+
+    // The kernels with a team form: the partial assembly (stored or compressed, the latter not on
+    // semi-structured hexahedra) and, without it, the TET4 product.
+    bool NeoHookeanOgden::team_supported() const {
+        for (const auto &kv : impl_->domains->domains()) {
+            const OpDomain &domain = kv.second;
+            auto            ua     = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
             if (ua->partial_assembly_buffer) {
-                if (ua->use_compression) {
-                    return neohookean_ogden_compressed_partial_assembly_apply(domain.element_type,
-                                                                              domain.block->n_elements(),
-                                                                              ua->elements_stride,
-                                                                              ua->elements->data(),
-                                                                              ua->partial_assembly_compressed->data(),
-                                                                              ua->compression_scaling->data(),
-                                                                              3,
-                                                                              &h[0],
-                                                                              &h[1],
-                                                                              &h[2],
-                                                                              3,
-                                                                              &out[0],
-                                                                              &out[1],
-                                                                              &out[2]);
-
-                } else {
-                    return neohookean_ogden_partial_assembly_apply(domain.element_type,
-                                                                   domain.block->n_elements(),
-                                                                   ua->elements_stride,
-                                                                   ua->elements->data(),
-                                                                   ua->partial_assembly_buffer->data(),
-                                                                   3,
-                                                                   &h[0],
-                                                                   &h[1],
-                                                                   &h[2],
-                                                                   3,
-                                                                   &out[0],
-                                                                   &out[1],
-                                                                   &out[2]);
-                }
+                if (ua->use_compression && is_semistructured_type(domain.element_type)) return false;
+            } else if (domain.element_type != smesh::TET4) {
+                return false;
             }
+        }
+        return true;
+    }
 
-            return neohookean_ogden_apply_aos(domain.element_type,
-                                              domain.block->n_elements(),
-                                              mesh->n_nodes(),
-                                              domain.block->elements()->data(),
-                                              mesh->points()->data(),
-                                              domain.parameters->get_real_value("mu", impl_->mu),
-                                              domain.parameters->get_real_value("lambda", impl_->lambda),
-                                              x,
-                                              h,
-                                              out);
+    int NeoHookeanOgden::team_apply(const Team &team,
+                                    const real_t *const x,
+                                    const real_t *const h,
+                                    real_t *const       out,
+                                    const ElementScope  scope) {
+        (void)team;
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            return neo_apply_domain<true>(domain,
+                                          *mesh,
+                                          domain.parameters->get_real_value("mu", impl_->mu),
+                                          domain.parameters->get_real_value("lambda", impl_->lambda),
+                                          x,
+                                          h,
+                                          out,
+                                          element_range(*mesh, *domain.block, scope));
         });
     }
 
@@ -250,6 +330,20 @@ namespace sfem {
                 auto nxe            = domain.second.block->n_nodes_per_element();
                 ua->elements        = convert_host_buffer_to_fake_SoA(nxe, soa_to_aos(1, nxe, domain.second.block->elements()));
                 ua->elements_stride = nxe;
+            }
+
+            auto mesh = impl_->space->mesh();
+            if (mesh_is_distributed(*mesh)) {
+                const int     nxe   = domain.second.block->n_nodes_per_element();
+                idx_t **const own   = domain.second.block->elements()->data();
+                idx_t **const store = ua->elements->data();
+                ua->interface_begin = element_range(*mesh, *domain.second.block, ElementScope::SHARED_AND_AURA).begin;
+                ua->interface_elements.resize(nxe);
+                ua->interface_block_elements.resize(nxe);
+                for (int v = 0; v < nxe; ++v) {
+                    ua->interface_elements[v]       = store[v] + ua->interface_begin * ua->elements_stride;
+                    ua->interface_block_elements[v] = own[v] + ua->interface_begin;
+                }
             }
         }
 
