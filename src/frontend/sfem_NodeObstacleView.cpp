@@ -191,6 +191,30 @@ namespace sfem {
         }
     }
 
+    void node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_apply_blocks(c, blocks, in, out);
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < c.size; ++i) {
+            const ptrdiff_t node = c.idx[i];
+            ::node_obstacle_packed_sym_apply(&blocks[6 * i], &in[node * 3], &out[node * 3]);
+        }
+    }
+
+    void node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_blocks_diagonal(c, blocks, d);
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < c.size; ++i) {
+            const ptrdiff_t node = c.idx[i];
+            d[node * 3] += blocks[6 * i];
+            d[node * 3 + 1] += blocks[6 * i + 3];
+            d[node * 3 + 2] += blocks[6 * i + 5];
+        }
+    }
+
     void node_obstacle_reaction(const NodeObstacleView &c, real_t *const out) {
 #ifdef SFEM_ENABLE_CUDA
         if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_reaction(c, out);

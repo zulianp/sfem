@@ -275,12 +275,17 @@ obstacle:
 | `linear.atol` | `1e-16` | |
 | `linear.max_it` | `2000` | |
 | `linear.storage_bytes` | `8` | `4` stores the BSR tangent in single precision (`node_sdf`'s too); `2` in half precision (host, without constraints or obstacle). |
-| `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). |
-| `linear.inexact.encoding` | `f32` | `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
+| `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). `auto` (with `encoding: auto`) takes the format measured fastest to a Newton solution for the element and the execution space: `bsr f16` on TET4 and on host TET10, `bsr i8` on device TET10 and on HEX8, `element_matrix f16` on host HEX27, `points f16` on device HEX27; it is printed at the first linearisation. |
+| `linear.inexact.encoding` | `f32` | `auto` with `store: auto`. `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
 | `linear.inexact.fold` | `auto` | The folded point store of the hexahedra (exact, fewer numbers): `auto`, `on`, `off`. On the device only HEX8 folds. |
 | `linear.inexact.traversal` | `auto` | `packed` (the packed mesh, deterministic) when the space has one, `atomic` otherwise. On the device the store chooses (`auto` only). |
 
-With an obstacle, the obstacle's step replaces the linear solver.
+With an obstacle, the obstacle's step replaces the linear solver; of `linear` it reads `format`,
+`inexact` and `storage_bytes`. `BSR` assembles the QP's tangent with the obstacle's curvature in
+it. `INEXACT` and `MF` apply it term by term: the material through its stored tangent (or
+matrix-free, which needs an operator with a diagonal: the generated materials have none), the
+curvature as a 3x3 block per contact node, its spectrum bounded by the power method instead of
+Gershgorin's rows. They run on one process, host or device.
 
 `format: INEXACT` applies the stored tangent of every operator that has one (GeneratedNeoHookeanOgden,
 GeneratedLinearElasticity, GeneratedLinearKelvinVoigt, GeneratedMooneyRivlinKelvinVoigt,

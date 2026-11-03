@@ -11,7 +11,8 @@
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_BLAS_cuda.hpp"
 #endif
-#include "sfem_BSRTangent.hpp"
+#include "sfem_ObstacleTangent.hpp"
+#include "sfem_PowerMethod.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_ContactCommon.hpp"
 #include "sfem_Merit.hpp"
@@ -53,11 +54,16 @@ namespace sfem {
         std::shared_ptr<BLAS<real_t>>        blas;
         ptrdiff_t                            ndofs{0};
         std::unique_ptr<OwnedReductions>     reductions;
-        std::shared_ptr<BSRTangent>          tangent;
+        std::shared_ptr<ObstacleTangent>     tangent;
         std::shared_ptr<Operator<real_t>>    tangent_op;
         // tangent_op on the host, whose product the QP's runs inside its own region.
         std::shared_ptr<TeamParallelOperator<real_t>> tangent_team;
         std::shared_ptr<MPRGP<real_t>>       qp;
+        // The QP's operator, and the power method that bounds its spectrum when the tangent has no
+        // bound to offer: its vector kept from one solve to the next.
+        std::shared_ptr<Operator<real_t>>    qp_op;
+        std::shared_ptr<PowerMethod<real_t>> power;
+        SharedBuffer<real_t>                 eigen_vector, eigen_work;
         SharedBuffer<real_t>                 k, k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
         // The QP's variables are y / scale, its bounds upper_bound / scale (scaled_bound), its
         // operator scale Q^T K Q scale; qp_tmp holds the unscaled product.
@@ -106,11 +112,33 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        // The largest eigenvalue of the QP's operator by the power method, started from the last
+        // solve's vector (a Newton step changes the operator little), with a margin: MPRGP's step
+        // 1.95 / lambda must stay within 2 / lambda_max.
+        real_t estimate_max_eig() {
+            if (!power) {
+                power        = std::make_shared<PowerMethod<real_t>>();
+                auto b       = blas;
+                power->norm2 = [b](const std::ptrdiff_t n, const real_t *const v) { return b->norm2(n, v); };
+                power->scal  = [b](const std::ptrdiff_t n, const real_t alpha, real_t *const v) { b->scal(n, alpha, v); };
+                power->zeros = [b](const std::size_t n, real_t *const v) { b->zeros(n, v); };
+                eigen_vector = create_buffer<real_t>(ndofs, f->execution_space());
+                eigen_work   = create_buffer<real_t>(ndofs, f->execution_space());
+                blas->values(ndofs, 1, eigen_vector->data());
+            }
+            auto         op     = qp_op;
+            const real_t lambda = power->max_eigen_value(
+                    [op](const real_t *const in, real_t *const out) { op->apply(in, out); }, 1000, real_t(1e-3), ndofs, eigen_vector->data(), eigen_work->data());
+            return real_t(1.02) * lambda;
+        }
+
         int solve_qp(const real_t *const r) {
             if (update_scaling() != SFEM_SUCCESS) return SFEM_FAILURE;
-            // Gershgorin's bound for S K S: the scale is one per contact node, so it commutes with
-            // the node's frame, and S Q^T K Q S = Q^T (S K S) Q has the same eigenvalues.
-            qp->set_max_eig(tangent->max_abs_row_sum(scale->data()));
+            // Gershgorin's bound for S K S where the tangent has its rows: the scale is one per
+            // contact node, so it commutes with the node's frame, and S Q^T K Q S = Q^T (S K S) Q has
+            // the same eigenvalues.
+            const real_t bound = tangent->max_eig(scale->data());
+            qp->set_max_eig(bound > 0 ? bound : estimate_max_eig());
             blas->zaxpby(ndofs, -1, r, 0, r, qp_rhs->data());
             // The constrained rows are the identity: their right-hand side and start are the
             // increment the step arrived with.
@@ -165,14 +193,10 @@ namespace sfem {
         impl.blas                              = blas<real_t>(es);
         impl.ndofs                             = f->space()->n_dofs();
         impl.reductions                        = std::make_unique<OwnedReductions>(f->space(), es);
-        // Its values are changed in place after `op` (the curvature, the shifts), which a copy
-        // taken there would miss: stored in real_t or, assembled so, in float.
-        if (options.storage_bytes != (int)sizeof(real_t) && options.storage_bytes != 4) {
-            SFEM_ERROR("NodeObstacleStep: storage_bytes %d (4 or %d)\n", options.storage_bytes, (int)sizeof(real_t));
-            return nullptr;
-        }
-        impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
+        impl.tangent = ObstacleTangent::create(f, contact, options.tangent);
         if (!impl.tangent) return nullptr;
+        // The assembled host tangent's product runs inside the QP's region (team()).
+        const bool in_region = es == EXECUTION_SPACE_HOST && options.tangent.format == op_type::BSR;
 
         for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
                              &impl.scale, &impl.inverse_scale, &impl.scaled_bound}) {
@@ -189,7 +213,7 @@ namespace sfem {
         // Under MPI the owned rows, as the tangent's product computes them.
         const ptrdiff_t                           owned = f->space()->n_dofs_owned();
         std::shared_ptr<ParallelOperator<real_t>> op;
-        if (es == EXECUTION_SPACE_HOST) {
+        if (in_region) {
             // One region: each thread takes its nodes into the frames, then, once every thread's
             // are in, its rows of the product and back out of the frames. It reads `in` only at
             // its own nodes before the barrier (input_in_share).
@@ -222,6 +246,7 @@ namespace sfem {
                     },
                     es);
         }
+        impl.qp_op          = op;
         impl.qp             = create_mprgp<real_t>(op, es);
         impl.qp->set_op_overwrites(true);
         impl.qp->verbose    = false;
@@ -248,7 +273,7 @@ namespace sfem {
         // of the step to the last, and its backward-Euler start).
         const real_t shift = context.scheme ? context.scheme->shift() : real_t(0);
         if (context.dt != impl.k_ref_dt || shift != impl.k_ref_shift) {
-            auto reference = create_buffer<real_t>(impl.ndofs, impl.tangent->execution_space());
+            auto reference = create_buffer<real_t>(impl.ndofs, impl.f->execution_space());
             if (impl.tangent->assemble(reference->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             impl.k_ref_dt    = context.dt;
@@ -299,15 +324,9 @@ namespace sfem {
         auto &impl = *impl_;
         if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
         // y = K x: the QP's product writes tmp whole.
-        impl.tangent_op = impl.tangent->op(0);
-        if (impl.tangent->execution_space() == EXECUTION_SPACE_HOST) {
-            impl.tangent_team = std::dynamic_pointer_cast<TeamParallelOperator<real_t>>(impl.tangent_op);
-            if (!impl.tangent_team) SFEM_ERROR("NodeObstacleStep: the host tangent has no product for a region of its caller\n");
-        }
-        if (impl.options.curvature) {
-            impl.contact->add_curvature(
-                    x, r, impl.k->data(), false, 1, impl.tangent->rowptr(), impl.tangent->colidx(), impl.tangent->values_type(), impl.tangent->values());
-        }
+        impl.tangent_op   = impl.tangent->op();
+        impl.tangent_team = impl.tangent->team();
+        if (impl.options.curvature && impl.tangent->set_curvature(x, r, impl.k->data(), false) != SFEM_SUCCESS) return SFEM_FAILURE;
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
         return SFEM_SUCCESS;
     }
@@ -326,10 +345,7 @@ namespace sfem {
             // MPRGP stops at negative curvature. Away from the solution the residual overstates the
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
-            if (impl.options.curvature) {
-                impl.contact->add_curvature(x, r, impl.k->data(), false, -1, tangent.rowptr(), tangent.colidx(), tangent.values_type(), tangent.values());
-                impl.contact->add_curvature(x, r, impl.k->data(), true, 1, tangent.rowptr(), tangent.colidx(), tangent.values_type(), tangent.values());
-            }
+            if (impl.options.curvature && tangent.set_curvature(x, r, impl.k->data(), true) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             // The material's tangent can be indefinite too (a hyperelastic block under
             // compression, on a mesh fine enough that c0 M no longer outweighs it): shift its

@@ -116,6 +116,14 @@ namespace sfem {
                            const smesh::PrimitiveType values_type,
                            void *const                values);
 
+        // The same term as add_curvature, one packed symmetric 3x3 block per contact node
+        // (node_obstacle_curvature_blocks, 6 * size() entries, overwritten), for a tangent that
+        // applies it on its own; apply_blocks adds B_i in_i to out_i at each contact node,
+        // blocks_diagonal their diagonals to d.
+        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped, real_t *const blocks);
+        void apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const;
+        void blocks_diagonal(const real_t *const blocks, real_t *const d) const;
+
         // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
         // residual's part that is the obstacle's reaction.
         void reaction(real_t *const out) const override;

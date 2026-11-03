@@ -1,8 +1,10 @@
 // The playground with a rigid obstacle: a free block dropped onto a hemisphere.
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -156,6 +158,87 @@ int test_single_precision_tangent() {
     }
     return SFEM_TEST_SUCCESS;
 #endif
+}
+
+// The drop with the QP's tangent applied term by term (ObstacleTangent): the material through its
+// stored tangent (solver.linear.format INEXACT), the obstacle's curvature as blocks. In double the
+// run is the assembled one's to rounding; in half precision to the store's. On the device too,
+// against the host's assembled run.
+int test_composed_tangent() {
+    struct Run {
+        const char *name;
+        const char *inexact;
+        double      tol;
+        const char *space;
+    };
+    std::vector<Run> runs = {{"BSR", "", 0, "host"},
+                             {"points f64", "{store: points, encoding: f64}", 1e-6, "host"},
+                             {"element_matrix f64", "{store: element_matrix, encoding: f64}", 1e-6, "host"},
+                             {"points f16", "{store: points, encoding: f16}", 1e-3, "host"},
+                             {"bsr f16", "{store: bsr, encoding: f16}", 1e-3, "host"}};
+#ifdef SFEM_ENABLE_CUDA
+    runs.push_back({"device points f64", "{store: points, encoding: f64}", 1e-6, "device"});
+    runs.push_back({"device element_matrix f64", "{store: element_matrix, encoding: f64}", 1e-6, "device"});
+    runs.push_back({"device points i8md", "{store: points, encoding: i8md}", 1e-2, "device"});
+    runs.push_back({"device bsr f16", "{store: bsr, encoding: f16}", 1e-3, "device"});
+#endif
+    std::vector<double> first(runs.size(), -1), impulse(runs.size(), 0);
+    std::vector<int>    newton(runs.size(), 0), qp(runs.size(), 0);
+    for (size_t k = 0; k < runs.size(); ++k) {
+        const std::string        csv       = "test_composed_tangent.csv";
+        std::vector<std::string> overrides = {"output.history_csv=" + csv, std::string("execution_space=") + runs[k].space};
+        if (k > 0) {
+            overrides.push_back("solver.linear.format=INEXACT");
+            overrides.push_back(std::string("solver.linear.inexact=") + runs[k].inexact);
+        }
+        auto pg = assemble(DROP, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        for (auto &row : sfem::test::read_history(csv)) {
+            if (row["status"] < 0) continue;
+            if (row["touched"] > 0 && first[k] < 0) first[k] = row["t"];
+            impulse[k] += row["reaction_z"] * row["dt"];
+            newton[k] += (int)row["newton"];
+            qp[k] += (int)row["linear"];
+        }
+        std::remove(csv.c_str());
+        printf("  %-25s contact at %g, impulse %.12g, %d Newton, %d QP iterations\n", runs[k].name, first[k], impulse[k], newton[k], qp[k]);
+    }
+    for (size_t k = 1; k < runs.size(); ++k) {
+        SFEM_TEST_ASSERT(first[k] == first[0]);
+        SFEM_TEST_ASSERT(std::abs(impulse[k] - impulse[0]) <= runs[k].tol * std::abs(impulse[0]));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// The QP capped at 8 iterations: MPRGP stops short, and the step is solved again with the curvature
+// capped, then with the tangent's diagonal shifted. The composed tangent (in double) gets through
+// the same way. Its MPRGP steps by the power method's estimate where the assembled one's take
+// Gershgorin's bound, so 8 iterations end elsewhere and the steps are cut differently: the
+// contact agrees, not the path.
+int test_composed_tangent_fallback() {
+    size_t steps[2]   = {0, 0};
+    double impulse[2] = {0, 0};
+    for (int composed = 0; composed < 2; ++composed) {
+        const std::string        csv       = "test_composed_tangent_fallback.csv";
+        std::vector<std::string> overrides = {"obstacle.qp.max_it=8", "time.t_end=0.12", "output.history_csv=" + csv};
+        if (composed) {
+            overrides.push_back("solver.linear.format=INEXACT");
+            overrides.push_back("solver.linear.inexact={store: points, encoding: f64}");
+        }
+        auto pg = assemble(DROP, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows       = sfem::test::read_history(csv);
+        steps[composed] = rows.size();
+        for (auto &row : rows) {
+            if (row["status"] >= 0) impulse[composed] += row["reaction_z"] * row["dt"];
+        }
+        std::remove(csv.c_str());
+    }
+    printf("  assembled: %zu rows, impulse %.12g; composed: %zu rows, impulse %.12g\n", steps[0], impulse[0], steps[1], impulse[1]);
+    SFEM_TEST_ASSERT(std::abs(impulse[1] - impulse[0]) <= 1e-3 * std::abs(impulse[0]));
+    return SFEM_TEST_SUCCESS;
 }
 
 // The ssmgc back-end on the same drop, linear and refined: in flight (t < 0.1) the body falls as it
@@ -328,6 +411,22 @@ output:
         SFEM_TEST_ASSERT(std::abs(rows[1]["reaction_z"] - 0.5) < 1e-8);
         std::remove(csv.c_str());
     }
+    // The same with the QP's tangent applied term by term, its constrained rows the identity: the
+    // material through its stored tangent, and matrix-free where it has a diagonal for the QP's
+    // scaling (the hand-written neo-Hookean; the generated materials have none).
+    for (const std::string format : {"MF", "INEXACT"}) {
+        const std::string        csv       = "test_static_reaction_" + format + ".csv";
+        std::vector<std::string> overrides = {"regime=steady", "solver.linear.format=" + format,
+                                              "solver.linear.inexact={store: points, encoding: f64}", "output.history_csv=" + csv};
+        if (format == "MF") overrides.push_back("material={type: NeoHookeanOgden, mu: 1, lambda: 2}");
+        auto pg = assemble(yaml, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows = sfem::test::read_history(csv);
+        printf("  %s: reaction_z %.12g (load 0.5)\n", format.c_str(), rows[1]["reaction_z"]);
+        SFEM_TEST_ASSERT(std::abs(rows[1]["reaction_z"] - 0.5) < 1e-8);
+        std::remove(csv.c_str());
+    }
     // Under inertia, loaded at once, the block rings and the scheme's dissipation settles it: then
     // the obstacle's force is the load. BDF2's reaction is the force; damped Newmark's force is 2
     // beta of its reaction (ContactStabilisedNewmarkScheme).
@@ -431,6 +530,48 @@ solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search
     return SFEM_TEST_SUCCESS;
 }
 
+// TET10 (a TET4 cube promoted by the playground) pressed onto a plane by a traction of 0.5 on its
+// unit top face: every node of the TRI6 faces is a contact node, and the obstacle's force balances
+// the load, the QP's tangent assembled (BSR) or stored (INEXACT, auto: bsr f16 on the host). The
+// promoted mesh has no file ids for its nodes, so initial conditions on it are refused.
+int test_tet10_contact() {
+    auto       cube = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    const auto dir  = (std::filesystem::temp_directory_path() /
+                      ("sfem_tet10_contact_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    SFEM_TEST_ASSERT(cube->write(smesh::Path(dir) / "cube") == SFEM_SUCCESS);
+    const std::string yaml = "mesh: {path: " + dir + "/cube, promote_to_p2: true, sidesets: [{name: top, plane: {axis: z, at: max}}]}\n" + R"(
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1], value: [0, 0]}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: top, component: 2, value: -0.5}
+obstacle: {backend: node_sdf, direction: z, shape: {type: plane, plane: 0}}
+regime: steady
+solver: {newton: {verbose: false}}
+output:
+  probes: [{type: contact}]
+)";
+    for (const std::string format : {"BSR", "INEXACT"}) {
+        const std::string csv = "test_tet10_contact.csv";
+        auto pg = assemble(yaml.c_str(), {"solver.linear.format=" + format, "solver.linear.inexact={store: auto, encoding: auto}",
+                                          "output.history_csv=" + csv});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->function()->space()->element_type() == smesh::TET10);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows = sfem::test::read_history(csv);
+        printf("  TET10 %s: reaction_z %.12g (load 0.5)\n", format.c_str(), rows[1]["reaction_z"]);
+        SFEM_TEST_ASSERT(rows[1]["touched"] == 1);
+        SFEM_TEST_ASSERT(std::abs(rows[1]["reaction_z"] - 0.5) < 1e-8);
+        std::remove(csv.c_str());
+    }
+    SFEM_TEST_ASSERT(assemble(yaml.c_str(), {"initial_conditions={displacement: {components: [a, b, c]}}"}) == nullptr);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 // Under inertia node_sdf takes Newmark, which it stabilises, or BDF2; backward Euler, which has no
 // inertia, is refused, and ssmgc takes Newmark alone. Without inertia node_sdf solves steady and
 // quasi-static contact; ssmgc does not.
@@ -450,8 +591,11 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_block_lands_on_the_hemisphere);
     SFEM_RUN_TEST(test_bdf2_steps_grow_back_twofold);
     SFEM_RUN_TEST(test_single_precision_tangent);
+    SFEM_RUN_TEST(test_composed_tangent);
+    SFEM_RUN_TEST(test_composed_tangent_fallback);
     SFEM_RUN_TEST(test_obstacle_needs_newmark);
     SFEM_RUN_TEST(test_static_reaction_balances_load);
+    SFEM_RUN_TEST(test_tet10_contact);
     SFEM_RUN_TEST(test_gap_tol);
     SFEM_RUN_TEST(test_disc_traction);
     SFEM_RUN_TEST(test_release_from_penetration);

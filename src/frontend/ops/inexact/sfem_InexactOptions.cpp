@@ -6,21 +6,23 @@ namespace sfem {
 
     namespace {
         InexactOptions::Store store_from_string(const std::string &name) {
+            if (name == "auto") return InexactOptions::Store::AUTO;
             if (name == "points") return InexactOptions::Store::POINTS;
             if (name == "element_matrix") return InexactOptions::Store::ELEMENT_MATRIX;
             if (name == "bsr") return InexactOptions::Store::BSR;
-            SFEM_ERROR("inexact: unknown store \"%s\" (points, element_matrix, bsr)\n", name.c_str());
+            SFEM_ERROR("inexact: unknown store \"%s\" (auto, points, element_matrix, bsr)\n", name.c_str());
             return InexactOptions::Store::POINTS;
         }
 
         InexactOptions::Encoding encoding_from_string(const std::string &name) {
+            if (name == "auto") return InexactOptions::Encoding::AUTO;
             if (name == "f64") return InexactOptions::Encoding::F64;
             if (name == "f32") return InexactOptions::Encoding::F32;
             if (name == "f16") return InexactOptions::Encoding::F16;
             if (name == "i8md") return InexactOptions::Encoding::I8_MEAN_DEVIATION;
             if (name == "i8pair") return InexactOptions::Encoding::I8_PAIR_SCALE;
             if (name == "i8") return InexactOptions::Encoding::I8_BLOCK;
-            SFEM_ERROR("inexact: unknown encoding \"%s\" (f64, f32, f16, i8md, i8pair, i8)\n", name.c_str());
+            SFEM_ERROR("inexact: unknown encoding \"%s\" (auto, f64, f32, f16, i8md, i8pair, i8)\n", name.c_str());
             return InexactOptions::Encoding::F32;
         }
 
@@ -42,6 +44,8 @@ namespace sfem {
 
         const char *to_string(const InexactOptions::Store store) {
             switch (store) {
+                case InexactOptions::Store::AUTO:
+                    return "auto";
                 case InexactOptions::Store::POINTS:
                     return "points";
                 case InexactOptions::Store::ELEMENT_MATRIX:
@@ -54,6 +58,8 @@ namespace sfem {
 
         const char *to_string(const InexactOptions::Encoding encoding) {
             switch (encoding) {
+                case InexactOptions::Encoding::AUTO:
+                    return "auto";
                 case InexactOptions::Encoding::F64:
                     return "f64";
                 case InexactOptions::Encoding::F32:
@@ -99,6 +105,9 @@ namespace sfem {
         // What each store offers; anything else is refused rather than mapped to a neighbour.
         bool offered = false;
         switch (store) {
+            case Store::AUTO:
+                offered = encoding == Encoding::AUTO;
+                break;
             case Store::POINTS:
                 offered = encoding == Encoding::F64 || encoding == Encoding::F32 || encoding == Encoding::F16 ||
                           encoding == Encoding::I8_MEAN_DEVIATION;
@@ -112,14 +121,51 @@ namespace sfem {
                 break;
         }
         if (!offered) {
-            SFEM_ERROR("inexact: store %s takes no encoding %s (points: f64 f32 f16 i8md; element_matrix: f64 f32 "
-                       "f16 i8pair; bsr: f16 i8)\n",
+            SFEM_ERROR("inexact: store %s takes no encoding %s (auto: auto; points: f64 f32 f16 i8md; element_matrix: "
+                       "f64 f32 f16 i8pair; bsr: f16 i8)\n",
                        to_string(store),
                        to_string(encoding));
         }
         if (store != Store::POINTS && fold == Switch::ON) {
             SFEM_ERROR("inexact: the fold is a property of the point store\n");
         }
+    }
+
+    InexactOptions InexactOptions::resolve(const smesh::ElemType element, const smesh::ExecutionSpace space) const {
+        if (!is_auto()) return *this;
+        const bool     device = space == smesh::EXECUTION_SPACE_DEVICE;
+        InexactOptions ret    = *this;
+        const auto     set    = [&](const Store s, const Encoding e) {
+            ret.store    = s;
+            ret.encoding = e;
+        };
+        switch (element) {
+            case smesh::TET4:
+                set(Store::BSR, Encoding::F16);
+                break;
+            case smesh::TET10:
+                if (device)
+                    set(Store::BSR, Encoding::I8_BLOCK);
+                else
+                    set(Store::BSR, Encoding::F16);
+                break;
+            case smesh::HEX8:
+            case smesh::PROTEUS_HEX8:
+                set(Store::BSR, Encoding::I8_BLOCK);
+                break;
+            case smesh::HEX27:
+            case smesh::PROTEUS_HEX27:
+                if (device)
+                    set(Store::POINTS, Encoding::F16);
+                else
+                    set(Store::ELEMENT_MATRIX, Encoding::F16);
+                break;
+            default:
+                set(Store::POINTS, Encoding::F32);
+                break;
+        }
+        ret.validate();
+        return ret;
     }
 
     InexactOptions InexactOptions::from_strings(const std::string &store,
