@@ -118,27 +118,27 @@ static SFEM_INLINE void macro_tet4_local_apply_adj(const scalar_t *const SFEM_RE
     }
 }
 
-int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
-                                       const ptrdiff_t nnodes,
-                                       idx_t **const SFEM_RESTRICT elements,
-                                       geom_t **const SFEM_RESTRICT points,
-                                       const real_t mu,
-                                       const real_t lambda,
-                                       const ptrdiff_t u_stride,
-                                       const real_t *const SFEM_RESTRICT g_ux,
-                                       const real_t *const SFEM_RESTRICT g_uy,
-                                       const real_t *const SFEM_RESTRICT g_uz,
-                                       const ptrdiff_t out_stride,
-                                       real_t *const SFEM_RESTRICT g_outx,
-                                       real_t *const SFEM_RESTRICT g_outy,
-                                       real_t *const SFEM_RESTRICT g_outz) {
+int macro_tet4_linear_elasticity_apply_team(const ptrdiff_t nelements,
+                                            const ptrdiff_t nnodes,
+                                            idx_t **const SFEM_RESTRICT elements,
+                                            geom_t **const SFEM_RESTRICT points,
+                                            const real_t mu,
+                                            const real_t lambda,
+                                            const ptrdiff_t u_stride,
+                                            const real_t *const SFEM_RESTRICT g_ux,
+                                            const real_t *const SFEM_RESTRICT g_uy,
+                                            const real_t *const SFEM_RESTRICT g_uz,
+                                            const ptrdiff_t out_stride,
+                                            real_t *const SFEM_RESTRICT g_outx,
+                                            real_t *const SFEM_RESTRICT g_outy,
+                                            real_t *const SFEM_RESTRICT g_outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[10];
         scalar_t ux[10];
@@ -202,6 +202,34 @@ int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
     }
     return 0;
 }
+
+// The plain entry point: one region around macro_tet4_linear_elasticity_apply_team.
+int macro_tet4_linear_elasticity_apply(const ptrdiff_t nelements,
+                                       const ptrdiff_t nnodes,
+                                       idx_t **const SFEM_RESTRICT elements,
+                                       geom_t **const SFEM_RESTRICT points,
+                                       const real_t mu,
+                                       const real_t lambda,
+                                       const ptrdiff_t u_stride,
+                                       const real_t *const SFEM_RESTRICT g_ux,
+                                       const real_t *const SFEM_RESTRICT g_uy,
+                                       const real_t *const SFEM_RESTRICT g_uz,
+                                       const ptrdiff_t out_stride,
+                                       real_t *const SFEM_RESTRICT g_outx,
+                                       real_t *const SFEM_RESTRICT g_outy,
+                                       real_t *const SFEM_RESTRICT g_outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = macro_tet4_linear_elasticity_apply_team(nelements, nnodes, elements, points, mu, lambda, u_stride, g_ux, g_uy, g_uz, out_stride, g_outx, g_outy, g_outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int macro_tet4_linear_elasticity_apply_opt(
         const ptrdiff_t nelements,

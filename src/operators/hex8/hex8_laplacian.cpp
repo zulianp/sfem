@@ -6,12 +6,12 @@
 #include "hex8_quadrature.hpp"
 #include "tet4_inline_cpu.hpp"
 
-int hex8_laplacian_apply(const ptrdiff_t                   nelements,
-                         const ptrdiff_t                   nnodes,
-                         idx_t **const SFEM_RESTRICT       elements,
-                         geom_t **const SFEM_RESTRICT      points,
-                         const real_t *const SFEM_RESTRICT u,
-                         real_t *const SFEM_RESTRICT       values) {
+int hex8_laplacian_apply_team(const ptrdiff_t                   nelements,
+                              const ptrdiff_t                   nnodes,
+                              idx_t **const SFEM_RESTRICT       elements,
+                              geom_t **const SFEM_RESTRICT      points,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT       values) {
     SFEM_UNUSED(nnodes);
 
     int SFEM_HEX8_ASSUME_AXIS_ALIGNED = 0;
@@ -24,7 +24,7 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
     const geom_t *const z = points[2];
 
     if (SFEM_HEX8_ASSUME_AXIS_ALIGNED) {
-#pragma omp parallel for
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t         ev[8];
             accumulator_t element_vector[8];
@@ -51,7 +51,7 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
             }
         }
     } else if (SFEM_HEX8_ASSUME_AFFINE) {
-#pragma omp parallel for
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t         ev[8];
             accumulator_t element_vector[8];
@@ -109,7 +109,7 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
             qw   = q6_w;
         }
 
-#pragma omp parallel for
+#pragma omp for
         for (ptrdiff_t i = 0; i < nelements; ++i) {
             idx_t         ev[8];
             accumulator_t element_vector[8] = {0};
@@ -144,6 +144,26 @@ int hex8_laplacian_apply(const ptrdiff_t                   nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_laplacian_apply_team.
+int hex8_laplacian_apply(const ptrdiff_t                   nelements,
+                         const ptrdiff_t                   nnodes,
+                         idx_t **const SFEM_RESTRICT       elements,
+                         geom_t **const SFEM_RESTRICT      points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_laplacian_apply_team(nelements, nnodes, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int hex8_laplacian_crs_sym(const ptrdiff_t                    nelements,
                            const ptrdiff_t                    /*nnodes*/,
@@ -306,13 +326,13 @@ int hex8_laplacian_diag(const ptrdiff_t              nelements,
     return SFEM_SUCCESS;
 }
 
-int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
-                             idx_t **const SFEM_RESTRICT           elements,
-                             const jacobian_t *const SFEM_RESTRICT fff,
-                             const real_t *const SFEM_RESTRICT     u,
-                             real_t *const SFEM_RESTRICT           values) {
+int hex8_laplacian_apply_opt_team(const ptrdiff_t                       nelements,
+                                  idx_t **const SFEM_RESTRICT           elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff,
+                                  const real_t *const SFEM_RESTRICT     u,
+                                  real_t *const SFEM_RESTRICT           values) {
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t         ev[8];
         accumulator_t element_vector[8];
@@ -343,3 +363,22 @@ int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_laplacian_apply_opt_team.
+int hex8_laplacian_apply_opt(const ptrdiff_t                       nelements,
+                             idx_t **const SFEM_RESTRICT           elements,
+                             const jacobian_t *const SFEM_RESTRICT fff,
+                             const real_t *const SFEM_RESTRICT     u,
+                             real_t *const SFEM_RESTRICT           values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_laplacian_apply_opt_team(nelements, elements, fff, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+

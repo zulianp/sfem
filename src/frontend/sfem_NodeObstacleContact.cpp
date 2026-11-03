@@ -199,6 +199,11 @@ namespace sfem {
         node_obstacle_curvature_blocks(view(normals_, gap_), r, k, capped, blocks);
     }
 
+    void NodeObstacleContact::apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const {
+        assert(team.begin % 3 == 0 && team.end % 3 == 0);
+        node_obstacle_apply_blocks(view(normals_, gap_), blocks, in, out, team.begin / 3, team.end / 3);
+    }
+
     void NodeObstacleContact::apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const {
         node_obstacle_apply_blocks(view(normals_, gap_), blocks, in, out);
     }

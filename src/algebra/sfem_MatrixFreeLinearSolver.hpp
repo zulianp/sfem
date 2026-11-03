@@ -8,6 +8,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_SparseBlockVector.hpp"
+#include "sfem_TeamOperator.hpp"
 
 
 // STL includes
@@ -23,58 +24,49 @@
 
 namespace sfem {
 
+    /// y += sum over the blocks i of scaling[i] B_i x at node idx[i]: the symmetric block (vec_dim
+    /// (vec_dim + 1) / 2 entries) of block i, its node's vec_dim rows. The body of every product.
     template <typename T>
-    class ScaledBlockVectorMult : public Operator<T> {
+    inline void scaled_sym_block_mult_block(const ptrdiff_t    i,
+                                            const idx_t* const idx,
+                                            const T* const     dd,
+                                            const T* const     s,
+                                            const int          sym_block_size,
+                                            const T* const     x,
+                                            T* const           y) {
+        const int vec_dim = (sym_block_size == 6) ? 3 : 2;
+        auto      di      = &dd[i * sym_block_size];
+        auto      si      = s[i];
+
+        const ptrdiff_t b  = idx[i];
+        auto            xi = &x[b * vec_dim];
+        auto            yi = &y[b * vec_dim];
+
+        T buff[3] = {0, 0, 0};
+
+        int d_idx = 0;
+        for (int d1 = 0; d1 < vec_dim; d1++) {
+            const auto m = si * di[d_idx++];
+            buff[d1] += m * xi[d1];
+            for (int d2 = d1 + 1; d2 < vec_dim; d2++) {
+                const auto m = si * di[d_idx++];
+                buff[d1] += m * xi[d2];
+                buff[d2] += m * xi[d1];
+            }
+        }
+
+        for (int d = 0; d < vec_dim; d++) {
+            yi[d] += buff[d];
+        }
+    }
+
+    template <typename T>
+    class ScaledBlockVectorMult : public Operator<T>, public TeamOperator<T> {
     public:
         ptrdiff_t                                        n_dofs;
         std::shared_ptr<SparseBlockVector<T>>            sbv;
         SharedBuffer<T>                                  scaling;
         std::function<int(const T* const x, T* const y)> apply_;
-
-        void default_init() {
-            apply_ = [this](const T* const x, T* const y) -> int {
-                const ptrdiff_t n_blocks = sbv->n_blocks();
-                if (n_blocks == 0) {
-                    return SFEM_SUCCESS;
-                }
-                const idx_t* const idx            = sbv->idx()->data();
-                const T* const     dd             = sbv->data()->data();
-                const T* const     s              = scaling->data();
-                const int          sym_block_size = sbv->block_size();
-                const int          vec_dim        = (sym_block_size == 6) ? 3 : 2;
-                assert(sym_block_size == 6 || sym_block_size == 3);
-                assert(sym_block_size == vec_dim * (vec_dim + 1) / 2);
-
-#pragma omp parallel for
-                for (ptrdiff_t i = 0; i < n_blocks; i++) {
-                    auto di = &dd[i * sym_block_size];
-                    auto si = s[i];
-
-                    const ptrdiff_t b  = idx[i];
-                    auto            xi = &x[b * vec_dim];
-                    auto            yi = &y[b * vec_dim];
-
-                    T buff[3] = {0, 0, 0};
-
-                    int d_idx = 0;
-                    for (int d1 = 0; d1 < vec_dim; d1++) {
-                        const auto m = si * di[d_idx++];
-                        buff[d1] += m * xi[d1];
-                        for (int d2 = d1 + 1; d2 < vec_dim; d2++) {
-                            const auto m = si * di[d_idx++];
-                            buff[d1] += m * xi[d2];
-                            buff[d2] += m * xi[d1];
-                        }
-                    }
-
-                    for (int d = 0; d < vec_dim; d++) {
-                        yi[d] += buff[d];
-                    }
-                }
-
-                return SFEM_SUCCESS;
-            };
-        }
 
 #ifdef SFEM_ENABLE_CUDA
         void cuda_init() {
@@ -100,14 +92,36 @@ namespace sfem {
                 return;
             }
 #endif
-            default_init();
         }
 
         ScaledBlockVectorMult() {}
 
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("ScaledBlockVectorMult::apply");
+            if (team_capable()) return team_region_apply<T>(*this, x, y);
             return apply_(x, y);
+        }
+
+        /// Every block, split among the region's threads (an orphaned `omp for`: a block's rows may
+        /// be any thread's), ending on the loop's barrier: the rows are complete for every thread.
+        /// The blocks are at distinct nodes.
+        void team_apply(const Team& /*team*/, const T* const x, T* const y) const override {
+            const ptrdiff_t n_blocks = sbv->n_blocks();
+            const idx_t* const idx   = sbv->idx()->data();
+            const T* const     dd    = sbv->data()->data();
+            const T* const     s     = scaling->data();
+            const int          sbs   = sbv->block_size();
+#pragma omp for schedule(static)
+            for (ptrdiff_t i = 0; i < n_blocks; i++) {
+                scaled_sym_block_mult_block(i, idx, dd, s, sbs, x, y);
+            }
+        }
+        Team team() const override { return Team::current(n_dofs); }
+        bool team_capable() const override { return sbv->mem_space() == MEMORY_SPACE_HOST; }
+        int  prepare() override {
+            const int sbs = sbv->block_size();
+            if (sbv->n_blocks() > 0 && sbs != 6 && sbs != 3) SFEM_ERROR("ScaledBlockVectorMult: symmetric blocks of %d entries\n", sbs);
+            return SFEM_SUCCESS;
         }
 
         std::ptrdiff_t rows() const override { return n_dofs; }
@@ -137,6 +151,10 @@ namespace sfem {
             SFEM_ERROR("[Error] ShiftableOperator::shift(block_diag, scaling) not implemented!\n");
             return SFEM_FAILURE;
         }
+        /// shift(block_diag, scaling) from inside a region, by every thread of it, ending on a
+        /// barrier: where team_shift_capable() (host, the update touching only the blocks' nodes).
+        virtual bool team_shift_capable() const { return false; }
+        virtual void team_shift(const std::shared_ptr<SparseBlockVector<T>>& /*block_diag*/, const SharedBuffer<T>& /*scaling*/) {}
     };
 
     template <typename T>
@@ -149,6 +167,8 @@ namespace sfem {
         virtual void set_n_dofs(const ptrdiff_t n)                                 = 0;
         virtual void set_initial_guess_zero(const bool /*val*/) {}
         virtual int  iterations() const = 0;
+        /// The preconditioner set_op_and_diag_shift shifts, where it is one (null otherwise).
+        virtual std::shared_ptr<ShiftableOperator<T>> shiftable_preconditioner() const { return nullptr; }
         virtual int  set_op_and_diag_shift(const std::shared_ptr<Operator<T>>& /*op*/, const SharedBuffer<T>& /*diag*/) {
             SFEM_ERROR(
                     "set_op_and_diag_shift: not implemented for subclass of "

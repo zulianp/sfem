@@ -15,6 +15,23 @@ extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa(
         void *const RSTR outx,
         void *const RSTR outy
 );
+extern "C" int linear_elasticity_proteus_quad4_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
 extern "C" int linear_elasticity_proteus_quad4_gradient_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -103,6 +120,32 @@ extern "C" int linear_elasticity_quad4_apply_i_msoa(
         elements[2]
     };
     return linear_elasticity_proteus_quad4_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
+}
+
+extern "C" int linear_elasticity_quad4_apply_i_msoa_team(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+    idx_t *proteus_elements[4] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2]
+    };
+    return linear_elasticity_proteus_quad4_apply_i_msoa_team(scalar_bytes, nelements, element_begin, element_end, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy);
 }
 
 extern "C" int linear_elasticity_quad4_gradient_i_msoa(

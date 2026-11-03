@@ -21,7 +21,6 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 #include "sfem_mprgp.hpp"
-#include "sfem_parallel_cg.hpp"
 
 // C includes
 #include "matrixio_array.h"
@@ -66,7 +65,6 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_bcrs_sym_SpMV.hpp"
 #include "sfem_cg.hpp"
-#include "sfem_parallel_cg.hpp"
 #include "sfem_crs_sym_SpMV.hpp"
 #include "sfem_mprgp.hpp"
 #include "smesh_glob.hpp"

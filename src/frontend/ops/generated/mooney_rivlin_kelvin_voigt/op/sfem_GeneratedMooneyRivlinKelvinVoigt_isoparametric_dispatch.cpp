@@ -197,6 +197,58 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa(
     void *const RSTR u0_out,
     void *const RSTR u1_out
 );
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+);
+extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out
+);
 extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -292,6 +344,96 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_m
 extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u0_direction,
+    const void *const RSTR u1_direction,
+    const void *const RSTR u2_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out
+);
+extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -647,6 +789,49 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_jacobi
       "mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t current_stride,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    case smesh::QUAD4:
+      return mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -723,6 +908,55 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_jacobi
   }
   return sfem::codegen::unsupported_dispatch(
       "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t eta_b,
+        const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
+        const real_t u_dt_shift,
+        const ptrdiff_t current_stride,
+        const void *const RSTR u0,
+        const void *const RSTR u1,
+        const void *const RSTR u2,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u0_old,
+        const void *const RSTR u1_old,
+        const void *const RSTR u2_old,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u0_direction,
+        const void *const RSTR u1_direction,
+        const void *const RSTR u2_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR u0_out,
+        void *const RSTR u1_out,
+        void *const RSTR u2_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX8:
+      return mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::PROTEUS_HEX8:
+      return mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    case smesh::TET10:
+      return mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_residual_2d_i_maos(

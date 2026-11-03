@@ -1,6 +1,7 @@
 #include "sfem_Laplacian.hpp"
 
 #include "laplacian.hpp"
+#include "sfem_team.h"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -117,6 +118,9 @@ namespace sfem {
             return heap_view.data();
         }
 
+        /// out += A u over the domain's elements in `range_in`: by the threads of the caller's
+        /// region (TEAM, team_supported: no buffer made per call) or opening its own.
+        template <bool TEAM>
         int laplacian_dispatch_domain_vector(const OpDomain     &domain,
                                              smesh::Mesh        &mesh,
                                              const real_t *const u,
@@ -138,14 +142,16 @@ namespace sfem {
             if (domain.user_data) {
                 auto                data     = std::static_pointer_cast<LaplacianDomainData>(domain.user_data);
                 if (data->sstet4_stencil && k == real_t(1) && use_sstet4_stencil_default()) {
-                    return sstet4_laplacian_apply_stencil_global_range(
+                    return SFEM_TEAM_KERNEL(TEAM, sstet4_laplacian_apply_stencil_global_range)(
                             data->sstet4_stencil.get(), range.begin, ne, view, u, out);
                 }
 
                 if (!data->fff) {
                     if (k == real_t(1)) {
-                        return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+                        return SFEM_TEAM_KERNEL(TEAM, laplacian_apply)(
+                                domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
                     }
+                    if constexpr (TEAM) return SFEM_FAILURE;
 
                     const ptrdiff_t n   = mesh.n_nodes();
                     real_t         *tmp = (real_t *)calloc((size_t)n, sizeof(real_t));
@@ -162,8 +168,9 @@ namespace sfem {
                 constexpr ptrdiff_t fff_size = 6;
                 const jacobian_t   *fff_in   = fff->fff_AoS()->data() + range.begin * fff_size;
                 if (k == real_t(1)) {
-                    return laplacian_apply_opt(domain.element_type, ne, view, fff_in, u, out);
+                    return SFEM_TEAM_KERNEL(TEAM, laplacian_apply_opt)(domain.element_type, ne, view, fff_in, u, out);
                 }
+                if constexpr (TEAM) return SFEM_FAILURE;
 
                 const ptrdiff_t nfff   = fff_size * ne;
                 jacobian_t     *scaled = (jacobian_t *)malloc((size_t)nfff * sizeof(jacobian_t));
@@ -176,8 +183,10 @@ namespace sfem {
             }
 
             if (k == real_t(1)) {
-                return laplacian_apply(domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
+                return SFEM_TEAM_KERNEL(TEAM, laplacian_apply)(
+                        domain.element_type, ne, mesh.n_nodes(), view, mesh.points()->data(), u, out);
             }
+            if constexpr (TEAM) return SFEM_FAILURE;
 
             const ptrdiff_t n   = mesh.n_nodes();
             real_t         *tmp = (real_t *)calloc((size_t)n, sizeof(real_t));
@@ -419,7 +428,11 @@ namespace sfem {
     }
 
     int Laplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        return apply(x, h, out, ElementScope::ALL);
+        if (!team_supported()) return apply(x, h, out, ElementScope::ALL);
+        SFEM_TRACE_SCOPE("Laplacian::apply");
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
     }
 
     int Laplacian::value(const real_t *x, real_t *const out) { return value(x, out, ElementScope::ALL); }
@@ -427,14 +440,45 @@ namespace sfem {
     int Laplacian::gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            return laplacian_dispatch_domain_vector(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
+            return laplacian_dispatch_domain_vector<false>(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
     int Laplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            return laplacian_dispatch_domain_vector(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
+            return laplacian_dispatch_domain_vector<false>(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
+        });
+    }
+
+    // Without a buffer made per call: a unit diffusion coefficient, and on semi-structured
+    // tetrahedra the stencil built at initialize.
+    bool Laplacian::team_supported() const {
+        for (const auto &kv : impl_->domains->domains()) {
+            const OpDomain &domain = kv.second;
+            if (domain_diffusion(domain) != real_t(1)) return false;
+            if (smesh::is_semistructured_type(domain.element_type) && smesh::is_tet_ss_family(domain.element_type)) {
+                auto data = std::static_pointer_cast<LaplacianDomainData>(domain.user_data);
+                if (!data || !data->sstet4_stencil || !use_sstet4_stencil_default()) return false;
+            }
+        }
+        return true;
+    }
+
+    int Laplacian::team_prepare() {
+        impl_->domains->prepare_views();
+        return SFEM_SUCCESS;
+    }
+
+    int Laplacian::team_apply(const Team &team,
+                              const real_t *const /*x*/,
+                              const real_t *const h,
+                              real_t *const       out,
+                              const ElementScope  scope) {
+        (void)team;
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) {
+            return laplacian_dispatch_domain_vector<true>(domain, *mesh, h, out, domain_element_range(*mesh, domain, scope));
         });
     }
 
@@ -443,36 +487,6 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) {
             return laplacian_value_domain_range(domain, *mesh, x, out, domain_element_range(*mesh, domain, scope));
         });
-    }
-
-    int Laplacian::apply_scope_flat_range(const real_t *const /*x*/,
-                                          const real_t *const h,
-                                          real_t *const       out,
-                                          const ElementScope  scope,
-                                          const ptrdiff_t     flat_begin,
-                                          const ptrdiff_t     flat_end) {
-        SFEM_TRACE_SCOPE("Laplacian::apply_scope_flat_range");
-        SFEM_OP_CAPTURE();
-
-        if (flat_end <= flat_begin) {
-            return SFEM_SUCCESS;
-        }
-
-        auto mesh = impl_->space->mesh();
-        int  err  = SFEM_SUCCESS;
-        for (const auto &slice : flat_block_element_chunks(*mesh, scope, flat_begin, flat_end)) {
-            const smesh::block_idx_t block = slice.block;
-            const ElementRange         range = slice.range;
-            if (impl_->iterate([&](const OpDomain &domain) {
-                    if (block_id_for_domain(*mesh, *domain.block) != block) {
-                        return SFEM_SUCCESS;
-                    }
-                    return laplacian_dispatch_domain_vector(domain, *mesh, h, out, range);
-                }) != SFEM_SUCCESS) {
-                err = SFEM_FAILURE;
-            }
-        }
-        return err;
     }
 
     int Laplacian::report(const real_t *const) { return SFEM_SUCCESS; }

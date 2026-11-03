@@ -82,6 +82,16 @@ class OpenMPEnergySoASourceBuilder:
     def parallel_for_lines(self, reduction=None):
         return self.target.parallel_element_loop_lines("static", reduction)
 
+    def parallel_region_lines(self):
+        """The region a kernel opens to stage through thread scratch: nothing in a
+        team body, whose block every thread of its caller's region runs."""
+        pragma = self.target.parallel_region_pragma()
+        return () if pragma is None else (pragma,)
+
+    def worksharing_for_lines(self, schedule=None):
+        pragma = self.target.worksharing_for_pragma(schedule)
+        return () if pragma is None else (pragma,)
+
     def atomic_update_lines(self):
         """The atomic-update pragma, or nothing where the target has none.
 
@@ -207,6 +217,12 @@ class CUDAEnergySoASourceBuilder:
         return self.target.work_item_loop_lines(indent)
 
     def parallel_for_lines(self, reduction=None):
+        return ()
+
+    def parallel_region_lines(self):
+        return ()
+
+    def worksharing_for_lines(self, schedule=None):
         return ()
 
     def atomic_update_lines(self):

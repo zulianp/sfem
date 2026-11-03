@@ -64,24 +64,24 @@ int tri3_linear_elasticity_value(const ptrdiff_t nelements,
     return SFEM_SUCCESS;
 }
 
-int tri3_linear_elasticity_apply(const ptrdiff_t nelements,
-                                 const ptrdiff_t nnodes,
-                                 idx_t **const SFEM_RESTRICT elements,
-                                 geom_t **const SFEM_RESTRICT points,
-                                 const real_t mu,
-                                 const real_t lambda,
-                                 const ptrdiff_t u_stride,
-                                 const real_t *const ux,
-                                 const real_t *const uy,
-                                 const ptrdiff_t out_stride,
-                                 real_t *const outx,
-                                 real_t *const outy) {
+int tri3_linear_elasticity_apply_team(const ptrdiff_t nelements,
+                                      const ptrdiff_t nnodes,
+                                      idx_t **const SFEM_RESTRICT elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t mu,
+                                      const real_t lambda,
+                                      const ptrdiff_t u_stride,
+                                      const real_t *const ux,
+                                      const real_t *const uy,
+                                      const ptrdiff_t out_stride,
+                                      real_t *const outx,
+                                      real_t *const outy) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         scalar_t element_ux[3];
@@ -134,6 +134,32 @@ int tri3_linear_elasticity_apply(const ptrdiff_t nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around tri3_linear_elasticity_apply_team.
+int tri3_linear_elasticity_apply(const ptrdiff_t nelements,
+                                 const ptrdiff_t nnodes,
+                                 idx_t **const SFEM_RESTRICT elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 const real_t mu,
+                                 const real_t lambda,
+                                 const ptrdiff_t u_stride,
+                                 const real_t *const ux,
+                                 const real_t *const uy,
+                                 const ptrdiff_t out_stride,
+                                 real_t *const outx,
+                                 real_t *const outy) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tri3_linear_elasticity_apply_team(nelements, nnodes, elements, points, mu, lambda, u_stride, ux, uy, out_stride, outx, outy);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int tri3_linear_elasticity_crs_aos(const ptrdiff_t nelements,
                                        const ptrdiff_t nnodes,

@@ -158,6 +158,35 @@ namespace sfem {
                   const real_t *const h,
                   real_t *const       out,
                   const ElementScope  scope = ElementScope::ALL);
+
+        /// Whether `apply` and `inexact_apply` run on the threads of a region their caller
+        /// opened (sfem_TeamOperator.hpp): every operator and constraint has a team form.
+        /// The team's rows are the space's dofs.
+        bool team_supported() const;
+        bool team_inexact_supported() const;
+        /// Outside any region, before its team products.
+        int team_prepare();
+        /// apply and inexact_apply by every thread of the caller's region, each with its Team;
+        /// on return the calling thread's rows are complete. A scope other than ALL takes the
+        /// operators' share of those elements and leaves the constraints to
+        /// team_copy_constrained_dofs, once both halves are in.
+        int team_apply(const Team         &team,
+                       const real_t *const x,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope = ElementScope::ALL);
+        /// copy_constrained_dofs on the calling thread's rows.
+        void team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest);
+        /// Whether every constraint has a team form, and their set-up outside the region (whether
+        /// or not the function handles its constraints in its products).
+        bool team_constraints_supported() const;
+        int  team_prepare_constraints();
+        /// apply_zero_constraints on the calling thread's rows (after team_prepare_constraints).
+        void team_apply_zero_constraints(const Team &team, real_t *const x);
+        int team_inexact_apply(const Team         &team,
+                               const real_t *const h,
+                               real_t *const       out,
+                               const ElementScope  scope = ElementScope::ALL);
         /**
          * @brief The sum of the operators' potentials at each trial step.
          *
@@ -249,14 +278,6 @@ namespace sfem {
 
     private:
         friend class ParallelMatrixFreeOperator;
-
-        /// Flat subrange within @p scope (parallel overlap); block layout resolved inside ops.
-        int apply_scope_flat_range(const real_t *const x,
-                                   const real_t *const h,
-                                   real_t *const       out,
-                                   const ElementScope  scope,
-                                   const ptrdiff_t     flat_begin,
-                                   const ptrdiff_t     flat_end);
 
         class Impl;
         std::unique_ptr<Impl> impl_;

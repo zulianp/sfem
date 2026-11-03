@@ -111,12 +111,13 @@ namespace sfem {
         int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) override;
         int value(const real_t *x, real_t *const out, const ElementScope scope) override;
 
-        int apply_scope_flat_range(const real_t *const x,
-                                   const real_t *const h,
-                                   real_t *const       out,
-                                   const ElementScope  scope,
-                                   const ptrdiff_t     flat_begin,
-                                   const ptrdiff_t     flat_end) override;
+        bool team_supported() const override;
+        int  team_prepare() override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
 
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;

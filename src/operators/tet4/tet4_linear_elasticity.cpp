@@ -79,27 +79,27 @@ int tet4_linear_elasticity_value(const ptrdiff_t              nelements,
     return SFEM_SUCCESS;
 }
 
-int tet4_linear_elasticity_apply(const ptrdiff_t              nelements,
-                                 const ptrdiff_t              nnodes,
-                                 idx_t **const SFEM_RESTRICT  elements,
-                                 geom_t **const SFEM_RESTRICT points,
-                                 const real_t                 mu,
-                                 const real_t                 lambda,
-                                 const ptrdiff_t              u_stride,
-                                 const real_t *const          ux,
-                                 const real_t *const          uy,
-                                 const real_t *const          uz,
-                                 const ptrdiff_t              out_stride,
-                                 real_t *const                outx,
-                                 real_t *const                outy,
-                                 real_t *const                outz) {
+int tet4_linear_elasticity_apply_team(const ptrdiff_t              nelements,
+                                      const ptrdiff_t              nnodes,
+                                      idx_t **const SFEM_RESTRICT  elements,
+                                      geom_t **const SFEM_RESTRICT points,
+                                      const real_t                 mu,
+                                      const real_t                 lambda,
+                                      const ptrdiff_t              u_stride,
+                                      const real_t *const          ux,
+                                      const real_t *const          uy,
+                                      const real_t *const          uz,
+                                      const ptrdiff_t              out_stride,
+                                      real_t *const                outx,
+                                      real_t *const                outy,
+                                      real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t    ev[4];
         scalar_t element_ux[4];
@@ -168,6 +168,34 @@ int tet4_linear_elasticity_apply(const ptrdiff_t              nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around tet4_linear_elasticity_apply_team.
+int tet4_linear_elasticity_apply(const ptrdiff_t              nelements,
+                                 const ptrdiff_t              nnodes,
+                                 idx_t **const SFEM_RESTRICT  elements,
+                                 geom_t **const SFEM_RESTRICT points,
+                                 const real_t                 mu,
+                                 const real_t                 lambda,
+                                 const ptrdiff_t              u_stride,
+                                 const real_t *const          ux,
+                                 const real_t *const          uy,
+                                 const real_t *const          uz,
+                                 const ptrdiff_t              out_stride,
+                                 real_t *const                outx,
+                                 real_t *const                outy,
+                                 real_t *const                outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tet4_linear_elasticity_apply_team(nelements, nnodes, elements, points, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int tet4_linear_elasticity_diag(const ptrdiff_t              nelements,
                                 const ptrdiff_t              nnodes,

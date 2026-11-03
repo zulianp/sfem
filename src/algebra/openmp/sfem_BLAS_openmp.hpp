@@ -1,6 +1,9 @@
 #ifndef SFEM_OPENMP_BLAS_HPP
 #define SFEM_OPENMP_BLAS_HPP
 
+#include "sfem_Team.hpp"
+#include "sfem_TeamBLAS.hpp"
+#include "sfem_TeamReduction.hpp"
 #include "sfem_fixed_chunks.hpp"
 #include "sfem_tpl_blas.hpp"
 
@@ -21,59 +24,18 @@
 
 namespace sfem {
 
-    // Deterministic reduction. On by default; SFEM_DETERMINISTIC_BLAS=0 opts out.
+    // The host BLAS: each operation one region, every thread the static share of the entries a
+    // `parallel for` would give it, through the functions a solver's region calls on its Team
+    // shares (sfem_TeamBLAS.hpp).
     //
-    // OpenMP's reduction clause combines partial sums in an unspecified order over chunks
-    // whose boundaries follow the thread count, so a dot product is reproducible neither
-    // between runs nor between thread counts. That alone is enough to make a Krylov solve
-    // irreproducible even when the operator is exact: in the CVFEM spike, a solve whose
-    // operator had been made bit-deterministic still varied by about twenty percent in
-    // iteration count, and the dot products were what was left.
-    //
-    // This splits the range into a fixed number of chunks that does not depend on the thread
-    // count, sums each serially, and combines them in index order, so the result is identical
-    // for any number of threads. The cost is one 256-element array and a serial combine of
-    // it. Off by default, because it changes results in the last bits relative to the
-    // existing path and callers may be comparing against those.
-    // On by default. SFEM_DETERMINISTIC_BLAS=0 restores the OpenMP reduction clause.
-    //
-    // Made the default because it is better on every axis measured: reproducible across
-    // thread counts, more accurate, and faster. On a CVFEM Navier-Stokes solve it cut the
-    // per-iteration cost from 8509 to 7672 microseconds -- the reduction clause privatises
-    // and combines per thread, where this writes a flat array and sums it once.
-    inline bool blas_deterministic() {
-        static const bool on = [] {
-            const char *e = std::getenv("SFEM_DETERMINISTIC_BLAS");
-            return !e || std::atoi(e) != 0;
-        }();
-        return on;
-    }
-
-    template <typename T, typename F>
-    inline T blas_fixed_chunk_sum(const ptrdiff_t n, F term) {
-        const ptrdiff_t NC = blas_chunk_count(n);
-
-        if (NC == 1) {
-            T acc = 0;
-            for (ptrdiff_t i = 0; i < n; ++i) acc += term(i);
-            return acc;
-        }
-
-        std::vector<T> part((size_t)NC);
-#pragma omp parallel for schedule(static)
-        for (ptrdiff_t c = 0; c < NC; ++c) {
-            ptrdiff_t b, e;
-            blas_chunk_bounds(n, NC, c, &b, &e);
-            T acc = 0;
-            for (ptrdiff_t i = b; i < e; ++i) acc += term(i);
-            part[(size_t)c] = acc;
-        }
-        T ret = 0;
-        for (ptrdiff_t c = 0; c < NC; ++c) ret += part[(size_t)c];
-        return ret;
-    }
-
-
+    // Dot products are deterministic: partial sums over chunks fixed by the length
+    // (team_chunk_count), combined in index order (TeamReduction), so the result is identical
+    // for any number of threads, and the same a solver's region computes. OpenMP's reduction
+    // clause combines in an unspecified order over chunks that follow the thread count; in the
+    // CVFEM spike that alone left a bit-deterministic operator's Krylov solve varying by about
+    // twenty percent in iterations, and the fixed chunks were also faster (8509 to 7672
+    // microseconds an iteration). Below blas_serial_below entries the chunks are summed by the
+    // calling thread: a region costs more than the arithmetic.
     template <typename T>
     class OpenMPBLAS final : public BLAS<T> {
     public:
@@ -85,107 +47,77 @@ namespace sfem {
 
         void destroy(void* a) override { free(a); }
 
-        void copy(const ptrdiff_t n, const T* const src, T* const dest) override {
-            memcpy(dest, src, n * sizeof(T));
-        }
+        void copy(const ptrdiff_t n, const T* const src, T* const dest) override { team_blas::copy(0, n, src, dest); }
 
         auto dot(const ptrdiff_t n, const T* const l, const T* const r) -> T override {
-            if (blas_deterministic())
-                return blas_fixed_chunk_sum<T>(n, [l, r](const ptrdiff_t i) { return l[i] * r[i]; });
-
-            T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-            for (ptrdiff_t i = 0; i < n; i++) {
-                ret += l[i] * r[i];
+            const ptrdiff_t chunks = team_chunk_count(n);
+            if ((ptrdiff_t)scratch_.size() < TeamReduction<T, 1>::buffer_size(chunks))
+                scratch_.resize((size_t)TeamReduction<T, 1>::buffer_size(chunks));
+            T* const buffer = scratch_.data();
+            if (n < blas_serial_below) {
+                TeamReduction<T, 1> reduction(buffer, chunks);
+                return team_blas::dot(Team::of(n, 0, 1), reduction, l, r);
             }
-
+            T ret = 0;
+#pragma omp parallel
+            {
+                TeamReduction<T, 1> reduction(buffer, chunks);
+                const Team          team = Team::current(n);
+                const T             v    = team_blas::dot(team, reduction, l, r);
+                if (team.leader()) ret = v;
+            }
             return ret;
         }
 
         void dot(const ptrdiff_t n, const T* const l, const T* const r, T* const result) override { *result = dot(n, l, r); }
 
         void axpy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                y[i] += alpha * x[i];
-            }
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::axpy(b, e, alpha, x, y); });
         }
 
-        void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
-                   T* const y) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                y[i] = alpha * x[i] + beta * y[i];
-            }
+        void axpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, T* const y) override {
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::axpby(b, e, alpha, x, beta, y); });
         }
 
-        void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta,
-                    const T* const y, T* const z) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                z[i] = alpha * x[i] + beta * y[i];
-            }
+        void zaxpby(const ptrdiff_t n, const T alpha, const T* const x, const T beta, const T* const y, T* const z) override {
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::zaxpby(b, e, alpha, x, beta, y, z); });
         }
 
         void zeros(const std::size_t size, T* const x) override {
-#ifdef _OPENMP
-#pragma omp parallel
-            {
-                size_t start, len;
-                int id = omp_get_thread_num();
-                int num = omp_get_num_threads();
-
-                start = (id * size) / num;
-                len = ((id + 1) * size) / num - start;
-
-                memset(&x[start], 0, len * sizeof(T));
-            }
-#else
-            memset(x, 0, size * sizeof(T));
-#endif
+            over_shares((ptrdiff_t)size, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::zeros(b, e, x); });
         }
 
-        auto norm2(const ptrdiff_t n, const T* const x) -> T override {
-            if (blas_deterministic())
-                return sqrt(blas_fixed_chunk_sum<T>(n, [x](const ptrdiff_t i) { return x[i] * x[i]; }));
-
-            T ret = 0;
-
-#pragma omp parallel for reduction(+ : ret)
-            for (ptrdiff_t i = 0; i < n; i++) {
-                ret += x[i] * x[i];
-            }
-
-            return sqrt(ret);
-        }
+        auto norm2(const ptrdiff_t n, const T* const x) -> T override { return sqrt(dot(n, x, x)); }
 
         void values(const std::size_t n, const T v, T* const x) override {
-#pragma omp parallel for
-            for (std::ptrdiff_t i = 0; i < (std::ptrdiff_t)n; i++) {
-                x[i] = v;
-            }
+            over_shares((ptrdiff_t)n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::values(b, e, v, x); });
         }
 
         void scal(const std::ptrdiff_t n, const T alpha, T* const x) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                x[i] *= alpha;
-            }
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::scal(b, e, alpha, x); });
         }
 
         void reciprocal(const std::ptrdiff_t n, const T alpha, T* const x) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                if (x[i]) x[i] = alpha / x[i];
-            }
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::reciprocal(b, e, alpha, x); });
         }
 
-        void xypaz(const std::ptrdiff_t n, const T* const x, const T* const y, const T alpha,
-                   T* const z) override {
-#pragma omp parallel for
-            for (ptrdiff_t i = 0; i < n; i++) {
-                z[i] = x[i] * y[i] + alpha * z[i];
+        void xypaz(const std::ptrdiff_t n, const T* const x, const T* const y, const T alpha, T* const z) override {
+            over_shares(n, [=](const ptrdiff_t b, const ptrdiff_t e) { team_blas::xypaz(b, e, x, y, alpha, z); });
+        }
+
+    private:
+        // The dot products' partial sums, grown to the longest vector's chunks.
+        std::vector<T> scratch_;
+
+        // One region, f(b, e) on every thread's static share of the n entries.
+        template <typename F>
+        static void over_shares(const ptrdiff_t n, F f) {
+#pragma omp parallel
+            {
+                const sfem_team_t team = sfem_team_current(0);
+                ptrdiff_t         b, e;
+                sfem_team_share(&team, n, 1, 0, &b, &e);
+                f(b, e);
             }
         }
     };

@@ -12,6 +12,8 @@ from codegen.framework.emitters.kernel_prologue import (
     retag_constants,
 )
 from codegen.framework.plans.conventions import (
+    with_team_element_range,
+    with_team_element_range_arguments,
     PREFIXES,
     abi_geometry_name,
     abi_mesh_fragment,
@@ -143,7 +145,7 @@ from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
     evaluation_strategy,
 )
-from codegen.framework.plans.geometry_variants import packed_kernel_forms
+from codegen.framework.plans.geometry_variants import kernel_target, packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
@@ -388,6 +390,18 @@ def _mesh_loop_lines():
         *target.parallel_element_loop_lines("static"),
         *mesh_loop_lines(target),
     )
+
+
+def _parallel_region_lines():
+    """The region a kernel opens to stage through thread scratch: nothing in a team
+    body, whose block every thread of its caller's region runs."""
+    pragma = _target().parallel_region_pragma()
+    return () if pragma is None else (pragma,)
+
+
+def _worksharing_for_lines(schedule=None):
+    pragma = _target().worksharing_for_pragma(schedule)
+    return () if pragma is None else (pragma,)
 
 
 def _atomic_update_pragma():
@@ -6739,20 +6753,22 @@ def _operator_source(
             lines.extend(
                 _runtime_typed_entry_point(function, params, (), body)
             )
-        lines.extend(
-            _mesh_operator_source(
-                system,
-                prefix,
-                local_prefix,
-                affine_specialization,
-                specialization,
-                form,
-                dependencies,
-                coefficients,
-                basis_family,
-                geometry_family,
+        # The operator's product is a team body (`kernel_target`).
+        with use_target(kernel_target(form, _target())):
+            lines.extend(
+                _mesh_operator_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    affine_specialization,
+                    specialization,
+                    form,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                    geometry_family,
+                )
             )
-        )
         # The AoS wrapper forwards to the isoparametric SoA kernel, so it
         # goes wherever that goes.  `apply_variants` already records that AoS
         # only ever appears with isoparametric geometry.
@@ -8122,6 +8138,7 @@ def _mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     for index, param in enumerate(params):
         lines.append(
             "    %s%s" % (param, "," if index + 1 < len(params) else "")
@@ -8399,6 +8416,7 @@ def _mesh_operator_source(
     )
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -10212,6 +10230,7 @@ def _isoparametric_mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -10417,6 +10436,7 @@ def _isoparametric_mesh_operator_source(
     call_args = ["nelements", "nnodes", "elements", "points"]
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -10523,7 +10543,7 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel",
+            *_parallel_region_lines(),
             "  {",
             "    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
         ]
@@ -10545,7 +10565,7 @@ def _scalar_packed_jacobian_action_source(
             "    s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
             "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
-            "#pragma omp for schedule(static)",
+            *_worksharing_for_lines("static"),
             "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
             "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
             "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -10752,7 +10772,7 @@ def _scalar_packed_jacobian_action_source(
                 "    }",
                 "  }",
                 "",
-                "#pragma omp parallel for schedule(static)",
+                *_target().parallel_element_loop_lines("static"),
                 "  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
                 "    const idx_t dest = ghost_reduce_dest[row];",
                 "    const ptrdiff_t begin = ghost_reduce_ptr[row];",
@@ -10985,7 +11005,7 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel",
+            *_parallel_region_lines(),
             "  {",
         ]
     )
@@ -11006,7 +11026,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "    s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
             "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
-            "#pragma omp for schedule(static)",
+            *_worksharing_for_lines("static"),
             "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
             "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
             "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",

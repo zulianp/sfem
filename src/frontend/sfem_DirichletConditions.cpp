@@ -140,6 +140,10 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::vector<struct Condition>  conditions;
+        //! The constrained dofs in order, for the team copy (team_prepare), and the conditions'
+        //! nodesets they were taken from.
+        std::vector<ptrdiff_t>    sorted_dofs;
+        std::vector<const void *> sorted_from;
     };
 
     std::shared_ptr<DirichletConditions> DirichletConditions::create(const std::shared_ptr<FunctionSpace> &space,
@@ -703,6 +707,40 @@ namespace sfem {
             constraint_nodes_copy_vec(c.nodeset->size(), c.nodeset->data(), impl_->space->block_size(), c.component, src, dest);
         }
 
+        return SFEM_SUCCESS;
+    }
+
+    int DirichletConditions::team_prepare() {
+        std::vector<const void *> from;
+        for (auto &c : impl_->conditions) from.push_back(c.nodeset ? (const void *)c.nodeset->data() : nullptr);
+        if (from == impl_->sorted_from && !impl_->sorted_dofs.empty()) return SFEM_SUCCESS;
+        const int bs = impl_->space->block_size();
+        impl_->sorted_dofs.clear();
+        for (auto &c : impl_->conditions) {
+            const idx_t *const nodes = c.nodeset->data();
+            for (ptrdiff_t k = 0; k < c.nodeset->size(); ++k) impl_->sorted_dofs.push_back((ptrdiff_t)nodes[k] * bs + c.component);
+        }
+        std::sort(impl_->sorted_dofs.begin(), impl_->sorted_dofs.end());
+        impl_->sorted_dofs.erase(std::unique(impl_->sorted_dofs.begin(), impl_->sorted_dofs.end()), impl_->sorted_dofs.end());
+        impl_->sorted_from = std::move(from);
+        return SFEM_SUCCESS;
+    }
+
+    int DirichletConditions::team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest) {
+        const ptrdiff_t *const dofs = impl_->sorted_dofs.data();
+        const ptrdiff_t        n    = (ptrdiff_t)impl_->sorted_dofs.size();
+        const ptrdiff_t        b    = std::lower_bound(dofs, dofs + n, team.begin) - dofs;
+        const ptrdiff_t        e    = std::lower_bound(dofs, dofs + n, team.end) - dofs;
+        for (ptrdiff_t k = b; k < e; ++k) dest[dofs[k]] = src[dofs[k]];
+        return SFEM_SUCCESS;
+    }
+
+    int DirichletConditions::team_apply_zero(const Team &team, real_t *const x) {
+        const ptrdiff_t *const dofs = impl_->sorted_dofs.data();
+        const ptrdiff_t        n    = (ptrdiff_t)impl_->sorted_dofs.size();
+        const ptrdiff_t        b    = std::lower_bound(dofs, dofs + n, team.begin) - dofs;
+        const ptrdiff_t        e    = std::lower_bound(dofs, dofs + n, team.end) - dofs;
+        for (ptrdiff_t k = b; k < e; ++k) x[dofs[k]] = 0;
         return SFEM_SUCCESS;
     }
 

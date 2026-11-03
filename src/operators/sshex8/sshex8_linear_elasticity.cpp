@@ -38,21 +38,21 @@ static void sshex8_isoparametric_quadrature(int *const n_qp, const scalar_t **co
     }
 }
 
-int sshex8_linear_elasticity_apply(const int                    level,
-                                   const ptrdiff_t              nelements,
-                                   const ptrdiff_t              /*nnodes*/,
-                                   idx_t **const SFEM_RESTRICT  elements,
-                                   geom_t **const SFEM_RESTRICT points,
-                                   const real_t                 mu,
-                                   const real_t                 lambda,
-                                   const ptrdiff_t              u_stride,
-                                   const real_t *const          ux,
-                                   const real_t *const          uy,
-                                   const real_t *const          uz,
-                                   const ptrdiff_t              out_stride,
-                                   real_t *const                outx,
-                                   real_t *const                outy,
-                                   real_t *const                outz) {
+int sshex8_linear_elasticity_apply_team(const int                    level,
+                                        const ptrdiff_t              nelements,
+                                        const ptrdiff_t              /*nnodes*/,
+                                        idx_t **const SFEM_RESTRICT  elements,
+                                        geom_t **const SFEM_RESTRICT points,
+                                        const real_t                 mu,
+                                        const real_t                 lambda,
+                                        const ptrdiff_t              u_stride,
+                                        const real_t *const          ux,
+                                        const real_t *const          uy,
+                                        const real_t *const          uz,
+                                        const ptrdiff_t              out_stride,
+                                        real_t *const                outx,
+                                        real_t *const                outy,
+                                        real_t *const                outz) {
     const int nxe = sshex8_nxe(level);
 
     const int proteus_to_std_hex8_corners[8] = {// Bottom
@@ -72,7 +72,6 @@ int sshex8_linear_elasticity_apply(const int                    level,
     const scalar_t *qw;
     sshex8_isoparametric_quadrature(&n_qp, &qx, &qw);
 
-#pragma omp parallel
     {
         // Allocation per thread
         scalar_t      *eu[3];
@@ -248,6 +247,35 @@ int sshex8_linear_elasticity_apply(const int                    level,
     return SFEM_SUCCESS;
 }
 
+// The plain entry point: one region around sshex8_linear_elasticity_apply_team.
+int sshex8_linear_elasticity_apply(const int                    level,
+                                   const ptrdiff_t              nelements,
+                                   const ptrdiff_t              nnodes,
+                                   idx_t **const SFEM_RESTRICT  elements,
+                                   geom_t **const SFEM_RESTRICT points,
+                                   const real_t                 mu,
+                                   const real_t                 lambda,
+                                   const ptrdiff_t              u_stride,
+                                   const real_t *const          ux,
+                                   const real_t *const          uy,
+                                   const real_t *const          uz,
+                                   const ptrdiff_t              out_stride,
+                                   real_t *const                outx,
+                                   real_t *const                outy,
+                                   real_t *const                outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_linear_elasticity_apply_team(level, nelements, nnodes, elements, points, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
+
 // The diagonal blocks, packed 00 01 02 11 12 22, of every micro element at the macro element's
 // Jacobian at each quadrature point, as sshex8_linear_elasticity_apply integrates them. `out` holds
 // the six packed arrays, or with `diag_only` three, which take the packed entries 0, 3 and 5.
@@ -417,29 +445,28 @@ int sshex8_linear_elasticity_block_diag_sym(const int                    level,
 
 #ifndef SFEM_ENABLE_BLAS
 
-int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                             level,
-                                                         const ptrdiff_t                       nelements,
-                                                         const ptrdiff_t                       nnodes,
-                                                         idx_t **const SFEM_RESTRICT           elements,
-                                                         geom_t **const SFEM_RESTRICT          points,
-                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
-                                                         const geom_t *const SFEM_RESTRICT     macro_determinant,
-                                                         const real_t                          mu,
-                                                         const real_t                          lambda,
-                                                         const ptrdiff_t                       u_stride,
-                                                         const real_t *const                   ux,
-                                                         const real_t *const                   uy,
-                                                         const real_t *const                   uz,
-                                                         const ptrdiff_t                       out_stride,
-                                                         real_t *const                         outx,
-                                                         real_t *const                         outy,
-                                                         real_t *const                         outz) {
+int affine_sshex8_linear_elasticity_apply_macro_adjugate_team(const int                             level,
+                                                              const ptrdiff_t                       nelements,
+                                                              const ptrdiff_t                       nnodes,
+                                                              idx_t **const SFEM_RESTRICT           elements,
+                                                              geom_t **const SFEM_RESTRICT          points,
+                                                              const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                              const geom_t *const SFEM_RESTRICT     macro_determinant,
+                                                              const real_t                          mu,
+                                                              const real_t                          lambda,
+                                                              const ptrdiff_t                       u_stride,
+                                                              const real_t *const                   ux,
+                                                              const real_t *const                   uy,
+                                                              const real_t *const                   uz,
+                                                              const ptrdiff_t                       out_stride,
+                                                              real_t *const                         outx,
+                                                              real_t *const                         outy,
+                                                              real_t *const                         outz) {
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(points);
 
     const int nxe = sshex8_nxe(level);
 
-#pragma omp parallel
     {
         scalar_t      *eu[3];
         accumulator_t *v[3];
@@ -567,6 +594,37 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around affine_sshex8_linear_elasticity_apply_macro_adjugate_team.
+int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                             level,
+                                                         const ptrdiff_t                       nelements,
+                                                         const ptrdiff_t                       nnodes,
+                                                         idx_t **const SFEM_RESTRICT           elements,
+                                                         geom_t **const SFEM_RESTRICT          points,
+                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT     macro_determinant,
+                                                         const real_t                          mu,
+                                                         const real_t                          lambda,
+                                                         const ptrdiff_t                       u_stride,
+                                                         const real_t *const                   ux,
+                                                         const real_t *const                   uy,
+                                                         const real_t *const                   uz,
+                                                         const ptrdiff_t                       out_stride,
+                                                         real_t *const                         outx,
+                                                         real_t *const                         outy,
+                                                         real_t *const                         outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = affine_sshex8_linear_elasticity_apply_macro_adjugate_team(level, nelements, nnodes, elements, points, macro_adjugate, macro_determinant, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int affine_sshex8_linear_elasticity_apply(const int                    level,
                                           const ptrdiff_t              nelements,
@@ -872,30 +930,29 @@ int affine_sshex8_linear_elasticity_apply(const int                    level,
     return SFEM_SUCCESS;
 }
 
-int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                             level,
-                                                         const ptrdiff_t                       nelements,
-                                                         const ptrdiff_t                       nnodes,
-                                                         idx_t **const SFEM_RESTRICT           elements,
-                                                         geom_t **const SFEM_RESTRICT          points,
-                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
-                                                         const geom_t *const SFEM_RESTRICT     macro_determinant,
-                                                         const real_t                          mu,
-                                                         const real_t                          lambda,
-                                                         const ptrdiff_t                       u_stride,
-                                                         const real_t *const                   ux,
-                                                         const real_t *const                   uy,
-                                                         const real_t *const                   uz,
-                                                         const ptrdiff_t                       out_stride,
-                                                         real_t *const                         outx,
-                                                         real_t *const                         outy,
-                                                         real_t *const                         outz) {
+int affine_sshex8_linear_elasticity_apply_macro_adjugate_team(const int                             level,
+                                                              const ptrdiff_t                       nelements,
+                                                              const ptrdiff_t                       nnodes,
+                                                              idx_t **const SFEM_RESTRICT           elements,
+                                                              geom_t **const SFEM_RESTRICT          points,
+                                                              const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                              const geom_t *const SFEM_RESTRICT     macro_determinant,
+                                                              const real_t                          mu,
+                                                              const real_t                          lambda,
+                                                              const ptrdiff_t                       u_stride,
+                                                              const real_t *const                   ux,
+                                                              const real_t *const                   uy,
+                                                              const real_t *const                   uz,
+                                                              const ptrdiff_t                       out_stride,
+                                                              real_t *const                         outx,
+                                                              real_t *const                         outy,
+                                                              real_t *const                         outz) {
     SFEM_UNUSED(nnodes);
     SFEM_UNUSED(points);
 
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
-#pragma omp parallel
     {
         scalar_t      *eu[3];
         accumulator_t *v[3];
@@ -980,6 +1037,37 @@ int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int              
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around affine_sshex8_linear_elasticity_apply_macro_adjugate_team.
+int affine_sshex8_linear_elasticity_apply_macro_adjugate(const int                             level,
+                                                         const ptrdiff_t                       nelements,
+                                                         const ptrdiff_t                       nnodes,
+                                                         idx_t **const SFEM_RESTRICT           elements,
+                                                         geom_t **const SFEM_RESTRICT          points,
+                                                         const jacobian_t *const SFEM_RESTRICT macro_adjugate,
+                                                         const geom_t *const SFEM_RESTRICT     macro_determinant,
+                                                         const real_t                          mu,
+                                                         const real_t                          lambda,
+                                                         const ptrdiff_t                       u_stride,
+                                                         const real_t *const                   ux,
+                                                         const real_t *const                   uy,
+                                                         const real_t *const                   uz,
+                                                         const ptrdiff_t                       out_stride,
+                                                         real_t *const                         outx,
+                                                         real_t *const                         outy,
+                                                         real_t *const                         outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = affine_sshex8_linear_elasticity_apply_macro_adjugate_team(level, nelements, nnodes, elements, points, macro_adjugate, macro_determinant, mu, lambda, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 #endif
 

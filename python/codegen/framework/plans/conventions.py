@@ -477,6 +477,55 @@ def diagnostics_tail(name):
             return tail
     return None
 
+#: The tail of a kernel's team entry point: the same kernel run by the threads of
+#: a parallel region its caller opened (a solver's region), every thread calling
+#: it with the same arguments.  The plain name opens that region around it.  A
+#: tail after the layout, so the name parses as its plain twin's and the
+#: dimension-generic dispatch carries it through (`..._3d_a_msoa_team`).
+ABI_TEAM_TAIL = "_team"
+
+#: The elements a team kernel walking the mesh is given, after `nelements`: its
+#: `_team` twin takes them, the plain name passes the whole mesh
+#: (`TargetPlatform.walks_an_element_range`).
+TEAM_ELEMENT_RANGE_PARAMETERS = ("const ptrdiff_t element_begin", "const ptrdiff_t element_end")
+TEAM_ELEMENT_RANGE_ARGUMENTS = ("element_begin", "element_end")
+WHOLE_MESH_ELEMENT_RANGE = ("0", "nelements")
+
+
+def _with_element_range(items, is_count, range_items, target):
+    """`items` with `range_items` after the element count (`is_count`), when `target` walks a
+    range (a team body) and the kernel walks elements rather than packs."""
+    items = list(items)
+    if not target.walks_an_element_range():
+        return items
+    if any(TEAM_ELEMENT_RANGE_ARGUMENTS[0] in item for item in items):
+        return items
+    if any("n_packs" in item for item in items):
+        return items
+    for index, item in enumerate(items):
+        if is_count(item):
+            return items[: index + 1] + list(range_items) + items[index + 1 :]
+    return items
+
+
+def with_team_element_range(params, target):
+    """`params` with the element range inserted after `nelements`, when `target`
+    walks one (a team body); unchanged otherwise, and for a kernel that walks
+    packs."""
+    return _with_element_range(
+        params,
+        lambda param: param.strip().rstrip(",") == "const ptrdiff_t nelements",
+        TEAM_ELEMENT_RANGE_PARAMETERS,
+        target,
+    )
+
+
+def with_team_element_range_arguments(arguments, target):
+    """The call's argument names to match `with_team_element_range`."""
+    return _with_element_range(
+        arguments, lambda name: name == "nelements", TEAM_ELEMENT_RANGE_ARGUMENTS, target
+    )
+
 #: The traversal a kernel name announces before its geometry token.  Unabbreviated
 #: for now: it is 0.08% of the tree and `packed` is the word every driver flag,
 #: plan field and benchmark column already uses.

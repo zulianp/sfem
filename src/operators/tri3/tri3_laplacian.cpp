@@ -52,18 +52,18 @@ int tri3_laplacian_assemble_value(const ptrdiff_t nelements,
     return 0;
 }
 
-int tri3_laplacian_apply(const ptrdiff_t nelements,
-                         const ptrdiff_t nnodes,
-                         idx_t **const SFEM_RESTRICT elements,
-                         geom_t **const SFEM_RESTRICT points,
-                         const real_t *const SFEM_RESTRICT u,
-                         real_t *const SFEM_RESTRICT values) {
+int tri3_laplacian_apply_team(const ptrdiff_t nelements,
+                              const ptrdiff_t nnodes,
+                              idx_t **const SFEM_RESTRICT elements,
+                              geom_t **const SFEM_RESTRICT points,
+                              const real_t *const SFEM_RESTRICT u,
+                              real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[3];
         scalar_t fff[3];
@@ -104,6 +104,26 @@ int tri3_laplacian_apply(const ptrdiff_t nelements,
 
     return 0;
 }
+
+// The plain entry point: one region around tri3_laplacian_apply_team.
+int tri3_laplacian_apply(const ptrdiff_t nelements,
+                         const ptrdiff_t nnodes,
+                         idx_t **const SFEM_RESTRICT elements,
+                         geom_t **const SFEM_RESTRICT points,
+                         const real_t *const SFEM_RESTRICT u,
+                         real_t *const SFEM_RESTRICT values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tri3_laplacian_apply_team(nelements, nnodes, elements, points, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int tri3_laplacian_crs(const ptrdiff_t nelements,
                                     const ptrdiff_t nnodes,
@@ -202,12 +222,12 @@ int tri3_laplacian_diag(const ptrdiff_t nelements,
 }
 
 // Optimized for matrix-free
-int tri3_laplacian_apply_opt(const ptrdiff_t nelements,
-                             idx_t **const SFEM_RESTRICT elements,
-                             const jacobian_t *const SFEM_RESTRICT fff_all,
-                             const real_t *const SFEM_RESTRICT u,
-                             real_t *const SFEM_RESTRICT values) {
-#pragma omp parallel for
+int tri3_laplacian_apply_opt_team(const ptrdiff_t nelements,
+                                  idx_t **const SFEM_RESTRICT elements,
+                                  const jacobian_t *const SFEM_RESTRICT fff_all,
+                                  const real_t *const SFEM_RESTRICT u,
+                                  real_t *const SFEM_RESTRICT values) {
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         accumulator_t element_vector[3];
         idx_t ev[3];
@@ -243,6 +263,25 @@ int tri3_laplacian_apply_opt(const ptrdiff_t nelements,
 
     return 0;
 }
+
+// The plain entry point: one region around tri3_laplacian_apply_opt_team.
+int tri3_laplacian_apply_opt(const ptrdiff_t nelements,
+                             idx_t **const SFEM_RESTRICT elements,
+                             const jacobian_t *const SFEM_RESTRICT fff_all,
+                             const real_t *const SFEM_RESTRICT u,
+                             real_t *const SFEM_RESTRICT values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tri3_laplacian_apply_opt_team(nelements, elements, fff_all, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int tri3_laplacian_diag_opt(const ptrdiff_t nelements,
                             idx_t **const SFEM_RESTRICT elements,

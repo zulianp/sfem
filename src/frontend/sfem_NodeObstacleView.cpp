@@ -202,6 +202,18 @@ namespace sfem {
         }
     }
 
+    void node_obstacle_apply_blocks(const NodeObstacleView &c,
+                                    const real_t *const     blocks,
+                                    const real_t *const     in,
+                                    real_t *const           out,
+                                    const ptrdiff_t         first,
+                                    const ptrdiff_t         end) {
+        for (ptrdiff_t node = first; node < end; ++node) {
+            const ptrdiff_t i = c.frame_of[node];
+            if (i >= 0) ::node_obstacle_packed_sym_apply(&blocks[6 * i], &in[node * 3], &out[node * 3]);
+        }
+    }
+
     void node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d) {
 #ifdef SFEM_ENABLE_CUDA
         if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_blocks_diagonal(c, blocks, d);

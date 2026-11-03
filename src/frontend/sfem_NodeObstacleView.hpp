@@ -46,6 +46,13 @@ namespace sfem {
                                   real_t *const           out,
                                   const ptrdiff_t         first,
                                   const ptrdiff_t         end);
+    // out_i += B_i in_i at the contact nodes among [first, end), by the calling thread alone.
+    void node_obstacle_apply_blocks(const NodeObstacleView &c,
+                                    const real_t *const     blocks,
+                                    const real_t *const     in,
+                                    real_t *const           out,
+                                    const ptrdiff_t         first,
+                                    const ptrdiff_t         end);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and

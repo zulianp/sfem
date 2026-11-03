@@ -10,6 +10,15 @@ extern "C" {
 
 typedef struct sstet4_linear_elasticity_stencil sstet4_linear_elasticity_stencil_t;
 
+int sstet4_linear_elasticity_apply_points_team(const int                         level,
+                                               const ptrdiff_t                   nelements,
+                                               idx_t **const SFEM_RESTRICT       elements,
+                                               geom_t **const SFEM_RESTRICT      points,
+                                               const real_t                      mu,
+                                               const real_t                      lambda,
+                                               const real_t *const SFEM_RESTRICT u,
+                                               real_t *const SFEM_RESTRICT       values);
+
 int sstet4_linear_elasticity_apply_points(const int                         level,
                                           const ptrdiff_t                   nelements,
                                           idx_t **const SFEM_RESTRICT       elements,

@@ -8,9 +8,11 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include "sfem_PowerMethod.hpp"
 #include "sfem_BLAS_openmp.hpp"
+#include "sfem_SolverExec.hpp"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -19,42 +21,11 @@
 // 3-term Chebyshev iteration (smoother / polynomial preconditioner)
 namespace sfem {
 
-    namespace chebyshev3_host_ {
 
-        // y ← alpha * x
-        template <typename T>
-        static void scaled_copy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-            for (ptrdiff_t i = 0; i < n; i++) {
-                y[i] = alpha * x[i];
-            }
-        }
-
-        // p ← β p − rhs + Ax;  x ← x − α p
-        template <typename T>
-        static void iteration_update(const ptrdiff_t n,
-                                     const T         alpha,
-                                     const T         beta,
-                                     const T* const  rhs,
-                                     const T* const  Ax,
-                                     T* const        p,
-                                     T* const        x) {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-            for (ptrdiff_t i = 0; i < n; i++) {
-                const T pi = beta * p[i] - rhs[i] + Ax[i];
-                p[i]       = pi;
-                x[i] -= alpha * pi;
-            }
-        }
-
-    }  // namespace chebyshev3_host_
-
+    /// As a smoother or a preconditioner it is a team operator where its operator is one (host):
+    /// its iterations then run on the threads of the caller's region (sfem_TeamOperator.hpp).
     template <typename T>
-    class Chebyshev3 : public MatrixFreeLinearSolver<T> {
+    class Chebyshev3 : public MatrixFreeLinearSolver<T>, public TeamOperator<T> {
     public:
         /// Built for the execution space es, on op.
         static std::shared_ptr<Chebyshev3<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
@@ -73,7 +44,7 @@ namespace sfem {
         T   eigen_solver_tol{1e-6};
         int eigen_solver_max_it{1000};
         int max_it{3};
-        int iterations_{0};
+        mutable int iterations_{0};
 
         T         eig_max{0};
         T         scale_eig_max{1};
@@ -98,9 +69,32 @@ namespace sfem {
 
         void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
 
+        /// A distributed operator makes the smoother distributed (SolveSpan): its power method's
+        /// norms are over the ranks.
         void set_op(const std::shared_ptr<Operator<T>>& op) override {
             n_dofs         = op->rows();
+            span_          = SolveSpan<T>::of(*op);
             this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            op_            = op;
+            team_op_       = std::dynamic_pointer_cast<TeamOperator<T>>(op);
+        }
+
+        // As a team operator: the operator's rows, ready where the operator is (host).
+        Team team() const override { return team_op_->team(); }
+        bool team_capable() const override {
+            return team_op_ && team_op_->team_capable() && this->execution_space() == EXECUTION_SPACE_HOST;
+        }
+        int prepare() override {
+            team_reduction_buffer(team_sums_, n_dofs);
+            return team_op_ ? team_op_->prepare() : SFEM_SUCCESS;
+        }
+        void team_apply(const Team& team, const T* const rhs, T* const x) const override {
+            team_solve(team, rhs, x, is_initial_guess_zero);
+        }
+        void team_solve(const Team& team, const T* const rhs, T* const x, const bool zero_guess) const override {
+            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
+            TeamExec<T>         e(team, sums);
+            run(e, *team_op_, rhs, x, p_->data(), temp_->data(), zero_guess);
         }
 
         void set_preconditioner_op(const std::shared_ptr<Operator<T>>&) override { assert(false); }
@@ -114,9 +108,12 @@ namespace sfem {
 
         void ensure_power_method() {
             if (!power_method) {
-                auto blas_impl      = this->blas;
-                power_method        = std::make_shared<PowerMethod<T>>();
-                power_method->norm2 = [blas_impl](const std::ptrdiff_t n, const T* const x) { return blas_impl->norm2(n, x); };
+                auto blas_impl           = this->blas;
+                power_method             = std::make_shared<PowerMethod<T>>();
+                const SolveSpan<T>* span = &span_;
+                power_method->norm2      = [blas_impl, span](const std::ptrdiff_t n, const T* const x) {
+                    return std::sqrt(span->sum(blas_impl->dot(n, x, x)));
+                };
                 power_method->scal  = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) {
                     blas_impl->scal(n, alpha, x);
                 };
@@ -127,6 +124,7 @@ namespace sfem {
         bool good() const { return blas->good() && apply_op; }
 
         void monitor(const int iter, const T residual) {
+            if (!span_.root()) return;
             if (iter == max_it || iter % 100 == 0 || residual < atol) {
                 std::cout << iter << ": " << residual << "\n";
             }
@@ -163,38 +161,72 @@ namespace sfem {
         }
 
         void init(const T* const guess_eigenvector) {
-            T* eigenvector = blas->allocate(this->rows());
-            T* work        = blas->allocate(this->rows());
+            // The products' vectors: a distributed operator's allocation, zero beyond the rows.
+            const ptrdiff_t n           = span_.size(this->rows());
+            T*              eigenvector = blas->allocate(n);
+            T*              work        = blas->allocate(n);
+            blas->zeros(n, eigenvector);
+            blas->zeros(n, work);
             blas->copy(this->rows(), guess_eigenvector, eigenvector);
 
             eig_max = max_eigen_value(eigenvector, work);
 
             auto blas_impl = blas;
-            p_             = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
-            temp_          = Buffer<T>::own(this->rows(), eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            p_             = Buffer<T>::own(n, work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            temp_          = Buffer<T>::own(n, eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
         }
 
         int apply(const T* const b, T* const x) override {
             SFEM_TRACE_SCOPE("Chebyshev3::apply");
-            precond_apply(b, x, p_->data(), temp_->data());
+            if (!good()) return SFEM_FAILURE;
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
+            BlasExec<T> e(*blas, n_dofs, span_.allocation, span_.ranks());
+            run(e, *op_, b, x, p_->data(), temp_->data(), is_initial_guess_zero);
             return 0;
         }
 
-        int precond_apply(const T* const rhs,
-                          T* const       x,
-                          // work-buffers
-                          T* const p,
-                          T* const temp) {
-            if (!good()) {
-                return SFEM_FAILURE;
-            }
+        void                  set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+        void                  set_max_it(const int it) override { max_it = it; }
+        inline std::ptrdiff_t rows() const override { return n_dofs; }
+        inline std::ptrdiff_t cols() const override { return n_dofs; }
 
+    private:
+        std::shared_ptr<Operator<T>>     op_;
+        std::shared_ptr<TeamOperator<T>> team_op_;
+        SolveSpan<T>                     span_;
+        // The executor's sums (Chebyshev takes none; TeamExec is built over them).
+        mutable std::vector<T> team_sums_;
+
+        // p <- beta p - rhs + Ax; x <- x - alpha p: the BLAS's three calls or, in a region, one pass
+        // over the thread's entries.
+        static void update(BlasExec<T>& e, const T alpha, const T beta, const T* const rhs, const T* const Ax, T* const p, T* const x) {
+            auto& blas = e.blas();
+            blas.axpby(e.size(), T(-1), rhs, beta, p);
+            blas.axpy(e.size(), T(1), Ax, p);
+            blas.axpy(e.size(), -alpha, p, x);
+        }
+
+        static void update(TeamExec<T>& e, const T alpha, const T beta, const T* const rhs, const T* const Ax, T* const p, T* const x) {
+            const Team& team = e.team();
+            for (ptrdiff_t i = team.begin; i < team.end; i++) {
+                const T pi = beta * p[i] - rhs[i] + Ax[i];
+                p[i]       = pi;
+                x[i] -= alpha * pi;
+            }
+        }
+
+        // x <- x - alpha p
+        static void step_x(BlasExec<T>& e, const T alpha, const T* const p, T* const x) { e.blas().axpy(e.size(), -alpha, p, x); }
+        static void step_x(TeamExec<T>& e, const T alpha, const T* const p, T* const x) { e.axpby(-alpha, p, T(1), x); }
+
+        /// The iterations, written once for their executor (sfem_SolverExec.hpp); x zero on entry
+        /// with zero_guess.
+        template <class E, class Op>
+        void run(E& e, Op& A, const T* const rhs, T* const x, T* const p, T* const temp, const bool zero_guess) const {
             if (max_it <= 0) {
-                iterations_ = 0;
-                return 0;
+                if (e.leader()) iterations_ = 0;
+                return;
             }
-
-            const ptrdiff_t n = this->rows();
 
             const T eig_max  = this->eig_max * scale_eig_max;
             const T eig_min  = scale_eig_min * eig_max;
@@ -206,99 +238,24 @@ namespace sfem {
             T dea   = 0;
 
             // Iteration 0: p = A x - rhs (or p = -rhs if x==0), then x -= alpha p
-            if (is_initial_guess_zero) {
-                scaled_copy(n, T(-1), rhs, p);
+            if (zero_guess) {
+                e.scale_into(T(-1), rhs, p);
             } else {
-                ensure_apply_buffer(n, p);
-                apply_op(x, p);
-                blas->axpy(n, T(-1), rhs, p);
+                e.apply(A, x, p, apply_overwrites_output);
+                e.axpby(T(-1), rhs, T(1), p);
             }
+            step_x(e, alpha, p, x);
 
-            blas->axpy(n, -alpha, p, x);
-            iterations_ = 1;
-            if (max_it == 1) {
-                return 0;
-            }
-
-            // Iteration 1
-            dea   = eig_diff * alpha;
-            beta  = T(0.5) * dea * dea;
-            alpha = T(1) / (eig_avg - (beta / alpha));
-            iteration_step(n, alpha, beta, rhs, x, p, temp);
-            iterations_ = 2;
-            if (max_it == 2) {
-                return 0;
-            }
-
-            // Iteration i >= 2
-            for (; iterations_ < max_it; iterations_++) {
+            int it = 1;
+            for (; it < max_it; it++) {
+                // Iteration 1, then i >= 2: the SpMV first (independent of p), then the update.
                 dea   = eig_diff * alpha;
-                beta  = T(0.25) * dea * dea;
+                beta  = (it == 1 ? T(0.5) : T(0.25)) * dea * dea;
                 alpha = T(1) / (eig_avg - (beta / alpha));
-                iteration_step(n, alpha, beta, rhs, x, p, temp);
+                e.apply(A, x, temp, apply_overwrites_output);
+                update(e, alpha, beta, rhs, temp, p, x);
             }
-
-            return 0;
-        }
-
-        void                  set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
-        void                  set_max_it(const int it) override { max_it = it; }
-        inline std::ptrdiff_t rows() const override { return n_dofs; }
-        inline std::ptrdiff_t cols() const override { return n_dofs; }
-
-    private:
-        bool use_host_kernels() const { return this->execution_space() == EXECUTION_SPACE_HOST; }
-
-        void ensure_apply_buffer(const ptrdiff_t n, T* const y) const {
-            if (!apply_overwrites_output) {
-                blas->zeros(n, y);
-            }
-        }
-
-        void scaled_copy(const ptrdiff_t n, const T alpha, const T* const x, T* const y) const {
-            if (use_host_kernels()) {
-                chebyshev3_host_::scaled_copy(n, alpha, x, y);
-            } else {
-                // Device / generic BLAS fallback
-                blas->zaxpby(n, alpha, x, T(0), x, y);
-            }
-        }
-
-        void iteration_update(const ptrdiff_t n,
-                              const T         alpha,
-                              const T         beta,
-                              const T* const  rhs,
-                              const T* const  Ax,
-                              T* const        p,
-                              T* const        x) const {
-            if (use_host_kernels()) {
-                chebyshev3_host_::iteration_update(n, alpha, beta, rhs, Ax, p, x);
-            } else {
-                blas->axpby(n, T(-1), rhs, beta, p);
-                blas->axpy(n, T(1), Ax, p);
-                blas->axpy(n, -alpha, p, x);
-            }
-        }
-
-        void iteration_step(const ptrdiff_t n,
-                            const T         alpha,
-                            const T         beta,
-                            const T* const  rhs,
-                            T* const        x,
-                            T* const        p,
-                            T* const        temp) const {
-            if (temp) {
-                // SpMV first (independent of p), then vector update:
-                //   p ← β p − rhs + A x;  x ← x − α p
-                ensure_apply_buffer(n, temp);
-                apply_op(x, temp);
-                iteration_update(n, alpha, beta, rhs, temp, p, x);
-            } else {
-                // Legacy in-place path (apply overwrites p).
-                blas->axpby(n, T(-1), rhs, beta, p);
-                apply_op(x, p);
-                blas->axpy(n, -alpha, p, x);
-            }
+            if (e.leader()) iterations_ = it;
         }
     };
 

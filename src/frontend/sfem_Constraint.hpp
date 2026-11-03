@@ -7,6 +7,7 @@
 #include "sfem_mask.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_TangentValues.hpp"
+#include "sfem_Team.hpp"
 
 namespace sfem {
 
@@ -24,6 +25,21 @@ public:
     virtual int apply_zero(real_t *const x);
     virtual int gradient(const real_t *const x, real_t *const g) = 0;
     virtual int copy_constrained_dofs(const real_t *const src, real_t *const dest) = 0;
+
+    /// copy_constrained_dofs by the threads of a region its caller opened
+    /// (sfem_TeamOperator.hpp): the constrained dofs in the calling thread's rows, after
+    /// team_prepare(), outside the region.
+    virtual bool team_supported() const { return false; }
+    virtual int  team_prepare() { return SFEM_SUCCESS; }
+    virtual int  team_copy_constrained_dofs(const Team & /*team*/, const real_t *const /*src*/, real_t *const /*dest*/) {
+        SFEM_ERROR("this constraint has no team copy");
+        return SFEM_FAILURE;
+    }
+    /// apply_zero on the constrained dofs in the calling thread's rows, as the team copy.
+    virtual int team_apply_zero(const Team & /*team*/, real_t *const /*x*/) {
+        SFEM_ERROR("this constraint has no team zero");
+        return SFEM_FAILURE;
+    }
     virtual int mask(mask_t *mask) = 0;
 
     virtual int hessian_crs(const real_t *const  x,
