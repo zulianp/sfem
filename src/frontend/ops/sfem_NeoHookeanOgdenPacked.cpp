@@ -39,6 +39,7 @@
 
 #ifdef _OPENMP
 #include <omp.h>
+#include <utility>
 #endif
 
 using PackedIdxType = sfem::FunctionSpace::PackedIdxType;
@@ -532,7 +533,8 @@ static int packed_neohookean_ogden_gradient(smesh::ElemType                     
 
 template <typename pack_idx_t, int NXE, typename MicroKernel>
 struct HyperelasticityPackedApply {
-    static int apply(const ptrdiff_t                            n_packs,
+    // By the threads of the caller's region: each its own scratch, the packs an orphaned `omp for`.
+    static int team_apply(const ptrdiff_t                            n_packs,
                      const ptrdiff_t                            n_elements_per_pack,
                      const ptrdiff_t                            n_elements,
                      const ptrdiff_t                            max_nodes_per_pack,
@@ -552,7 +554,6 @@ struct HyperelasticityPackedApply {
                      real_t *const SFEM_RESTRICT                outy,
                      real_t *const SFEM_RESTRICT                outz,
                      HyperelasticityScratch                    &scratch) {
-#pragma omp parallel
         {
 #ifdef _OPENMP
             int thread_id = omp_get_thread_num();
@@ -681,6 +682,39 @@ struct HyperelasticityPackedApply {
         }
         return SFEM_SUCCESS;
     }
+
+    // The plain product: one region around team_apply.
+    static int apply(const ptrdiff_t                            n_packs,
+                     const ptrdiff_t                            n_elements_per_pack,
+                     const ptrdiff_t                            n_elements,
+                     const ptrdiff_t                            max_nodes_per_pack,
+                     pack_idx_t **const SFEM_RESTRICT           elements,
+                     const ptrdiff_t *const SFEM_RESTRICT       owned_nodes_ptr,
+                     const ptrdiff_t *const SFEM_RESTRICT       n_shared_nodes,
+                     const ptrdiff_t *const SFEM_RESTRICT       ghost_ptr,
+                     const idx_t *const SFEM_RESTRICT           ghost_idx,
+                     const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                     const scalar_t *const SFEM_RESTRICT        Wimpn_compressed,
+                     const ptrdiff_t                            h_stride,
+                     const real_t *const SFEM_RESTRICT          hx,
+                     const real_t *const SFEM_RESTRICT          hy,
+                     const real_t *const SFEM_RESTRICT          hz,
+                     const ptrdiff_t                            out_stride,
+                     real_t *const SFEM_RESTRICT                outx,
+                     real_t *const SFEM_RESTRICT                outy,
+                     real_t *const SFEM_RESTRICT                outz,
+                     HyperelasticityScratch                    &scratch) {
+        int ret = SFEM_SUCCESS;
+#pragma omp parallel
+        {
+            const int err = team_apply(n_packs, n_elements_per_pack, n_elements, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, partial_assembly, Wimpn_compressed, h_stride, hx, hy, hz, out_stride, outx, outy, outz, scratch);
+            if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+                ret = err;
+            }
+        }
+        return ret;
+    }
 };
 
 struct Hex8MicroKernelApply {
@@ -721,7 +755,17 @@ struct Tet10MicroKernelApply {
         tet10_SdotHdotG(S_ikmn, Wimpn, hx, hy, hz, outx, outy, outz);
     }
 };
-template <typename pack_idx_t>
+// K::team_apply by the threads of the caller's region (TEAM), K::apply opening its own.
+template <bool TEAM, typename K, typename... Args>
+static int packed_call(Args &&...args) {
+    if constexpr (TEAM) {
+        return K::team_apply(std::forward<Args>(args)...);
+    } else {
+        return K::apply(std::forward<Args>(args)...);
+    }
+}
+
+template <bool TEAM, typename pack_idx_t>
 static int packed_neohookean_ogden_apply(smesh::ElemType                              element_type,
                                          const ptrdiff_t                            n_packs,
                                          const ptrdiff_t                            n_elements_per_pack,
@@ -746,7 +790,7 @@ static int packed_neohookean_ogden_apply(smesh::ElemType                        
         case smesh::HEX8: {
             scalar_t Wimpn_compressed[10];
             hex8_Wimpn_compressed(Wimpn_compressed);
-            return HyperelasticityPackedApply<PackedIdxType, 8, Hex8MicroKernelApply>::apply(n_packs,
+            return packed_call<TEAM, HyperelasticityPackedApply<PackedIdxType, 8, Hex8MicroKernelApply>>(n_packs,
                                                                                              n_elements_per_pack,
                                                                                              n_elements,
                                                                                              max_nodes_per_pack,
@@ -792,7 +836,7 @@ static int packed_neohookean_ogden_apply(smesh::ElemType                        
         case smesh::TET10: {
             scalar_t Wimpn_compressed[10];
             tet10_Wimpn_compressed(Wimpn_compressed);
-            return HyperelasticityPackedApply<PackedIdxType, 10, Tet10MicroKernelApply>::apply(n_packs,
+            return packed_call<TEAM, HyperelasticityPackedApply<PackedIdxType, 10, Tet10MicroKernelApply>>(n_packs,
                                                                                                n_elements_per_pack,
                                                                                                n_elements,
                                                                                                max_nodes_per_pack,
@@ -831,6 +875,22 @@ namespace sfem {
         real_t                                                      mu{1}, lambda{1};
         std::vector<std::shared_ptr<HyperelasticityScratch>>        scratch;
         std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
+
+        // Each block's packs as raw pointers, made at initialize: a product, which every thread of a
+        // region runs, then copies no shared pointer.
+        struct PackView {
+            ptrdiff_t                n_packs{0};
+            ptrdiff_t                n_elements_per_pack{0};
+            ptrdiff_t                n_elements{0};
+            PackedIdxType          **elements{nullptr};
+            const ptrdiff_t         *owned_nodes_ptr{nullptr};
+            const ptrdiff_t         *n_shared{nullptr};
+            const ptrdiff_t         *ghost_ptr{nullptr};
+            const idx_t             *ghost_idx{nullptr};
+            HyperelasticityScratch  *scratch{nullptr};
+            const metric_tensor_t   *partial_assembly{nullptr};
+        };
+        std::vector<PackView> views;
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -894,6 +954,22 @@ namespace sfem {
             impl_->assembly_data[b]->elements_stride = domain->second.block->n_nodes_per_element();
             impl_->assembly_data[b]->partial_assembly_buffer =
                     sfem::create_host_buffer<metric_tensor_t>(domain->second.block->n_elements() * HEX8_S_IKMN_SIZE);
+        }
+
+        impl_->views.resize(impl_->packed->n_blocks());
+        for (int b = 0; b < impl_->packed->n_blocks(); b++) {
+            auto &v               = impl_->views[b];
+            auto  elements        = impl_->packed->elements(b);
+            v.n_packs             = impl_->packed->n_packs(b);
+            v.n_elements_per_pack = impl_->packed->n_elements_per_pack(b);
+            v.n_elements          = elements->extent(1);
+            v.elements            = elements->data();
+            v.owned_nodes_ptr     = impl_->packed->owned_nodes_ptr(b)->data();
+            v.n_shared            = impl_->packed->n_shared(b)->data();
+            v.ghost_ptr           = impl_->packed->ghost_ptr(b)->data();
+            v.ghost_idx           = impl_->packed->ghost_idx(b)->data();
+            v.scratch             = impl_->scratch[b].get();
+            v.partial_assembly    = impl_->assembly_data[b]->partial_assembly_buffer->data();
         }
 
         return SFEM_SUCCESS;
@@ -1082,45 +1158,61 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanOgdenPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::apply");
-
-        auto mesh   = impl_->space->mesh();
-        auto points = mesh->points();
+    template <bool TEAM>
+    int NeoHookeanOgdenPacked::apply_packs(const real_t *const h, real_t *const out) {
+        const ptrdiff_t max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
         return impl_->iterate([&](const OpDomain &domain) {
-            auto b               = *std::static_pointer_cast<int>(domain.user_data);
-            auto elements        = impl_->packed->elements(b);
-            auto owned_nodes_ptr = impl_->packed->owned_nodes_ptr(b);
-            auto n_shared        = impl_->packed->n_shared(b);
-            auto ghost_ptr       = impl_->packed->ghost_ptr(b);
-            auto ghost_idx       = impl_->packed->ghost_idx(b);
-
-            auto assembly_data = impl_->assembly_data[b];
-
-            auto scratch = impl_->scratch[b];
-
-            auto max_nodes_per_pack = impl_->packed->max_nodes_per_pack();
-            return packed_neohookean_ogden_apply<PackedIdxType>(domain.element_type,
-                                                                impl_->packed->n_packs(b),
-                                                                impl_->packed->n_elements_per_pack(b),
-                                                                elements->extent(1),
-                                                                max_nodes_per_pack,
-                                                                elements->data(),
-                                                                owned_nodes_ptr->data(),
-                                                                n_shared->data(),
-                                                                ghost_ptr->data(),
-                                                                ghost_idx->data(),
-                                                                assembly_data->partial_assembly_buffer->data(),
-                                                                3,
-                                                                &h[0],
-                                                                &h[1],
-                                                                &h[2],
-                                                                3,
-                                                                &out[0],
-                                                                &out[1],
-                                                                &out[2],
-                                                                *scratch);
+            const int   b = *static_cast<const int *>(domain.user_data.get());
+            const auto &v = impl_->views[b];
+            return packed_neohookean_ogden_apply<TEAM, PackedIdxType>(domain.element_type,
+                                                                      v.n_packs,
+                                                                      v.n_elements_per_pack,
+                                                                      v.n_elements,
+                                                                      max_nodes_per_pack,
+                                                                      v.elements,
+                                                                      v.owned_nodes_ptr,
+                                                                      v.n_shared,
+                                                                      v.ghost_ptr,
+                                                                      v.ghost_idx,
+                                                                      v.partial_assembly,
+                                                                      3,
+                                                                      &h[0],
+                                                                      &h[1],
+                                                                      &h[2],
+                                                                      3,
+                                                                      &out[0],
+                                                                      &out[1],
+                                                                      &out[2],
+                                                                      *v.scratch);
         });
+    }
+
+    int NeoHookeanOgdenPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenPacked::apply");
+        if (!team_supported()) return apply_packs<false>(h, out);
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
+
+    // A packed mesh is a single rank's: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool NeoHookeanOgdenPacked::team_supported() const {
+        if (mesh_is_distributed(*impl_->space->mesh())) return false;
+        for (const auto &kv : impl_->domains->domains()) {
+            const OpDomain &domain = kv.second;
+            if (domain.element_type != smesh::HEX8 && domain.element_type != smesh::TET10) return false;
+        }
+        return true;
+    }
+
+    int NeoHookeanOgdenPacked::team_apply(const Team &team,
+                                          const real_t *const /*x*/,
+                                          const real_t *const h,
+                                          real_t *const       out,
+                                          const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_packs<true>(h, out);
     }
 
     int NeoHookeanOgdenPacked::value(const real_t *x, real_t *const out) {

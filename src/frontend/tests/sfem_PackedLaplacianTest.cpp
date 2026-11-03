@@ -2,6 +2,9 @@
 
 #include "sfem_API.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 int test_packed_laplacian() {
 
     enum smesh::ElemType SFEM_ELEM_TYPE = smesh::type_from_string(smesh::Env::read_string("SFEM_ELEM_TYPE", "HEX8").c_str());
@@ -58,9 +61,66 @@ int test_packed_laplacian() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The packed Neo-Hookean (Ogden) against the standard one at the same state: the partial assembly
+// on HEX8 and TET10, through the plain apply (one region around the team product).
+static int check_packed_neohookean_ogden(const std::shared_ptr<sfem::Mesh> &mesh) {
+    auto fs = sfem::FunctionSpace::create(mesh, 3);
+    SFEM_TEST_ASSERT(fs->initialize_packed_mesh() == SFEM_SUCCESS);
+
+    auto op        = sfem::create_op(fs, "NeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
+    auto packed_op = sfem::create_op(fs, "NeoHookeanOgdenPacked", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(op != nullptr);
+    SFEM_TEST_ASSERT(packed_op != nullptr);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(packed_op->initialize() == SFEM_SUCCESS);
+
+    const ptrdiff_t ndofs  = fs->n_dofs();
+    const ptrdiff_t nnodes = mesh->n_nodes();
+    auto            points = mesh->points()->data();
+
+    auto u        = sfem::create_host_buffer<real_t>(ndofs);
+    auto h        = sfem::create_host_buffer<real_t>(ndofs);
+    auto y_ref    = sfem::create_host_buffer<real_t>(ndofs);
+    auto y_packed = sfem::create_host_buffer<real_t>(ndofs);
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        const real_t x = points[0][i], y = points[1][i], z = points[2][i];
+        for (int c = 0; c < 3; ++c) {
+            u->data()[i * 3 + c] = real_t(0.01) * (x * y + (c + 1) * z * z - c * x);
+            h->data()[i * 3 + c] = x + 2 * y - 3 * z + c;
+        }
+    }
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        y_ref->data()[i]    = 0;
+        y_packed->data()[i] = 0;
+    }
+
+    SFEM_TEST_ASSERT(op->update(u->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(packed_op->update(u->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op->apply(u->data(), h->data(), y_ref->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(packed_op->apply(u->data(), h->data(), y_packed->data()) == SFEM_SUCCESS);
+
+    real_t scale = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) scale = std::max(scale, std::abs(y_ref->data()[i]));
+    SFEM_TEST_ASSERT(scale > 0);
+    SFEM_ASSERT_ARRAY_APPROX_EQ(ndofs, y_ref->data(), y_packed->data(), 1e-12 * scale);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_packed_neohookean_ogden() {
+    constexpr int N    = 12;
+    auto          hex8 = sfem::Mesh::create_cube(sfem::Communicator::world(), smesh::HEX8, N, N, N, -1, -1, -1, 1, 1, 1);
+    SFEM_TEST_ASSERT(check_packed_neohookean_ogden(hex8) == SFEM_TEST_SUCCESS);
+
+    auto tet4  = sfem::Mesh::create_cube(sfem::Communicator::world(), smesh::TET4, N, N, N, -1, -1, -1, 1, 1, 1);
+    auto tet10 = smesh::promote_to(smesh::TET10, tet4);
+    SFEM_TEST_ASSERT(check_packed_neohookean_ogden(tet10) == SFEM_TEST_SUCCESS);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_packed_laplacian);
+    SFEM_RUN_TEST(test_packed_neohookean_ogden);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
