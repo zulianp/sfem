@@ -39,6 +39,9 @@ namespace sfem {
         void print_info() { domains->print_info(); }
 
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
+
+        /// The mesh's points, taken by team_prepare for the team product.
+        geom_t **points{nullptr};
     };
 
     namespace {
@@ -48,6 +51,7 @@ namespace sfem {
         template <bool TEAM>
         int mass_apply_domain(const OpDomain     &domain,
                               smesh::Mesh        &mesh,
+                              geom_t **const      points,
                               const real_t *const h,
                               real_t *const       out,
                               const ElementRange  range) {
@@ -66,7 +70,7 @@ namespace sfem {
             }
 
             return SFEM_TEAM_KERNEL(TEAM, apply_mass)(
-                    domain.element_type, range.size(), mesh.n_nodes(), view, mesh.points()->data(), 1, h, 1, out);
+                    domain.element_type, range.size(), mesh.n_nodes(), view, points, 1, h, 1, out);
         }
 
     }  // namespace
@@ -121,7 +125,8 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            return mass_apply_domain<false>(domain, *mesh, x, out, element_range(*mesh, *domain.block, ElementScope::ALL));
+            return mass_apply_domain<false>(
+                    domain, *mesh, mesh->points()->data(), x, out, element_range(*mesh, *domain.block, ElementScope::ALL));
         });
     }
 
@@ -137,7 +142,7 @@ namespace sfem {
     int Mass::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            return mass_apply_domain<false>(domain, *mesh, h, out, element_range(*mesh, *domain.block, scope));
+            return mass_apply_domain<false>(domain, *mesh, mesh->points()->data(), h, out, element_range(*mesh, *domain.block, scope));
         });
     }
 
@@ -154,10 +159,15 @@ namespace sfem {
                          real_t *const       out,
                          const ElementScope  scope) {
         (void)team;
-        auto mesh = impl_->space->mesh();
+        smesh::Mesh &mesh = *impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            return mass_apply_domain<true>(domain, *mesh, h, out, element_range(*mesh, *domain.block, scope));
+            return mass_apply_domain<true>(domain, mesh, impl_->points, h, out, element_range(mesh, *domain.block, scope));
         });
+    }
+
+    int Mass::team_prepare() {
+        impl_->points = impl_->space->mesh()->points()->data();
+        return SFEM_SUCCESS;
     }
 
     int Mass::value(const real_t * /*x*/, real_t *const /*out*/) {

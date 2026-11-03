@@ -65,7 +65,7 @@ namespace sfem {
 
         /// The element columns of `range`: the stored ones from element 0, the interface ones made at
         /// initialize from the first SHARED_AND_AURA element; nullptr for any other start.
-        idx_t **columns_from(const ElementRange range, SharedBuffer<idx_t *> &stored, std::vector<idx_t *> &interface,
+        idx_t **columns_from(const ElementRange range, const SharedBuffer<idx_t *> &stored, std::vector<idx_t *> &interface,
                              const ptrdiff_t interface_begin) {
             if (range.begin == 0) return stored->data();
             if (range.begin == interface_begin && !interface.empty()) return interface.data();
@@ -78,6 +78,7 @@ namespace sfem {
         template <bool TEAM>
         int neo_apply_domain(const OpDomain     &domain,
                              smesh::Mesh        &mesh,
+                             geom_t **const      points,
                              const real_t        mu,
                              const real_t        lambda,
                              const real_t *const x,
@@ -86,7 +87,7 @@ namespace sfem {
                              const ElementRange  range) {
             if (range.empty()) return SFEM_SUCCESS;
 
-            auto            ua = std::static_pointer_cast<struct ElasticityAssemblyData>(domain.user_data);
+            auto *const     ua = static_cast<struct ElasticityAssemblyData *>(domain.user_data.get());
             const ptrdiff_t ne = range.size();
 
             if (ua->partial_assembly_buffer) {
@@ -125,13 +126,12 @@ namespace sfem {
                                                                                        &out[2]);
             }
 
-            SharedBuffer<idx_t *> block_elements = domain.block->elements();
             return SFEM_TEAM_KERNEL(TEAM, neohookean_ogden_apply_aos)(
                     domain.element_type,
                     ne,
                     mesh.n_nodes(),
-                    columns_from(range, block_elements, ua->interface_block_elements, ua->interface_begin),
-                    mesh.points()->data(),
+                    columns_from(range, domain.block->elements(), ua->interface_block_elements, ua->interface_begin),
+                    points,
                     mu,
                     lambda,
                     x,
@@ -147,6 +147,9 @@ namespace sfem {
         std::shared_ptr<MultiDomainOp> domains;
         real_t                         mu{1}, lambda{1};
         bool                           use_affine_approximation{true};
+
+        /// The mesh's points, taken by team_prepare for the team product.
+        geom_t **points{nullptr};
 
         Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
@@ -263,6 +266,7 @@ namespace sfem {
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neo_apply_domain<false>(domain,
                                            *mesh,
+                                           mesh->points()->data(),
                                            domain.parameters->get_real_value("mu", impl_->mu),
                                            domain.parameters->get_real_value("lambda", impl_->lambda),
                                            x,
@@ -293,17 +297,23 @@ namespace sfem {
                                     real_t *const       out,
                                     const ElementScope  scope) {
         (void)team;
-        auto mesh = impl_->space->mesh();
+        smesh::Mesh &mesh = *impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) -> int {
             return neo_apply_domain<true>(domain,
-                                          *mesh,
+                                          mesh,
+                                          impl_->points,
                                           domain.parameters->get_real_value("mu", impl_->mu),
                                           domain.parameters->get_real_value("lambda", impl_->lambda),
                                           x,
                                           h,
                                           out,
-                                          element_range(*mesh, *domain.block, scope));
+                                          element_range(mesh, *domain.block, scope));
         });
+    }
+
+    int NeoHookeanOgden::team_prepare() {
+        impl_->points = impl_->space->mesh()->points()->data();
+        return SFEM_SUCCESS;
     }
 
     int NeoHookeanOgden::initialize(const std::vector<std::string> &block_names) {
