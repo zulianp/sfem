@@ -534,6 +534,8 @@ static int packed_neohookean_ogden_gradient(smesh::ElemType                     
 template <typename pack_idx_t, int NXE, typename MicroKernel>
 struct HyperelasticityPackedApply {
     // By the threads of the caller's region: each its own scratch, the packs an orphaned `omp for`.
+    // A function of its own, not the TEAM instance of a template whose plain instance calls it: so
+    // made, gcc no longer inlines SdotHdotG into it, and the product is 25% slower.
     static int team_apply(const ptrdiff_t                            n_packs,
                      const ptrdiff_t                            n_elements_per_pack,
                      const ptrdiff_t                            n_elements,
