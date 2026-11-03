@@ -2,8 +2,6 @@
 
 #include <map>
 #include "sfem_BoundaryMass.hpp"
-#include "sfem_CVFEMMass.hpp"
-#include "sfem_CVFEMUpwindConvection.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
 #include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
@@ -65,9 +63,7 @@ namespace sfem {
             instance_.private_register_op("em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
             instance_.private_register_op("LinearElasticityHyTeG", SemiStructuredHyTeGLinearElasticity::create);
             instance_.private_register_op("SpectralElementLaplacian", SpectralElementLaplacian::create);
-            instance_.private_register_op("CVFEMUpwindConvection", CVFEMUpwindConvection::create);
             instance_.private_register_op("Mass", Mass::create);
-            instance_.private_register_op("CVFEMMass", CVFEMMass::create);
             instance_.private_register_op("LumpedMass", LumpedMass::create);
             instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
             instance_.private_register_op("NeoHookeanOgdenPacked", NeoHookeanOgdenPacked::create);
