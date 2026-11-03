@@ -8,7 +8,16 @@
 extern "C" {
 #endif
 
-void tri3_apply_mass(const ptrdiff_t nelements,
+int tri3_apply_mass_team(const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     const ptrdiff_t stride_x,
+                     const real_t *const x,
+                     const ptrdiff_t stride_values,
+                     real_t *const values);
+
+int tri3_apply_mass(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const SFEM_RESTRICT elems,
                      geom_t **const SFEM_RESTRICT xyz,

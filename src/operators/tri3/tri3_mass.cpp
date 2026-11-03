@@ -114,7 +114,7 @@ static SFEM_INLINE void lumped_mass(const real_t px0,
     element_matrix_diag[2] = x0;
 }
 
-void tri3_apply_mass(const ptrdiff_t nelements,
+int tri3_apply_mass_team(const ptrdiff_t nelements,
                      const ptrdiff_t nnodes,
                      idx_t **const SFEM_RESTRICT elems,
                      geom_t **const SFEM_RESTRICT xyz,
@@ -124,9 +124,6 @@ void tri3_apply_mass(const ptrdiff_t nelements,
                      real_t *const values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = smesh::time_seconds();
-
-#pragma omp parallel
     {
 #pragma omp for  // nowait
         for (ptrdiff_t i = 0; i < nelements; ++i) {
@@ -169,9 +166,30 @@ void tri3_apply_mass(const ptrdiff_t nelements,
         }
     }
 
-    double tock = smesh::time_seconds();
-    printf("tri3_mass.c: tri3_apply_mass\t%g seconds\n", tock - tick);
+    return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around tri3_apply_mass_team.
+int tri3_apply_mass(const ptrdiff_t nelements,
+                     const ptrdiff_t nnodes,
+                     idx_t **const SFEM_RESTRICT elems,
+                     geom_t **const SFEM_RESTRICT xyz,
+                     const ptrdiff_t stride_x,
+                     const real_t *const x,
+                     const ptrdiff_t stride_values,
+                     real_t *const values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tri3_apply_mass_team(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 void tri3_assemble_mass(const ptrdiff_t nelements,
                         const ptrdiff_t nnodes,
