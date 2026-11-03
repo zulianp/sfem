@@ -69,7 +69,6 @@ set(SFEM_MODULES
     operators/boundary_conditions
     operators/contact
     operators/cvfem 
-    operators/cvfem_quad4
     operators/edgeshell2
     operators/edgeshell3
     operators/generic
