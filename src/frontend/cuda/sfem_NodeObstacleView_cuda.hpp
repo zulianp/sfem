@@ -44,6 +44,8 @@ namespace sfem {
                                           const real_t *const     k,
                                           const bool              capped,
                                           real_t *const           blocks);
+    void d_node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out);
+    void d_node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d);
 
     // out (zeroed by the caller) at the contact nodes: -mu n.
     void d_node_obstacle_reaction(const NodeObstacleView &c, real_t *const out);

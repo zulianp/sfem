@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "sfem_LinearizedStep.hpp"
+#include "sfem_ObstacleTangent.hpp"
 #include "sfem_Observers.hpp"
 
 namespace sfem {
@@ -29,9 +30,9 @@ namespace sfem {
         bool qp_accept_capped{false};
         /// The obstacle's curvature in the tangent.
         bool curvature{true};
-        /// Bytes per stored value of the tangent: sizeof(real_t), or 4 for single precision
-        /// (BSRTangent::create).
-        int storage_bytes{(int)sizeof(real_t)};
+        /// The QP's tangent: assembled (BSR, with its storage_bytes) or applied term by term
+        /// (INEXACT, MF), ObstacleTangent.
+        ObstacleTangent::Options tangent;
     };
 
     /// Newton's step with a rigid obstacle (NodeObstacleContact): the linearised problem is the QP

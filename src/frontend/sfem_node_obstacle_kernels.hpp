@@ -148,4 +148,11 @@ SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_pack_sym(const real_t *const B, 
     packed[5] = B[8];
 }
 
+// out += B in, B a symmetric 3x3 block packed as node_obstacle_pack_sym leaves it.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_packed_sym_apply(const real_t *const B, const real_t *const in, real_t *const out) {
+    out[0] += B[0] * in[0] + B[1] * in[1] + B[2] * in[2];
+    out[1] += B[1] * in[0] + B[3] * in[1] + B[4] * in[2];
+    out[2] += B[2] * in[0] + B[4] * in[1] + B[5] * in[2];
+}
+
 #endif  // SFEM_NODE_OBSTACLE_KERNELS_HPP
