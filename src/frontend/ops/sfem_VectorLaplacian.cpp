@@ -33,7 +33,7 @@ namespace sfem {
         /// `elements`: by the threads of the caller's region (TEAM) or opening its own.
         template <bool TEAM>
         int vector_laplacian_dispatch_apply(const OpDomain &domain,
-                                            smesh::Mesh    &mesh,
+                                            const ptrdiff_t n_nodes,
                                             geom_t **const  points,
                                             const jacobian_t *const fff,
                                             const int       block_size,
@@ -56,7 +56,7 @@ namespace sfem {
 
             return SFEM_TEAM_KERNEL(TEAM, vector_laplacian_apply)(domain.element_type,
                                                                   ne,
-                                                                  mesh.n_nodes(),
+                                                                  n_nodes,
                                                                   elements,
                                                                   points,
                                                                   block_size,
@@ -93,14 +93,16 @@ namespace sfem {
         };
         std::map<const smesh::Mesh::Block *, InterfaceColumns> interface;
 
-        // The points and each domain's FFF as raw pointers, taken outside any region with the
+        // The points, their number and each domain's FFF as raw pointers, taken outside any region with the
         // interface columns: the threads of a team product copy no shared buffer.
         geom_t                                                   **points{nullptr};
+        ptrdiff_t                                                  n_nodes{0};
         std::map<const smesh::Mesh::Block *, const jacobian_t *> fff;
 
         void prepare() {
             auto mesh = space->mesh();
             points    = mesh->points()->data();
+            n_nodes   = mesh->n_nodes();
             for (const auto &kv : domains->domains()) {
                 if (!kv.second.user_data) continue;
                 fff[kv.second.block.get()] = static_cast<smesh::FFF *>(kv.second.user_data.get())->fff_AoS()->data();
@@ -149,7 +151,7 @@ namespace sfem {
             }
             const auto it_fff = fff.find(domain.block.get());
             return vector_laplacian_dispatch_apply<TEAM>(domain,
-                                                         mesh,
+                                                         n_nodes,
                                                          points,
                                                          it_fff == fff.end() ? nullptr : it_fff->second,
                                                          block_size,

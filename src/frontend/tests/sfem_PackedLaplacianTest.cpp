@@ -61,14 +61,14 @@ int test_packed_laplacian() {
     return SFEM_TEST_SUCCESS;
 }
 
-// The packed Neo-Hookean (Ogden) against the standard one at the same state: the partial assembly
-// on HEX8 and TET10, through the plain apply (one region around the team product).
-static int check_packed_neohookean_ogden(const std::shared_ptr<sfem::Mesh> &mesh) {
+// The packed Neo-Hookean (Ogden), or the generic Hyperelasticity, against the standard one at the same
+// state: the partial assembly, through the plain apply (one region around the team product).
+static int check_neohookean_ogden(const std::shared_ptr<sfem::Mesh> &mesh, const char *const name) {
     auto fs = sfem::FunctionSpace::create(mesh, 3);
     SFEM_TEST_ASSERT(fs->initialize_packed_mesh() == SFEM_SUCCESS);
 
     auto op        = sfem::create_op(fs, "NeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
-    auto packed_op = sfem::create_op(fs, "NeoHookeanOgdenPacked", sfem::EXECUTION_SPACE_HOST);
+    auto packed_op = sfem::create_op(fs, name, sfem::EXECUTION_SPACE_HOST);
     SFEM_TEST_ASSERT(op != nullptr);
     SFEM_TEST_ASSERT(packed_op != nullptr);
     SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
@@ -109,11 +109,19 @@ static int check_packed_neohookean_ogden(const std::shared_ptr<sfem::Mesh> &mesh
 int test_packed_neohookean_ogden() {
     constexpr int N    = 12;
     auto          hex8 = sfem::Mesh::create_cube(sfem::Communicator::world(), smesh::HEX8, N, N, N, -1, -1, -1, 1, 1, 1);
-    SFEM_TEST_ASSERT(check_packed_neohookean_ogden(hex8) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(check_neohookean_ogden(hex8, "NeoHookeanOgdenPacked") == SFEM_TEST_SUCCESS);
 
     auto tet4  = sfem::Mesh::create_cube(sfem::Communicator::world(), smesh::TET4, N, N, N, -1, -1, -1, 1, 1, 1);
     auto tet10 = smesh::promote_to(smesh::TET10, tet4);
-    SFEM_TEST_ASSERT(check_packed_neohookean_ogden(tet10) == SFEM_TEST_SUCCESS);
+    SFEM_TEST_ASSERT(check_neohookean_ogden(tet10, "NeoHookeanOgdenPacked") == SFEM_TEST_SUCCESS);
+    return SFEM_TEST_SUCCESS;
+}
+
+// Hyperelasticity registers Neo-Hookean (Ogden) kernels for HEX8 only.
+int test_hyperelasticity() {
+    constexpr int N    = 12;
+    auto          hex8 = sfem::Mesh::create_cube(sfem::Communicator::world(), smesh::HEX8, N, N, N, -1, -1, -1, 1, 1, 1);
+    SFEM_TEST_ASSERT(check_neohookean_ogden(hex8, "Hyperelasticity") == SFEM_TEST_SUCCESS);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -121,6 +129,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_packed_laplacian);
     SFEM_RUN_TEST(test_packed_neohookean_ogden);
+    SFEM_RUN_TEST(test_hyperelasticity);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
