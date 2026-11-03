@@ -6,6 +6,8 @@
 #include "sfem_aliases.hpp"
 #include "sfem_MultiDomainOp.hpp"
 
+#include <vector>
+
 namespace sfem {
 
     struct ElasticityAssemblyData {
@@ -14,6 +16,13 @@ namespace sfem {
         SharedBuffer<compressed_t>    partial_assembly_compressed;
         SharedBuffer<idx_t *>         elements;
         ptrdiff_t                     elements_stride{1};
+
+        // `elements` (with elements_stride) and the block's own columns from the first element of
+        // ElementScope::SHARED_AND_AURA on, made at initialize on a distributed mesh: a scoped product
+        // then reads them as they are, and builds no view inside a region.
+        ptrdiff_t            interface_begin{0};
+        std::vector<idx_t *> interface_elements;
+        std::vector<idx_t *> interface_block_elements;
 
         bool use_partial_assembly{false};
         bool use_compression{false};
