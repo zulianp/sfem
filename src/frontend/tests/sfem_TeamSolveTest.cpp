@@ -30,7 +30,7 @@ namespace {
         ptrdiff_t                                n{0};
     };
 
-    Problem elasticity_cube(const int cells) {
+    Problem elasticity_cube(const int cells, const char *const op_name = "GeneratedLinearElasticity") {
         auto es   = sfem::EXECUTION_SPACE_HOST;
         auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), cells, cells, cells, 0, 0, 0, 1, 1, 1);
         auto fs   = sfem::FunctionSpace::create(mesh, 3);
@@ -64,7 +64,7 @@ namespace {
         conds.push_back(pull);
         f->add_constraint(sfem::create_dirichlet_conditions(fs, conds, es));
 
-        auto op = sfem::create_op(fs, "GeneratedLinearElasticity", es);
+        auto op = sfem::create_op(fs, op_name, es);
         op->initialize();
         f->add_operator(op);
 
@@ -290,6 +290,35 @@ int test_team_crs() {
     return compare("CRS, inverse diagonal", p, sfem::create_inverse_diagonal_scaling(diag, es));
 }
 
+// The assembled vector tangent (CRS over the dof graph, the constraints' identity rows in it) of
+// the hand-written elasticity (the generated one assembles no CRS): the product equals the
+// matrix-free one, and PCG over it (inverse diagonal) the plain run.
+int test_team_vector_crs() {
+    const Problem p = elasticity_cube(smesh::Env::read<int>("SFEM_TEAM_SOLVE_CELLS", 8), "LinearElasticity");
+    Problem       q = p;
+    q.A             = sfem::create_linear_operator(sfem::op_type::CRS, p.f, nullptr, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(q.A != nullptr);
+    SFEM_TEST_ASSERT(std::dynamic_pointer_cast<sfem::TeamOperator<real_t>>(q.A) != nullptr);
+
+    std::vector<real_t> u((size_t)p.n), y_mf((size_t)p.n, 0), y_crs((size_t)p.n, 0);
+    for (ptrdiff_t i = 0; i < p.n; ++i) u[i] = std::sin(0.37 * (real_t)i);
+    p.A->apply(u.data(), y_mf.data());
+    q.A->apply(u.data(), y_crs.data());
+    double num = 0, den = 0;
+    for (ptrdiff_t i = 0; i < p.n; ++i) {
+        num += (y_crs[i] - y_mf[i]) * (y_crs[i] - y_mf[i]);
+        den += y_mf[i] * y_mf[i];
+    }
+    printf("  %ld dofs: |A_crs u - A_mf u| / |A_mf u| = %.2e\n", (long)p.n, std::sqrt(num / den));
+    SFEM_TEST_ASSERT(den > 0);
+    SFEM_TEST_ASSERT(std::sqrt(num / den) < 1e-6);
+
+    auto diag = sfem::create_host_buffer<real_t>(p.n);
+    std::fill(diag->data(), diag->data() + p.n, real_t(0));
+    SFEM_TEST_ASSERT(p.f->hessian_diag(nullptr, diag->data()) == SFEM_SUCCESS);
+    return compare("vector CRS, inverse diagonal", q, sfem::create_inverse_diagonal_scaling(diag, sfem::EXECUTION_SPACE_HOST));
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_team_cg_matches_the_vector_by_vector_run);
@@ -297,6 +326,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_team_stationary_iteration);
     SFEM_RUN_TEST(test_team_bicgstab);
     SFEM_RUN_TEST(test_team_crs);
+    SFEM_RUN_TEST(test_team_vector_crs);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

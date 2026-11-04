@@ -26,11 +26,6 @@ namespace sfem {
                                                                            const SharedBuffer<real_t>            &x,
                                                                            const sfem::ExecutionSpace             es);
 
-    std::shared_ptr<sfem::CRS<count_t, idx_t, real_t, real_t>> node_block_crs_to_scalar_crs(
-            const std::shared_ptr<CRSGraph> &crs_graph,
-            const int                        block_size,
-            const SharedBuffer<real_t>      &node_block_values);
-
     std::shared_ptr<Operator<real_t>> compose_constraints_op(const std::shared_ptr<sfem::Function>         &f,
                                                              const std::shared_ptr<sfem::Operator<real_t>> &op);
 
