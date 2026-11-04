@@ -388,7 +388,7 @@ namespace sfem {
         return exchange ? exchange->gather_wait() : status;
     }
 
-    std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
+    const std::shared_ptr<FunctionSpace::PackedMesh> &FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
 
     SharedBuffer<idx_t> FunctionSpace::packed_node_map() const { return impl_->packed_node_map; }
 }  // namespace sfem
