@@ -776,8 +776,12 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 ssmgc_contact = ContactConditions::create(fs, obstacle_sdf, sidesets, es);
-                if (!ssmgc_contact || ssmgc_contact->n_constrained_dofs() == 0) {
-                    fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
+                if (!ssmgc_contact) return SFEM_FAILURE;
+                // Over every rank, as node_sdf's below.
+                const ptrdiff_t n_ssmgc = m->comm()->size() > 1 ? m->comm()->sum(ssmgc_contact->n_constrained_dofs())
+                                                                : ssmgc_contact->n_constrained_dofs();
+                if (n_ssmgc == 0) {
+                    if (m->comm()->rank() == 0) fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
                     return SFEM_FAILURE;
                 }
                 const auto gap = read_string(node, "gap", "nodal");
@@ -814,8 +818,11 @@ namespace sfem {
             contact  = std::make_shared<NodeObstacleContact>(
                     obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_dofs_owned(), dir, es);
             obstacle = contact;
-            if (contact->size() == 0) {
-                fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
+            // Over every rank: a rank may own none of the surface's nodes (many ranks, a thin body),
+            // and returning on that rank alone leaves the others waiting in the solve's collectives.
+            const ptrdiff_t n_contact = m->comm()->size() > 1 ? m->comm()->sum(contact->size()) : contact->size();
+            if (n_contact == 0) {
+                if (m->comm()->rank() == 0) fprintf(stderr, "Playground: the obstacle has no contact nodes\n");
                 return SFEM_FAILURE;
             }
             contact->set_shift(read<real_t>(node, "shift", 0));
@@ -832,7 +839,6 @@ namespace sfem {
                     return SFEM_SUCCESS;
                 });
             }
-            const ptrdiff_t n_contact = m->comm()->size() > 1 ? m->comm()->sum(contact->size()) : contact->size();
             if (m->comm()->rank() == 0) printf("Contact: %td nodes\n", n_contact);
             return SFEM_SUCCESS;
         }
