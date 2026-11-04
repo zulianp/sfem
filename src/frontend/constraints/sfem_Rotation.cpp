@@ -116,6 +116,12 @@ namespace sfem {
     int Rotation::copy_constrained_dofs(const real_t *const src, real_t *const dest) {
         return impl_->conditions->copy_constrained_dofs(src, dest);
     }
+    bool Rotation::team_supported() const { return impl_->conditions->team_supported(); }
+    int  Rotation::team_prepare() { return impl_->conditions->team_prepare(); }
+    int  Rotation::team_copy_constrained_dofs(const Team &team, const real_t *const src, real_t *const dest) {
+        return impl_->conditions->team_copy_constrained_dofs(team, src, dest);
+    }
+    int Rotation::team_apply_zero(const Team &team, real_t *const x) { return impl_->conditions->team_apply_zero(team, x); }
     int Rotation::mask(mask_t *mask) { return impl_->conditions->mask(mask); }
     int Rotation::value(const real_t *const x, real_t *const out) { return impl_->conditions->value(x, out); }
     int Rotation::value_steps(const real_t       *x,
