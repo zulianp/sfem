@@ -230,12 +230,73 @@ int test_team_bicgstab() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The assembled Laplacian (CRS) and the inverse diagonal as team operators: the product equals
+// the matrix-free one, and PCG over them the plain run.
+int test_team_crs() {
+    const int cells = smesh::Env::read<int>("SFEM_TEAM_SOLVE_CELLS", 8);
+    auto      es    = sfem::EXECUTION_SPACE_HOST;
+    auto      mesh  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), cells, cells, cells, 0, 0, 0, 1, 1, 1);
+    auto      fs    = sfem::FunctionSpace::create(mesh, 1);
+    auto      f     = sfem::Function::create(fs);
+
+    const ptrdiff_t     nnodes = mesh->n_nodes();
+    const geom_t *const x      = mesh->points()->data()[0];
+    std::vector<idx_t>  left, right;
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        if (x[i] < 1e-8) left.push_back((idx_t)i);
+        if (x[i] > 1 - 1e-8) right.push_back((idx_t)i);
+    }
+    auto to_buffer = [](const std::vector<idx_t> &v) {
+        auto b = sfem::create_host_buffer<idx_t>((ptrdiff_t)v.size());
+        std::copy(v.begin(), v.end(), b->data());
+        return b;
+    };
+    sfem::DirichletConditions::Condition low, high;
+    low.nodeset   = to_buffer(left);
+    high.nodeset  = to_buffer(right);
+    high.value    = 1;
+    f->add_constraint(sfem::create_dirichlet_conditions(fs, {low, high}, es));
+    auto op = sfem::create_op(fs, "Laplacian", es);
+    op->initialize();
+    f->add_operator(op);
+
+    Problem p;
+    p.f   = f;
+    p.n   = fs->n_dofs();
+    p.A   = sfem::create_linear_operator(sfem::op_type::CRS, f, nullptr, es);
+    p.rhs = sfem::create_host_buffer<real_t>(p.n);
+    f->apply_constraints(p.rhs->data());
+    SFEM_TEST_ASSERT(p.A != nullptr);
+    SFEM_TEST_ASSERT(std::dynamic_pointer_cast<sfem::TeamOperator<real_t>>(p.A) != nullptr);
+
+    auto                mf = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
+    std::vector<real_t> u((size_t)p.n), y_mf((size_t)p.n, 0), y_crs((size_t)p.n, 0);
+    for (ptrdiff_t i = 0; i < p.n; ++i) u[i] = std::sin(0.37 * (real_t)i);
+    mf->apply(u.data(), y_mf.data());
+    p.A->apply(u.data(), y_crs.data());
+    double num = 0, den = 0;
+    for (ptrdiff_t i = 0; i < p.n; ++i) {
+        num += (y_crs[i] - y_mf[i]) * (y_crs[i] - y_mf[i]);
+        den += y_mf[i] * y_mf[i];
+    }
+    printf("  %ld dofs: |A_crs u - A_mf u| / |A_mf u| = %.2e\n", (long)p.n, std::sqrt(num / den));
+    SFEM_TEST_ASSERT(den > 0);
+    // Two kernels over the single-precision geometry: alike to its rounding, not bitwise.
+    SFEM_TEST_ASSERT(std::sqrt(num / den) < 1e-6);
+
+    auto diag = sfem::create_host_buffer<real_t>(p.n);
+    std::fill(diag->data(), diag->data() + p.n, real_t(0));
+    SFEM_TEST_ASSERT(f->hessian_diag(nullptr, diag->data()) == SFEM_SUCCESS);
+    return compare("CRS, inverse diagonal", p, sfem::create_inverse_diagonal_scaling(diag, es));
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_team_cg_matches_the_vector_by_vector_run);
     SFEM_RUN_TEST(test_team_preconditioned_cg);
     SFEM_RUN_TEST(test_team_stationary_iteration);
     SFEM_RUN_TEST(test_team_bicgstab);
+    SFEM_RUN_TEST(test_team_crs);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
