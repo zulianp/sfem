@@ -5,6 +5,10 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 
+#include "spectral_hex_laplacian.hpp"
+
+#include <cmath>
+
 int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
     int L = 8;
 
@@ -198,12 +202,63 @@ int test_restrict_cube() {
     return test_restriction(m, smesh::Path("test_restrict_cube"));
 }
 
+// SpectralElementLaplacian (Lagrange basis, exact quadrature on an affine mesh): the energy of u = x is the volume
+// (to the quadrature tables' digits, ~1e-10) and 1^T A u = 0. Its team form (Op::apply) against the plain kernel,
+// which opens its own region.
+int test_spectral_laplacian() {
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 1, 1, 0, 0, 0, 2, 1, 1);
+
+    for (int L : {2, 4}) {
+        auto ssmesh = smesh::to_semistructured(L, m, true, false);
+        auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
+        auto op     = sfem::create_op(fs, "SpectralElementLaplacian", sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+
+        const ptrdiff_t n      = fs->n_dofs();
+        auto            u      = sfem::create_host_buffer<real_t>(n);
+        auto            out    = sfem::create_host_buffer<real_t>(n);
+        auto            ref    = sfem::create_host_buffer<real_t>(n);
+        auto            points = ssmesh->points()->data();
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            u->data()[i] = points[0][i];
+        }
+
+        SFEM_TEST_ASSERT(op->apply(nullptr, u->data(), out->data()) == SFEM_SUCCESS);
+
+        auto block = ssmesh->block(0);
+        SFEM_TEST_ASSERT(spectral_hex_laplacian_apply(smesh::semistructured_level(*ssmesh),
+                                                      block->n_elements(),
+                                                      smesh::semistructured_interior_start(*ssmesh),
+                                                      block->elements()->data(),
+                                                      points,
+                                                      u->data(),
+                                                      ref->data()) == SFEM_SUCCESS);
+
+        double energy = 0, sum = 0, diff = 0, scale = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            energy += u->data()[i] * out->data()[i];
+            sum += out->data()[i];
+            diff  = std::max(diff, (double)std::abs(out->data()[i] - ref->data()[i]));
+            scale = std::max(scale, (double)std::abs(ref->data()[i]));
+        }
+
+        printf("SpectralElementLaplacian L=%d: energy %.15g, sum %g, |team - plain| %g of %g\n", L, energy, sum, diff, scale);
+        SFEM_TEST_ASSERT(std::abs(energy - 2) < 1e-8);
+        SFEM_TEST_ASSERT(std::abs(sum) < 1e-10);
+        SFEM_TEST_ASSERT(diff <= 1e-12 * scale);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_derefine_cube);
     // SFEM_RUN_TEST(test_derefine_mesh); // FIXME use mesh that is always available
     SFEM_RUN_TEST(test_prolongation_cube);
     SFEM_RUN_TEST(test_restrict_cube);
+    SFEM_RUN_TEST(test_spectral_laplacian);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

@@ -48,6 +48,13 @@ namespace sfem {
         // Vector operations
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+
+        bool team_supported() const override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
         int value(const real_t *x, real_t *const out) override;
         int value_steps(const real_t       *x,
                         const real_t       *h,
@@ -80,6 +87,10 @@ namespace sfem {
                              real_t **const       off_diag_values) override;
 
     private:
+        /// out += H h over every element: by the threads of the caller's region (TEAM) or opening its own.
+        template <bool TEAM>
+        int apply_elements(const real_t *const x, const real_t *const h, real_t *const out);
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

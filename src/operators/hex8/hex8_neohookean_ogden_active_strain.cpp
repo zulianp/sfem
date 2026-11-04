@@ -414,7 +414,7 @@ int hex8_neohookean_ogden_active_strain_gradient(const ptrdiff_t                
     return SFEM_SUCCESS;
 }
 
-int hex8_neohookean_ogden_active_strain_apply(const ptrdiff_t                    nelements,
+int hex8_neohookean_ogden_active_strain_apply_team(const ptrdiff_t                    nelements,
                                               const ptrdiff_t                    stride,
                                               idx_t **const SFEM_RESTRICT        elements,
                                               geom_t **const SFEM_RESTRICT       points,
@@ -442,7 +442,7 @@ int hex8_neohookean_ogden_active_strain_apply(const ptrdiff_t                   
     static const scalar_t *qx   = line_q2_x;
     static const scalar_t *qw   = line_q2_w;
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         scalar_t element_matrix[(3 * 8) * (3 * 8)] = {0};
         idx_t    ev[8];
@@ -559,6 +559,40 @@ int hex8_neohookean_ogden_active_strain_apply(const ptrdiff_t                   
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_neohookean_ogden_active_strain_apply_team.
+int hex8_neohookean_ogden_active_strain_apply(const ptrdiff_t                    nelements,
+                                              const ptrdiff_t                    stride,
+                                              idx_t **const SFEM_RESTRICT        elements,
+                                              geom_t **const SFEM_RESTRICT       points,
+                                              const real_t                       mu,
+                                              const real_t                       lambda,
+                                              const ptrdiff_t                    Fa_stride,
+                                              const real_t **const               Fa,
+                                              const ptrdiff_t                    u_stride,
+                                              const real_t *const SFEM_RESTRICT  ux,
+                                              const real_t *const SFEM_RESTRICT  uy,
+                                              const real_t *const SFEM_RESTRICT  uz,
+                                              const ptrdiff_t                    h_stride,
+                                              const real_t *const SFEM_RESTRICT  hx,
+                                              const real_t *const SFEM_RESTRICT  hy,
+                                              const real_t *const SFEM_RESTRICT  hz,
+                                              const ptrdiff_t                    out_stride,
+                                              real_t *const SFEM_RESTRICT        outx,
+                                              real_t *const SFEM_RESTRICT        outy,
+                                              real_t *const SFEM_RESTRICT        outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_neohookean_ogden_active_strain_apply_team(nelements, stride, elements, points, mu, lambda, Fa_stride, Fa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int hex8_neohookean_ogden_active_strain_hessian_partial_assembly(const ptrdiff_t                      nelements,
                                                                  const ptrdiff_t                      stride,
@@ -677,7 +711,7 @@ int hex8_neohookean_ogden_active_strain_hessian_partial_assembly(const ptrdiff_t
     return SFEM_SUCCESS;
 }
 
-int hex8_neohookean_ogden_active_strain_partial_assembly_apply(const ptrdiff_t                            nelements,
+int hex8_neohookean_ogden_active_strain_partial_assembly_apply_team(const ptrdiff_t                            nelements,
                                                                const ptrdiff_t                            stride,
                                                                idx_t **const SFEM_RESTRICT                elements,
                                                                const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
@@ -692,7 +726,7 @@ int hex8_neohookean_ogden_active_strain_partial_assembly_apply(const ptrdiff_t  
     scalar_t Wimpn_compressed[10];
     hex8_Wimpn_compressed(Wimpn_compressed);
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[8];
 
@@ -744,6 +778,32 @@ int hex8_neohookean_ogden_active_strain_partial_assembly_apply(const ptrdiff_t  
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_neohookean_ogden_active_strain_partial_assembly_apply_team.
+int hex8_neohookean_ogden_active_strain_partial_assembly_apply(const ptrdiff_t                            nelements,
+                                                               const ptrdiff_t                            stride,
+                                                               idx_t **const SFEM_RESTRICT                elements,
+                                                               const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                                               const ptrdiff_t                            h_stride,
+                                                               const real_t *const                        hx,
+                                                               const real_t *const                        hy,
+                                                               const real_t *const                        hz,
+                                                               const ptrdiff_t                            out_stride,
+                                                               real_t *const                              outx,
+                                                               real_t *const                              outy,
+                                                               real_t *const                              outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_neohookean_ogden_active_strain_partial_assembly_apply_team(nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 // Apply partially assembled operator
 int hex8_neohookean_ogden_active_strain_compressed_partial_assembly_apply(const ptrdiff_t             nelements,

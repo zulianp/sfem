@@ -1,6 +1,7 @@
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 
 #include "sfem_defs.hpp"
+#include "sfem_team.h"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"
 #include "smesh_env.hpp"
@@ -32,6 +33,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace::PackedMesh>                  packed;
         real_t                                                      mu{1}, lambda{1};
         std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
+        /// The mesh's points, taken by team_prepare for the team product.
+        geom_t **points{nullptr};
 
         // Active strain data per block (AoS buffer and stride)
         std::vector<SharedBuffer<real_t>> Fa;
@@ -268,16 +271,15 @@ namespace sfem {
         });
     }
 
-    int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::apply");
-        auto mesh = impl_->space->mesh();
+    template <bool TEAM>
+    int NeoHookeanOgdenActiveStrainPacked::apply_elements(const real_t *const x, const real_t *const h, real_t *const out) {
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::apply only implemented for smesh::HEX8\n");
                 return SFEM_FAILURE;
             }
-            auto b             = *std::static_pointer_cast<int>(domain.user_data);
-            auto assembly_data = impl_->assembly_data[b];
+            const int   b             = *static_cast<const int *>(domain.user_data.get());
+            const auto &assembly_data = impl_->assembly_data[b];
 
 #if 1
             const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
@@ -291,10 +293,10 @@ namespace sfem {
             for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
 
             if (x) {
-                return hex8_neohookean_ogden_active_strain_apply(domain.block->n_elements(),
+                return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_active_strain_apply)(domain.block->n_elements(),
                                                                  assembly_data->elements_stride,
                                                                  assembly_data->elements->data(),
-                                                                 mesh->points()->data(),
+                                                                 impl_->points,
                                                                  domain.parameters->get_real_value("mu", impl_->mu),
                                                                  domain.parameters->get_real_value("lambda", impl_->lambda),
                                                                  Fa_stride,
@@ -313,7 +315,7 @@ namespace sfem {
                                                                  &out[2]);
             }
 #endif
-            return hex8_neohookean_ogden_active_strain_partial_assembly_apply(domain.block->n_elements(),
+            return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_active_strain_partial_assembly_apply)(domain.block->n_elements(),
                                                                               assembly_data->elements_stride,
                                                                               assembly_data->elements->data(),
                                                                               assembly_data->partial_assembly_buffer->data(),
@@ -326,6 +328,41 @@ namespace sfem {
                                                                               &out[1],
                                                                               &out[2]);
         });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::apply");
+        if (!team_supported()) {
+            team_prepare();
+            return apply_elements<false>(x, h, out);
+        }
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
+
+    // A packed space is a single rank's: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool NeoHookeanOgdenActiveStrainPacked::team_supported() const {
+        if (mesh_is_distributed(*impl_->space->mesh())) return false;
+        for (const auto &kv : impl_->domains->domains()) {
+            if (kv.second.element_type != smesh::HEX8) return false;
+        }
+        return true;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::team_apply(const Team &team,
+                       const real_t *const x,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_elements<true>(x, h, out);
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::team_prepare() {
+        impl_->points = impl_->space->mesh()->points()->data();
+        return SFEM_SUCCESS;
     }
 
     int NeoHookeanOgdenActiveStrainPacked::value(const real_t *x, real_t *const out) {

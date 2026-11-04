@@ -521,7 +521,7 @@ int sstet4_linear_elasticity_apply_stencil(const sstet4_linear_elasticity_stenci
     return SFEM_SUCCESS;
 }
 
-int sstet4_linear_elasticity_apply_stencil_global_vectorized(const sstet4_linear_elasticity_stencil_t *const stencil,
+int sstet4_linear_elasticity_apply_stencil_global_vectorized_team(const sstet4_linear_elasticity_stencil_t *const stencil,
                                                              const ptrdiff_t                                 nelements,
                                                              idx_t **const SFEM_RESTRICT                     elements,
                                                              const real_t *const SFEM_RESTRICT               u,
@@ -534,7 +534,7 @@ int sstet4_linear_elasticity_apply_stencil_global_vectorized(const sstet4_linear
     const int entries       = nxe * SSTET4_LINEAR_ELASTICITY_MAX_STENCIL;
     const int weight_stride = entries * SSTET4_LINEAR_ELASTICITY_BLOCK_SIZE;
 
-#pragma omp parallel for schedule(static)
+#pragma omp for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += SSTET4_LINEAR_ELASTICITY_VECTOR_SIZE) {
         const int nelems =
                 (int)((nelements - evbegin) < SSTET4_LINEAR_ELASTICITY_VECTOR_SIZE ? (nelements - evbegin)
@@ -649,6 +649,25 @@ int sstet4_linear_elasticity_apply_stencil_global_vectorized(const sstet4_linear
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sstet4_linear_elasticity_apply_stencil_global_vectorized_team.
+int sstet4_linear_elasticity_apply_stencil_global_vectorized(const sstet4_linear_elasticity_stencil_t *const stencil,
+                                                             const ptrdiff_t                                 nelements,
+                                                             idx_t **const SFEM_RESTRICT                     elements,
+                                                             const real_t *const SFEM_RESTRICT               u,
+                                                             real_t *const SFEM_RESTRICT                     values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sstet4_linear_elasticity_apply_stencil_global_vectorized_team(stencil, nelements, elements, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int sstet4_linear_elasticity_block_diag_sym_stencil(const sstet4_linear_elasticity_stencil_t *const stencil,
                                                     const ptrdiff_t                                 nelements,

@@ -6,6 +6,7 @@
 #include "smesh_mesh.hpp"
 
 #include "mass.hpp"
+#include "sfem_team.h"
 
 
 #include "sfem_FunctionSpace.hpp"
@@ -38,7 +39,42 @@ namespace sfem {
         void print_info() { domains->print_info(); }
 
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
+
+        /// The mesh's points and their number, taken by team_prepare for the team product.
+        geom_t  **points{nullptr};
+        ptrdiff_t n_nodes{0};
     };
+
+    namespace {
+
+        /// out += M h over the elements of `range` in the domain's block: by the threads of the
+        /// caller's region (TEAM) or opening its own.
+        template <bool TEAM>
+        int mass_apply_domain(const OpDomain     &domain,
+                              const ptrdiff_t     n_nodes,
+                              geom_t **const      points,
+                              const real_t *const h,
+                              real_t *const       out,
+                              const ElementRange  range) {
+            if (range.empty()) return SFEM_SUCCESS;
+
+            const int nxe = smesh::elem_num_nodes(domain.element_type);
+            if (nxe > 8) {
+                SFEM_ERROR("Mass: %d nodes per element, at most 8 supported\n", nxe);
+                return SFEM_FAILURE;
+            }
+
+            idx_t **const elems = domain.block->elements()->data();
+            idx_t        *view[8];
+            for (int v = 0; v < nxe; ++v) {
+                view[v] = elems[v] + range.begin;
+            }
+
+            return SFEM_TEAM_KERNEL(TEAM, apply_mass)(
+                    domain.element_type, range.size(), n_nodes, view, points, 1, h, 1, out);
+        }
+
+    }  // namespace
 
     inline ptrdiff_t Mass::n_dofs_domain() const { return impl_->space->n_dofs(); }
 
@@ -90,38 +126,51 @@ namespace sfem {
 
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            apply_mass(domain.element_type,
-                       domain.block->n_elements(),
-                       mesh->n_nodes(),
-                       domain.block->elements()->data(),
-                       mesh->points()->data(),
-                       1,
-                       x,
-                       1,
-                       out);
-            //    FIXME
-            return SFEM_SUCCESS;
+            return mass_apply_domain<false>(
+                    domain, mesh->n_nodes(), mesh->points()->data(), x, out, element_range(*mesh, *domain.block, ElementScope::ALL));
         });
     }
 
-    int Mass::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
+    int Mass::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("Mass::apply");
         SFEM_OP_CAPTURE();
+        if (!team_supported()) return apply(x, h, out, ElementScope::ALL);
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
 
+    int Mass::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out, const ElementScope scope) {
         auto mesh = impl_->space->mesh();
         return impl_->iterate([&](const OpDomain &domain) {
-            apply_mass(domain.element_type,
-                       domain.block->n_elements(),
-                       mesh->n_nodes(),
-                       domain.block->elements()->data(),
-                       mesh->points()->data(),
-                       1,
-                       h,
-                       1,
-                       out);
-            //    FIXME
-            return SFEM_SUCCESS;
+            return mass_apply_domain<false>(
+                    domain, mesh->n_nodes(), mesh->points()->data(), h, out, element_range(*mesh, *domain.block, scope));
         });
+    }
+
+    bool Mass::team_supported() const {
+        for (const auto &kv : impl_->domains->domains()) {
+            if (!apply_mass_supported(kv.second.element_type)) return false;
+        }
+        return true;
+    }
+
+    int Mass::team_apply(const Team &team,
+                         const real_t *const /*x*/,
+                         const real_t *const h,
+                         real_t *const       out,
+                         const ElementScope  scope) {
+        (void)team;
+        smesh::Mesh &mesh = *impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) {
+            return mass_apply_domain<true>(domain, impl_->n_nodes, impl_->points, h, out, element_range(mesh, *domain.block, scope));
+        });
+    }
+
+    int Mass::team_prepare() {
+        impl_->points  = impl_->space->mesh()->points()->data();
+        impl_->n_nodes = impl_->space->mesh()->n_nodes();
+        return SFEM_SUCCESS;
     }
 
     int Mass::value(const real_t * /*x*/, real_t *const /*out*/) {

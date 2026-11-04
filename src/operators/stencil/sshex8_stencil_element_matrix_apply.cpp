@@ -10,7 +10,7 @@
 
 #define SSHEX8_LINEAR_ELASTICITY_TENSOR_COEFFS 81
 
-int sshex8_stencil_element_matrix_apply(const int                           level,
+int sshex8_stencil_element_matrix_apply_team(const int                           level,
                                         const ptrdiff_t                     nelements,
                                         idx_t **const SFEM_RESTRICT         elements,
                                         const scalar_t *const SFEM_RESTRICT g_element_matrix,
@@ -18,7 +18,6 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
                                         real_t *const SFEM_RESTRICT         values) {
     const int nxe  = sshex8_nxe(level);
 
-#pragma omp parallel
     {
         // Allocation per thread
         scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
@@ -78,7 +77,27 @@ int sshex8_stencil_element_matrix_apply(const int                           leve
     return SFEM_SUCCESS;
 }
 
-int sshex8_stencil_element_matrix_apply_hyteg(const int                           level,
+// The plain entry point: one region around sshex8_stencil_element_matrix_apply_team.
+int sshex8_stencil_element_matrix_apply(const int                           level,
+                                        const ptrdiff_t                     nelements,
+                                        idx_t **const SFEM_RESTRICT         elements,
+                                        const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                        const real_t *const SFEM_RESTRICT   u,
+                                        real_t *const SFEM_RESTRICT         values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_stencil_element_matrix_apply_team(level, nelements, elements, g_element_matrix, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
+
+int sshex8_stencil_element_matrix_apply_hyteg_team(const int                           level,
                                               const ptrdiff_t                     nelements,
                                               idx_t **const SFEM_RESTRICT         elements,
                                               const scalar_t *const SFEM_RESTRICT g_element_matrix,
@@ -87,7 +106,6 @@ int sshex8_stencil_element_matrix_apply_hyteg(const int                         
                                               real_t *const SFEM_RESTRICT         values) {
     const int nxe = sshex8_nxe(level);
 
-#pragma omp parallel
     {
         scalar_t      *eu = (scalar_t *)malloc(nxe * sizeof(scalar_t));
         idx_t         *ev = (idx_t *)malloc(nxe * sizeof(idx_t));
@@ -147,7 +165,28 @@ int sshex8_stencil_element_matrix_apply_hyteg(const int                         
     return SFEM_SUCCESS;
 }
 
-int sshex8_stencil_element_matrix_apply3(const int                           level,
+// The plain entry point: one region around sshex8_stencil_element_matrix_apply_hyteg_team.
+int sshex8_stencil_element_matrix_apply_hyteg(const int                           level,
+                                              const ptrdiff_t                     nelements,
+                                              idx_t **const SFEM_RESTRICT         elements,
+                                              const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                              const scalar_t *const SFEM_RESTRICT g_stencil,
+                                              const real_t *const SFEM_RESTRICT   u,
+                                              real_t *const SFEM_RESTRICT         values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_stencil_element_matrix_apply_hyteg_team(level, nelements, elements, g_element_matrix, g_stencil, u, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
+
+int sshex8_stencil_element_matrix_apply3_team(const int                           level,
                                          const ptrdiff_t                     nelements,
                                          idx_t **const SFEM_RESTRICT         elements,
                                          const scalar_t *const SFEM_RESTRICT g_element_matrix,
@@ -162,7 +201,6 @@ int sshex8_stencil_element_matrix_apply3(const int                           lev
     const int nxe = sshex8_nxe(level);
     const int txe = sshex8_txe(level);
 
-#pragma omp parallel
     {
         scalar_t *eu[3];
         scalar_t *v[3];
@@ -227,6 +265,32 @@ int sshex8_stencil_element_matrix_apply3(const int                           lev
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sshex8_stencil_element_matrix_apply3_team.
+int sshex8_stencil_element_matrix_apply3(const int                           level,
+                                         const ptrdiff_t                     nelements,
+                                         idx_t **const SFEM_RESTRICT         elements,
+                                         const scalar_t *const SFEM_RESTRICT g_element_matrix,
+                                         const ptrdiff_t                     u_stride,
+                                         const real_t *const SFEM_RESTRICT   ux,
+                                         const real_t *const SFEM_RESTRICT   uy,
+                                         const real_t *const SFEM_RESTRICT   uz,
+                                         const ptrdiff_t                     out_stride,
+                                         real_t *const SFEM_RESTRICT         outx,
+                                         real_t *const SFEM_RESTRICT         outy,
+                                         real_t *const SFEM_RESTRICT         outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_stencil_element_matrix_apply3_team(level, nelements, elements, g_element_matrix, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 static SFEM_INLINE int sshex8_hex8_node(const int x, const int y, const int z) {
     return x + 2 * y + 4 * z;
@@ -1556,7 +1620,7 @@ int sshex8_stencil_element_matrix_apply3_hyteg_tensor_stencil(
     return SFEM_SUCCESS;
 }
 
-int sshex8_stencil_element_matrix_apply3_hyteg_stencil(
+int sshex8_stencil_element_matrix_apply3_hyteg_stencil_team(
         const int                           level,
         const ptrdiff_t                     nelements,
         idx_t **const SFEM_RESTRICT         elements,
@@ -1571,7 +1635,6 @@ int sshex8_stencil_element_matrix_apply3_hyteg_stencil(
         real_t *const SFEM_RESTRICT         outz) {
     const int nxe = sshex8_nxe(level);
 
-#pragma omp parallel
     {
         scalar_t *eu[3];
         scalar_t *v[3];
@@ -1629,3 +1692,30 @@ int sshex8_stencil_element_matrix_apply3_hyteg_stencil(
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around sshex8_stencil_element_matrix_apply3_hyteg_stencil_team.
+int sshex8_stencil_element_matrix_apply3_hyteg_stencil(
+        const int                           level,
+        const ptrdiff_t                     nelements,
+        idx_t **const SFEM_RESTRICT         elements,
+        const scalar_t *const SFEM_RESTRICT g_category_stencils,
+        const ptrdiff_t                     u_stride,
+        const real_t *const SFEM_RESTRICT   ux,
+        const real_t *const SFEM_RESTRICT   uy,
+        const real_t *const SFEM_RESTRICT   uz,
+        const ptrdiff_t                     out_stride,
+        real_t *const SFEM_RESTRICT         outx,
+        real_t *const SFEM_RESTRICT         outy,
+        real_t *const SFEM_RESTRICT         outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = sshex8_stencil_element_matrix_apply3_hyteg_stencil_team(level, nelements, elements, g_category_stencils, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+

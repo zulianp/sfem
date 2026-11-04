@@ -3,6 +3,7 @@
 
 #include "smesh_env.hpp"
 #include "sfem_defs.hpp"
+#include "sfem_team.h"
 #include "sfem_logger.hpp"
 #include "sfem_macros.hpp"
 #include "smesh_mesh.hpp"
@@ -273,16 +274,16 @@ namespace sfem {
         });
     }
 
-    int MooneyRivlinActiveStrainPacked::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::apply");
+    template <bool TEAM>
+    int MooneyRivlinActiveStrainPacked::apply_elements(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
         return impl_->iterate([&](const OpDomain &domain) {
             if (domain.element_type != smesh::HEX8) {
                 SFEM_ERROR("MooneyRivlinActiveStrainPacked::apply only implemented for smesh::HEX8\n");
                 return SFEM_FAILURE;
             }
-            auto b             = *std::static_pointer_cast<int>(domain.user_data);
-            auto assembly_data = impl_->assembly_data[b];
-            return hex8_mooney_rivlin_active_strain_partial_assembly_apply(
+            const int   b             = *static_cast<const int *>(domain.user_data.get());
+            const auto &assembly_data = impl_->assembly_data[b];
+            return SFEM_TEAM_KERNEL(TEAM, hex8_mooney_rivlin_active_strain_partial_assembly_apply)(
                     domain.block->n_elements(),
                     assembly_data->elements_stride,
                     assembly_data->elements->data(),
@@ -296,6 +297,33 @@ namespace sfem {
                     &out[1],
                     &out[2]);
         });
+    }
+
+    int MooneyRivlinActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("MooneyRivlinActiveStrainPacked::apply");
+        if (!team_supported()) return apply_elements<false>(x, h, out);
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
+
+    // A packed space is a single rank's: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool MooneyRivlinActiveStrainPacked::team_supported() const {
+        if (mesh_is_distributed(*impl_->space->mesh())) return false;
+        for (const auto &kv : impl_->domains->domains()) {
+            if (kv.second.element_type != smesh::HEX8) return false;
+        }
+        return true;
+    }
+
+    int MooneyRivlinActiveStrainPacked::team_apply(const Team &team,
+                       const real_t *const x,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_elements<true>(x, h, out);
     }
 
     int MooneyRivlinActiveStrainPacked::value(const real_t *x, real_t *const out) {

@@ -711,30 +711,33 @@ namespace sfem {
     });
   }
 
-  int GeneratedMooneyRivlinKelvinVoigt::apply(const real_t *const state,
+  int GeneratedMooneyRivlinKelvinVoigt::team_apply(const Team &team,
+                      const real_t *const state,
                       const real_t *const direction,
-                      real_t *const out) {
-    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::apply");
+                      real_t *const out,
+                      const ElementScope scope) {
+    (void)team;
     const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt requires current and previous states\n");
       return SFEM_FAILURE;
     }
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->apply(state, direction, out) != SFEM_SUCCESS) {
+    if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+      if (term->team_apply(team, state, direction, out, scope) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
+      team.barrier();
     }
 
-    auto mesh = impl_->space->mesh();
+    const auto &mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
+        auto *const cache = static_cast<AffineGeometryCache *>(domain.user_data.get());
         if (!cache) {
           SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt affine jacobian action requires cached geometry\n");
           return SFEM_FAILURE;
@@ -763,9 +766,9 @@ namespace sfem {
           const real_t *const RSTR u_direction_data[2] = {direction + 0, direction + 1};
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TRI3) {
-          return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
+          return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
         }
-        return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
+        return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 3;
@@ -774,13 +777,43 @@ namespace sfem {
           const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
         if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4) {
-          return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+          return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
         }
-        return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
+        return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
       }
       SFEM_ERROR("mooney_rivlin_kelvin_voigt_total jacobian_action does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
     });
+  }
+
+  int GeneratedMooneyRivlinKelvinVoigt::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
+  }
+
+  bool GeneratedMooneyRivlinKelvinVoigt::team_supported() const {
+    auto term = time_scheme_term(impl_->time_scheme);
+    return !term || term->team_supported();
+  }
+
+  int GeneratedMooneyRivlinKelvinVoigt::team_prepare() {
+    impl_->domains->prepare_views();
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->team_prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+    }
+    if (!impl_->inexact.assembled() && impl_->space->has_packed_mesh()) {
+      auto mesh = impl_->space->packed_mesh();
+      impl_->domains->iterate([&](const OpDomain &domain) {
+        const int block = packed_block_id_for_domain(*mesh, *domain.block);
+        if (block >= 0) impl_->inexact.packed_view(*mesh, block, 3);
+        return SFEM_SUCCESS;
+      });
+    }
+    return SFEM_SUCCESS;
   }
 
   void GeneratedMooneyRivlinKelvinVoigt::set_field(const char *name,
@@ -1137,33 +1170,53 @@ namespace sfem {
     });
   }
 
-  int GeneratedMooneyRivlinKelvinVoigt::inexact_apply(const real_t *const h, real_t *const out) {
-    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_apply");
-    // The assembled store holds the whole tangent, inertia included.
-    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
-    if (auto term = time_scheme_term(impl_->time_scheme)) {
-      if (term->apply(impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+  int GeneratedMooneyRivlinKelvinVoigt::team_inexact_apply(const Team &team,
+                      const real_t *const h,
+                      real_t *const out,
+                      const ElementScope scope) {
+    // The assembled store holds the whole tangent, inertia included. Its rows read every
+    // column, so the halves of a distributed product take it with the interface, once the
+    // halo is in.
+    if (impl_->inexact.assembled()) {
+      if (scope != ElementScope::OWNED_NOT_SHARED) impl_->inexact.team_apply_bsr(team, h, out);
+      return SFEM_SUCCESS;
+    }
+    if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+      if (term->team_apply(team, impl_->inexact.state, h, out, scope) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
+      team.barrier();
     }
+    const auto &mesh = impl_->space->mesh();
+    int domain_index = 0;
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
         SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt::inexact_apply requires inexact_update first\n");
         return SFEM_FAILURE;
       }
+      if (domain_index++ > 0) team.barrier();
       inexact::PackedView view;
       const inexact::PackedView *packed = nullptr;
       if (impl_->space->has_packed_mesh()) {
-        auto mesh = impl_->space->packed_mesh();
+        const auto &mesh = impl_->space->packed_mesh();
         const int block = packed_block_id_for_domain(*mesh, *domain.block);
         if (block >= 0) {
           view = impl_->inexact.packed_view(*mesh, block, 3);
           packed = &view;
         }
       }
-      store->second->apply(domain.block->n_elements(), element_connectivity(domain), packed, 3, h, out);
+      store->second->team_apply(
+          team, domain.block->n_elements(), range.begin, range.end, element_connectivity(domain), packed, 3, h, out);
       return SFEM_SUCCESS;
+    });
+  }
+
+  int GeneratedMooneyRivlinKelvinVoigt::inexact_apply(const real_t *const h, real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_inexact_apply(team, h, out, ElementScope::ALL);
     });
   }
 }  // namespace sfem

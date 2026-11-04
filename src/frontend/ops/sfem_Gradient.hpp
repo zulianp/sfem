@@ -75,6 +75,13 @@ namespace sfem {
         // Vector operations
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+        bool team_supported() const override;
+        int  team_prepare() override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
         int value(const real_t *x, real_t *const out) override;
         int report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;
@@ -83,6 +90,9 @@ namespace sfem {
         void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
 
     private:
+        /// out += the patch-recovered gradient of h, by the threads of the caller's region.
+        int apply_patches(const real_t *const h, real_t *const out);
+
         class Impl;
         std::unique_ptr<Impl> impl_;
     };

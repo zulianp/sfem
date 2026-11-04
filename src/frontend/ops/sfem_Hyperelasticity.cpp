@@ -119,6 +119,7 @@ namespace sfem {
                                  const real_t *const,
                                  real_t *const) = 0;
 
+        // The three products (apply_aos and the partial assemblies) are called by every thread of a region.
         virtual int apply_aos(const ptrdiff_t,
                               const ptrdiff_t,
                               idx_t **const,
@@ -197,6 +198,25 @@ namespace sfem {
     };
 
     namespace hex8 {
+        // The micro-kernels as function objects: the element loops call them directly and gcc can
+        // inline them (through a function pointer every element paid an indirect call).
+        struct WimpnCompressed {
+            void operator()(scalar_t *const Wimpn_compressed) const { hex8_Wimpn_compressed(Wimpn_compressed); }
+        };
+
+        struct SdotHdotG {
+            void operator()(const scalar_t *const S_ikmn,
+                            const scalar_t *const Wimpn_compressed,
+                            const scalar_t *const hx,
+                            const scalar_t *const hy,
+                            const scalar_t *const hz,
+                            scalar_t *const       outx,
+                            scalar_t *const       outy,
+                            scalar_t *const       outz) const {
+                hex8_SdotHdotG(S_ikmn, Wimpn_compressed, hx, hy, hz, outx, outy, outz);
+            }
+        };
+
         class NeoHookeanOgden final : public HyperelasticityKernels {
         public:
             // Implement using generic_hyperelasticity.hpp and smesh::HEX8 micro-kernels
@@ -374,9 +394,9 @@ namespace sfem {
                 };
 
                 Hyperelasticity3 helper;
-                return helper.apply_aos<8, 10, HEX8_S_IKMN_SIZE>(s_kernel,
-                                                                 hex8_Wimpn_compressed,
-                                                                 hex8_SdotHdotG,
+                return helper.apply_aos_team<8, 10, HEX8_S_IKMN_SIZE>(s_kernel,
+                                                                 WimpnCompressed{},
+                                                                 SdotHdotG{},
                                                                  nelements,
                                                                  /*stride*/ 1,
                                                                  elements,
@@ -408,9 +428,9 @@ namespace sfem {
                                        real_t *const                        outy,
                                        real_t *const                        outz) override {
                 Hyperelasticity3 helper;
-                return helper.partial_assembly_apply<8, 10, HEX8_S_IKMN_SIZE>(
-                        hex8_Wimpn_compressed,
-                        hex8_SdotHdotG,
+                return helper.partial_assembly_apply_team<8, 10, HEX8_S_IKMN_SIZE>(
+                        WimpnCompressed{},
+                        SdotHdotG{},
                         nelements,
                         stride,
                         elements,
@@ -439,9 +459,9 @@ namespace sfem {
                                                   real_t *const                  outy,
                                                   real_t *const                  outz) override {
                 Hyperelasticity3 helper;
-                return helper.compressed_partial_assembly_apply<8, 10, HEX8_S_IKMN_SIZE>(
-                        hex8_Wimpn_compressed,
-                        hex8_SdotHdotG,
+                return helper.compressed_partial_assembly_apply_team<8, 10, HEX8_S_IKMN_SIZE>(
+                        WimpnCompressed{},
+                        SdotHdotG{},
                         nelements,
                         stride,
                         elements,
@@ -704,6 +724,9 @@ namespace sfem {
         int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
 
         std::unordered_map<smesh::ElemType, std::shared_ptr<HyperelasticityKernels>> kernels;
+        /// The mesh's points and their number, taken by team_prepare for the team product.
+        geom_t  **points{nullptr};
+        ptrdiff_t n_nodes{0};
         std::shared_ptr<HyperelasticityKernels> find_kernels(const OpDomain &domain) { return kernels[domain.element_type]; }
     };
 
@@ -774,15 +797,12 @@ namespace sfem {
         });
     }
 
-    int Hyperelasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("Hyperelasticity::apply");
-
-        auto mesh = impl_->space->mesh();
+    int Hyperelasticity::apply_domains(const real_t *const x, const real_t *const h, real_t *const out) {
         return impl_->iterate([&](const OpDomain &domain) -> int {
-            auto ua = std::static_pointer_cast<struct HyperelasticityAssemblyData>(domain.user_data);
+            auto *const ua      = static_cast<struct HyperelasticityAssemblyData *>(domain.user_data.get());
+            auto *const kernels = impl_->kernels.find(domain.element_type)->second.get();
             if (ua->partial_assembly_buffer) {
                 if (ua->use_compression) {
-                    auto kernels = impl_->find_kernels(domain);
                     return kernels->compressed_partial_assembly_apply(domain.block->n_elements(),
                                                                       ua->elements_stride,
                                                                       ua->elements->data(),
@@ -798,7 +818,6 @@ namespace sfem {
                                                                       &out[2]);
 
                 } else {
-                    auto kernels = impl_->find_kernels(domain);
                     return kernels->partial_assembly_apply(domain.block->n_elements(),
                                                            ua->elements_stride,
                                                            ua->elements->data(),
@@ -814,15 +833,40 @@ namespace sfem {
                 }
             }
 
-            auto kernels = impl_->find_kernels(domain);
             return kernels->apply_aos(domain.block->n_elements(),
-                                      mesh->n_nodes(),
+                                      impl_->n_nodes,
                                       domain.block->elements()->data(),
-                                      mesh->points()->data(),
+                                      impl_->points,
                                       x,
                                       h,
                                       out);
         });
+    }
+
+    int Hyperelasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("Hyperelasticity::apply");
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &) {
+            return apply_domains(x, h, out);
+        });
+    }
+
+    int Hyperelasticity::team_prepare() {
+        impl_->points  = impl_->space->mesh()->points()->data();
+        impl_->n_nodes = impl_->space->mesh()->n_nodes();
+        return SFEM_SUCCESS;
+    }
+
+    // Every domain on one rank: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool Hyperelasticity::team_supported() const { return !mesh_is_distributed(*impl_->space->mesh()); }
+
+    int Hyperelasticity::team_apply(const Team &team,
+                                    const real_t *const x,
+                                    const real_t *const h,
+                                    real_t *const       out,
+                                    const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_domains(x, h, out);
     }
 
     int Hyperelasticity::initialize(const std::vector<std::string> &block_names) {

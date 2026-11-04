@@ -312,9 +312,21 @@ int main(int argc, char *argv[]) {
             // assemble without a previous state, and the names come from the
             // caller rather than from a test on the operator's own name, which
             // would be this benchmark deciding what an operator is.
+            // `SFEM_EXTRA_OP_FIELD_ELEMENT_TENSOR=1`: each field is a 3x3 identity per element (an
+            // active strain), not a nodal vector of zeros.
             std::vector<std::shared_ptr<sfem::Buffer<real_t>>> extra_fields;
+            const bool element_tensor_fields = smesh::Env::read("SFEM_EXTRA_OP_FIELD_ELEMENT_TENSOR", false);
             for (const auto &field : named_fields()) {
-                extra_fields.push_back(sfem::create_buffer<real_t>(op->n_dofs_domain(), es));
+                if (element_tensor_fields) {
+                    const ptrdiff_t ne = fs->mesh()->n_elements();
+                    auto            Fa = sfem::create_host_buffer<real_t>(9 * ne);
+                    for (ptrdiff_t e = 0; e < ne; ++e) {
+                        for (int k = 0; k < 9; ++k) Fa->data()[e * 9 + k] = (k % 4 == 0) ? real_t(1) : real_t(0);
+                    }
+                    extra_fields.push_back(Fa);
+                } else {
+                    extra_fields.push_back(sfem::create_buffer<real_t>(op->n_dofs_domain(), es));
+                }
                 op->set_field(field.c_str(), extra_fields.back(), 0);
             }
 

@@ -285,7 +285,7 @@ namespace sfem {
         }
 
         template <int NXE, int WIMPNSIZE, int IKMN_SIZE, typename WimpnKernel, typename MicroKernel, typename T>
-        int partial_assembly_apply(WimpnKernel                                wimpn_kernel,
+        int partial_assembly_apply_team(WimpnKernel                                wimpn_kernel,
                                    MicroKernel                                micro_kernel,
                                    const ptrdiff_t                            nelements,
                                    const ptrdiff_t                            stride,
@@ -302,7 +302,7 @@ namespace sfem {
             T Wimpn_compressed[WIMPNSIZE];
             wimpn_kernel(Wimpn_compressed);
 
-#pragma omp parallel for
+#pragma omp for
             for (ptrdiff_t i = 0; i < nelements; ++i) {
                 idx_t ev[NXE];
 
@@ -356,7 +356,7 @@ namespace sfem {
         }
 
         template <int NXE, int WIMPNSIZE, int IKMN_SIZE, typename WimpnKernel, typename MicroKernel, typename T>
-        int compressed_partial_assembly_apply(WimpnKernel                             wimpn_kernel,
+        int compressed_partial_assembly_apply_team(WimpnKernel                             wimpn_kernel,
                                               MicroKernel                             micro_kernel,
                                               const ptrdiff_t                         nelements,
                                               const ptrdiff_t                         stride,
@@ -374,7 +374,7 @@ namespace sfem {
             T Wimpn_compressed[WIMPNSIZE];
             wimpn_kernel(Wimpn_compressed);
 
-#pragma omp parallel for
+#pragma omp for
             for (ptrdiff_t i = 0; i < nelements; ++i) {
                 idx_t ev[NXE];
 
@@ -501,7 +501,7 @@ namespace sfem {
         // WimpnKernel: fills Wimpn_compressed[WIMPNSIZE]
         // SdotHKernel: performs contraction to produce eoutx/y/z
         template <int NXE, int WIMPNSIZE, int IKMN_SIZE, typename SKernel, typename WimpnKernel, typename SdotHKernel, typename T>
-        int apply_aos(SKernel                                   s_kernel,
+        int apply_aos_team(SKernel                                   s_kernel,
                       WimpnKernel                               wimpn_kernel,
                       SdotHKernel                               sdot_kernel,
                       const ptrdiff_t                           nelements,
@@ -527,7 +527,7 @@ namespace sfem {
             T Wimpn_compressed[WIMPNSIZE];
             wimpn_kernel(Wimpn_compressed);
 
-#pragma omp parallel for
+#pragma omp for
             for (ptrdiff_t i = 0; i < nelements; ++i) {
                 idx_t ev[NXE];
 

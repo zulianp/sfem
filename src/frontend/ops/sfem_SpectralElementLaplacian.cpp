@@ -1,4 +1,5 @@
 #include "sfem_SpectralElementLaplacian.hpp"
+#include "sfem_team.h"
 
 // C includes
 #include "spectral_hex_laplacian.hpp"
@@ -95,7 +96,22 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int SpectralElementLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
+    template <bool TEAM>
+    int SpectralElementLaplacian::apply_block(const real_t *const h, real_t *const out) {
+        return SFEM_TEAM_KERNEL(TEAM, spectral_hex_laplacian_apply)(
+                level, block_view.n_elements, interior_start, block_view.elements, points, h, out);
+    }
+
+    int SpectralElementLaplacian::team_prepare() {
+        auto &ssm      = *space->mesh();
+        block_view     = block_elements(ssm)[0];
+        interior_start = smesh::semistructured_interior_start(ssm);
+        points         = ssm.points()->data();
+        level          = smesh::semistructured_level(ssm);
+        return SFEM_SUCCESS;
+    }
+
+    int SpectralElementLaplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("SpectralElementLaplacian::apply");
 
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
@@ -111,22 +127,36 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        auto block = ssm.block(0);
-
         double tick = smesh::time_seconds();
-
-        int err = spectral_hex_laplacian_apply(smesh::semistructured_level(ssm),
-                                               block->n_elements(),
-                                               smesh::semistructured_interior_start(ssm),
-                                               block->elements()->data(),
-                                               ssm.points()->data(),
-                                               h,
-                                               out);
-
+        int    err  = SFEM_SUCCESS;
+        if (team_supported()) {
+            err = op_team_region(*this, space->n_dofs(), [&](const Team &team) {
+                return team_apply(team, x, h, out, ElementScope::ALL);
+            });
+        } else {
+            err = team_prepare();
+            if (err == SFEM_SUCCESS) err = apply_block<false>(h, out);
+        }
         double tock = smesh::time_seconds();
         total_time += (tock - tick);
         calls++;
         return err;
+    }
+
+    // One HEX SS block on one rank: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool SpectralElementLaplacian::team_supported() const {
+        auto &ssm = *space->mesh();
+        return !mesh_is_distributed(ssm) && ssm.n_blocks() == 1 && smesh::is_hex_ss_family(ssm.element_type(0));
+    }
+
+    int SpectralElementLaplacian::team_apply(const Team &team,
+                                             const real_t *const /*x*/,
+                                             const real_t *const h,
+                                             real_t *const       out,
+                                             const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_block<true>(h, out);
     }
 
     int SpectralElementLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {

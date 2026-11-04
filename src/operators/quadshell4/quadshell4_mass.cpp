@@ -77,7 +77,7 @@ static SFEM_INLINE void quadshell4_apply_mass_kernel(const scalar_t px0,
     }
 }
 
-void quadshell4_apply_mass(const ptrdiff_t nelements,
+int quadshell4_apply_mass_team(const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const SFEM_RESTRICT elements,
                            geom_t **const SFEM_RESTRICT points,
@@ -91,7 +91,7 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
         scalar_t element_u[4];
@@ -133,4 +133,28 @@ void quadshell4_apply_mass(const ptrdiff_t nelements,
             values[ev[edof_i] * stride_values] += element_vector[edof_i];
         }
     }
+
+    return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around quadshell4_apply_mass_team.
+int quadshell4_apply_mass(const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elements,
+                           geom_t **const SFEM_RESTRICT points,
+                           const ptrdiff_t stride_u,
+                           const real_t *const SFEM_RESTRICT u,
+                           const ptrdiff_t stride_values,
+                           real_t *const SFEM_RESTRICT values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = quadshell4_apply_mass_team(nelements, nnodes, elements, points, stride_u, u, stride_values, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
