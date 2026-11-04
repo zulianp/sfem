@@ -84,12 +84,19 @@ namespace sfem {
                            const std::ptrdiff_t cols,
                            const bool           reserve_first,
                            TeamApply            team_apply,
-                           Prepare              prepare = {})
-            : rows_(rows), cols_(cols), reserve_first_(reserve_first), team_apply_(std::move(team_apply)), prepare_(std::move(prepare)) {}
+                           Prepare              prepare        = {},
+                           const bool           input_in_share = false)
+            : rows_(rows),
+              cols_(cols),
+              reserve_first_(reserve_first),
+              input_in_share_(input_in_share),
+              team_apply_(std::move(team_apply)),
+              prepare_(std::move(prepare)) {}
 
         int  apply(const T* const x, T* const y) override { return team_region_apply<T>(*this, x, y); }
         Team team() const override { return Team::current(rows_, reserve_first_); }
         void team_apply(const Team& team, const T* const x, T* const y) const override { team_apply_(team, x, y); }
+        bool input_in_share() const override { return input_in_share_; }
         int  prepare() override { return prepare_ ? prepare_() : SFEM_SUCCESS; }
 
         std::ptrdiff_t   rows() const override { return rows_; }
@@ -100,6 +107,7 @@ namespace sfem {
         std::ptrdiff_t rows_{0};
         std::ptrdiff_t cols_{0};
         bool           reserve_first_{false};
+        bool           input_in_share_{false};
         TeamApply      team_apply_;
         Prepare        prepare_;
     };
@@ -109,8 +117,10 @@ namespace sfem {
                                                                       const std::ptrdiff_t                       cols,
                                                                       const bool                                 reserve_first,
                                                                       typename TeamLambdaOperator<T>::TeamApply  team_apply,
-                                                                      typename TeamLambdaOperator<T>::Prepare    prepare = {}) {
-        return std::make_shared<TeamLambdaOperator<T>>(rows, cols, reserve_first, std::move(team_apply), std::move(prepare));
+                                                                      typename TeamLambdaOperator<T>::Prepare    prepare        = {},
+                                                                      const bool                                 input_in_share = false) {
+        return std::make_shared<TeamLambdaOperator<T>>(
+                rows, cols, reserve_first, std::move(team_apply), std::move(prepare), input_in_share);
     }
 
 }  // namespace sfem
