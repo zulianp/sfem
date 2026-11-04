@@ -6941,54 +6941,56 @@ def _mixed_operator_source(
         ),
     )
     for form, coefficients, dependencies in form_data:
-        lines.extend(
-            _mixed_affine_function(
-                system,
-                prefix,
-                local_prefix,
-                element,
-                rule,
-                AFFINE_MODE,
-                # Through the target, as every other mesh operator's width
-                # is.  Passed raw, a device mixed kernel declared `VS = 16`
-                # and blocked its staging over sixteen elements while the
-                # micro-kernels it calls hold one, so it handed a scalar entry
-                # point a lane-blocked tile -- which nvcc rejects, and which
-                # would have computed the wrong numbers had it compiled.
-                current_target().effective_vector_size(
-                    cell_specialization.vector_size
-                ),
-                field_element_types,
-                form,
-                dependencies,
-                basis_family,
+        # The operator's product is a team body (`kernel_target`).
+        with use_target(kernel_target(form, _target())):
+            lines.extend(
+                _mixed_affine_function(
+                    system,
+                    prefix,
+                    local_prefix,
+                    element,
+                    rule,
+                    AFFINE_MODE,
+                    # Through the target, as every other mesh operator's width
+                    # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                    # and blocked its staging over sixteen elements while the
+                    # micro-kernels it calls hold one, so it handed a scalar entry
+                    # point a lane-blocked tile -- which nvcc rejects, and which
+                    # would have computed the wrong numbers had it compiled.
+                    current_target().effective_vector_size(
+                        cell_specialization.vector_size
+                    ),
+                    field_element_types,
+                    form,
+                    dependencies,
+                    basis_family,
+                )
             )
-        )
-        lines.extend(
-            _mixed_isoparametric_function(
-                system,
-                prefix,
-                local_prefix,
-                element,
-                rule,
-                ISOPARAMETRIC_MODE,
-                # Through the target, as every other mesh operator's width
-                # is.  Passed raw, a device mixed kernel declared `VS = 16`
-                # and blocked its staging over sixteen elements while the
-                # micro-kernels it calls hold one, so it handed a scalar entry
-                # point a lane-blocked tile -- which nvcc rejects, and which
-                # would have computed the wrong numbers had it compiled.
-                current_target().effective_vector_size(
-                    cell_specialization.vector_size
-                ),
-                field_element_types,
-                form,
-                coefficients,
-                dependencies,
-                basis_family,
-                geometry_family,
+            lines.extend(
+                _mixed_isoparametric_function(
+                    system,
+                    prefix,
+                    local_prefix,
+                    element,
+                    rule,
+                    ISOPARAMETRIC_MODE,
+                    # Through the target, as every other mesh operator's width
+                    # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                    # and blocked its staging over sixteen elements while the
+                    # micro-kernels it calls hold one, so it handed a scalar entry
+                    # point a lane-blocked tile -- which nvcc rejects, and which
+                    # would have computed the wrong numbers had it compiled.
+                    current_target().effective_vector_size(
+                        cell_specialization.vector_size
+                    ),
+                    field_element_types,
+                    form,
+                    coefficients,
+                    dependencies,
+                    basis_family,
+                    geometry_family,
+                )
             )
-        )
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
@@ -7125,6 +7127,7 @@ def _mixed_affine_function(
                 % (field_group.name, field_group.components)
             )
 
+    params = with_team_element_range(params, _target())
     impl = "%s_%s_%s_affine_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -7265,6 +7268,7 @@ def _mixed_affine_function(
     call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
     call_args.append("out_stride")
     call_args.extend("%s_out" % group.name for group in layout.groups)
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -7312,6 +7316,7 @@ def _mixed_isoparametric_function(
                 "s_t *const RSTR %s_out[%d]"
                 % (field_group.name, field_group.components)
             )
+    params = with_team_element_range(params, _target())
     impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -7536,6 +7541,7 @@ def _mixed_isoparametric_function(
     call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
     call_args.append("out_stride")
     call_args.extend("%s_out" % group.name for group in layout.groups)
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
