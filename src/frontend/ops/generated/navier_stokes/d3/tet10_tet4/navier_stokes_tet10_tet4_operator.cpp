@@ -656,6 +656,8 @@ namespace codegen {
 template <typename s_t, typename g_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const g_t *const RSTR g_adj0,
@@ -691,9 +693,9 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixe
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape(), sfem::codegen::ref_tet4_q11<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+#pragma omp for schedule(static)
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bprevious[N_FIELD_STREAMS][VS];
     s_t bdirection[N_FIELD_STREAMS][VS];
     s_t boutput[N_FIELD_STREAMS][VS];
@@ -810,6 +812,50 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixe
 } // namespace codegen
 } // namespace sfem
 
+extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+}
+
 extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -840,16 +886,22 @@ extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa(
     void *const RSTR p_out
 ) {
   switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-    }
-    case (int)sizeof(float): {
-        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-    }
-    default:
+    case (int)sizeof(double):
+    case (int)sizeof(float):
       break;
+    default:
+      return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
   }
-  return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = navier_stokes_tet10_tet4_jacobian_action_a_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }
 
 namespace sfem {
@@ -858,6 +910,8 @@ namespace codegen {
 template <typename s_t>
 static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
@@ -885,9 +939,9 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_isoparametric_me
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+#pragma omp for schedule(static)
+  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);
     s_t bcoordinates[ND * CELL_NS][VS];
     s_t badjugate_data[ND * ND][NQ * VS];
     s_t bdeterminant[NQ * VS];
@@ -1092,6 +1146,41 @@ static SFEM_INLINE int navier_stokes_tet10_tet4_jacobian_action_isoparametric_me
 } // namespace codegen
 } // namespace sfem
 
+extern "C" int navier_stokes_tet10_tet4_jacobian_action_i_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, element_begin, element_end, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, element_begin, element_end, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+}
+
 extern "C" int navier_stokes_tet10_tet4_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1113,14 +1202,20 @@ extern "C" int navier_stokes_tet10_tet4_jacobian_action_i_msoa(
     void *const RSTR p_out
 ) {
   switch (scalar_bytes) {
-    case (int)sizeof(double): {
-        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl<double>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-    }
-    case (int)sizeof(float): {
-        return sfem::codegen::navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl<float>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-    }
-    default:
+    case (int)sizeof(double):
+    case (int)sizeof(float):
       break;
+    default:
+      return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_i_msoa", -1, (int)scalar_bytes);
   }
-  return sfem::codegen::unsupported_dispatch("navier_stokes_tet10_tet4_jacobian_action_i_msoa", -1, (int)scalar_bytes);
+  int ret = SFEM_SUCCESS;
+#pragma omp parallel
+  {
+    const int err = navier_stokes_tet10_tet4_jacobian_action_i_msoa_team(scalar_bytes, nelements, 0, nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+      ret = err;
+    }
+  }
+  return ret;
 }

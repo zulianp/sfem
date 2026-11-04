@@ -611,23 +611,25 @@ namespace sfem {
     });
   }
 
-  int GeneratedNavierStokes::apply(const real_t *const /*state*/,
+  int GeneratedNavierStokes::team_apply(const Team &team,
+                      const real_t *const /*state*/,
                       const real_t *const direction,
-                      real_t *const out) {
-    SFEM_TRACE_SCOPE("GeneratedNavierStokes::apply");
+                      real_t *const out,
+                      const ElementScope scope) {
+    (void)team;
     if (!impl_->previous) {
       SFEM_ERROR("GeneratedNavierStokes requires a previous state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh();
+    const auto &mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
+        auto *const cache = static_cast<AffineGeometryCache *>(domain.user_data.get());
         if (!cache) {
           SFEM_ERROR("GeneratedNavierStokes affine jacobian action requires cached geometry\n");
           return SFEM_FAILURE;
@@ -658,9 +660,9 @@ namespace sfem {
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
           real_t *const RSTR p_out = out + 2;
         if (impl_->jacobian_action_uses_affine) {
-          return navier_stokes_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
+          return navier_stokes_jacobian_action_2d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
         }
-        return navier_stokes_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
+        return navier_stokes_jacobian_action_2d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[4], storage[5], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 4;
@@ -671,13 +673,31 @@ namespace sfem {
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
           real_t *const RSTR p_out = out + 3;
         if (impl_->jacobian_action_uses_affine) {
-          return navier_stokes_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
+          return navier_stokes_jacobian_action_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
         }
-        return navier_stokes_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
+        return navier_stokes_jacobian_action_3d_i_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[5], storage[6], FIELD_STRIDE, (const void *const *)u_old_data, p_old_data, FIELD_STRIDE, (const void *const *)u_direction_data, p_direction_data, FIELD_STRIDE, (void *const *)u_out, p_out);
       }
       SFEM_ERROR("navier_stokes jacobian_action does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
     });
+  }
+
+  int GeneratedNavierStokes::apply(const real_t *const x,
+                      const real_t *const h,
+                      real_t *const out) {
+    SFEM_TRACE_SCOPE("GeneratedNavierStokes::apply");
+    return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+      return team_apply(team, x, h, out, ElementScope::ALL);
+    });
+  }
+
+  bool GeneratedNavierStokes::team_supported() const {
+    return true;
+  }
+
+  int GeneratedNavierStokes::team_prepare() {
+    impl_->domains->prepare_views();
+    return SFEM_SUCCESS;
   }
 
   void GeneratedNavierStokes::set_field(const char *name,

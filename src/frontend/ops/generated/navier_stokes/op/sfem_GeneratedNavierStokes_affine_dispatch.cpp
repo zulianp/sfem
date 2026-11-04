@@ -231,6 +231,25 @@ extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa(
     void *const RSTR u_out[2],
     void *const RSTR p_out
 );
+extern "C" int navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2],
+    void *const RSTR p_out
+);
 extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -297,9 +316,100 @@ extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa(
     void *const RSTR u_out[3],
     void *const RSTR p_out
 );
+extern "C" int navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_form_2_p_u_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
 extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -380,9 +490,104 @@ extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa(
     void *const RSTR u_out[3],
     void *const RSTR p_out
 );
+extern "C" int navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
 extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[2],
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2]
+);
+extern "C" int navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -479,9 +684,119 @@ extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa(
     const ptrdiff_t out_stride,
     void *const RSTR u_out[3]
 );
+extern "C" int navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3]
+);
+extern "C" int navier_stokes_form_2_u_u_proteus_hex27_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3]
+);
+extern "C" int navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3]
+);
 extern "C" int navier_stokes_tri6_tri3_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[2],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[2],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[2],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_tri6_tri3_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -564,6 +879,99 @@ extern "C" int navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_a_msoa(
 extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_hex27_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t convection_scale,
+    const real_t dt,
+    const real_t nu,
+    const real_t rho,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u_old_data[3],
+    const void *const RSTR p_old_data,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR u_direction_data[3],
+    const void *const RSTR p_direction_data,
+    const ptrdiff_t out_stride,
+    void *const RSTR u_out[3],
+    void *const RSTR p_out
+);
+extern "C" int navier_stokes_tet10_tet4_jacobian_action_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t element_begin,
+    const ptrdiff_t element_end,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const RSTR g_adj0,
@@ -910,6 +1318,40 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
       "navier_stokes_form_2_p_u_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6:
+      return navier_stokes_form_2_p_u_tri6_tri3_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_p_u_jacobian_action_2d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -951,6 +1393,49 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_actio
       "navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return navier_stokes_form_2_p_u_hex27_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::PROTEUS_HEX27:
+      return navier_stokes_form_2_p_u_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::TET10:
+      return navier_stokes_form_2_p_u_tet10_tet4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_p_u_jacobian_action_3d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -981,6 +1466,40 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
   }
   return sfem::codegen::unsupported_dispatch(
       "navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6:
+      return navier_stokes_form_2_u_p_tri6_tri3_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_u_p_jacobian_action_2d_a_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa(
@@ -1024,6 +1543,49 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_actio
       "navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::PROTEUS_HEX27:
+      return navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::TET10:
+      return navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_u_p_jacobian_action_3d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -1058,6 +1620,44 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
   }
   return sfem::codegen::unsupported_dispatch(
       "navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t convection_scale,
+        const real_t dt,
+        const real_t nu,
+        const real_t rho,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u_old_data[2],
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[2],
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[2]
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6:
+      return navier_stokes_form_2_u_u_tri6_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_u_u_jacobian_action_2d_a_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa(
@@ -1105,6 +1705,53 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_actio
       "navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
 }
 
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t convection_scale,
+        const real_t dt,
+        const real_t nu,
+        const real_t rho,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u_old_data[3],
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[3],
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[3]
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return navier_stokes_form_2_u_u_hex27_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+    case smesh::PROTEUS_HEX27:
+      return navier_stokes_form_2_u_u_proteus_hex27_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+    case smesh::TET10:
+      return navier_stokes_form_2_u_u_tet10_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, direction_stride, u_direction_data, out_stride, u_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_form_2_u_u_jacobian_action_3d_a_msoa_team", (int)element_type, (int)real_type);
+}
+
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -1142,6 +1789,47 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_a_msoa
   }
   return sfem::codegen::unsupported_dispatch(
       "navier_stokes_jacobian_action_2d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_2d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t convection_scale,
+        const real_t dt,
+        const real_t nu,
+        const real_t rho,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u_old_data[2],
+        const void *const RSTR p_old_data,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[2],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[2],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::TRI6:
+      return navier_stokes_tri6_tri3_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_jacobian_action_2d_a_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_a_msoa(
@@ -1190,6 +1878,56 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_a_msoa
   }
   return sfem::codegen::unsupported_dispatch(
       "navier_stokes_jacobian_action_3d_a_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_jacobian_action_3d_a_msoa_team(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t element_begin,
+        const ptrdiff_t element_end,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t convection_scale,
+        const real_t dt,
+        const real_t nu,
+        const real_t rho,
+        const ptrdiff_t previous_stride,
+        const void *const RSTR u_old_data[3],
+        const void *const RSTR p_old_data,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR u_direction_data[3],
+        const void *const RSTR p_direction_data,
+        const ptrdiff_t out_stride,
+        void *const RSTR u_out[3],
+        void *const RSTR p_out
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return navier_stokes_hex27_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::PROTEUS_HEX27:
+      return navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    case smesh::TET10:
+      return navier_stokes_tet10_tet4_jacobian_action_a_msoa_team((int)resolved_real_type, nelements, element_begin, element_end, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, convection_scale, dt, nu, rho, previous_stride, u_old_data, p_old_data, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "navier_stokes_jacobian_action_3d_a_msoa_team", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int navier_stokes_residual_2d_a_msoa(
