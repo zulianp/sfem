@@ -1,5 +1,6 @@
 #include "sfem_operator_factory.hpp"
 
+#include "sfem_TeamOperator.hpp"
 #include "sfem_blas_factory.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -43,18 +44,19 @@ namespace sfem {
         }
 #endif  // SFEM_ENABLE_CUDA
 
-        return sfem::make_op<T>(
+        // Each thread its own rows, reading x only there.
+        const T *const d = diag->data();
+        return sfem::make_team_lambda_op<T>(
                 diag->size(),
                 diag->size(),
-                [=](const T *const x, T *const y) {
-                    auto d = diag->data();
-
-#pragma omp parallel for
-                    for (ptrdiff_t i = 0; i < (ptrdiff_t)diag->size(); ++i) {
+                false,
+                [diag, d](const Team &team, const T *const x, T *const y) {
+                    for (ptrdiff_t i = team.begin; i < team.end; ++i) {
                         y[i] = x[i] / d[i];
                     }
                 },
-                EXECUTION_SPACE_HOST);
+                {},
+                true);
     }
 
     real_t residual(Operator<real_t> &op, const real_t *const rhs, const real_t *const x, real_t *const r) {
