@@ -1,4 +1,5 @@
 #include "mass.hpp"
+#include "sfem_team.h"
 
 #include <assert.h>
 #include <math.h>
@@ -272,39 +273,34 @@ void apply_inv_lumped_mass(const int element_type,
     }
 }
 
-void apply_mass(const int element_type,
-                const ptrdiff_t nelements,
-                const ptrdiff_t nnodes,
-                idx_t **const SFEM_RESTRICT elems,
-                geom_t **const SFEM_RESTRICT xyz,
-                const ptrdiff_t stride_x,
-                const real_t *const x,
-                const ptrdiff_t stride_values,
-                real_t *const values) {
-    if (!nelements) return;
+template <bool TEAM>
+static int apply_mass_dispatch(const int                    element_type,
+                               const ptrdiff_t              nelements,
+                               const ptrdiff_t              nnodes,
+                               idx_t **const SFEM_RESTRICT  elems,
+                               geom_t **const SFEM_RESTRICT xyz,
+                               const ptrdiff_t              stride_x,
+                               const real_t *const          x,
+                               const ptrdiff_t              stride_values,
+                               real_t *const                values) {
+    if (!nelements) return SFEM_SUCCESS;
 
     switch (element_type) {
         case smesh::BEAM2:
         case smesh::EDGESHELL2: {
-            beam2_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
-            break;
+            return SFEM_TEAM_KERNEL(TEAM, beam2_apply_mass)(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
         }
         case smesh::TRI3: {
-            tri3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
-            break;
+            return SFEM_TEAM_KERNEL(TEAM, tri3_apply_mass)(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
         }
         case smesh::TRISHELL3: {
-            trishell3_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
-            break;
+            return SFEM_TEAM_KERNEL(TEAM, trishell3_apply_mass)(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
         }
         case smesh::QUADSHELL4: {
-            quadshell4_apply_mass(
-                    nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
-            break;
+            return SFEM_TEAM_KERNEL(TEAM, quadshell4_apply_mass)(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
         }
         case smesh::HEX8: {
-            hex8_apply_mass(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
-            break;
+            return SFEM_TEAM_KERNEL(TEAM, hex8_apply_mass)(nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
         }
             // case smesh::TRI6: {
             //         tri6_apply_mass(nelements, nnodes, elems, xyz, x, values);
@@ -326,4 +322,44 @@ void apply_mass(const int element_type,
                        sfem::type_to_string((smesh::ElemType)element_type));
         }
     }
+
+    return SFEM_FAILURE;
+}
+
+int apply_mass_supported(const int element_type) {
+    switch (element_type) {
+        case smesh::BEAM2:
+        case smesh::EDGESHELL2:
+        case smesh::TRI3:
+        case smesh::TRISHELL3:
+        case smesh::QUADSHELL4:
+        case smesh::HEX8:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+int apply_mass(const int                    element_type,
+               const ptrdiff_t              nelements,
+               const ptrdiff_t              nnodes,
+               idx_t **const SFEM_RESTRICT  elems,
+               geom_t **const SFEM_RESTRICT xyz,
+               const ptrdiff_t              stride_x,
+               const real_t *const          x,
+               const ptrdiff_t              stride_values,
+               real_t *const                values) {
+    return apply_mass_dispatch<false>(element_type, nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
+}
+
+int apply_mass_team(const int                    element_type,
+                    const ptrdiff_t              nelements,
+                    const ptrdiff_t              nnodes,
+                    idx_t **const SFEM_RESTRICT  elems,
+                    geom_t **const SFEM_RESTRICT xyz,
+                    const ptrdiff_t              stride_x,
+                    const real_t *const          x,
+                    const ptrdiff_t              stride_values,
+                    real_t *const                values) {
+    return apply_mass_dispatch<true>(element_type, nelements, nnodes, elems, xyz, stride_x, x, stride_values, values);
 }

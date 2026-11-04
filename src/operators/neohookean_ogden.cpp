@@ -2,6 +2,7 @@
 
 #include "hex8_neohookean_ogden.hpp"
 #include "sfem_defs.hpp"
+#include "sfem_team.h"
 #include "sshex8_neohookean_ogden.hpp"
 #include "tet10_neohookean_ogden.hpp"
 #include "tet4_neohookean_ogden.hpp"
@@ -117,7 +118,8 @@ int neohookean_ogden_value_aos(const smesh::ElemType               /*element_typ
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
+template <bool TEAM>
+static int neohookean_ogden_apply_aos_dispatch(const smesh::ElemType               element_type,
                                const ptrdiff_t                   nelements,
                                const ptrdiff_t                   nnodes,
                                idx_t **const SFEM_RESTRICT       elements,
@@ -135,7 +137,7 @@ int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
     }
     switch (element_type) {
         case smesh::TET4: {
-            return tet4_neohookean_ogden_apply(nelements,
+            return SFEM_TEAM_KERNEL(TEAM, tet4_neohookean_ogden_apply)(nelements,
                                                nnodes,
                                                elements,
                                                points,
@@ -160,6 +162,32 @@ int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
     }
 
     return SFEM_FAILURE;
+}
+
+int neohookean_ogden_apply_aos(const smesh::ElemType               element_type,
+                               const ptrdiff_t                   nelements,
+                               const ptrdiff_t                   nnodes,
+                               idx_t **const SFEM_RESTRICT       elements,
+                               geom_t **const SFEM_RESTRICT      points,
+                               const real_t                      mu,
+                               const real_t                      lambda,
+                               const real_t *const SFEM_RESTRICT u,
+                               const real_t *const SFEM_RESTRICT h,
+                               real_t *const SFEM_RESTRICT       values) {
+    return neohookean_ogden_apply_aos_dispatch<false>(element_type, nelements, nnodes, elements, points, mu, lambda, u, h, values);
+}
+
+int neohookean_ogden_apply_aos_team(const smesh::ElemType               element_type,
+                               const ptrdiff_t                   nelements,
+                               const ptrdiff_t                   nnodes,
+                               idx_t **const SFEM_RESTRICT       elements,
+                               geom_t **const SFEM_RESTRICT      points,
+                               const real_t                      mu,
+                               const real_t                      lambda,
+                               const real_t *const SFEM_RESTRICT u,
+                               const real_t *const SFEM_RESTRICT h,
+                               real_t *const SFEM_RESTRICT       values) {
+    return neohookean_ogden_apply_aos_dispatch<true>(element_type, nelements, nnodes, elements, points, mu, lambda, u, h, values);
 }
 
 int neohookean_ogden_gradient_aos(const smesh::ElemType               element_type,
@@ -396,7 +424,8 @@ int neohookean_ogden_hessian_partial_assembly(const smesh::ElemType             
     return SFEM_FAILURE;
 }
 
-int neohookean_ogden_partial_assembly_apply(const smesh::ElemType                        element_type,
+template <bool TEAM>
+static int neohookean_ogden_partial_assembly_apply_dispatch(const smesh::ElemType                        element_type,
                                             const ptrdiff_t                            nelements,
                                             const ptrdiff_t                            stride,
                                             idx_t **const SFEM_RESTRICT                elements,
@@ -411,7 +440,7 @@ int neohookean_ogden_partial_assembly_apply(const smesh::ElemType               
                                             real_t *const                              outz) {
     if (sfem::is_semistructured_type(element_type)) {
         const int level = smesh::semistructured_level(element_type);
-        return sshex8_neohookean_ogden_partial_assembly_apply(level,
+        return SFEM_TEAM_KERNEL(TEAM, sshex8_neohookean_ogden_partial_assembly_apply)(level,
                                                               nelements,
                                                               stride,
                                                               elements,
@@ -427,19 +456,108 @@ int neohookean_ogden_partial_assembly_apply(const smesh::ElemType               
     }
     switch (element_type) {
         case smesh::TET4: {
-            return tet4_neohookean_ogden_partial_assembly_apply(
+            return SFEM_TEAM_KERNEL(TEAM, tet4_neohookean_ogden_partial_assembly_apply)(
                     nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         case smesh::TET10: {
-            return tet10_neohookean_ogden_partial_assembly_apply(
+            return SFEM_TEAM_KERNEL(TEAM, tet10_neohookean_ogden_partial_assembly_apply)(
                     nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         case smesh::HEX8: {
-            return hex8_neohookean_ogden_partial_assembly_apply(
+            return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_partial_assembly_apply)(
                     nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
         }
         default: {
             SFEM_ERROR("neohookean_ogden_partial_assembly_apply not implemented for type %s\n", type_to_string(element_type));
+        }
+    }
+    return SFEM_FAILURE;
+}
+
+int neohookean_ogden_partial_assembly_apply(const smesh::ElemType                        element_type,
+                                            const ptrdiff_t                            nelements,
+                                            const ptrdiff_t                            stride,
+                                            idx_t **const SFEM_RESTRICT                elements,
+                                            const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                            const ptrdiff_t                            h_stride,
+                                            const real_t *const                        hx,
+                                            const real_t *const                        hy,
+                                            const real_t *const                        hz,
+                                            const ptrdiff_t                            out_stride,
+                                            real_t *const                              outx,
+                                            real_t *const                              outy,
+                                            real_t *const                              outz) {
+    return neohookean_ogden_partial_assembly_apply_dispatch<false>(element_type, nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+}
+
+int neohookean_ogden_partial_assembly_apply_team(const smesh::ElemType                        element_type,
+                                            const ptrdiff_t                            nelements,
+                                            const ptrdiff_t                            stride,
+                                            idx_t **const SFEM_RESTRICT                elements,
+                                            const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                            const ptrdiff_t                            h_stride,
+                                            const real_t *const                        hx,
+                                            const real_t *const                        hy,
+                                            const real_t *const                        hz,
+                                            const ptrdiff_t                            out_stride,
+                                            real_t *const                              outx,
+                                            real_t *const                              outy,
+                                            real_t *const                              outz) {
+    return neohookean_ogden_partial_assembly_apply_dispatch<true>(element_type, nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+}
+
+template <bool TEAM>
+static int neohookean_ogden_compressed_partial_assembly_apply_dispatch(const smesh::ElemType                     element_type,
+                                                       const ptrdiff_t                         nelements,
+                                                       const ptrdiff_t                         stride,
+                                                       idx_t **const SFEM_RESTRICT             elements,
+                                                       const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                       const scaling_t *const SFEM_RESTRICT    scaling,
+                                                       const ptrdiff_t                         h_stride,
+                                                       const real_t *const                     hx,
+                                                       const real_t *const                     hy,
+                                                       const real_t *const                     hz,
+                                                       const ptrdiff_t                         out_stride,
+                                                       real_t *const                           outx,
+                                                       real_t *const                           outy,
+                                                       real_t *const                           outz) {
+    if (sfem::is_semistructured_type(element_type)) {
+        const int level = smesh::semistructured_level(element_type);
+        if constexpr (TEAM) {
+            SFEM_ERROR("%s_team: no semi-structured kernel\n", "neohookean_ogden_compressed_partial_assembly_apply");
+            return SFEM_FAILURE;
+        }
+        return sshex8_neohookean_ogden_compressed_partial_assembly_apply(level,
+                                                                         nelements,
+                                                                         stride,
+                                                                         elements,
+                                                                         partial_assembly,
+                                                                         scaling,
+                                                                         h_stride,
+                                                                         hx,
+                                                                         hy,
+                                                                         hz,
+                                                                         out_stride,
+                                                                         outx,
+                                                                         outy,
+                                                                         outz);
+    }
+    switch (element_type) {
+        case smesh::TET4: {
+            return SFEM_TEAM_KERNEL(TEAM, tet4_neohookean_ogden_compressed_partial_assembly_apply)(
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
+        case smesh::TET10: {
+            return SFEM_TEAM_KERNEL(TEAM, tet10_neohookean_ogden_compressed_partial_assembly_apply)(
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
+        case smesh::HEX8: {
+            return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_compressed_partial_assembly_apply)(
+                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        }
+        default: {
+            SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n",
+                       type_to_string(element_type));
         }
     }
     return SFEM_FAILURE;
@@ -459,42 +577,24 @@ int neohookean_ogden_compressed_partial_assembly_apply(const smesh::ElemType    
                                                        real_t *const                           outx,
                                                        real_t *const                           outy,
                                                        real_t *const                           outz) {
-    if (sfem::is_semistructured_type(element_type)) {
-        const int level = smesh::semistructured_level(element_type);
-        return sshex8_neohookean_ogden_compressed_partial_assembly_apply(level,
-                                                                         nelements,
-                                                                         stride,
-                                                                         elements,
-                                                                         partial_assembly,
-                                                                         scaling,
-                                                                         h_stride,
-                                                                         hx,
-                                                                         hy,
-                                                                         hz,
-                                                                         out_stride,
-                                                                         outx,
-                                                                         outy,
-                                                                         outz);
-    }
-    switch (element_type) {
-        case smesh::TET4: {
-            return tet4_neohookean_ogden_compressed_partial_assembly_apply(
-                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        }
-        case smesh::TET10: {
-            return tet10_neohookean_ogden_compressed_partial_assembly_apply(
-                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        }
-        case smesh::HEX8: {
-            return hex8_neohookean_ogden_compressed_partial_assembly_apply(
-                    nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        }
-        default: {
-            SFEM_ERROR("neohookean_ogden_compressed_partial_assembly_apply not implemented for type %s\n",
-                       type_to_string(element_type));
-        }
-    }
-    return SFEM_FAILURE;
+    return neohookean_ogden_compressed_partial_assembly_apply_dispatch<false>(element_type, nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+}
+
+int neohookean_ogden_compressed_partial_assembly_apply_team(const smesh::ElemType                     element_type,
+                                                       const ptrdiff_t                         nelements,
+                                                       const ptrdiff_t                         stride,
+                                                       idx_t **const SFEM_RESTRICT             elements,
+                                                       const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                       const scaling_t *const SFEM_RESTRICT    scaling,
+                                                       const ptrdiff_t                         h_stride,
+                                                       const real_t *const                     hx,
+                                                       const real_t *const                     hy,
+                                                       const real_t *const                     hz,
+                                                       const ptrdiff_t                         out_stride,
+                                                       real_t *const                           outx,
+                                                       real_t *const                           outy,
+                                                       real_t *const                           outz) {
+    return neohookean_ogden_compressed_partial_assembly_apply_dispatch<true>(element_type, nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
 }
 
 int neohookean_ogden_objective_aos(const smesh::ElemType               element_type,

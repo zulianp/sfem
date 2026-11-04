@@ -23,6 +23,10 @@ namespace sfem {
         SharedBuffer<count_t>          n2e_ptr;
         SharedBuffer<element_idx_t>    n2e_idx;
         ptrdiff_t                      max_indicence;
+        /// The block's connectivity, the points and their number, taken by team_prepare for the team product.
+        BlockElements block_view;
+        geom_t      **points{nullptr};
+        ptrdiff_t     n_nodes{0};
 
 #if SFEM_PRINT_THROUGHPUT
         std::unique_ptr<OpTracer> op_profiler;
@@ -231,22 +235,48 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
-        auto block   = mesh->block(0);
-        auto n2e_ptr = impl_->n2e_ptr;
-        auto n2e_idx = impl_->n2e_idx;
+        return op_team_region(*this, n_dofs_image(), [&](const Team &) { return apply_patches(h, out); });
+    }
 
-        return tet4_patch_gradient(block->n_elements(),
-                                   block->elements()->data(),
-                                   mesh->n_nodes(),
-                                   impl_->max_indicence,
-                                   n2e_ptr->data(),
-                                   n2e_idx->data(),
-                                   mesh->points()->data(),
-                                   h,
-                                   3,
-                                   &out[0],
-                                   &out[1],
-                                   &out[2]);
+    int Gradient::team_prepare() {
+        auto mesh = impl_->space->mesh();
+        if (mesh->n_blocks() != 1) {
+            SFEM_ERROR("Gradient::apply: multi-block meshes are not implemented\n");
+            return SFEM_FAILURE;
+        }
+
+        impl_->block_view = block_elements(*mesh)[0];
+        impl_->points     = mesh->points()->data();
+        impl_->n_nodes    = mesh->n_nodes();
+        return SFEM_SUCCESS;
+    }
+
+    // The nodes' patches on one rank: OWNED_NOT_SHARED is every node, SHARED_AND_AURA none.
+    bool Gradient::team_supported() const { return !mesh_is_distributed(*impl_->space->mesh()); }
+
+    int Gradient::team_apply(const Team &team,
+                             const real_t *const /*x*/,
+                             const real_t *const h,
+                             real_t *const       out,
+                             const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_patches(h, out);
+    }
+
+    int Gradient::apply_patches(const real_t *const h, real_t *const out) {
+        return tet4_patch_gradient_team(impl_->block_view.n_elements,
+                                        impl_->block_view.elements,
+                                        impl_->n_nodes,
+                                        impl_->max_indicence,
+                                        impl_->n2e_ptr->data(),
+                                        impl_->n2e_idx->data(),
+                                        impl_->points,
+                                        h,
+                                        3,
+                                        &out[0],
+                                        &out[1],
+                                        &out[2]);
     }
 
     int Gradient::value(const real_t * /*x*/, real_t *const /*out*/) {

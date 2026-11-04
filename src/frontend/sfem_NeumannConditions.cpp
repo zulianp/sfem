@@ -246,6 +246,8 @@ namespace sfem {
     public:
         std::shared_ptr<FunctionSpace> space;
         std::vector<struct Condition>  conditions;
+        /// The mesh's points, taken by team_prepare for the follower pressures' team product.
+        geom_t **points{nullptr};
         ~Impl() {}
     };
 
@@ -854,50 +856,83 @@ namespace sfem {
         return err;
     }
 
-    int NeumannConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("NeumannConditions::apply");
-
-        auto space  = impl_->space;
-        auto mesh   = space->mesh();
-        auto points = mesh->points();
-        if (space->has_semi_structured_mesh()) points = space->mesh()->points();
+    // The follower pressures' surfaces: their types against the space, before any region.
+    int NeumannConditions::team_prepare() {
+        auto      space = impl_->space;
+        const int dim   = space->mesh()->spatial_dimension();
         for (const auto &c : impl_->conditions) {
             if (!c.follower_pressure) continue;
-            const int dim = mesh->spatial_dimension();
-            if (!x || space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
+            if (space->block_size() != dim || !is_supported_pressure_surface(c.element_type)) {
                 SFEM_ERROR("Follower pressure apply requires the current state and a supported oriented surface\n");
                 return SFEM_FAILURE;
             }
+
+            if (dim == 3 && c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4) {
+                SFEM_ERROR("Three-dimensional follower pressure requires TRI3 or QUAD4 surfaces\n");
+                return SFEM_FAILURE;
+            }
+
+            if (dim != 3 && (dim != 2 || (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2))) {
+                SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
+                return SFEM_FAILURE;
+            }
+        }
+
+        impl_->points = space->mesh()->points()->data();
+        return SFEM_SUCCESS;
+    }
+
+    int NeumannConditions::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeumannConditions::apply");
+
+        if (is_linear()) return SFEM_SUCCESS;
+        if (!x) {
+            SFEM_ERROR("Follower pressure apply requires the current state and a supported oriented surface\n");
+            return SFEM_FAILURE;
+        }
+
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &) { return apply_follower_pressure(x, h, out); });
+    }
+
+    // Surfaces on one rank: OWNED_NOT_SHARED is every surface element, SHARED_AND_AURA none.
+    bool NeumannConditions::team_supported() const { return !mesh_is_distributed(*impl_->space->mesh()); }
+
+    int NeumannConditions::team_apply(const Team &team,
+                                      const real_t *const x,
+                                      const real_t *const h,
+                                      real_t *const       out,
+                                      const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA || is_linear()) return SFEM_SUCCESS;
+        if (!x) return SFEM_FAILURE;
+        return apply_follower_pressure(x, h, out);
+    }
+
+    int NeumannConditions::apply_follower_pressure(const real_t *const x, const real_t *const h, real_t *const out) {
+        const geom_t *const *const points = impl_->points;
+        const int                  dim    = impl_->space->mesh()->spatial_dimension();
+        for (const auto &c : impl_->conditions) {
+            if (!c.follower_pressure) continue;
 
             const idx_t *const node0 = c.surface->data()[0];
             const idx_t *const node1 = c.surface->data()[1];
             const ptrdiff_t    n     = c.surface->extent(1);
 
             if (dim == 3) {
-                if (c.element_type != smesh::TRI3 && c.element_type != smesh::QUAD4) {
-                    SFEM_ERROR("Three-dimensional follower pressure requires TRI3 or QUAD4 surfaces\n");
-                    return SFEM_FAILURE;
-                }
-
                 const idx_t *const node2 = c.surface->data()[2];
                 const idx_t *const node3 = c.element_type == smesh::QUAD4 ? c.surface->data()[3] : nullptr;
                 const real_t       q     = c.value / real_t(6);
-#pragma omp parallel for
+#pragma omp for
                 for (ptrdiff_t e = 0; e < n; ++e) {
-                    pressure_triangle_apply(node0[e], node1[e], node2[e], points->data(), x, h, q, out);
-                    if (node3) pressure_triangle_apply(node0[e], node2[e], node3[e], points->data(), x, h, q, out);
+                    pressure_triangle_apply(node0[e], node1[e], node2[e], points, x, h, q, out);
+                    if (node3) pressure_triangle_apply(node0[e], node2[e], node3[e], points, x, h, q, out);
                 }
                 continue;
             }
 
-            if (dim != 2 || (c.element_type != smesh::EDGE2 && c.element_type != smesh::EDGESHELL2)) {
-                SFEM_ERROR("Two-dimensional follower pressure requires EDGE2 surfaces\n");
-                return SFEM_FAILURE;
-            }
-
             const real_t q = c.value * real_t(0.5);
 
-#pragma omp parallel for
+#pragma omp for
             for (ptrdiff_t e = 0; e < n; ++e) {
                 const idx_t i = node0[e];
                 const idx_t j = node1[e];

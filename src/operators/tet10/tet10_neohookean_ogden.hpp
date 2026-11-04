@@ -70,6 +70,19 @@ int tet10_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t             
                                                     const real_t *const SFEM_RESTRICT    uz,
                                                     metric_tensor_t *const SFEM_RESTRICT partial_assembly);
 
+int tet10_neohookean_ogden_partial_assembly_apply_team(const ptrdiff_t                            nelements,
+                                                  const ptrdiff_t                            stride,
+                                                  idx_t **const SFEM_RESTRICT                elements,
+                                                  const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                                  const ptrdiff_t                            h_stride,
+                                                  const real_t *const SFEM_RESTRICT          hx,
+                                                  const real_t *const SFEM_RESTRICT          hy,
+                                                  const real_t *const SFEM_RESTRICT          hz,
+                                                  const ptrdiff_t                            out_stride,
+                                                  real_t *const SFEM_RESTRICT                outx,
+                                                  real_t *const SFEM_RESTRICT                outy,
+                                                  real_t *const SFEM_RESTRICT                outz);
+
 int tet10_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                            nelements,
                                                   const ptrdiff_t                            stride,
                                                   idx_t **const SFEM_RESTRICT                elements,
@@ -82,6 +95,20 @@ int tet10_neohookean_ogden_partial_assembly_apply(const ptrdiff_t               
                                                   real_t *const SFEM_RESTRICT                outx,
                                                   real_t *const SFEM_RESTRICT                outy,
                                                   real_t *const SFEM_RESTRICT                outz);
+
+int tet10_neohookean_ogden_compressed_partial_assembly_apply_team(const ptrdiff_t                         nelements,
+                                                             const ptrdiff_t                         stride,
+                                                             idx_t **const SFEM_RESTRICT             elements,
+                                                             const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                             const scaling_t *const SFEM_RESTRICT    scaling,
+                                                             const ptrdiff_t                         h_stride,
+                                                             const real_t *const SFEM_RESTRICT       hx,
+                                                             const real_t *const SFEM_RESTRICT       hy,
+                                                             const real_t *const SFEM_RESTRICT       hz,
+                                                             const ptrdiff_t                         out_stride,
+                                                             real_t *const SFEM_RESTRICT             outx,
+                                                             real_t *const SFEM_RESTRICT             outy,
+                                                             real_t *const SFEM_RESTRICT             outz);
 
 int tet10_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
                                                              const ptrdiff_t                         stride,

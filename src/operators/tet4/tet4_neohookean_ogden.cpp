@@ -340,7 +340,7 @@ static void neohookean_gradient_ref(const real_t                      mu,
 }
 #endif
 
-int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
+int tet4_neohookean_ogden_apply_team(const ptrdiff_t              nelements,
                                 const ptrdiff_t              nnodes,
                                 idx_t **const SFEM_RESTRICT  elements,
                                 geom_t **const SFEM_RESTRICT points,
@@ -357,16 +357,14 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
                                 const ptrdiff_t              out_stride,
                                 real_t *const                outx,
                                 real_t *const                outy,
-                                real_t *const                outz)
-
-{
+                                real_t *const                outz) {
     SFEM_UNUSED(nnodes);
 
     const geom_t *const x = points[0];
     const geom_t *const y = points[1];
     const geom_t *const z = points[2];
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t    ev[4];
         scalar_t element_ux[4];
@@ -477,6 +475,38 @@ int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around tet4_neohookean_ogden_apply_team.
+int tet4_neohookean_ogden_apply(const ptrdiff_t              nelements,
+                                const ptrdiff_t              nnodes,
+                                idx_t **const SFEM_RESTRICT  elements,
+                                geom_t **const SFEM_RESTRICT points,
+                                const real_t                 mu,
+                                const real_t                 lambda,
+                                const ptrdiff_t              u_stride,
+                                const real_t *const          ux,
+                                const real_t *const          uy,
+                                const real_t *const          uz,
+                                const ptrdiff_t              h_stride,
+                                const real_t *const          hx,
+                                const real_t *const          hy,
+                                const real_t *const          hz,
+                                const ptrdiff_t              out_stride,
+                                real_t *const                outx,
+                                real_t *const                outy,
+                                real_t *const                outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tet4_neohookean_ogden_apply_team(nelements, nnodes, elements, points, mu, lambda, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int tet4_neohookean_ogden_gradient(const ptrdiff_t                   nelements,
                                    const ptrdiff_t                   nnodes,
@@ -834,7 +864,7 @@ int tet4_neohookean_ogden_hessian_partial_assembly(const ptrdiff_t              
 }
 
 // Apply partially assembled operator
-int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                            nelements,
+int tet4_neohookean_ogden_partial_assembly_apply_team(const ptrdiff_t                            nelements,
                                                          const ptrdiff_t                            stride,
                                                          idx_t **const SFEM_RESTRICT                elements,
                                                          const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
@@ -846,7 +876,7 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
                                                          real_t *const                              outx,
                                                          real_t *const                              outy,
                                                          real_t *const                              outz) {
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
 
@@ -897,8 +927,34 @@ int         tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t        
     return SFEM_SUCCESS;
 }
 
+// The plain entry point: one region around tet4_neohookean_ogden_partial_assembly_apply_team.
+int tet4_neohookean_ogden_partial_assembly_apply(const ptrdiff_t                            nelements,
+                                                         const ptrdiff_t                            stride,
+                                                         idx_t **const SFEM_RESTRICT                elements,
+                                                         const metric_tensor_t *const SFEM_RESTRICT partial_assembly,
+                                                         const ptrdiff_t                            h_stride,
+                                                         const real_t *const                        hx,
+                                                         const real_t *const                        hy,
+                                                         const real_t *const                        hz,
+                                                         const ptrdiff_t                            out_stride,
+                                                         real_t *const                              outx,
+                                                         real_t *const                              outy,
+                                                         real_t *const                              outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tet4_neohookean_ogden_partial_assembly_apply_team(nelements, stride, elements, partial_assembly, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
+
 // Apply partially assembled operator
-int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
+int tet4_neohookean_ogden_compressed_partial_assembly_apply_team(const ptrdiff_t                         nelements,
                                                                     const ptrdiff_t                         stride,
                                                                     idx_t **const SFEM_RESTRICT             elements,
                                                                     const compressed_t *const SFEM_RESTRICT partial_assembly,
@@ -911,7 +967,7 @@ int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
                                                                     real_t *const                           outx,
                                                                     real_t *const                           outy,
                                                                     real_t *const                           outz) {
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t ev[4];
 
@@ -967,3 +1023,30 @@ int         tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdif
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around tet4_neohookean_ogden_compressed_partial_assembly_apply_team.
+int tet4_neohookean_ogden_compressed_partial_assembly_apply(const ptrdiff_t                         nelements,
+                                                                    const ptrdiff_t                         stride,
+                                                                    idx_t **const SFEM_RESTRICT             elements,
+                                                                    const compressed_t *const SFEM_RESTRICT partial_assembly,
+                                                                    const scaling_t *const SFEM_RESTRICT    scaling,
+                                                                    const ptrdiff_t                         h_stride,
+                                                                    const real_t *const                     hx,
+                                                                    const real_t *const                     hy,
+                                                                    const real_t *const                     hz,
+                                                                    const ptrdiff_t                         out_stride,
+                                                                    real_t *const                           outx,
+                                                                    real_t *const                           outy,
+                                                                    real_t *const                           outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tet4_neohookean_ogden_compressed_partial_assembly_apply_team(nelements, stride, elements, partial_assembly, scaling, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+

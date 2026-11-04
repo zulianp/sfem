@@ -32,6 +32,21 @@ namespace sfem {
         int                 hessian_diag(const real_t *const, real_t *const out) override;
         int                 gradient(const real_t *const x, real_t *const out) override;
         int                 apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+
+        bool team_supported() const override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
+
+        /// out += A h over every block: by the threads of the caller's region (TEAM) or opening its own.
+        template <bool TEAM>
+        int apply_blocks(const real_t *const h, real_t *const out);
+        /// Outside any region: the blocks' connectivity and the level that apply_blocks reads.
+        int                        team_prepare() override;
+        std::vector<BlockElements> block_views;
+        int                        level{0};
         int                 value(const real_t *x, real_t *const out) override;
         int                 report(const real_t *const) override;
         std::shared_ptr<Op> clone() const override;

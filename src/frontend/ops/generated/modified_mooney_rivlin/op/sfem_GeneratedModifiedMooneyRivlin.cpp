@@ -736,15 +736,14 @@ namespace sfem {
       }
       team.barrier();
     }
-    auto mesh = impl_->space->mesh();
+    const auto &mesh = impl_->space->mesh();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
             if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
+        auto *const cache = static_cast<AffineGeometryCache *>(domain.user_data.get());
         if (!cache || !cache->jacobian_soa) {
           SFEM_ERROR("GeneratedModifiedMooneyRivlin affine hessian action requires cached geometry\n");
           return SFEM_FAILURE;
@@ -772,17 +771,17 @@ namespace sfem {
       else if (dim == 3) {
         if (impl_->apply_uses_affine || domain.element_type == smesh::TET4) {
           if (scope == ElementScope::ALL && impl_->space->has_packed_mesh()) {
-            auto packed = impl_->space->packed_mesh();
+            const auto &packed = impl_->space->packed_mesh();
             const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
             if (packed_block >= 0) {
-              auto packed_elements = packed->elements(packed_block);
-              auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
-              auto n_shared_nodes = packed->n_shared(packed_block);
-              auto ghost_ptr = packed->ghost_ptr(packed_block);
-              auto ghost_idx = packed->ghost_idx(packed_block);
-              auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
-              auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
-              auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+              const auto &packed_elements = packed->elements(packed_block);
+              const auto &owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+              const auto &n_shared_nodes = packed->n_shared(packed_block);
+              const auto &ghost_ptr = packed->ghost_ptr(packed_block);
+              const auto &ghost_idx = packed->ghost_idx(packed_block);
+              const auto &ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+              const auto &ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+              const auto &ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
               if (impl_->use_packed_two_pass) {
                 return modified_mooney_rivlin_apply_packed_two_pass_3d_a_msoa_team(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
               }
@@ -792,17 +791,17 @@ namespace sfem {
           return modified_mooney_rivlin_apply_3d_a_msoa_team(domain.element_type, real_type, domain.block->n_elements(), range.begin, range.end, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
         }
         if (scope == ElementScope::ALL && impl_->space->has_packed_mesh()) {
-          auto packed = impl_->space->packed_mesh();
+          const auto &packed = impl_->space->packed_mesh();
           const int packed_block = packed_block_id_for_domain(*packed, *domain.block);
           if (packed_block >= 0) {
-            auto packed_elements = packed->elements(packed_block);
-            auto owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
-            auto n_shared_nodes = packed->n_shared(packed_block);
-            auto ghost_ptr = packed->ghost_ptr(packed_block);
-            auto ghost_idx = packed->ghost_idx(packed_block);
-            auto ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
-            auto ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
-            auto ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
+            const auto &packed_elements = packed->elements(packed_block);
+            const auto &owned_nodes_ptr = packed->owned_nodes_ptr(packed_block);
+            const auto &n_shared_nodes = packed->n_shared(packed_block);
+            const auto &ghost_ptr = packed->ghost_ptr(packed_block);
+            const auto &ghost_idx = packed->ghost_idx(packed_block);
+            const auto &ghost_reduce_ptr = packed->ghost_reduce_ptr(packed_block);
+            const auto &ghost_reduce_idx = packed->ghost_reduce_idx(packed_block);
+            const auto &ghost_reduce_dest = packed->ghost_reduce_dest(packed_block);
             if (impl_->use_packed_two_pass) {
               return modified_mooney_rivlin_apply_packed_two_pass_3d_i_msoa_team(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), packed->n_ghost_entries(packed_block), packed->n_ghost_reduce_rows(packed_block), ghost_reduce_ptr->data(), ghost_reduce_idx->data(), ghost_reduce_dest->data(), impl_->packed_ghost_buf[packed_block]->data(), points, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
             }

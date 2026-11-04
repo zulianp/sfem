@@ -1,4 +1,5 @@
 #include "sfem_SemiStructuredEMLinearElasticity.hpp"
+#include "sfem_team.h"
 
 #include "sshex8_linear_elasticity.hpp"
 #include "sshex8_stencil_element_matrix_apply.hpp"
@@ -289,21 +290,17 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int SemiStructuredEMLinearElasticity::apply(const real_t *const, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::apply");
-
+    template <bool TEAM>
+    int SemiStructuredEMLinearElasticity::apply_blocks(const real_t *const h, real_t *const out) {
         assert(is_semistructured_type(element_type));
-        auto &ssm = *space->mesh();
 
-        double tick = smesh::time_seconds();
-        int    err  = SFEM_SUCCESS;
+        int err = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
             auto &matrix = element_matrices[b];
-            const auto block_id = static_cast<smesh::block_idx_t>(b);
             if (matrix) {
-                err = sshex8_stencil_element_matrix_apply3(smesh::semistructured_level(ssm),
-                                                           ssm.n_elements(block_id),
-                                                           ssm.elements(block_id)->data(),
+                err = SFEM_TEAM_KERNEL(TEAM, sshex8_stencil_element_matrix_apply3)(level,
+                                                           block_views[b].n_elements,
+                                                           block_views[b].elements,
                                                            matrix->data(),
                                                            3,
                                                            &h[0],
@@ -314,9 +311,9 @@ namespace sfem {
                                                            &out[1],
                                                            &out[2]);
             } else if (sstet4_stencils[b]) {
-                err = sstet4_linear_elasticity_apply_stencil_global_vectorized(sstet4_stencils[b].get(),
-                                                                               ssm.n_elements(block_id),
-                                                                               ssm.elements(block_id)->data(),
+                err = SFEM_TEAM_KERNEL(TEAM, sstet4_linear_elasticity_apply_stencil_global_vectorized)(sstet4_stencils[b].get(),
+                                                                               block_views[b].n_elements,
+                                                                               block_views[b].elements,
                                                                                h,
                                                                                out);
             } else {
@@ -326,11 +323,45 @@ namespace sfem {
                 return err;
             }
         }
+        return err;
+    }
 
+    int SemiStructuredEMLinearElasticity::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLinearElasticity::apply");
+
+        double tick = smesh::time_seconds();
+        int    err  = SFEM_SUCCESS;
+        if (team_supported()) {
+            err = op_team_region(*this, space->n_dofs(), [&](const Team &team) {
+                return team_apply(team, x, h, out, ElementScope::ALL);
+            });
+        } else {
+            err = team_prepare();
+            if (err == SFEM_SUCCESS) err = apply_blocks<false>(h, out);
+        }
         double tock = smesh::time_seconds();
         total_time += (tock - tick);
         calls++;
         return err;
+    }
+
+    int SemiStructuredEMLinearElasticity::team_prepare() {
+        block_views = block_elements(*space->mesh());
+        level       = smesh::semistructured_level(*space->mesh());
+        return SFEM_SUCCESS;
+    }
+
+    // A semi-structured mesh on one rank: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool SemiStructuredEMLinearElasticity::team_supported() const { return !mesh_is_distributed(*space->mesh()); }
+
+    int SemiStructuredEMLinearElasticity::team_apply(const Team &team,
+                       const real_t *const /*x*/,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_blocks<true>(h, out);
     }
 
     int SemiStructuredEMLinearElasticity::value(const real_t * /*x*/, real_t *const /*out*/) {

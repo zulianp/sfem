@@ -1,4 +1,5 @@
 #include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_team.h"
 
 // C includes
 #include "sshex8_laplacian.hpp"
@@ -190,14 +191,10 @@ namespace sfem {
         return SFEM_FAILURE;
     }
 
-    int SemiStructuredEMLaplacian::apply(const real_t *const /*x*/, const real_t *const h, real_t *const out) {
-        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::apply");
-
+    template <bool TEAM>
+    int SemiStructuredEMLaplacian::apply_blocks(const real_t *const h, real_t *const out) {
         assert(is_semistructured_type(element_type));  // REMOVEME once generalized approach
 
-        auto &ssm = *space->mesh();
-
-        double tick = smesh::time_seconds();
 
         int err = SFEM_SUCCESS;
         for (size_t b = 0; b < element_matrices.size(); ++b) {
@@ -206,19 +203,18 @@ namespace sfem {
                 continue;
             }
 
-            const auto block_id = static_cast<smesh::block_idx_t>(b);
             if (element_stencils[b]) {
-                err = sshex8_stencil_element_matrix_apply_hyteg(smesh::semistructured_level(ssm),
-                                                                ssm.n_elements(block_id),
-                                                                ssm.elements(block_id)->data(),
+                err = SFEM_TEAM_KERNEL(TEAM, sshex8_stencil_element_matrix_apply_hyteg)(level,
+                                                                block_views[b].n_elements,
+                                                                block_views[b].elements,
                                                                 matrix->data(),
                                                                 element_stencils[b]->data(),
                                                                 h,
                                                                 out);
             } else {
-                err = sshex8_stencil_element_matrix_apply(smesh::semistructured_level(ssm),
-                                                          ssm.n_elements(block_id),
-                                                          ssm.elements(block_id)->data(),
+                err = SFEM_TEAM_KERNEL(TEAM, sshex8_stencil_element_matrix_apply)(level,
+                                                          block_views[b].n_elements,
+                                                          block_views[b].elements,
                                                           matrix->data(),
                                                           h,
                                                           out);
@@ -227,11 +223,45 @@ namespace sfem {
                 return err;
             }
         }
+        return err;
+    }
 
+    int SemiStructuredEMLaplacian::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("SemiStructuredEMLaplacian::apply");
+
+        double tick = smesh::time_seconds();
+        int    err  = SFEM_SUCCESS;
+        if (team_supported()) {
+            err = op_team_region(*this, space->n_dofs(), [&](const Team &team) {
+                return team_apply(team, x, h, out, ElementScope::ALL);
+            });
+        } else {
+            err = team_prepare();
+            if (err == SFEM_SUCCESS) err = apply_blocks<false>(h, out);
+        }
         double tock = smesh::time_seconds();
         total_time += (tock - tick);
         calls++;
         return err;
+    }
+
+    int SemiStructuredEMLaplacian::team_prepare() {
+        block_views = block_elements(*space->mesh());
+        level       = smesh::semistructured_level(*space->mesh());
+        return SFEM_SUCCESS;
+    }
+
+    // A semi-structured mesh on one rank: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool SemiStructuredEMLaplacian::team_supported() const { return !mesh_is_distributed(*space->mesh()); }
+
+    int SemiStructuredEMLaplacian::team_apply(const Team &team,
+                       const real_t *const /*x*/,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_blocks<true>(h, out);
     }
 
     int SemiStructuredEMLaplacian::value(const real_t * /*x*/, real_t *const /*out*/) {

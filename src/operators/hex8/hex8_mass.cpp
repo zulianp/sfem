@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-int hex8_apply_mass(const ptrdiff_t                   nelements,
+int hex8_apply_mass_team(const ptrdiff_t                   nelements,
                     const ptrdiff_t                   /*nnodes*/,
                     idx_t **const SFEM_RESTRICT       elements,
                     geom_t **const SFEM_RESTRICT      points,
@@ -22,7 +22,7 @@ int hex8_apply_mass(const ptrdiff_t                   nelements,
     const scalar_t *qz   = q27_z;
     const scalar_t *qw   = q27_w;
 
-#pragma omp parallel for
+#pragma omp for
     for (ptrdiff_t i = 0; i < nelements; ++i) {
         idx_t         ev[8];
         accumulator_t element_vector[8] = {0};
@@ -56,6 +56,28 @@ int hex8_apply_mass(const ptrdiff_t                   nelements,
 
     return SFEM_SUCCESS;
 }
+
+// The plain entry point: one region around hex8_apply_mass_team.
+int hex8_apply_mass(const ptrdiff_t                   nelements,
+                    const ptrdiff_t                   nnodes,
+                    idx_t **const SFEM_RESTRICT       elements,
+                    geom_t **const SFEM_RESTRICT      points,
+                    const ptrdiff_t                   stride_u,
+                    const real_t *const SFEM_RESTRICT u,
+                    const ptrdiff_t                   stride_values,
+                    real_t *const SFEM_RESTRICT       values) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = hex8_apply_mass_team(nelements, nnodes, elements, points, stride_u, u, stride_values, values);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
+}
+
 
 int hex8_assemble_lumped_mass(const ptrdiff_t              nelements,
                               const ptrdiff_t              /*nnodes*/,

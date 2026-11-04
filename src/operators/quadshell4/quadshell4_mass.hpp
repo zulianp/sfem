@@ -8,7 +8,16 @@
 extern "C" {
 #endif
 
-void quadshell4_apply_mass(const ptrdiff_t nelements,
+int quadshell4_apply_mass_team(const ptrdiff_t nelements,
+                           const ptrdiff_t nnodes,
+                           idx_t **const SFEM_RESTRICT elements,
+                           geom_t **const SFEM_RESTRICT points,
+                           const ptrdiff_t stride_u,
+                           const real_t *const SFEM_RESTRICT u,
+                           const ptrdiff_t stride_values,
+                           real_t *const SFEM_RESTRICT values);
+
+int quadshell4_apply_mass(const ptrdiff_t nelements,
                            const ptrdiff_t nnodes,
                            idx_t **const SFEM_RESTRICT elements,
                            geom_t **const SFEM_RESTRICT points,

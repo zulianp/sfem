@@ -9,6 +9,7 @@
 #include "smesh_mesh.hpp"
 
 #include <cstddef>
+#include <vector>
 
 namespace sfem {
 
@@ -123,6 +124,22 @@ namespace sfem {
                        (long)mesh.n_blocks());
         }
         return element_range(mesh, *mesh.block(block_idx), scope);
+    }
+
+    /// A block's connectivity as raw pointers. Taken outside any region, it spares the threads of a
+    /// team body the shared reference counts that Mesh::block and Mesh::elements copy.
+    struct BlockElements {
+        ptrdiff_t n_elements{0};
+        idx_t   **elements{nullptr};
+    };
+
+    inline std::vector<BlockElements> block_elements(const smesh::Mesh &mesh) {
+        std::vector<BlockElements> ret(mesh.n_blocks());
+        for (size_t b = 0; b < ret.size(); ++b) {
+            auto block = mesh.block(static_cast<smesh::block_idx_t>(b));
+            ret[b]     = {block->n_elements(), block->elements()->data()};
+        }
+        return ret;
     }
 
 }  // namespace sfem

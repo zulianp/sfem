@@ -59,7 +59,7 @@ inline static void grad(const real_t                xp,
                  up * (-x20 * x27 + x22 * x26));
 }
 
-int         tet4_patch_gradient(const ptrdiff_t                                        /*nelements*/,
+int         tet4_patch_gradient_team(const ptrdiff_t                                        /*nelements*/,
                                 const idx_t* const SFEM_RESTRICT* const SFEM_RESTRICT  elements,
                                 const ptrdiff_t                                        nnodes,
                                 const ptrdiff_t                                        max_indicence,
@@ -71,7 +71,6 @@ int         tet4_patch_gradient(const ptrdiff_t                                 
                                 real_t* const SFEM_RESTRICT                            outx,
                                 real_t* const SFEM_RESTRICT                            outy,
                                 real_t* const SFEM_RESTRICT                            outz) {
-#pragma omp parallel
     {
         real_t* arena = (real_t *)malloc(sizeof(real_t) * max_indicence * 15);
 
@@ -176,4 +175,30 @@ int         tet4_patch_gradient(const ptrdiff_t                                 
     }
 
     return SFEM_SUCCESS;
+}
+
+// The plain entry point: one region around tet4_patch_gradient_team.
+int tet4_patch_gradient(const ptrdiff_t                                        nelements,
+                        const idx_t* const SFEM_RESTRICT* const SFEM_RESTRICT  elements,
+                        const ptrdiff_t                                        nnodes,
+                        const ptrdiff_t                                        max_indicence,
+                        const count_t* const SFEM_RESTRICT                     n2e_ptr,
+                        const element_idx_t* const SFEM_RESTRICT               n2e_idx,
+                        const geom_t* const SFEM_RESTRICT* const SFEM_RESTRICT points,
+                        const real_t* const SFEM_RESTRICT                      in,
+                        const ptrdiff_t                                        out_stride,
+                        real_t* const SFEM_RESTRICT                            outx,
+                        real_t* const SFEM_RESTRICT                            outy,
+                        real_t* const SFEM_RESTRICT                            outz) {
+    int ret = SFEM_SUCCESS;
+#pragma omp parallel
+    {
+        const int err = tet4_patch_gradient_team(
+                nelements, elements, nnodes, max_indicence, n2e_ptr, n2e_idx, points, in, out_stride, outx, outy, outz);
+        if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+            ret = err;
+        }
+    }
+    return ret;
 }

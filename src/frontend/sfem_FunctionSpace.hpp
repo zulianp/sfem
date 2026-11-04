@@ -62,7 +62,7 @@ namespace sfem {
          * nodes and says nothing about it.
          */
         SharedBuffer<idx_t> packed_node_map() const;
-        std::shared_ptr<PackedMesh> packed_mesh();
+        const std::shared_ptr<PackedMesh> &packed_mesh();
 
         SharedBuffer<geom_t *> points();
 
