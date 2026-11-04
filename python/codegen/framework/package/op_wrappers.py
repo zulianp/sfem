@@ -637,6 +637,36 @@ _TEAM_RANGE_ARGUMENTS = ("range.begin", "range.end")
 _TEAM_PACKED_GUARD = "scope == ElementScope::ALL && "
 
 
+def _bind_team_views(source, op):
+    """The team bodies of `op` (`team_apply`, `team_inexact_apply`) bind what they read by
+    reference: every thread of the region runs them, and a copied shared pointer or buffer is
+    a reference count all of them contend on (+25 us per product measured on a 1 ms operator).
+    The plain bodies run on one thread and keep their copies."""
+    for method in ("team_apply", "team_inexact_apply"):
+        start = source.find("  int %s::%s(" % (op, method))
+        if start < 0:
+            continue
+        end = source.index("\n  }\n", start)
+        body = source[start:end]
+        body = re.sub(
+            r"\bauto (\w+) = impl_->space->(mesh|packed_mesh)\(\);",
+            r"const auto &\1 = impl_->space->\2();",
+            body,
+        )
+        body = re.sub(
+            r"\bauto (\w+) = packed->(\w+)\(packed_block\);",
+            r"const auto &\1 = packed->\2(packed_block);",
+            body,
+        )
+        body = re.sub(
+            r"\bauto (\w+) = std::static_pointer_cast<([\w:]+)>\(\s*domain\.user_data\);",
+            r"auto *const \1 = static_cast<\2 *>(domain.user_data.get());",
+            body,
+        )
+        source = source[:start] + body + source[end:]
+    return source
+
+
 def _team_product(plain, team, what):
     """Whether an operator's product is published for a team: its body with the `_team`
     twins (`team`) against the plain one.  The twins are found by name, and a missing name
@@ -2477,7 +2507,7 @@ namespace sfem {
             publishes_inexact=bool(_inexact_units(kernel_sources)),
             team=team,
         ),
-        source,
+        _bind_team_views(source, _op_class_name(material)),
     )
 
 
@@ -4002,7 +4032,8 @@ namespace sfem {
     return _header(material, True, publishes_value_steps=emits_linear_work,
                    node_wise=not emits_linear_work, state_independent=emits_linear_work,
                    linear=_tangent_is_constant(form_collections),
-                   publishes_inexact=bool(_inexact_units(kernel_sources)), team=team), source
+                   publishes_inexact=bool(_inexact_units(kernel_sources)), team=team), \
+        _bind_team_views(source, _op_class_name(material))
 
 
 _GRAPH_ROWS = {

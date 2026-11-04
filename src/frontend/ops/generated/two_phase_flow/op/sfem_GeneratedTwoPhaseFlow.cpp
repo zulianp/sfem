@@ -698,7 +698,7 @@ namespace sfem {
       SFEM_ERROR("GeneratedTwoPhaseFlow requires a current state\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh();
+    const auto &mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -706,8 +706,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
+        auto *const cache = static_cast<AffineGeometryCache *>(domain.user_data.get());
         if (!cache) {
           SFEM_ERROR("GeneratedTwoPhaseFlow affine jacobian action requires cached geometry\n");
           return SFEM_FAILURE;

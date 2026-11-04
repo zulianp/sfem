@@ -638,15 +638,14 @@ namespace sfem {
                       const ElementScope scope) {
     (void)team;
 
-    auto mesh = impl_->space->mesh();
+    const auto &mesh = impl_->space->mesh();
     auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const ElementRange range = element_range(*mesh, *domain.block, scope);
       const geom_t *determinant = nullptr;
       if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
-        auto cache = std::static_pointer_cast<AffineGeometryCache>(
-            domain.user_data);
+        auto *const cache = static_cast<AffineGeometryCache *>(domain.user_data.get());
         if (!cache) {
           SFEM_ERROR("GeneratedVectorMass affine jacobian action requires cached geometry\n");
           return SFEM_FAILURE;
