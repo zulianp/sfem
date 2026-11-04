@@ -988,17 +988,10 @@ NB_MODULE(pysfem, m) {
 
     m.def("assemble_csr",
           [](const std::shared_ptr<Function> &fun) -> nb::tuple {
-              auto        space      = fun->space();
-              auto        node_graph = space->node_to_node_graph();
-              const int   bs         = space->block_size();
-              const auto  nnz_nodes  = node_graph->nnz();
-              auto        values     = sfem::create_host_buffer<real_t>(nnz_nodes * bs * bs);
-              std::memset(values->data(), 0, (size_t)values->size() * sizeof(real_t));
-              if (fun->hessian_crs(nullptr, node_graph->rowptr()->data(), node_graph->colidx()->data(), values->data()) !=
-                  SFEM_SUCCESS) {
+              auto crs = sfem::hessian_crs(fun, nullptr, sfem::EXECUTION_SPACE_HOST);
+              if (!crs) {
                   throw std::runtime_error("assemble_csr: hessian_crs failed");
               }
-              auto crs = sfem::node_block_crs_to_scalar_crs(node_graph, bs, values);
 
               auto copy_buf = [](const auto &buf) {
                   using T          = std::remove_pointer_t<decltype(buf->data())>;

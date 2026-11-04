@@ -1,6 +1,7 @@
 #ifndef SFEM_CRS_SPMV_HPP
 #define SFEM_CRS_SPMV_HPP
 
+#include <cassert>
 #include <cstddef>
 #include <limits>
 #include <memory>
@@ -11,6 +12,7 @@
 #endif
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_TeamOperator.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_types.hpp"
 
@@ -340,8 +342,10 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    /// y = A x + scale_output y on the rows [row_begin, row_end) (a team's share).
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    void crs_mv(const ptrdiff_t                     rows,
+    void crs_mv(const ptrdiff_t                     row_begin,
+                const ptrdiff_t                     row_end,
                 const R* const SFEM_RESTRICT        rowptr,
                 const C* const SFEM_RESTRICT        colidx,
                 const TStorage* const SFEM_RESTRICT values,
@@ -349,8 +353,7 @@ namespace sfem {
                 T* const SFEM_RESTRICT              y,
                 const T                             scale_output) {
         if (scale_output == 0) {
-#pragma omp parallel for  // nowait
-            for (ptrdiff_t i = 0; i < rows; i++) {
+            for (ptrdiff_t i = row_begin; i < row_end; i++) {
                 const R row_begin = rowptr[i];
                 const R row_end   = rowptr[i + 1];
 
@@ -366,8 +369,7 @@ namespace sfem {
             }
         } else if (scale_output == 1) {
             // 20-27% faster on M1
-#pragma omp parallel for  // nowait
-            for (ptrdiff_t i = 0; i < rows; i++) {
+            for (ptrdiff_t i = row_begin; i < row_end; i++) {
                 const R row_begin = rowptr[i];
                 const R extent    = rowptr[i + 1] - row_begin;
 
@@ -404,8 +406,7 @@ namespace sfem {
                 y[i] = val;
             }
         } else {
-#pragma omp parallel for  // nowait
-            for (ptrdiff_t i = 0; i < rows; i++) {
+            for (ptrdiff_t i = row_begin; i < row_end; i++) {
                 const R row_begin = rowptr[i];
                 const R row_end   = rowptr[i + 1];
 
@@ -422,9 +423,11 @@ namespace sfem {
         }
     }
 
+    /// On the host a team operator (sfem_TeamOperator.hpp): each thread its share of the rows.
     template <typename R, typename C, typename TStorage, typename T = TStorage>
-    class CRS : public Operator<T> {
+    class CRS : public Operator<T>, public TeamOperator<T> {
     public:
+        /// The device product (sfem_crs_spmv_cuda.cpp).
         std::function<void(const T* const, T* const)> apply_;
 
         std::shared_ptr<CRS<R, C, TStorage, T>> transpose() const {
@@ -442,18 +445,9 @@ namespace sfem {
 
             crs_transpose(cols_, row_ptr, col_idx, values, ret->row_ptr, ret->col_idx, ret->values);
 
-            const ptrdiff_t ret_rows        = cols_;
             ret->cols_                      = rows();
             ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
             ret->execution_space_           = EXECUTION_SPACE_HOST;
-
-            ret->apply_ = [=](const T* const x, T* const y) {
-                auto rowptr_ = ret->row_ptr->data();
-                auto colidx_ = ret->col_idx->data();
-                auto values_ = ret->values->data();
-
-                crs_mv(ret_rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
-            };
 
             return ret;
         }
@@ -482,27 +476,26 @@ namespace sfem {
                    ret->col_idx,
                    ret->values);
 
-            const ptrdiff_t ret_rows        = rows();
             ret->cols_                      = other->cols_;
             ret->uniform_pre_output_scaling = 0;
             ret->execution_space_           = EXECUTION_SPACE_HOST;
-
-            ret->apply_ = [=](const T* const x, T* const y) {
-                auto rowptr_ = ret->row_ptr->data();
-                auto colidx_ = ret->col_idx->data();
-                auto values_ = ret->values->data();
-
-                crs_mv(ret_rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
-            };
 
             return ret;
         }
 
         int apply(const T* const x, T* const y) override {
             SFEM_TRACE_SCOPE("CRS::apply");
+            if (execution_space_ == EXECUTION_SPACE_HOST) return team_region_apply<T>(*this, x, y);
             apply_(x, y);
             return 0;
         }
+
+        Team team() const override { return Team::current(rows()); }
+        void team_apply(const Team& team, const T* const x, T* const y) const override {
+            crs_mv(team.begin, team.end, row_ptr->data(), col_idx->data(), values->data(), x, y, uniform_pre_output_scaling);
+        }
+        bool team_capable() const override { return execution_space_ == EXECUTION_SPACE_HOST; }
+
         std::ptrdiff_t rows() const override { return row_ptr->size() - 1; }
         std::ptrdiff_t cols() const override { return cols_; }
 
@@ -557,6 +550,8 @@ namespace sfem {
                                                        const SharedBuffer<C>&        colidx,
                                                        const SharedBuffer<TStorage>& values,
                                                        const T                       uniform_pre_output_scaling) {
+        SFEM_UNUSED(rows);
+        assert(rows + 1 == ptrdiff_t(rowptr->size()));
         auto ret                        = std::make_shared<CRS<R, C, TStorage, T>>();
         ret->row_ptr                    = rowptr;
         ret->col_idx                    = colidx;
@@ -565,15 +560,6 @@ namespace sfem {
         ret->uniform_pre_output_scaling = uniform_pre_output_scaling;
 
         ret->execution_space_ = EXECUTION_SPACE_HOST;
-
-        ret->apply_ = [=](const T* const x, T* const y) {
-            auto rowptr_ = ret->row_ptr->data();
-            auto colidx_ = ret->col_idx->data();
-            auto values_ = ret->values->data();
-
-            crs_mv(rows, rowptr_, colidx_, values_, x, y, ret->uniform_pre_output_scaling);
-        };
-
         return ret;
     }
 
