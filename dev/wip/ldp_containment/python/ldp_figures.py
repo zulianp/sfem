@@ -1361,8 +1361,15 @@ def figure_prony_torsion(series):
               ("int8_md", "LdpD, densely dashed", "int8 a.+d.")]
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
-           r"\begin{axis}[width=\columnwidth, height=5.2cm, ymode=log, xmin=0, xmax=1, ymin=1e-11, ymax=1e3,",
-           r"  xlabel={$t$ (\si{\second})}, ylabel={$e_u$ (\%)}, xmajorgrids, ymajorgrids,",
+           r"\begin{axis}[width=\columnwidth, height=6.2cm, ymode=log, xmin=0, xmax=1, ymin=1e-11, ymax=1e3,",
+           r"  xlabel={$t$ (\si{\second})}, ylabel={$e_u$ (\%)},",
+           # A labelled tick every second decade, a light grid line at the others and between the
+           # time ticks: fourteen decades are otherwise three labels.
+           r"  ytickten={-10,-8,...,2}, minor ytick={1e-11,1e-9,1e-7,1e-5,1e-3,1e-1,1e1,1e3},",
+           r"  xtick distance=0.2, minor x tick num=1,",
+           r"  xmajorgrids, ymajorgrids, xminorgrids, yminorgrids,",
+           r"  major grid style={draw=gray!60, line width=0.3pt},",
+           r"  minor grid style={draw=gray!40, line width=0.2pt, opacity=0.5},",
            r"  tick label style={font=\scriptsize}, label style={font=\footnotesize},",
            r"  legend style={font=\tiny, at={(0.5,1.02)}, anchor=south, legend columns=4, draw=none}]"]
     for run, style, label in styles:
