@@ -96,6 +96,11 @@ namespace sfem {
     /// committed. Prints which g and tau each k is. Every block must hold the same series.
     std::shared_ptr<Probe> create_prony_probe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm);
 
+    /// The memory of the run, summed over the ranks: the peak resident set of the host process
+    /// (host_peak_rss) and, with CUDA, the largest device memory in use seen at a sample
+    /// (device_used_peak; total minus free, so anything else on the device counts too). Bytes.
+    std::shared_ptr<Probe> create_memory_probe(const std::shared_ptr<Communicator> &comm);
+
     /// The same probe with its columns prefixed by `name` and an underscore, so that several of a
     /// kind can share one history.
     std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe);

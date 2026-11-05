@@ -271,8 +271,12 @@ namespace sfem {
         }
     }
 
-    std::size_t PronyRelaxation::bytes() const {
-        return (H_ ? H_->bytes() : 0) + (D_ ? D_->bytes() : 0) + history_->size() * sizeof(real_t);
-    }
+    std::size_t PronyRelaxation::bytes() const { return history_bytes() + increment_bytes() + frozen_bytes(); }
+
+    std::size_t PronyRelaxation::history_bytes() const { return H_ ? H_->bytes() : 0; }
+
+    std::size_t PronyRelaxation::increment_bytes() const { return D_ ? D_->bytes() : 0; }
+
+    std::size_t PronyRelaxation::frozen_bytes() const { return history_->size() * sizeof(real_t); }
 
 }  // namespace sfem

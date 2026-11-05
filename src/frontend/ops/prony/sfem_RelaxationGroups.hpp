@@ -131,6 +131,16 @@ namespace sfem {
         /// Persistent bytes: the history and the stress slots.
         std::size_t bytes() const;
 
+        /// The persistent bytes by what holds them, summed over blocks and groups.
+        struct Bytes {
+            std::size_t history{0};    ///< the stored terms H_i, scales included
+            std::size_t increment{0};  ///< the shared increment D of the completely relaxed terms
+            std::size_t frozen{0};     ///< the frozen history the kernels read
+            std::size_t stress{0};     ///< the two relaxed-stress slots
+            std::size_t total() const { return history + increment + frozen + stress; }
+        };
+        Bytes bytes_breakdown() const;
+
 #ifdef SFEM_ENABLE_RYAML
         /// Read the `relaxation` entry of `node` into `block` ("" for every block).
         void configure_from_yaml(const std::string &block, const ryml::ConstNodeRef &node);

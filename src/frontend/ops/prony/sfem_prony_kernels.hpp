@@ -5,6 +5,7 @@
 #include <cstddef>
 
 #include "sfem_HistoryStorage.hpp"
+#include "sfem_prony_diagnostics.hpp"
 
 // Pointwise host loops of the Prony infrastructure.
 //
@@ -177,6 +178,7 @@ namespace sfem {
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                SFEM_PRONY_COUNTERS;
 
                 for (int i = 0; i < n_terms; i++) {
                     typename HCodec::storage_t *const h_i  = &H[i * rows * n];
@@ -215,11 +217,14 @@ namespace sfem {
                         const real_t *const               sp = &S_n[r * n + e0];
                         const real_t *const               sn = &S_new[r * n + e0];
                         for (ptrdiff_t l = 0; l < nb; l++) {
+                            SFEM_PRONY_DIAGNOSTIC(const real_t before = HCodec::decode(h[l], old_scale[l]));
                             const real_t v = a * HCodec::decode(h[l], old_scale[l]) + bi * (sn[l] - sp[l]);
                             h[l]           = HCodec::encode(v, inv[l]);
+                            SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], hs_i[l]));
                         }
                     }
                 }
+                SFEM_PRONY_COMMIT_COUNTS;
             }
         }
 

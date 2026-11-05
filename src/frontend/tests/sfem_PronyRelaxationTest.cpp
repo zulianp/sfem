@@ -189,6 +189,27 @@ int test_completely_relaxed_terms_are_not_stored() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_bytes_by_part() {
+    // Two terms still relaxing and one held as a coefficient on the shared
+    // increment D: H holds two tensors, D one, the frozen history one in real_t.
+    const sfem::PronySeries fast({real_t(0.3), real_t(0.25), real_t(0.15)}, {real_t(1e-3), real_t(1), real_t(10)});
+    std::vector<real_t>     grid{0};
+    while (grid.back() < 5) grid.push_back(grid.back() + 1);
+
+    sfem::PronyRelaxation::Options options;
+    options.history_storage = sfem::HistoryStorage::INT8_SCALED;
+    sfem::PronyRelaxation relaxation(fast, N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    drive(relaxation, grid, 20);
+    SFEM_TEST_ASSERT(relaxation.n_stored_terms() == 2);
+
+    const size_t tensor = size_t(N_ENTRIES) * sfem::bytes_per_value(options.history_storage) + size_t(N_ELEMENTS) * sizeof(scaling_t);
+    SFEM_TEST_ASSERT(relaxation.history_bytes() == 2 * tensor);
+    SFEM_TEST_ASSERT(relaxation.increment_bytes() == tensor);
+    SFEM_TEST_ASSERT(relaxation.frozen_bytes() == size_t(N_ENTRIES) * sizeof(real_t));
+    SFEM_TEST_ASSERT(relaxation.bytes() == 3 * tensor + size_t(N_ENTRIES) * sizeof(real_t));
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_midpoint_is_second_order() {
     // On a smooth history (a ramp that never ends) the midpoint recursion
     // converges at second order.
@@ -368,6 +389,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_linear_interpolation_is_exact_for_a_ramp);
     SFEM_RUN_TEST(test_variable_steps_stay_exact);
     SFEM_RUN_TEST(test_completely_relaxed_terms_are_not_stored);
+    SFEM_RUN_TEST(test_bytes_by_part);
     SFEM_RUN_TEST(test_midpoint_is_second_order);
     SFEM_RUN_TEST(test_wlf_shifts_time_and_nothing_else);
     SFEM_RUN_TEST(test_every_codec_round_trips_within_its_bound);

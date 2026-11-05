@@ -327,7 +327,8 @@ Probes, each with a `type` and an optional `name` that prefixes its columns:
 | `control_point` | `at: [x, y, z]` (the nearest node), `rates` (default `true` in `dynamic`) | `ux, uy, uz`, and `vx..vz, ax..az` with rates |
 | `torque` | `constraint` (index into `constraints`, default 0) | `angle, released, torque` |
 | `contact` | | `reaction_x, reaction_y, reaction_z, touched` (with an obstacle) |
-| `prony` | | `<group>_gamma`, `<group>_H<k>` (with a Prony material) |
+| `prony` | | `<group>_gamma`, `<group>_H<k>`, `<group>_stored` (terms holding a tensor), `bytes_history, bytes_increment, bytes_frozen, bytes_stress` (persistent bytes over all ranks; with a Prony material); `updates, updates_lost` when built with `SFEM_ENABLE_PRONY_DIAGNOSTICS` (history values `advance` meant to change, and those the storage format rounded away; cumulative, host only) |
+| `memory` | | `host_peak_rss, device_used_peak` (bytes over all ranks; the device's total minus free) |
 
 See [outputs](outputs.md) for the files.
 
