@@ -40,9 +40,6 @@ namespace sfem {
         scales_ = create_buffer<scaling_t>(n_tensors * n_elements, es);
 
         if (is_mean_deviation(storage)) {
-            if (es != EXECUTION_SPACE_HOST) {
-                SFEM_ERROR("QuadratureState: %s is host only for now\n", to_string(storage));
-            }
             if (n_components > 9) {
                 SFEM_ERROR("QuadratureState: %s holds at most 9 components, not %d\n", to_string(storage), n_components);
             }
@@ -78,7 +75,8 @@ namespace sfem {
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_zero(data_->size(), data_->data(), scales_->size(), scales_->data(), stream) != SFEM_SUCCESS) {
+            if (cu_prony_zero(data_->size(), data_->data(), scales_->size(), scales_->data(), stream) != SFEM_SUCCESS ||
+                (means_ && cu_prony_zero(means_->size() * sizeof(history_mean_t), means_->data(), 0, nullptr, stream) != SFEM_SUCCESS)) {
                 SFEM_ERROR("QuadratureState::zero failed on the device\n");
             }
             return;
@@ -99,7 +97,12 @@ namespace sfem {
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_zero(tensor_bytes, data, n_elements_, s, stream) != SFEM_SUCCESS) {
+            if (cu_prony_zero(tensor_bytes, data, n_elements_, s, stream) != SFEM_SUCCESS ||
+                (means_ && cu_prony_zero(n_components_ * n_groups_ * sizeof(history_mean_t),
+                                         means_view().tensor(t, values_per_tensor()),
+                                         0,
+                                         nullptr,
+                                         stream) != SFEM_SUCCESS)) {
                 SFEM_ERROR("QuadratureState::zero_tensor failed on the device\n");
             }
             return;
@@ -124,7 +127,14 @@ namespace sfem {
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_copy(tensor_bytes, src_data, dst_data, n_elements_, src_scales, dst_scales, stream) != SFEM_SUCCESS) {
+            if (cu_prony_copy(tensor_bytes, src_data, dst_data, n_elements_, src_scales, dst_scales, stream) != SFEM_SUCCESS ||
+                (means_ && cu_prony_copy(n_components_ * n_groups_ * sizeof(history_mean_t),
+                                         src.means_view().tensor(from, values_per_tensor()),
+                                         means_view().tensor(to, values_per_tensor()),
+                                         0,
+                                         nullptr,
+                                         nullptr,
+                                         stream) != SFEM_SUCCESS)) {
                 SFEM_ERROR("QuadratureState::copy_tensor failed on the device\n");
             }
             return;
@@ -146,7 +156,9 @@ namespace sfem {
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_scale(storage_, values_per_tensor(), n_elements_, factor, data, s, stream) != SFEM_SUCCESS) {
+            prony::Means m = means_view();
+            m.data         = means_ ? m.tensor(t, values_per_tensor()) : nullptr;
+            if (cu_prony_scale(storage_, values_per_tensor(), n_elements_, factor, data, s, m, stream) != SFEM_SUCCESS) {
                 SFEM_ERROR("QuadratureState::scale_tensor failed on the device\n");
             }
             return;
@@ -183,8 +195,11 @@ namespace sfem {
         const scaling_t *s            = scales_->data() + t * n_elements_;
         // On the device the encoded tensor and its scales come to the host, which decodes them
         // as it does its own.
-        std::vector<uint8_t>   host_data;
-        std::vector<scaling_t> host_scales;
+        prony::Means m = means_view();
+        m.data         = means_ ? m.tensor(t, values_per_tensor()) : nullptr;
+        std::vector<uint8_t>        host_data;
+        std::vector<scaling_t>      host_scales;
+        std::vector<history_mean_t> host_means;
         if (es_ != EXECUTION_SPACE_HOST) {
 #ifdef SFEM_ENABLE_CUDA
             host_data.resize(tensor_bytes);
@@ -195,14 +210,20 @@ namespace sfem {
             }
             data = host_data.data();
             s    = host_scales.data();
+            if (m.data) {
+                host_means.resize(n_components_ * n_groups_);
+                if (cudaMemcpy(host_means.data(), m.data, host_means.size() * sizeof(history_mean_t), cudaMemcpyDeviceToHost) !=
+                    cudaSuccess) {
+                    SFEM_ERROR("QuadratureState::decode: copying the means from the device failed\n");
+                }
+                m.data = host_means.data();
+            }
 #else
             SFEM_ERROR("QuadratureState::decode: device state without CUDA\n");
 #endif
         }
         dispatch_history_codec(storage_, [&](auto codec) {
             using Codec = decltype(codec);
-            prony::Means m = means_view();
-            m.data         = means_ ? m.tensor(t, values_per_tensor()) : nullptr;
             prony::decode<Codec>(
                     values_per_tensor(), n_elements_, reinterpret_cast<const typename Codec::storage_t *>(data), s, values, m);
             return 0;

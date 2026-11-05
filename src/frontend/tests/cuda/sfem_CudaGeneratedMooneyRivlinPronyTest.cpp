@@ -187,6 +187,25 @@ int test_device_matches_host_float16_storage() {
     return host_vs_device(HistoryStorage::FLOAT16_SCALED, real_t(1e-5));
 }
 
+// Mean-deviation storage: the means are summed in the host's order, so the codes differ only
+// where a rounding tie falls differently; one int8 code is 1/127 of an element's largest
+// deviation, one float16 code 2^-11 of it. TET4 takes its mean over runs of elements.
+int test_device_matches_host_int8_md_storage() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT8_MD, real_t(5e-3), element) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_device_matches_host_float16_md_storage() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::FLOAT16_MD, real_t(1e-4), element) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // Any generated energy material on HEX8 goes through the same HEX8 -> PROTEUS_HEX8 forwarding
 // as this one, so the existing modified Mooney-Rivlin is checked on the device too: its gradient
 // against the host's.  If this fails as well, a failure above is the forwarding's, not Prony's.
@@ -220,6 +239,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_full_storage);
     SFEM_RUN_TEST(test_device_matches_host_int16_storage);
     SFEM_RUN_TEST(test_device_matches_host_float16_storage);
+    SFEM_RUN_TEST(test_device_matches_host_int8_md_storage);
+    SFEM_RUN_TEST(test_device_matches_host_float16_md_storage);
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_UNIT_TEST_FINALIZE();

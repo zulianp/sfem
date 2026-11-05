@@ -30,6 +30,7 @@ namespace sfem {
                                 const scaling_t *const H_scales,
                                 const real_t *const  S_n,
                                 real_t *const        out,
+                                const prony::Means  &means,
                                 void *const          stream);
 
     /// H_i <- alpha_i H_i + b_i (S_new - S_n), re-encoding H_i with a fresh scale.
@@ -43,17 +44,23 @@ namespace sfem {
                          const real_t *const  S_new,
                          void *const          H,
                          scaling_t *const     H_scales,
+                         const prony::Means  &means,
                          void *const          stream);
 
-    /// Zero `bytes` bytes and set `n_scales` scales to one.
+    /// H <- factor H, re-encoded.
+    ///
+    /// The mean-deviation formats (`means` non-empty) take the means of the tensors H holds,
+    /// device pointers, and update them with the codes.
     int cu_prony_scale(const HistoryStorage storage,
                        const ptrdiff_t      rows,
                        const ptrdiff_t      n,
                        const real_t         factor,
                        void *const          H,
                        scaling_t *const     H_scales,
+                       const prony::Means  &means,
                        void *const          stream);
 
+    /// Copy `bytes` bytes and `n_scales` scales.
     int cu_prony_copy(const ptrdiff_t        bytes,
                       const void *const      src,
                       void *const            dst,
@@ -62,6 +69,7 @@ namespace sfem {
                       scaling_t *const       dst_scales,
                       void *const            stream);
 
+    /// Zero `bytes` bytes and set `n_scales` scales to one.
     int cu_prony_zero(const ptrdiff_t bytes,
                       void *const     data,
                       const ptrdiff_t n_scales,
