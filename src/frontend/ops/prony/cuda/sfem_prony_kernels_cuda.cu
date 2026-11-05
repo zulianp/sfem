@@ -46,7 +46,7 @@ namespace sfem {
         }
 
         /// One thread per (row, element): the entries are independent.
-        template <class Codec>
+        template <class Codec, typename S_t>
         __global__ void frozen_history_kernel(const int                                             n_terms,
                                               const ptrdiff_t                                       rows,
                                               const ptrdiff_t                                       n,
@@ -54,7 +54,7 @@ namespace sfem {
                                               const real_t                                          b_sum,
                                               const typename Codec::storage_t *const SFEM_RESTRICT H,
                                               const scaling_t *const SFEM_RESTRICT                 H_scales,
-                                              const real_t *const SFEM_RESTRICT                    S_n,
+                                              const S_t *const SFEM_RESTRICT                       S_n,
                                               real_t *const SFEM_RESTRICT                          out,
                                               const prony::Means                                    m) {
             const ptrdiff_t total = rows * n;
@@ -62,7 +62,7 @@ namespace sfem {
                  k += (ptrdiff_t)blockDim.x * gridDim.x) {
                 const ptrdiff_t r   = k / n;
                 const ptrdiff_t e   = k - r * n;
-                real_t          acc = -b_sum * S_n[k];
+                real_t          acc = -b_sum * static_cast<real_t>(S_n[k]);
                 for (int i = 0; i < n_terms; i++) {
                     real_t h = Codec::decode(H[(i * rows + r) * n + e], H_scales[i * n + e]);
                     if constexpr (Codec::mean_deviation) {
@@ -85,13 +85,13 @@ namespace sfem {
         /// threads' sums, in the host's order.  Every thread of a block walks the same tiles, so
         /// the barriers are reached by all; the new means are written only after every thread
         /// of the group has read the old ones.
-        template <class Codec>
+        template <class Codec, typename S_t>
         __global__ void advance_mean_deviation_kernel(const int                                       n_terms,
                                                       const ptrdiff_t                                 rows,
                                                       const ptrdiff_t                                 n,
                                                       const Weights                                   w,
-                                                      const real_t *const SFEM_RESTRICT              S_n,
-                                                      const real_t *const SFEM_RESTRICT              S_new,
+                                                      const S_t *const SFEM_RESTRICT                 S_n,
+                                                      const S_t *const SFEM_RESTRICT                 S_new,
                                                       typename Codec::storage_t *const               H,
                                                       scaling_t *const                               H_scales,
                                                       const prony::Means                              m) {
@@ -116,7 +116,7 @@ namespace sfem {
                     const auto z = [&](const ptrdiff_t r) {
                         const ptrdiff_t k = r * n + e;
                         const real_t    v = static_cast<real_t>(mi[(r / m.n_qp) * m.n_groups + g]) + Codec::decode(h[k], hs[e]);
-                        return S_n ? a * v + bi * (S_new[k] - S_n[k]) : a * v;
+                        return S_n ? a * v + bi * (static_cast<real_t>(S_new[k]) - static_cast<real_t>(S_n[k])) : a * v;
                     };
 
                     if (active) {
@@ -167,13 +167,13 @@ namespace sfem {
         /// tensor of the element before its first value is written, so the
         /// element's rows stay in one thread.  Adjacent threads read adjacent
         /// elements of every row, so the accesses coalesce.
-        template <class Codec>
+        template <class Codec, typename S_t>
         __global__ void advance_kernel(const int                                       n_terms,
                                        const ptrdiff_t                                 rows,
                                        const ptrdiff_t                                 n,
                                        const Weights                                   w,
-                                       const real_t *const SFEM_RESTRICT              S_n,
-                                       const real_t *const SFEM_RESTRICT              S_new,
+                                       const S_t *const SFEM_RESTRICT                 S_n,
+                                       const S_t *const SFEM_RESTRICT                 S_new,
                                        typename Codec::storage_t *const SFEM_RESTRICT H,
                                        scaling_t *const SFEM_RESTRICT                 H_scales) {
             for (ptrdiff_t e = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; e < n;
@@ -189,7 +189,7 @@ namespace sfem {
                         real_t max_abs = 0;
                         for (ptrdiff_t r = 0; r < rows; r++) {
                             const ptrdiff_t k = r * n + e;
-                            const real_t    v = a * Codec::decode(h[k], old_scale) + bi * (S_new[k] - S_n[k]);
+                            const real_t    v = a * Codec::decode(h[k], old_scale) + bi * (static_cast<real_t>(S_new[k]) - static_cast<real_t>(S_n[k]));
                             max_abs           = fmax(max_abs, fabs(v));
                         }
                         const scaling_t scale = Codec::scale_for(max_abs);
@@ -199,7 +199,7 @@ namespace sfem {
 
                     for (ptrdiff_t r = 0; r < rows; r++) {
                         const ptrdiff_t k = r * n + e;
-                        const real_t    v = a * Codec::decode(h[k], old_scale) + bi * (S_new[k] - S_n[k]);
+                        const real_t    v = a * Codec::decode(h[k], old_scale) + bi * (static_cast<real_t>(S_new[k]) - static_cast<real_t>(S_n[k]));
                         h[k]              = Codec::encode(v, inv);
                     }
                 }
@@ -241,6 +241,21 @@ namespace sfem {
             }
         }
 
+        __global__ void narrow_kernel(const ptrdiff_t n, const real_t *const SFEM_RESTRICT in, float *const SFEM_RESTRICT out) {
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < n;
+                 k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                out[k] = static_cast<float>(in[k]);
+            }
+        }
+
+        /// Call `f` with a null pointer of the stress type `stress_bytes` names.
+        template <class F>
+        int dispatch_stress(const int stress_bytes, F &&f) {
+            if (stress_bytes == (int)sizeof(real_t)) return f((const real_t *)nullptr);
+            if (stress_bytes == (int)sizeof(float)) return f((const float *)nullptr);
+            return SFEM_FAILURE;
+        }
+
         /// The loops stride over the grid, so a capped grid covers any size.
         unsigned grid_for(const ptrdiff_t n, const int block) {
             const ptrdiff_t blocks = std::max(ptrdiff_t(1), (n + block - 1) / block);
@@ -270,7 +285,8 @@ namespace sfem {
                                 const real_t           b_sum,
                                 const void *const      H,
                                 const scaling_t *const H_scales,
-                                const real_t *const    S_n,
+                                const int              stress_bytes,
+                                const void *const      S_n,
                                 real_t *const          out,
                                 const prony::Means    &means,
                                 void *const            stream) {
@@ -280,9 +296,12 @@ namespace sfem {
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
             using Codec = decltype(codec);
-            frozen_history_kernel<Codec><<<grid_for(rows * n, block), block, 0, (cudaStream_t)stream>>>(
-                    n_terms, rows, n, w, b_sum, static_cast<const typename Codec::storage_t *>(H), H_scales, S_n, out, means);
-            return launched();
+            return dispatch_stress(stress_bytes, [&](auto stress) {
+                using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+                frozen_history_kernel<Codec, S_t><<<grid_for(rows * n, block), block, 0, (cudaStream_t)stream>>>(
+                        n_terms, rows, n, w, b_sum, static_cast<const typename Codec::storage_t *>(H), H_scales, (const S_t *)S_n, out, means);
+                return launched();
+            });
         });
         SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
@@ -294,8 +313,9 @@ namespace sfem {
                          const ptrdiff_t      n,
                          const real_t *const  alpha,
                          const real_t *const  b,
-                         const real_t *const  S_n,
-                         const real_t *const  S_new,
+                         const int            stress_bytes,
+                         const void *const    S_n,
+                         const void *const    S_new,
                          void *const          H,
                          scaling_t *const     H_scales,
                          const prony::Means  &means,
@@ -306,15 +326,19 @@ namespace sfem {
         const int     block = 128;
         const int     ret   = dispatch(storage, [&](auto codec) {
             using Codec = decltype(codec);
-            if constexpr (Codec::mean_deviation) {
-                if (rows / means.n_qp > MD_MAX_COMPONENTS) return SFEM_FAILURE;
-                advance_mean_deviation_kernel<Codec><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
-                        n_terms, rows, n, w, S_n, S_new, static_cast<typename Codec::storage_t *>(H), H_scales, means);
-            } else {
-                advance_kernel<Codec><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
-                        n_terms, rows, n, w, S_n, S_new, static_cast<typename Codec::storage_t *>(H), H_scales);
-            }
-            return launched();
+            return dispatch_stress(stress_bytes, [&](auto stress) {
+                using S_t     = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+                const S_t *sp = (const S_t *)S_n, *sn = (const S_t *)S_new;
+                if constexpr (Codec::mean_deviation) {
+                    if (rows / means.n_qp > MD_MAX_COMPONENTS) return SFEM_FAILURE;
+                    advance_mean_deviation_kernel<Codec, S_t><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, means);
+                } else {
+                    advance_kernel<Codec, S_t><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales);
+                }
+                return launched();
+            });
         });
         SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
@@ -336,7 +360,7 @@ namespace sfem {
                 // factor * H is the update with alpha = factor and no increment.
                 if (rows / means.n_qp > MD_MAX_COMPONENTS) return SFEM_FAILURE;
                 const Weights w = pack(1, &factor, nullptr);
-                advance_mean_deviation_kernel<Codec><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
+                advance_mean_deviation_kernel<Codec, real_t><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
                         1, rows, n, w, nullptr, nullptr, static_cast<typename Codec::storage_t *>(H), H_scales, means);
             } else {
                 scale_kernel<Codec><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
@@ -344,6 +368,15 @@ namespace sfem {
             }
             return launched();
         });
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return ret;
+    }
+
+    int cu_prony_narrow(const ptrdiff_t n, const real_t *const in, float *const out, void *const stream) {
+        if (n <= 0) return SFEM_SUCCESS;
+        const int block = 128;
+        narrow_kernel<<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(n, in, out);
+        const int ret = launched();
         SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
     }

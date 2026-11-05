@@ -70,6 +70,10 @@ namespace sfem {
             real_t                                temperature{0};     ///< read through `shift` at every begin_step
             HistoryStorage                        history_storage{HistoryStorage::FULL};  ///< for H_i
             int history_elements_per_mean{0};  ///< mean-deviation storage: QuadratureState's elements_per_mean
+            //! The relaxed-stress slots `RelaxationGroups` keeps for this group: FULL (real_t) or
+            //! FLOAT32. A float32 slot holds the stress rounded once, and both ends of every
+            //! step read the rounded values, so the increments still telescope.
+            HistoryStorage stress_storage{HistoryStorage::FULL};
             ExecutionSpace                        execution_space{EXECUTION_SPACE_HOST};  ///< where the state lives
             void                                 *stream{nullptr};  ///< the device loops' stream
         };
@@ -90,10 +94,18 @@ namespace sfem {
         /// the relaxed stress at the converged state the step starts from.
         /// May be called again to retry the same step with another `dt`.
         void begin_step(const real_t t, const real_t dt, const real_t *const relaxed_stress_n);
+#if SFEM_REAL_T_IS_FLOAT64
+        /// The same from float32 stress slots (`Options::stress_storage`); with a float real_t
+        /// the overload above is that.
+        void begin_step(const real_t t, const real_t dt, const float *const relaxed_stress_n);
+#endif
 
         /// Commit the open step: `relaxed_stress_n` at the state it started
         /// from, `relaxed_stress` at the converged state it ends at.
         void advance(const real_t *const relaxed_stress_n, const real_t *const relaxed_stress);
+#if SFEM_REAL_T_IS_FLOAT64
+        void advance(const float *const relaxed_stress_n, const float *const relaxed_stress);
+#endif
 
         /// Restart from rest: H_i = 0.  The relaxed stress of the state at rest
         /// is the caller's to evaluate at the next `begin_step`, as always.
@@ -134,6 +146,11 @@ namespace sfem {
         std::size_t frozen_bytes() const;
 
     private:
+        template <typename S_t>
+        void begin_step_typed(const real_t dt, const S_t *const relaxed_stress_n);
+        template <typename S_t>
+        void advance_typed(const S_t *const relaxed_stress_n, const S_t *const relaxed_stress);
+
         void zero_history();
         void reserve(const int n_slots);
         void store(const int i);

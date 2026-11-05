@@ -98,6 +98,27 @@ namespace sfem {
     }
 
     void PronyRelaxation::begin_step(const real_t, const real_t dt, const real_t *const relaxed_stress_n) {
+        begin_step_typed(dt, relaxed_stress_n);
+    }
+
+#if SFEM_REAL_T_IS_FLOAT64
+    void PronyRelaxation::begin_step(const real_t, const real_t dt, const float *const relaxed_stress_n) {
+        begin_step_typed(dt, relaxed_stress_n);
+    }
+#endif
+
+    void PronyRelaxation::advance(const real_t *const relaxed_stress_n, const real_t *const relaxed_stress) {
+        advance_typed(relaxed_stress_n, relaxed_stress);
+    }
+
+#if SFEM_REAL_T_IS_FLOAT64
+    void PronyRelaxation::advance(const float *const relaxed_stress_n, const float *const relaxed_stress) {
+        advance_typed(relaxed_stress_n, relaxed_stress);
+    }
+#endif
+
+    template <typename S_t>
+    void PronyRelaxation::begin_step_typed(const real_t dt, const S_t *const relaxed_stress_n) {
         SFEM_TRACE_SCOPE("PronyRelaxation::begin_step");
 
         if (!(dt > 0)) {
@@ -147,6 +168,7 @@ namespace sfem {
                                         b_sum,
                                         H_ ? H_->raw() : nullptr,
                                         H_ ? H_->scales() : nullptr,
+                                        (int)sizeof(S_t),
                                         relaxed_stress_n,
                                         history_->data(),
                                         H_ ? H_->means_view() : prony::Means{},
@@ -174,7 +196,8 @@ namespace sfem {
         step_open_ = true;
     }
 
-    void PronyRelaxation::advance(const real_t *const relaxed_stress_n, const real_t *const relaxed_stress) {
+    template <typename S_t>
+    void PronyRelaxation::advance_typed(const S_t *const relaxed_stress_n, const S_t *const relaxed_stress) {
         SFEM_TRACE_SCOPE("PronyRelaxation::advance");
 
         if (!step_open_) {
@@ -211,6 +234,7 @@ namespace sfem {
                                                  n_elements_,
                                                  slot_alpha_.data(),
                                                  slot_b_.data(),
+                                                 (int)sizeof(S_t),
                                                  relaxed_stress_n,
                                                  relaxed_stress,
                                                  H_->raw(),
@@ -223,6 +247,7 @@ namespace sfem {
                                                  n_elements_,
                                                  &zero,
                                                  &one,
+                                                 (int)sizeof(S_t),
                                                  relaxed_stress_n,
                                                  relaxed_stress,
                                                  D_->raw(),

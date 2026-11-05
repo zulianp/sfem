@@ -74,7 +74,10 @@ namespace {
     }
 
     template <class OpType>
-    void configure(OpType &op, const std::shared_ptr<Mesh> &mesh, const HistoryStorage storage) {
+    void configure(OpType                      &op,
+                   const std::shared_ptr<Mesh> &mesh,
+                   const HistoryStorage         storage,
+                   const HistoryStorage         stress = HistoryStorage::FULL) {
         for (const auto &block : mesh->blocks()) {
             op.set_value_in_block(block->name(), "C10", test_C10);
             op.set_value_in_block(block->name(), "C01", test_C01);
@@ -82,10 +85,14 @@ namespace {
         }
         PronyRelaxation::Options options;
         options.history_storage = storage;
+        options.stress_storage  = stress;
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
-    int host_vs_device(const HistoryStorage storage, const real_t tolerance, const smesh::ElemType element = smesh::HEX8) {
+    int host_vs_device(const HistoryStorage  storage,
+                       const real_t          tolerance,
+                       const smesh::ElemType element = smesh::HEX8,
+                       const HistoryStorage  stress  = HistoryStorage::FULL) {
         const int n = 6;
         std::shared_ptr<Mesh> mesh;
         if (element == smesh::HEX8) {
@@ -104,8 +111,8 @@ namespace {
                 create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_DEVICE));
         SFEM_TEST_ASSERT(host_op != nullptr);
         SFEM_TEST_ASSERT(device_op != nullptr);
-        configure(*host_op, mesh, storage);
-        configure(*device_op, mesh, storage);
+        configure(*host_op, mesh, storage, stress);
+        configure(*device_op, mesh, storage, stress);
 
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
@@ -198,6 +205,11 @@ int test_device_matches_host_int8_md_storage() {
     return SFEM_TEST_SUCCESS;
 }
 
+// float32 stress slots on both sides: the same rounding of the same stress.
+int test_device_matches_host_float32_stress_slots() {
+    return host_vs_device(HistoryStorage::FULL, real_t(1e-10), smesh::HEX8, HistoryStorage::FLOAT32);
+}
+
 int test_device_matches_host_float16_md_storage() {
     const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
     for (const auto element : elements) {
@@ -241,6 +253,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_float16_storage);
     SFEM_RUN_TEST(test_device_matches_host_int8_md_storage);
     SFEM_RUN_TEST(test_device_matches_host_float16_md_storage);
+    SFEM_RUN_TEST(test_device_matches_host_float32_stress_slots);
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_UNIT_TEST_FINALIZE();

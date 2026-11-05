@@ -375,7 +375,8 @@ namespace {
                                                                   const real_t                               C01,
                                                                   const real_t                               K,
                                                                   const bool                                 relaxing,
-                                                                  const bool                                 affine) {
+                                                                  const bool                                 affine,
+                                                                  const sfem::HistoryStorage stress = sfem::HistoryStorage::FULL) {
         auto op = std::make_shared<sfem::GeneratedMooneyRivlinProny>(fs);
         if (affine) op->set_option("ASSUME_AFFINE", true);
         op->initialize();
@@ -384,7 +385,9 @@ namespace {
             op->set_value_in_block(block->name(), "C01", C01);
             op->set_value_in_block(block->name(), "K", K);
         }
-        if (relaxing) op->relaxation_groups().set_series("", "iso", sfem::PronySeries(prony_g(), prony_tau()));
+        sfem::PronyRelaxation::Options options;
+        options.stress_storage = stress;
+        if (relaxing) op->relaxation_groups().set_series("", "iso", sfem::PronySeries(prony_g(), prony_tau()), options);
         return op;
     }
 
@@ -431,7 +434,12 @@ namespace {
 /// which the linear-interpolation recursion reproduces exactly.  The two elastic parts are the
 /// same operator with K = 0 and with C10 = C01 = 0, both without terms.  `affine` takes TET10's
 /// affine route, whose rule is pinned to the isoparametric one's points.
-int homogeneous_relaxation(const smesh::ElemType element, const bool affine = false) {
+///
+/// With float32 stress slots the relaxed stress is rounded once per step, the increments still
+/// telescope, and the force is the closed form to float's rounding of the relaxing part.
+int homogeneous_relaxation(const smesh::ElemType      element,
+                           const bool                 affine = false,
+                           const sfem::HistoryStorage stress = sfem::HistoryStorage::FULL) {
     auto comm = sfem::Communicator::world();
     std::shared_ptr<sfem::Mesh> mesh;
     if (element == smesh::TRI3) {
@@ -455,7 +463,7 @@ int homogeneous_relaxation(const smesh::ElemType element, const bool affine = fa
 
     const int    n_steps = 12;
     const real_t dt      = 0.25;
-    auto prony = material_on(fs, test_C10, test_C01, test_K, true, affine);
+    auto prony = material_on(fs, test_C10, test_C01, test_K, true, affine, stress);
     auto iso   = material_on(fs, test_C10, test_C01, 0, false, affine);
     auto vol   = material_on(fs, 0, 0, test_K, false, affine);
     const auto relaxed = held_face_forces(*prony, *fs, u.data(), n_steps, dt);
@@ -478,15 +486,17 @@ int homogeneous_relaxation(const smesh::ElemType element, const bool affine = fa
             scale             = std::max(scale, std::abs(want));
         }
     }
-    printf("  homogeneous relaxation %s%s, %td dofs, %d steps: worst force error %.3e of %.3e\n",
+    printf("  homogeneous relaxation %s%s%s, %td dofs, %d steps: worst force error %.3e of %.3e\n",
            smesh::type_to_string(element),
            affine ? " affine" : "",
+           stress == sfem::HistoryStorage::FLOAT32 ? " float32 stress slots" : "",
            fs->n_dofs(),
            n_steps,
            (double)worst,
            (double)scale);
     SFEM_TEST_ASSERT(scale > 0);
-    SFEM_TEST_ASSERT(worst <= real_t(1e-11) * scale);
+    const real_t tolerance = stress == sfem::HistoryStorage::FLOAT32 ? real_t(1e-6) : real_t(1e-11);
+    SFEM_TEST_ASSERT(worst <= tolerance * scale);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -496,6 +506,12 @@ int test_homogeneous_relaxation_tet10() { return homogeneous_relaxation(smesh::T
 int test_homogeneous_relaxation_tet10_affine() { return homogeneous_relaxation(smesh::TET10, true); }
 int test_homogeneous_relaxation_tri3() { return homogeneous_relaxation(smesh::TRI3); }
 int test_homogeneous_relaxation_quad4() { return homogeneous_relaxation(smesh::QUAD4); }
+int test_homogeneous_relaxation_hex8_float32_stress() {
+    return homogeneous_relaxation(smesh::HEX8, false, sfem::HistoryStorage::FLOAT32);
+}
+int test_homogeneous_relaxation_tet4_float32_stress() {
+    return homogeneous_relaxation(smesh::TET4, false, sfem::HistoryStorage::FLOAT32);
+}
 
 /// Nothing but `advance` moves the history: a trial gradient elsewhere, a repeated
 /// `begin_step`, and an apply leave the next gradient bitwise unchanged.
@@ -761,6 +777,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet4);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet10);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet10_affine);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_hex8_float32_stress);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_tet4_float32_stress);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tri3);
     SFEM_RUN_TEST(test_homogeneous_relaxation_quad4);
     SFEM_RUN_TEST(test_evaluation_is_pure);
