@@ -63,6 +63,7 @@ namespace sfem {
     ///         history_storage: full      # full, float32, float16, float16_scaled,
     ///                                    # int16_scaled, int8_scaled, float16_md, int8_md
     ///         history_elements_per_mean: 16  # *_md on one-point elements (QuadratureState)
+    ///         stress_storage: full       # the relaxed-stress slots: full or float32
     ///
     /// An entry overrides only the keys it names, so a block can change the
     /// temperature and keep the spectrum the top level gave it.  Any other key
@@ -107,9 +108,13 @@ namespace sfem {
         /// they read are written by kernels on it.
         void set_stream(void *const stream);
 
-        /// Stress slot `slot` of a group, laid out like the history: slot 0 is
-        /// the relaxed stress the open or next step starts from, slot 1 the one
-        /// `advance` commits.  Allocated, for every block and group, at first use.
+        /// Where the operator writes stress slot `slot` of a group, laid out like
+        /// the history: slot 0 is the relaxed stress the open or next step starts
+        /// from, slot 1 the one `advance` commits.  Allocated, for every block and
+        /// group, at first use.  A group whose slots are float32
+        /// (`PronyRelaxation::Options::stress_storage`) is written to a real_t
+        /// scratch that exists only while `evaluate` runs, and rounded into the
+        /// slot after it.
         real_t *stress_scratch(const std::string &block, const std::string &stress_name, const int slot);
 
         /// Open a step at the relaxed stresses in slot 0, evaluating them at the
@@ -152,8 +157,15 @@ namespace sfem {
             ptrdiff_t                                     n_elements{0};
             int                                           n_qp{0};
             std::vector<std::shared_ptr<PronyRelaxation>> groups;
+            //! A stress slot: real_t, or float32 when the group's stress_storage is.
+            struct Slot {
+                std::shared_ptr<Buffer<real_t>> full;
+                std::shared_ptr<Buffer<float>>  narrow;
+            };
             //! [slot][group]: slot 0 the step's start, slot 1 its end.
-            std::vector<std::vector<std::shared_ptr<Buffer<real_t>>>> stress;
+            std::vector<std::vector<Slot>> stress;
+            //! [group]: where a float32 group's stress is evaluated, during `evaluate` only.
+            std::vector<std::shared_ptr<Buffer<real_t>>> scratch;
         };
 
         int          group_index(const std::string &group) const;
@@ -161,7 +173,9 @@ namespace sfem {
         int          stress_index(const std::string &stress) const;
         Block       &block(const std::string &name);
         const Block &block(const std::string &name) const;
-        const real_t *slot(const Block &b, const int slot, const size_t group) const;
+        bool          narrow(const Block &b, const size_t group) const;
+        void          begin_group(Block &b, const size_t group, const real_t t, const real_t dt);
+        void          advance_group(Block &b, const size_t group);
         void          allocate_stress();
         void          evaluate(const real_t *const x, const int slot, const StressEvaluation &evaluate);
 

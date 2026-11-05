@@ -99,6 +99,7 @@ material:
       history_storage: full         # full | float32 | float16 | float16_scaled | int16_scaled | int8_scaled
                                     # | float16_md | int8_md (a float mean per group, the deviations coded)
       history_elements_per_mean: 16 # *_md on one-point elements: the elements a mean is taken over (power of two, <= 64)
+      stress_storage: full          # the two relaxed-stress slots kept between steps: full | float32
       wlf: {C1: 17.4, C2: 51.6, T_ref: 20}   # optional time-temperature shift
       temperature: 20
 ```

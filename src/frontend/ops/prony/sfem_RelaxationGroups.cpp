@@ -6,6 +6,10 @@
 #include "sfem_blas_factory.hpp"
 #include "sfem_logger.hpp"
 
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_prony_kernels_cuda.hpp"
+#endif
+
 namespace sfem {
 
     RelaxationGroups::RelaxationGroups(std::vector<RelaxationGroupDeclaration> declarations,
@@ -78,6 +82,10 @@ namespace sfem {
         for (auto &entry : blocks_) {
             if (!block_name.empty() && entry.first != block_name) continue;
             Block &b = entry.second;
+            if (!b.stress.empty() && (b.groups[g]->options().stress_storage == HistoryStorage::FLOAT32) !=
+                                             (placed.stress_storage == HistoryStorage::FLOAT32)) {
+                SFEM_ERROR("RelaxationGroups: stress_storage of %s cannot change once its stress slots exist\n", group.c_str());
+            }
             // Released first, so the old state and the new are never held together.
             b.groups[g].reset();
             b.groups[g] = std::make_shared<PronyRelaxation>(
@@ -117,15 +125,31 @@ namespace sfem {
         }
     }
 
+    bool RelaxationGroups::narrow(const Block &b, const size_t group) const {
+#if SFEM_REAL_T_IS_FLOAT64
+        return b.groups[group]->options().stress_storage == HistoryStorage::FLOAT32;
+#else
+        // real_t is float already: a FLOAT32 slot is a real_t one.
+        (void)b;
+        (void)group;
+        return false;
+#endif
+    }
+
     void RelaxationGroups::allocate_stress() {
         for (auto &entry : blocks_) {
             Block &b = entry.second;
             if (!b.stress.empty()) continue;
-            b.stress.assign(2, {});
+            b.stress.assign(2, std::vector<Block::Slot>(declarations_.size()));
+            b.scratch.assign(declarations_.size(), nullptr);
             for (int s = 0; s < 2; s++) {
-                for (const auto &d : declarations_) {
-                    b.stress[s].push_back(
-                            create_buffer<real_t>(static_cast<ptrdiff_t>(d.n_components) * b.n_qp * b.n_elements, es_));
+                for (size_t g = 0; g < declarations_.size(); g++) {
+                    const ptrdiff_t n = static_cast<ptrdiff_t>(declarations_[g].n_components) * b.n_qp * b.n_elements;
+                    if (narrow(b, g)) {
+                        b.stress[s][g].narrow = create_buffer<float>(n, es_);
+                    } else {
+                        b.stress[s][g].full = create_buffer<real_t>(n, es_);
+                    }
                 }
             }
         }
@@ -136,17 +160,73 @@ namespace sfem {
             SFEM_ERROR("RelaxationGroups: there is no stress slot %d (0 and 1 exist)\n", s);
         }
         allocate_stress();
-        return block(block_name).stress[s][stress_index(stress_name)]->data();
-    }
-
-    const real_t *RelaxationGroups::slot(const Block &b, const int s, const size_t group) const {
-        return b.stress.empty() ? nullptr : b.stress[s][group]->data();
+        Block    &b = block(block_name);
+        const int g = stress_index(stress_name);
+        if (!narrow(b, g)) return b.stress[s][g].full->data();
+        if (!b.scratch[g]) {
+            SFEM_ERROR("RelaxationGroups: a float32 stress slot is written only while the stress is evaluated\n");
+        }
+        return b.scratch[g]->data();
     }
 
     void RelaxationGroups::evaluate(const real_t *const x, const int slot, const StressEvaluation &evaluate) {
         allocate_stress();
+        // The float32 groups' scratch, for this evaluation only: one real_t
+        // tensor per group while the operator writes it.
+        for (auto &entry : blocks_) {
+            Block &b = entry.second;
+            for (size_t g = 0; g < b.groups.size(); g++) {
+                if (!narrow(b, g)) continue;
+                b.scratch[g] = create_buffer<real_t>(b.stress[slot][g].narrow->size(), es_);
+            }
+        }
         if (evaluate(x, slot) != SFEM_SUCCESS) {
             SFEM_ERROR("RelaxationGroups: evaluating the relaxed stress failed\n");
+        }
+        for (auto &entry : blocks_) {
+            Block &b = entry.second;
+            for (size_t g = 0; g < b.groups.size(); g++) {
+                if (!narrow(b, g)) continue;
+                const ptrdiff_t     n   = b.scratch[g]->size();
+                const real_t *const in  = b.scratch[g]->data();
+                float *const        out = b.stress[slot][g].narrow->data();
+#ifdef SFEM_ENABLE_CUDA
+                if (es_ == EXECUTION_SPACE_DEVICE) {
+                    if (cu_prony_narrow(n, in, out, stream_) != SFEM_SUCCESS) {
+                        SFEM_ERROR("RelaxationGroups: rounding the stress to float32 failed on the device\n");
+                    }
+                } else
+#endif
+                {
+#pragma omp parallel for
+                    for (ptrdiff_t k = 0; k < n; k++) out[k] = static_cast<float>(in[k]);
+                }
+                b.scratch[g].reset();
+            }
+        }
+    }
+
+    void RelaxationGroups::begin_group(Block &b, const size_t g, const real_t t, const real_t dt) {
+        if (b.stress.empty()) {
+            b.groups[g]->begin_step(t, dt, static_cast<const real_t *>(nullptr));
+        } else if (narrow(b, g)) {
+#if SFEM_REAL_T_IS_FLOAT64
+            b.groups[g]->begin_step(t, dt, b.stress[0][g].narrow->data());
+#endif
+        } else {
+            b.groups[g]->begin_step(t, dt, b.stress[0][g].full->data());
+        }
+    }
+
+    void RelaxationGroups::advance_group(Block &b, const size_t g) {
+        if (b.stress.empty()) {
+            b.groups[g]->advance(static_cast<const real_t *>(nullptr), static_cast<const real_t *>(nullptr));
+        } else if (narrow(b, g)) {
+#if SFEM_REAL_T_IS_FLOAT64
+            b.groups[g]->advance(b.stress[0][g].narrow->data(), b.stress[1][g].narrow->data());
+#endif
+        } else {
+            b.groups[g]->advance(b.stress[0][g].full->data(), b.stress[1][g].full->data());
         }
     }
 
@@ -164,7 +244,7 @@ namespace sfem {
         }
         for (auto &entry : blocks_) {
             Block &b = entry.second;
-            for (size_t g = 0; g < b.groups.size(); g++) b.groups[g]->begin_step(t, dt, slot(b, 0, g));
+            for (size_t g = 0; g < b.groups.size(); g++) begin_group(b, g, t, dt);
         }
     }
 
@@ -173,7 +253,7 @@ namespace sfem {
         if (relaxing) this->evaluate(x, 1, evaluate);
         for (auto &entry : blocks_) {
             Block &b = entry.second;
-            for (size_t g = 0; g < b.groups.size(); g++) b.groups[g]->advance(slot(b, 0, g), slot(b, 1, g));
+            for (size_t g = 0; g < b.groups.size(); g++) advance_group(b, g);
             // The stress the step ended at is the one the next step starts from.
             if (!b.stress.empty()) std::swap(b.stress[0], b.stress[1]);
         }
@@ -217,7 +297,9 @@ namespace sfem {
                 ret.frozen += group->frozen_bytes();
             }
             for (const auto &slots : entry.second.stress) {
-                for (const auto &buffer : slots) ret.stress += buffer->size() * sizeof(real_t);
+                for (const auto &s : slots) {
+                    ret.stress += s.full ? s.full->size() * sizeof(real_t) : s.narrow->size() * sizeof(float);
+                }
             }
         }
         return ret;
@@ -244,7 +326,7 @@ namespace sfem {
         if (!node.has_child("relaxation")) return;
 
         static const char *const keys[] = {
-                "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean"};
+                "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean", "stress_storage"};
 
         for (auto group_node : node["relaxation"].children()) {
             const auto        key   = group_node.key();
@@ -258,7 +340,7 @@ namespace sfem {
                 for (const char *const allowed : keys) known = known || name == allowed;
                 if (!known) {
                     SFEM_ERROR("relaxation.%s: unknown key \"%s\" (expected prony, integrator, wlf, temperature, "
-                               "history_storage, history_elements_per_mean)\n",
+                               "history_storage, history_elements_per_mean, stress_storage)\n",
                                group.c_str(),
                                name.c_str());
                 }
@@ -294,6 +376,13 @@ namespace sfem {
                 }
                 if (group_node.has_child("history_storage")) {
                     options.history_storage = history_storage_from_string(read_string(group_node["history_storage"]));
+                }
+                if (group_node.has_child("stress_storage")) {
+                    const auto storage = history_storage_from_string(read_string(group_node["stress_storage"]));
+                    if (storage != HistoryStorage::FULL && storage != HistoryStorage::FLOAT32) {
+                        SFEM_ERROR("relaxation.%s.stress_storage: full or float32, not %s\n", group.c_str(), to_string(storage));
+                    }
+                    options.stress_storage = storage;
                 }
                 if (group_node.has_child("history_elements_per_mean")) {
                     options.history_elements_per_mean = static_cast<int>(read_real(group_node, "history_elements_per_mean"));

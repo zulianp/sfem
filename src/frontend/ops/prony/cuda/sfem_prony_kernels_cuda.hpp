@@ -13,7 +13,8 @@ namespace sfem {
     /// contiguous run per (tensor, component, point) -- and the same codecs, so
     /// a history written by one is read by the other bit for bit in the store.
     /// `alpha` and `b` are host arrays of the step's weights; they travel to the
-    /// device in the launch.  At most `cu_prony_max_terms()` terms.  Everything
+    /// device in the launch.  The relaxed stresses are real_t or float, by
+    /// `stress_bytes`.  At most `cu_prony_max_terms()` terms.  Everything
     /// runs on `stream`, the operator's, where the stresses these loops read
     /// were written; a launch failure is returned, not deferred.
 
@@ -28,7 +29,8 @@ namespace sfem {
                                 const real_t         b_sum,
                                 const void *const    H,
                                 const scaling_t *const H_scales,
-                                const real_t *const  S_n,
+                                const int            stress_bytes,
+                                const void *const    S_n,
                                 real_t *const        out,
                                 const prony::Means  &means,
                                 void *const          stream);
@@ -40,8 +42,9 @@ namespace sfem {
                          const ptrdiff_t      n,
                          const real_t *const  alpha,
                          const real_t *const  b,
-                         const real_t *const  S_n,
-                         const real_t *const  S_new,
+                         const int            stress_bytes,
+                         const void *const    S_n,
+                         const void *const    S_new,
                          void *const          H,
                          scaling_t *const     H_scales,
                          const prony::Means  &means,
@@ -59,6 +62,9 @@ namespace sfem {
                        scaling_t *const     H_scales,
                        const prony::Means  &means,
                        void *const          stream);
+
+    /// out = (float) in: a relaxed stress into a float32 slot.
+    int cu_prony_narrow(const ptrdiff_t n, const real_t *const in, float *const out, void *const stream);
 
     /// Copy `bytes` bytes and `n_scales` scales.
     int cu_prony_copy(const ptrdiff_t        bytes,

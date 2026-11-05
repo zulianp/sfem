@@ -73,9 +73,13 @@ namespace {
     // The relaxed stress is the caller's to evaluate at both ends of a step, as
     // an operator evaluates it from the displacements; here it is the scalar
     // history times the amplitudes, at the previous and the current time.
+    //
+    // S_t is the type the stresses are handed over in: real_t, or float as the
+    // float32 stress slots hold them.
+    template <typename S_t = real_t>
     real_t drive(sfem::PronyRelaxation &relaxation, const std::vector<real_t> &times, const real_t t_ramp) {
         const auto          a = amplitudes();
-        std::vector<real_t> S(N_ENTRIES), S_n(N_ENTRIES);
+        std::vector<S_t>    S(N_ENTRIES), S_n(N_ENTRIES);
         real_t              worst = 0;
 
         for (size_t n = 1; n < times.size(); n++) {
@@ -83,16 +87,17 @@ namespace {
             const real_t dt = times[n] - times[n - 1];
 
             const real_t s_n = ramp(times[n - 1], t_ramp);
-            for (ptrdiff_t k = 0; k < N_ENTRIES; k++) S_n[k] = a[k] * s_n;
+            for (ptrdiff_t k = 0; k < N_ENTRIES; k++) S_n[k] = static_cast<S_t>(a[k] * s_n);
             relaxation.begin_step(t, dt, S_n.data());
 
             const real_t s = ramp(t, t_ramp);
-            for (ptrdiff_t k = 0; k < N_ENTRIES; k++) S[k] = a[k] * s;
+            for (ptrdiff_t k = 0; k < N_ENTRIES; k++) S[k] = static_cast<S_t>(a[k] * s);
 
             const real_t *const hist  = relaxation.history();
             const real_t        exact = exact_stress(relaxation.series(), t, t_ramp);
             for (ptrdiff_t k = 0; k < N_ENTRIES; k++) {
-                const real_t computed = relaxation.gamma() * S[k] + hist[k];
+                // The operator's current stress is real_t whatever the slots hold.
+                const real_t computed = relaxation.gamma() * (a[k] * s) + hist[k];
                 worst                 = std::max(worst, std::abs(computed - a[k] * exact) / std::abs(a[k]));
             }
 
@@ -476,6 +481,25 @@ int test_mean_deviation_is_thread_count_invariant() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_float32_stress_slots_do_not_accumulate() {
+#if SFEM_REAL_T_IS_FLOAT64
+    // Both ends of every step read the same rounded stresses, so the increments
+    // telescope: the error is the stress's own float rounding, carried by the
+    // terms' weights, and does not grow with the number of steps.
+    const real_t f32 = real_t(std::ldexp(1.0, -24));
+    real_t       err[2];
+    const int    steps[2] = {100, 1000};
+    for (int r = 0; r < 2; r++) {
+        sfem::PronyRelaxation relaxation(series(), N_COMPONENTS, N_QP, N_ELEMENTS);
+        err[r] = drive<float>(relaxation, uniform_grid(30, steps[r]), real_t(0.9));
+    }
+    printf("float32 stresses: worst relative stress error %g over 100 steps, %g over 1000\n", (double)err[0], (double)err[1]);
+    SFEM_TEST_ASSERT(err[0] < 8 * f32);
+    SFEM_TEST_ASSERT(err[1] < 8 * f32);
+#endif
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_reset_restarts_from_a_prestressed_state() {
     const auto            a = amplitudes();
     sfem::PronyRelaxation relaxation(series(), N_COMPONENTS, N_QP, N_ELEMENTS);
@@ -508,6 +532,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_mean_deviation_codes_the_variation);
     SFEM_RUN_TEST(test_mean_over_one_point_elements);
     SFEM_RUN_TEST(test_mean_deviation_is_thread_count_invariant);
+    SFEM_RUN_TEST(test_float32_stress_slots_do_not_accumulate);
     SFEM_RUN_TEST(test_reset_restarts_from_a_prestressed_state);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
