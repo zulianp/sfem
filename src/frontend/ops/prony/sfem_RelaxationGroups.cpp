@@ -206,14 +206,18 @@ namespace sfem {
         return false;
     }
 
-    std::size_t RelaxationGroups::bytes() const {
-        std::size_t ret = 0;
+    std::size_t RelaxationGroups::bytes() const { return bytes_breakdown().total(); }
+
+    RelaxationGroups::Bytes RelaxationGroups::bytes_breakdown() const {
+        Bytes ret;
         for (const auto &entry : blocks_) {
-            for (const auto &group : entry.second.groups) ret += group->bytes();
-        }
-        for (const auto &entry : blocks_) {
+            for (const auto &group : entry.second.groups) {
+                ret.history += group->history_bytes();
+                ret.increment += group->increment_bytes();
+                ret.frozen += group->frozen_bytes();
+            }
             for (const auto &slots : entry.second.stress) {
-                for (const auto &buffer : slots) ret += buffer->size() * sizeof(real_t);
+                for (const auto &buffer : slots) ret.stress += buffer->size() * sizeof(real_t);
             }
         }
         return ret;

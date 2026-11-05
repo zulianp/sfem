@@ -46,6 +46,7 @@ endif()
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" OFF)
 option(SFEM_ENABLE_TRACE "Enable trace facilities: smesh writes smesh.trace.csv (override with SMESH_TRACE_FILE in the env)" ON)
+option(SFEM_ENABLE_PRONY_DIAGNOSTICS "Count the Prony history updates the storage format rounds away (host loops; the prony probe reports them)" OFF)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 

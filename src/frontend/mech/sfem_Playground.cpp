@@ -1230,6 +1230,8 @@ namespace sfem {
                             return SFEM_FAILURE;
                         }
                         probe = create_prony_probe(*relaxations, mesh->comm());
+                    } else if (type == "memory") {
+                        probe = create_memory_probe(mesh->comm());
                     } else if (type == "contact" && obstacle) {
                         std::function<real_t()> min_gap = [c = contact] { return c->min_gap(); };
                         if (ssmgc_step) min_gap = [s = ssmgc_step] { return s->min_gap(); };
@@ -1241,7 +1243,7 @@ namespace sfem {
                                                      contact_force_scale,
                                                      mesh->comm());
                     } else {
-                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque, prony; contact with an obstacle)\n", type.c_str());
+                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque, prony, memory; contact with an obstacle)\n", type.c_str());
                         return SFEM_FAILURE;
                     }
                     history->add_probe(has(p, "name") ? create_named_probe(read_string(p, "name", ""), probe) : probe);

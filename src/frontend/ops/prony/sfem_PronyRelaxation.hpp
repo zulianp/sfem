@@ -122,8 +122,15 @@ namespace sfem {
         /// How many terms hold a stored tensor.
         int n_stored_terms() const { return n_live_; }
 
-        /// Bytes of state held, frozen history included.
+        /// Bytes of state held, frozen history included: the sum of the three below.
         std::size_t bytes() const;
+
+        /// The stored terms H_i, scales included.
+        std::size_t history_bytes() const;
+        /// The shared increment D of the terms that relax completely.
+        std::size_t increment_bytes() const;
+        /// The frozen history the kernels read.
+        std::size_t frozen_bytes() const;
 
     private:
         void zero_history();

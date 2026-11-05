@@ -428,6 +428,12 @@ extern void host_to_device(const std::size_t n, const real_t *const h, real_t *d
 
 extern void d_destroy(void *a) { cudaFree(a); }
 
+extern size_t d_memory_in_use(void) {
+    size_t free = 0, total = 0;
+    CHECK_CUDA(cudaMemGetInfo(&free, &total));
+    return total - free;
+}
+
 extern void d_copy(const ptrdiff_t n, const real_t *const src, real_t *const dest) {
     cudaMemcpy(dest, src, n * sizeof(real_t), cudaMemcpyDeviceToDevice);
 }
