@@ -126,6 +126,24 @@ namespace sfem {
                                                const ptrdiff_t                 e) {
                 return static_cast<real_t>(means[(r / m.n_qp) * m.n_groups + e / m.elements]) + Codec::decode(code, scale);
             }
+
+            /// The group of each element of the block [e0, e0 + nb): computed once per block, not per value.
+            inline void lane_groups(const ptrdiff_t e0, const ptrdiff_t nb, const Means &m, ptrdiff_t *const groups) {
+                for (ptrdiff_t l = 0; l < nb; l++) groups[l] = (e0 + l) / m.elements;
+            }
+
+            /// The means of one tensor at each element of the block, by component: means[c][l].
+            inline void lane_means(const ptrdiff_t        nc,
+                                   const ptrdiff_t        nb,
+                                   const Means           &m,
+                                   const history_mean_t *const tensor_means,
+                                   const ptrdiff_t *const groups,
+                                   real_t (*const means)[BLOCK]) {
+                for (ptrdiff_t c = 0; c < nc; c++) {
+                    const history_mean_t *const row = &tensor_means[c * m.n_groups];
+                    for (ptrdiff_t l = 0; l < nb; l++) means[c][l] = static_cast<real_t>(row[groups[l]]);
+                }
+            }
         }  // namespace detail
 
         /// Encode `rows` rows of real_t values into one tensor of a store.
@@ -227,6 +245,10 @@ namespace sfem {
 #pragma omp parallel for
                 for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                     const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    ptrdiff_t groups[BLOCK];
+                    real_t    old_mean[detail::MAX_COMPONENTS][BLOCK];
+                    detail::lane_groups(e0, nb, m, groups);
+                    detail::lane_means(rows / m.n_qp, nb, m, m.data, groups, old_mean);
                     detail::store_mean_deviation<Codec, false>(
                             rows,
                             n,
@@ -234,8 +256,7 @@ namespace sfem {
                             nb,
                             m,
                             [&](const ptrdiff_t r, const ptrdiff_t l) {
-                                return factor *
-                                       detail::mean_deviation_value<Codec>(H[r * n + e0 + l], H_scales[e0 + l], m.data, m, r, e0 + l);
+                                return factor * (old_mean[r / m.n_qp][l] + Codec::decode(H[r * n + e0 + l], H_scales[e0 + l]));
                             },
                             [](const ptrdiff_t, const ptrdiff_t) { return real_t(0); },
                             H,
@@ -298,6 +319,8 @@ namespace sfem {
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                ptrdiff_t       groups[BLOCK];
+                if constexpr (HCodec::mean_deviation) detail::lane_groups(e0, nb, m, groups);
                 for (ptrdiff_t r = 0; r < rows; r++) {
                     real_t *const       o = &out[r * n + e0];
                     const real_t *const s = &S_n[r * n + e0];
@@ -308,9 +331,9 @@ namespace sfem {
                         const scaling_t *const                  hs = &H_scales[i * n + e0];
                         const real_t                            a  = alpha[i];
                         if constexpr (HCodec::mean_deviation) {
-                            const history_mean_t *const mi = m.tensor(i, rows);
+                            const history_mean_t *const row = m.tensor(i, rows) + (r / m.n_qp) * m.n_groups;
                             for (ptrdiff_t l = 0; l < nb; l++) {
-                                o[l] += a * detail::mean_deviation_value<HCodec>(h[l], hs[l], mi, m, r, e0 + l);
+                                o[l] += a * (static_cast<real_t>(row[groups[l]]) + HCodec::decode(h[l], hs[l]));
                             }
                         } else {
                             for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], hs[l]);
@@ -340,14 +363,18 @@ namespace sfem {
 #pragma omp parallel for
                 for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                     const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    ptrdiff_t       groups[BLOCK];
+                    real_t          old_mean[detail::MAX_COMPONENTS][BLOCK];
+                    detail::lane_groups(e0, nb, m, groups);
                     for (int i = 0; i < n_terms; i++) {
                         typename HCodec::storage_t *const h_i  = &H[i * rows * n];
                         scaling_t *const                  hs_i = &H_scales[i * n];
                         history_mean_t *const             m_i  = m.tensor(i, rows);
                         const real_t                      a    = alpha[i];
                         const real_t                      bi   = b[i];
+                        detail::lane_means(rows / m.n_qp, nb, m, m_i, groups, old_mean);
                         const auto stored = [&](const ptrdiff_t r, const ptrdiff_t l) {
-                            return detail::mean_deviation_value<HCodec>(h_i[r * n + e0 + l], hs_i[e0 + l], m_i, m, r, e0 + l);
+                            return old_mean[r / m.n_qp][l] + HCodec::decode(h_i[r * n + e0 + l], hs_i[e0 + l]);
                         };
                         detail::store_mean_deviation<HCodec, true>(
                                 rows,
