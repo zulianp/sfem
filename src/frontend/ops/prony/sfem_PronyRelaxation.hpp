@@ -69,6 +69,7 @@ namespace sfem {
             std::shared_ptr<TimeTemperatureShift> shift;              ///< default: NoShift
             real_t                                temperature{0};     ///< read through `shift` at every begin_step
             HistoryStorage                        history_storage{HistoryStorage::FULL};  ///< for H_i
+            int history_elements_per_mean{0};  ///< mean-deviation storage: QuadratureState's elements_per_mean
             ExecutionSpace                        execution_space{EXECUTION_SPACE_HOST};  ///< where the state lives
             void                                 *stream{nullptr};  ///< the device loops' stream
         };

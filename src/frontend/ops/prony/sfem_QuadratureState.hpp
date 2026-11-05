@@ -24,6 +24,13 @@ namespace sfem {
     /// Generic on purpose: the Prony history is its first user, and any other
     /// integration-point internal variable can be held the same way.
     ///
+    /// A mean-deviation store (`is_mean_deviation(storage)`) also holds a mean
+    /// per (tensor, component, group): a group is an element's points, or, on
+    /// one-point elements, the points of `elements_per_mean` consecutive
+    /// elements -- neighbours, when the mesh is ordered along a space-filling
+    /// curve.  `elements_per_mean` 0 picks one element for several points and
+    /// DEFAULT_ELEMENTS_PER_MEAN for one.
+    ///
     /// The store lives in `es`, where the kernels that read and write it run.
     /// `encode` and `decode` are host conveniences for setting and inspecting a
     /// host store; the device loops go through the codecs directly.
@@ -33,8 +40,11 @@ namespace sfem {
                         const int            n_components,
                         const int            n_qp,
                         const ptrdiff_t      n_elements,
-                        const HistoryStorage storage = HistoryStorage::FULL,
-                        const ExecutionSpace es      = EXECUTION_SPACE_HOST);
+                        const HistoryStorage storage           = HistoryStorage::FULL,
+                        const ExecutionSpace es                = EXECUTION_SPACE_HOST,
+                        const int            elements_per_mean = 0);
+
+        static constexpr int DEFAULT_ELEMENTS_PER_MEAN = 16;
 
         int            n_tensors() const { return n_tensors_; }
         int            n_components() const { return n_components_; }
@@ -46,7 +56,12 @@ namespace sfem {
         /// Values per element and tensor, n_components * n_qp.
         ptrdiff_t values_per_tensor() const { return static_cast<ptrdiff_t>(n_components_) * n_qp_; }
 
-        /// Bytes held, scales included.
+        /// The mean-deviation layout, all of whose tensors' means start at
+        /// `means_view().data`; empty for the other formats.
+        prony::Means       means_view() const;
+        int                elements_per_mean() const { return elements_per_mean_; }
+
+        /// Bytes held, scales and means included.
         std::size_t bytes() const;
 
         /// Zero every value; scales go to one.  On the device, in `stream`.
@@ -102,6 +117,10 @@ namespace sfem {
         ExecutionSpace                    es_;
         std::shared_ptr<Buffer<uint8_t>>  data_;
         std::shared_ptr<Buffer<scaling_t>> scales_;
+        int                               elements_per_mean_{1};
+        ptrdiff_t                         n_groups_{0};
+        //! [tensor][component][group], empty unless mean-deviation.
+        std::shared_ptr<Buffer<history_mean_t>> means_;
     };
 
 }  // namespace sfem

@@ -243,7 +243,8 @@ namespace sfem {
     void RelaxationGroups::configure_from_yaml(const std::string &block_name, const ryml::ConstNodeRef &node) {
         if (!node.has_child("relaxation")) return;
 
-        static const char *const keys[] = {"prony", "integrator", "wlf", "temperature", "history_storage"};
+        static const char *const keys[] = {
+                "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean"};
 
         for (auto group_node : node["relaxation"].children()) {
             const auto        key   = group_node.key();
@@ -257,7 +258,7 @@ namespace sfem {
                 for (const char *const allowed : keys) known = known || name == allowed;
                 if (!known) {
                     SFEM_ERROR("relaxation.%s: unknown key \"%s\" (expected prony, integrator, wlf, temperature, "
-                               "history_storage)\n",
+                               "history_storage, history_elements_per_mean)\n",
                                group.c_str(),
                                name.c_str());
                 }
@@ -293,6 +294,9 @@ namespace sfem {
                 }
                 if (group_node.has_child("history_storage")) {
                     options.history_storage = history_storage_from_string(read_string(group_node["history_storage"]));
+                }
+                if (group_node.has_child("history_elements_per_mean")) {
+                    options.history_elements_per_mean = static_cast<int>(read_real(group_node, "history_elements_per_mean"));
                 }
 
                 set_series(entry.first, group, series, options);

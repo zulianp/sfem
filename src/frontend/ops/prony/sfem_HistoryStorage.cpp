@@ -9,10 +9,12 @@ namespace sfem {
         if (name == "float16_scaled") return HistoryStorage::FLOAT16_SCALED;
         if (name == "int16_scaled") return HistoryStorage::INT16_SCALED;
         if (name == "int8_scaled") return HistoryStorage::INT8_SCALED;
+        if (name == "float16_md") return HistoryStorage::FLOAT16_MD;
+        if (name == "int8_md") return HistoryStorage::INT8_MD;
 
         SFEM_ERROR(
-                "Unknown history storage \"%s\" (expected full, float32, float16, float16_scaled, int16_scaled or "
-                "int8_scaled)\n",
+                "Unknown history storage \"%s\" (expected full, float32, float16, float16_scaled, int16_scaled, "
+                "int8_scaled, float16_md or int8_md)\n",
                 name.c_str());
         return HistoryStorage::FULL;
     }
@@ -31,6 +33,10 @@ namespace sfem {
                 return "int16_scaled";
             case HistoryStorage::INT8_SCALED:
                 return "int8_scaled";
+            case HistoryStorage::FLOAT16_MD:
+                return "float16_md";
+            case HistoryStorage::INT8_MD:
+                return "int8_md";
         }
         return "unknown";
     }
@@ -41,6 +47,10 @@ namespace sfem {
 
     bool is_scaled(const HistoryStorage storage) {
         return dispatch_history_codec(storage, [](auto codec) { return decltype(codec)::scaled; });
+    }
+
+    bool is_mean_deviation(const HistoryStorage storage) {
+        return dispatch_history_codec(storage, [](auto codec) { return decltype(codec)::mean_deviation; });
     }
 
 }  // namespace sfem
