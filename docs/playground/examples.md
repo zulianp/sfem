@@ -29,7 +29,7 @@ the result (see its README):
 
 | Case | What it shows |
 |---|---|
-| `torsion_hold.yaml`, `torsion_release.yaml` | A rotation ramped, held, then released (`constraints[].release`); `history_storage: int8_scaled`; the torque probe. |
+| `torsion_hold.yaml`, `torsion_release.yaml` | A rotation ramped, held, then released (`constraints[].release`); `history_storage: float32` (hold) and `int8_scaled` (release); the torque probe. |
 | `creep_torsion.yaml` | A torque-controlled rotation (`control.torque`): creep. |
 | `cyclic_torsion.yaml` | A `sine` profile: hysteresis. |
 | `axis_z_torsion.yaml` | Rotation about `z`. |
