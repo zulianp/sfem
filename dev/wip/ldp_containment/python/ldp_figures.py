@@ -32,6 +32,14 @@ Inputs (../data, copied from the jobs that produced them; README.md names the jo
                           the first 16 or 30 ms one change at a time (python/collect_transient.py)
   fp70_membrane_pressure.csv
                           the chamber pressure driving them (workflows/ldp_containment/transient)
+  prony_runs.csv, prony_series.csv
+                          the Prony history's storage formats (python/collect_prony.py): FF200
+                          simulation 2 on one GPU and the EPDM torsion bar on Grace, per format
+                          the bytes and the displacement's difference from double storage
+  prony_diag.csv          the torsion bar with the build that counts the history updates a format
+                          rounds away (SFEM_ENABLE_PRONY_DIAGNOSTICS)
+  prony_tangent_*.csv     the float32 BSR tangent's and the mesh's bytes (collect_prony.py tangent)
+  prony_bench.csv         drivers/bench/bench_prony_history: a step's two passes per format
 
 Usage:
     python3 ldp_figures.py --out ../figures --tables ../tables
@@ -1206,6 +1214,238 @@ def figure_stills(history):
     return "\n".join(out) + "\n"
 
 
+
+# ---------------------------------------------------------------------------------------------
+# The viscoelastic history's storage
+# ---------------------------------------------------------------------------------------------
+
+MB = 1e6
+# The history formats in table order: (format, label).
+HISTORY_FORMATS = [
+    ("full", "double"),
+    ("float32", "float32"),
+    ("int16_scaled", "int16"),
+    ("float16_scaled", "float16"),
+    ("int8_scaled", "int8"),
+    ("float16_md", "float16 a.+d."),
+    ("int8_md", "int8 a.+d."),
+]
+FORMAT_LABEL = dict(HISTORY_FORMATS)
+# The torsion meshes: (set, element, macro key).
+TORSION_SETS = [
+    ("torsion_HEX8_40", "HEX8", "HexC"),
+    ("torsion_HEX8_80", "HEX8", "HexF"),
+    ("torsion_TET10_40", "TET10", "TetTen"),
+    ("torsion_TET4_40", "TET4", "TetFour"),
+]
+# FF200's runs in table order.
+VALVE_RUNS = ["full_b", "float32", "int16_scaled", "float16_scaled", "int8_scaled", "float16_md_p16",
+              "int8_md_p4", "int8_md_p16", "int8_md_p64",
+              "full_a_s32", "float32_s32", "int8_scaled_s32", "int8_md_p16_s32"]
+# The benchmark's shapes: (elements, points, label).
+BENCH_SHAPES = [("242336", "1", r"TET4, \num{242336}"), ("1768274", "1", r"TET4, \num{1768274}"),
+                ("250000", "8", r"8 points, \num{250000}")]
+
+
+def prony_index(rows):
+    index = {}
+    for r in rows:
+        key = (r["set"], r["run"])
+        if key in index:
+            sys.exit("ldp_figures: %s appears twice in prony data" % (key,))
+        index[key] = r
+    return index
+
+
+def prony_state(r):
+    return sum(float(r[k]) for k in ("bytes_history", "bytes_increment", "bytes_frozen", "bytes_stress"))
+
+
+def run_label(r):
+    """The storage of one run: its history format, and whether its stress slots are float32."""
+    label = FORMAT_LABEL[r["format"]]
+    if r["repeat"] == "b":
+        label += ", repeat"
+    return label
+
+
+def lost(r):
+    return float(r["updates_lost"]) / float(r["updates"])
+
+
+def table_prony_memory(valves, tangent):
+    """FF200's persistent bytes: the tangent, the mesh and the Prony state by part, per storage."""
+    t = tangent[0]
+    rows = [("full_b", "double"), ("int8_scaled", "int8"), ("int8_md_p16", "int8 a.+d."),
+            ("full_a_s32", "double"), ("int8_scaled_s32", "int8"), ("int8_md_p16_s32", "int8 a.+d.")]
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+             r"Stress slots & History & $H_i$ & $D$ & $S^{\mathrm{hist}}$ & Slots & Total \\", r"\midrule"]
+    for i, (run, label) in enumerate(rows):
+        r = valves[("FF200", run)]
+        if i == 3:
+            lines.append(r"\addlinespace")
+        lines.append("%s & %s & %s & %s & %s & %s & %s \\\\" % (
+            ("double" if i == 0 else "float32" if i == 3 else ""), label,
+            num(float(r["bytes_history"]) / MB, 3), num(float(r["bytes_increment"]) / MB, 3),
+            num(float(r["bytes_frozen"]) / MB, 3), num(float(r["bytes_stress"]) / MB, 3), num(prony_state(r) / MB, 3)))
+    lines += [r"\midrule",
+              r"\multicolumn{6}{@{}l}{Tangent, float32 BSR (double)} & %s (%s) \\" % (
+                  num(float(t["tangent_f32_bytes"]) / MB, 3), num(float(t["tangent_f64_bytes"]) / MB, 3)),
+              r"\multicolumn{6}{@{}l}{Mesh (connectivity and coordinates)} & %s \\" % num(float(t["mesh_bytes"]) / MB, 3),
+              r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_prony_valves(valves):
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}llrrrrr@{}}", r"\toprule",
+             r"History & Slots & MB & $e_u$ (\%) & Steps & Failed & \si{\second} \\", r"\midrule"]
+    for i, run in enumerate(VALVE_RUNS):
+        r = valves[("FF200", run)]
+        if run == "full_a_s32":
+            lines.append(r"\addlinespace")
+        label = run_label(r)
+        if r["elements_per_mean"] != "0":
+            label += r", %s" % r["elements_per_mean"]
+        lines.append("%s & %s & %s & %s & %s & %s & %s \\\\" % (
+            label, "float32" if r["stress_storage"] == "float32" else "double", num(prony_state(r) / MB, 3),
+            num(float(r["e_u_median"]), 2), integer(r["steps"]), integer(r["failed"]), integer(float(r["stepper_s"]))))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_prony_torsion(torsion, diag):
+    head = " & ".join(r"%s, \num{%s}" % (el, torsion[(s, "full_b")]["dofs"]) for s, el, _ in TORSION_SETS)
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
+             r" & \multicolumn{4}{c}{median $e_u$ (\%)} & $H_i$, $D$ (MB) & lost (\%) \\",
+             r"\cmidrule(lr){2-5}",
+             r"History & %s & \multicolumn{2}{c}{HEX8, \num{%s}} \\" % (head, torsion[("torsion_HEX8_80", "full_b")]["dofs"]),
+             r"\midrule"]
+    for fmt, label in [("full_b", "double, repeat")] + [(f, l) for f, l in HISTORY_FORMATS if f != "full"]:
+        cells = [num(float(torsion[(s, fmt)]["e_u_median"]), 2) for s, _, _ in TORSION_SETS]
+        r = torsion[("torsion_HEX8_80", fmt)]
+        hd = num((float(r["bytes_history"]) + float(r["bytes_increment"])) / MB, 3)
+        d = diag.get(("diag_HEX8_80", fmt))
+        lost_cell = num(100 * lost(d), 2) if d else "--"
+        lines.append("%s & %s & %s & %s \\\\" % (label, " & ".join(cells), hd, lost_cell))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def table_prony_cost(bench):
+    index = {(r["format"], r["space"], r["elements"], r["n_qp"]): r for r in bench}
+    cols = [(space, e, q) for space in ("host", "device") for e, q, _ in BENCH_SHAPES]
+    lines = [PREAMBLE,
+             r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
+             r" & \multicolumn{3}{c}{Grace, %s threads} & \multicolumn{3}{c}{H100} \\" % bench[0]["threads"],
+             r"\cmidrule(lr){2-4}\cmidrule(l){5-7}",
+             r"History & %s & %s \\" % (" & ".join(l for _, _, l in BENCH_SHAPES), " & ".join(l for _, _, l in BENCH_SHAPES)),
+             r"\midrule"]
+    for fmt, label in HISTORY_FORMATS:
+        cells = []
+        for space, e, q in cols:
+            r = index[(fmt, space, e, q)]
+            cells.append(num(float(r["begin_step_us"]) + float(r["advance_us"]), 3))
+        lines.append("%s & %s \\\\" % (label, " & ".join(cells)))
+    lines += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(lines) + "\n"
+
+
+def figure_prony_torsion(series):
+    """e_u(t) on the finer HEX8 bar, one line per history format."""
+    styles = [("full_b", "black, dotted", "double, repeat"), ("float32", "LdpA", "float32"),
+              ("int16_scaled", "LdpC", "int16"), ("float16_scaled", "LdpB", "float16"),
+              ("int8_scaled", "LdpD", "int8"), ("float16_md", "LdpB, densely dashed", "float16 a.+d."),
+              ("int8_md", "LdpD, densely dashed", "int8 a.+d.")]
+    out = [PREAMBLE,
+           r"\begin{tikzpicture}",
+           r"\begin{axis}[width=\columnwidth, height=5.2cm, ymode=log, xmin=0, xmax=1, ymin=1e-11, ymax=1e3,",
+           r"  xlabel={$t$ (\si{\second})}, ylabel={$e_u$ (\%)}, xmajorgrids, ymajorgrids,",
+           r"  tick label style={font=\scriptsize}, label style={font=\footnotesize},",
+           r"  legend style={font=\tiny, at={(0.5,1.02)}, anchor=south, legend columns=4, draw=none}]"]
+    for run, style, label in styles:
+        pts = [(float(r["t"]), max(float(r["e_u"]), 1e-11)) for r in series
+               if r["set"] == "torsion_HEX8_80" and r["run"] == run]
+        out.append(r"\addplot[%s, semithick] coordinates {%s};" % (style, " ".join("(%.4f,%.3e)" % p for p in pts)))
+        out.append(r"\addlegendentry{%s}" % label)
+    for t in (0.5, 0.65):
+        out.append(r"\draw[gray, thin] (axis cs:%.2f,1e-11) -- (axis cs:%.2f,1e3);" % (t, t))
+    out += [r"\end{axis}", r"\end{tikzpicture}"]
+    return "\n".join(out) + "\n"
+
+
+def prony_macros(valves, torsion, diag, tangent, refined, bench):
+    out = []
+
+    def m(name, value):
+        out.append(macro(name, value))
+
+    t = tangent[0]
+    v = lambda run: valves[("FF200", run)]
+    m("hsTangentMB", num(float(t["tangent_f32_bytes"]) / MB, 3))
+    m("hsTangentDoubleMB", num(float(t["tangent_f64_bytes"]) / MB, 3))
+    m("hsMeshMB", num(float(t["mesh_bytes"]) / MB, 3))
+    m("hsRefinedTangentMB", num(float(refined[0]["tangent_f32_bytes"]) / MB, 3))
+    m("hsElements", integer(t["elements"]))
+    m("hsStateFullMB", num(prony_state(v("full_b")) / MB, 3))
+    m("hsStateIntMB", num(prony_state(v("int8_scaled")) / MB, 3))
+    m("hsStateMdMB", num(prony_state(v("int8_md_p16")) / MB, 3))
+    m("hsStateFullSlotsMB", num(prony_state(v("full_a_s32")) / MB, 3))
+    m("hsStateIntSlotsMB", num(prony_state(v("int8_scaled_s32")) / MB, 3))
+    m("hsStateMdSlotsMB", num(prony_state(v("int8_md_p16_s32")) / MB, 3))
+    m("hsStateSingleSlotsMB", num(prony_state(v("float32_s32")) / MB, 3))
+    m("hsStateOverTangent", num(prony_state(v("full_b")) / float(t["tangent_f32_bytes"]), 2))
+    m("hsStateIntSlotsOverTangent", num(prony_state(v("int8_scaled_s32")) / float(t["tangent_f32_bytes"]), 2))
+    m("hsFrozenMB", num(float(v("full_b")["bytes_frozen"]) / MB, 3))
+    m("hsSlotsMB", num(float(v("full_b")["bytes_stress"]) / MB, 3))
+    m("hsSlotsNarrowMB", num(float(v("full_a_s32")["bytes_stress"]) / MB, 3))
+    m("hsRealShareInt", integer(100 * (float(v("int8_scaled")["bytes_frozen"]) + float(v("int8_scaled")["bytes_stress"]))
+                                / prony_state(v("int8_scaled"))))
+    m("hsStored", integer(v("full_b")["iso_stored"]))
+    m("hsStepMs", integer(1e3 * float(v("full_b")["stepper_s"]) / float(v("full_b")["steps"])))
+    m("hsDevicePeakGB", num(float(v("full_b")["device_used_peak"]) / 1e9, 3))
+    for run, key in (("full_b", "Noise"), ("float32", "Single"), ("int16_scaled", "Sixteen"),
+                     ("float16_scaled", "Half"), ("int8_scaled", "Int"), ("float16_md_p16", "HalfMd"),
+                     ("int8_md_p16", "Md"), ("int8_md_p4", "MdFour"), ("int8_md_p64", "MdSixtyFour"),
+                     ("full_a_s32", "FullSlots"), ("float32_s32", "SingleSlots"),
+                     ("int8_scaled_s32", "IntSlots"), ("int8_md_p16_s32", "MdSlots")):
+        m("hsValve" + key, num(float(v(run)["e_u_median"]), 2))
+    m("hsValveMdGain", num(float(v("int8_scaled")["e_u_median"]) / float(v("int8_md_p16")["e_u_median"]), 2))
+    m("hsValveMaxNoise", num(float(v("full_b")["e_u_max"]), 2))
+    times = [float(v(r)["stepper_s"]) for r in VALVE_RUNS]
+    m("hsValveTimeMin", integer(min(times)))
+    m("hsValveTimeMax", integer(max(times)))
+    gains = [float(torsion[(s, "int8_scaled")]["e_u_median"]) / float(torsion[(s, "int8_md")]["e_u_median"])
+             for s, el, _ in TORSION_SETS if el != "TET4"]
+    m("hsTorsionMdGainMin", integer(min(gains)))
+    m("hsTorsionMdGainMax", integer(max(gains)))
+    hgains = [float(torsion[(s, "float16_scaled")]["e_u_median"]) / float(torsion[(s, "float16_md")]["e_u_median"])
+              for s, el, _ in TORSION_SETS if el != "TET4"]
+    m("hsTorsionHalfGainMin", integer(min(hgains)))
+    m("hsTorsionHalfGainMax", integer(max(hgains)))
+    m("hsTorsionTetGain", num(float(torsion[("torsion_TET4_40", "int8_scaled")]["e_u_median"]) /
+                              float(torsion[("torsion_TET4_40", "int8_md")]["e_u_median"]), 2))
+    m("hsTorsionNoiseMax", num(max(float(torsion[(s, "full_b")]["e_u_median"]) for s, _, _ in TORSION_SETS), 2))
+    for s, _, key in TORSION_SETS:
+        m("hsDofs" + key, integer(torsion[(s, "full_b")]["dofs"]))
+    hf = lambda fmt: torsion[("torsion_HEX8_80", fmt)]
+    m("hsTorsionMdBytes", num((float(hf("int8_md")["bytes_history"]) + float(hf("int8_md")["bytes_increment"])) / MB, 3))
+    m("hsTorsionHalfBytes", num((float(hf("float16_scaled")["bytes_history"]) + float(hf("float16_scaled")["bytes_increment"])) / MB, 3))
+    for fmt, key in (("float16_scaled", "Half"), ("int8_scaled", "Int"), ("int8_md", "Md"), ("float16_md", "HalfMd")):
+        m("hsLost" + key, num(100 * lost(diag[("diag_HEX8_80", fmt)]), 2))
+        m("hsLostTet" + key, num(100 * lost(diag[("diag_TET4_40", fmt)]), 2))
+    b = {(r["format"], r["space"], r["elements"], r["n_qp"]): r for r in bench}
+    step = lambda fmt, space, e, q: float(b[(fmt, space, e, q)]["begin_step_us"]) + float(b[(fmt, space, e, q)]["advance_us"])
+    m("hsCostMdHost", num(step("int8_md", "host", "242336", "1") / step("int8_scaled", "host", "242336", "1"), 2))
+    m("hsCostMdDevice", num(step("int8_md", "device", "242336", "1") / step("int8_scaled", "device", "242336", "1"), 2))
+    m("hsCostMdHostUs", integer(step("int8_md", "host", "242336", "1")))
+    m("hsCostMdDeviceUs", integer(step("int8_md", "device", "242336", "1")))
+    m("hsCostShare", num(100 * step("int8_md", "device", "242336", "1") * 1e-6 /
+                         (float(v("full_b")["stepper_s"]) / float(v("full_b")["steps"])), 2))
+    return "".join(out)
+
 # ---------------------------------------------------------------------------------------------
 # Driver
 # ---------------------------------------------------------------------------------------------
@@ -1247,6 +1487,17 @@ def generate(out, tables):
     write(os.path.join(tables, "precision.tex"), table_precision(precision))
     write(os.path.join(tables, "nccl.tex"), table_nccl(nccl))
     write(os.path.join(tables, "release.tex"), table_release(read_csv("release_runs.csv")))
+    prony = prony_index(read_csv("prony_runs.csv"))
+    diag = prony_index(read_csv("prony_diag.csv"))
+    tangent, refined = read_csv("prony_tangent_FF200.csv"), read_csv("prony_tangent_FF200_refined.csv")
+    bench = read_csv("prony_bench.csv")
+    with open(os.path.join(out, "ldp_macros.tex"), "a") as fh:
+        fh.write(prony_macros(prony, prony, diag, tangent, refined, bench))
+    write(os.path.join(tables, "prony_memory.tex"), table_prony_memory(prony, tangent))
+    write(os.path.join(tables, "prony_valves.tex"), table_prony_valves(prony))
+    write(os.path.join(tables, "prony_torsion.tex"), table_prony_torsion(prony, diag))
+    write(os.path.join(tables, "prony_cost.tex"), table_prony_cost(bench))
+    write(os.path.join(out, "prony_torsion.tex"), figure_prony_torsion(read_csv("prony_series.csv")))
 
 
 def selftest():
@@ -1305,6 +1556,20 @@ def selftest():
     e = valve_events(rows, "u", 1)
     assert [round(x["open"] * 1e3) for x in e] == [5, 60] and [round(x["close"] * 1e3) for x in e] == [21, 71], e
     assert round(e[1]["rebound"] * 1e3) == 3 and e[0]["rebound"] == 0, e
+    # The history's storage: every run the tables name, and the diagnostics' counts.
+    prony = prony_index(read_csv("prony_runs.csv"))
+    for run in VALVE_RUNS:
+        assert ("FF200", run) in prony, run
+    for s, _, _ in TORSION_SETS:
+        for fmt in ["full_b"] + [f for f, _ in HISTORY_FORMATS if f != "full"]:
+            assert (s, fmt) in prony, (s, fmt)
+    diag = prony_index(read_csv("prony_diag.csv"))
+    assert all(int(r["updates"]) > 0 for r in diag.values())
+    bench = {(r["format"], r["space"], r["elements"], r["n_qp"]) for r in read_csv("prony_bench.csv")}
+    for fmt, _ in HISTORY_FORMATS:
+        for space in ("host", "device"):
+            for e, q, _ in BENCH_SHAPES:
+                assert (fmt, space, e, q) in bench, (fmt, space, e, q)
     print("ldp_figures selftest passed")
 
 

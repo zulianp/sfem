@@ -1,5 +1,6 @@
-%% Valve containment in liquid diaphragm pumps: contact on a signed distance field, on Grace and
-%% Hopper.
+%% Space-efficient simulation of the EPDM valves of liquid diaphragm pumps on Grace and Hopper:
+%% containment by contact on a signed distance field, pump strokes, and the viscoelastic history's
+%% storage.
 %%
 %% Build:  make          (latexmk -pdf)
 %%         make figures  (regenerate every figure, table and macro from data/)
@@ -26,8 +27,8 @@
 
 \begin{document}
 
-\title{Valve containment by obstacle contact on a signed distance field: a matrix-based
-Newton--MPRGP solver on Grace and Hopper}
+\title{Space-efficient simulation of the EPDM valves of liquid diaphragm pumps on Grace and
+Hopper}
 
 \author{Patrick Zulian}
 \orcid{0000-0002-5822-3288}
@@ -49,24 +50,25 @@ Newton--MPRGP solver on Grace and Hopper}
 \email{patrick.zulian@usi.ch}
 
 \begin{abstract}
-Before a fluid simulation of a liquid diaphragm pump can start, the valves of its solid model
-must be pushed out of the fluid domain into which the meshing has placed them. We solve this
-containment problem as hyperelastic contact with a rigid obstacle given by a signed distance
-field: Newton's method with a bound-constrained quadratic program per step, solved by MPRGP. The
-solver runs on Grace CPUs and Hopper GPUs, on one and two nodes of the Alps GH200 system, from a
-single implementation. On four industrial meshes with \dofsMin{} to \dofsMax{} degrees of
-freedom, all host and device configurations produce the same converged displacement to a
-relative \agreeParallel{}, and the converged solutions have a KKT residual \kktRatioMin{} to
-\kktRatioMax{} times smaller than the production solver they replace. The QP iteration is
-latency bound at these sizes: on the three smaller meshes the fastest Grace configuration and one
-GPU solve within \graceGpuCloseMax\% of each other, and several GPUs are the fastest on the
-largest. Storing the tangent in single precision lowers the cost per QP
-iteration by up to \singleMax\% and changes the solution less than repeated runs do. From the
-contained state, the same solver drives the FF200 valves through \trStrokes{} pump strokes of
-transient contact with a viscoelastic material, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
-on one GPU; on the refined mesh, \dofsFFf{} degrees of freedom on a node's \trGpusRefined{} GPUs, the
-valves open and close within \trResEventShift\,\si{\milli\second} of the coarse mesh's in
-\trSteppingRefined\,\si{\second}.
+The valves of a liquid diaphragm pump are EPDM bodies held only by the cavity around them. We
+simulate them in two stages with one solver, Newton's method with a bound-constrained quadratic
+program per step solved by MPRGP, against a rigid obstacle given by a signed distance field, on
+Grace CPUs and Hopper GPUs of the Alps GH200 system. First the valves are pushed out of the fluid
+domain into which the meshing has placed them: on four industrial meshes with \dofsMin{} to
+\dofsMax{} degrees of freedom, all host and device configurations reach the same displacement to
+a relative \agreeParallel{}, with a KKT residual \kktRatioMin{} to \kktRatioMax{} times smaller
+than the production solver's, and storing the tangent in single precision lowers the cost per QP
+iteration by up to \singleMax\%. Then the FF200 valves run through \trStrokes{} pump strokes of
+transient contact with a 15-term Prony series, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
+on one GPU. There the viscoelastic history, not the tangent, dominates the operator's memory: in
+double precision it takes \hsStateOverTangent{} times the bytes of the single-precision tangent.
+Storing the history and the stress slots it keeps between steps in single precision moves the
+solution no more than repeated runs differ and takes FF200's history from \hsStateFullMB{} to
+\hsStateSingleSlotsMB\,MB. Narrower codes round away updates of the slowly relaxing terms, a
+quarter of them with 8 bits. Storing per element an average in single precision and 8-bit deviations from it keeps
+them, and is \hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more accurate than 8-bit codes
+alone on elements with several quadrature points, and \hsValveMdGain{} times on the valves'
+one-point tetrahedra, at \hsStateMdSlotsMB\,MB.
 \end{abstract}
 
 \maketitle
@@ -93,8 +95,18 @@ tolerance. The contributions are
 \item a comparison of every configuration with the single-process result and of the converged
   states with utopia's, by displacement, penetration, contact set and KKT residual;
 \item time to solution and cost per QP iteration on one Grace module up to eight Hopper GPUs on
-  two nodes, and with the tangent assembled in single precision.
+  two nodes, and with the tangent assembled in single precision;
+\item the EPDM valves through pump strokes with a broadband Prony series, and the storage of its
+  history: what it costs in memory, how narrow formats perturb the solution and why, and a format
+  that stores an average per element in single precision and the deviations from it in 8 bits.
 \end{itemize}
+
+The valves are viscoelastic, and a broadband Prony series keeps one stress-like tensor per term
+and quadrature point. A first assessment of reduced-precision storage for such histories, on a
+bar in torsion, found single precision indistinguishable from double and half precision, scaled or
+not, a few percent off~\cite{yang2026prony}. Here the question is the valves', where the history
+outweighs the tangent, and the formats include the average-and-deviation storage that compresses
+the stored tangent of a matrix-free operator.
 
 \section{Problem and method}
 \label{sec:problem}
@@ -557,6 +569,137 @@ section; coloured as Figure~\ref{fig:stills}.}
 \end{figure*}
 
 
+\section{Storing the viscoelastic history}
+\label{sec:history}
+
+\paragraph{The state.} Term $i$ of the Prony series relaxes the isochoric second Piola--Kirchhoff
+stress $S$ through a stress-like tensor $H_i$ at every quadrature point~\cite{simo1987}. Over a
+step of length $\Delta t$ in which $S$ varies linearly,
+\begin{equation}
+  H_i^{n+1} = \alpha_i H_i^n + b_i\bigl(S^{n+1} - S^n\bigr),\qquad
+  \alpha_i = e^{-\Delta t/\tau_i},\quad b_i = g_i\frac{\tau_i}{\Delta t}(1-\alpha_i),
+\end{equation}
+and within the step the history the element kernels read,
+$S^{\mathrm{hist}} = \sum_i\alpha_iH_i^n - \bigl(\sum_ib_i\bigr)S^n$, is fixed. A term whose $\alpha_i$
+lies below half a unit of double precision relaxes completely within the step; such terms keep no
+tensor of their own but a coefficient on one increment $D=S^{n+1}-S^n$ that they share. At the strokes'
+step \hsStored{} of the 15 terms keep a tensor. $S^n$ and $S^{n+1}$ are evaluated from the
+displacements at the two ends of a step into two slots kept between steps, so that the next step
+starts from the very tensor this one ended at and the increments telescope. The persistent state
+per relaxation group is therefore the $H_i$, $D$, $S^{\mathrm{hist}}$ and the two slots.
+Table~\ref{tab:prony-memory} gives their bytes on FF200 (\hsElements{} tetrahedra, one quadrature
+point each): \hsStateFullMB\,MB in double precision, \hsStateOverTangent{} times the
+single-precision tangent of Section~\ref{sec:problem} and more than the tangent in double.
+
+\paragraph{Formats.} Arithmetic stays in double; only the store is narrowed. Single precision
+rounds each value. The scaled formats keep one single-precision scale per term and element: int8
+and int16 store $\mathrm{round}(v/s)$ with $s$ the element's largest $|v|$ over 127 or 32767, and
+float16 stores $v/s$ with a power of two $s$ that keeps it in range. Each step decodes, updates and
+re-encodes $H_i$, so the rounding of every step is carried on with weight $\alpha_i$. For a term
+with $\tau_i\gg\Delta t$, $\alpha_i$ is close to one and $b_i(S^{n+1}-S^n)$ is a small fraction of $H_i$;
+below half a code it is rounded away, and the history stops following the stress.
+
+\paragraph{Average and deviation.} The stored tangent of a matrix-free operator is compressed by
+keeping per element its average over the quadrature points in single precision and coding only the
+deviations from it, whose range is the variation over the element rather than its size. The same
+applies to the history: per term, component and group of points, the average $\bar H$ in single
+precision, and per element the deviations $H-\bar H$ in int8 or scaled float16 under one scale.
+Decoding is $\bar H + s\,c$. A group is an element's quadrature points; on elements with one point
+it is a run of $P$ consecutive elements, neighbours since the meshes are ordered along a
+space-filling curve. The part of an update shared by the group lands in $\bar H$, so a slow drift is
+not rounded away. Encoding takes three passes over the values instead of two: the averages, the
+deviations' scale, and the codes.
+
+\paragraph{Stress slots in single precision.} The kernel that evaluates $S$ writes it in double to a
+scratch that exists only during the evaluation; it is rounded once into a single-precision slot,
+and both ends of every step read the rounded values. The increments therefore still telescope, and
+the rounding of $S$ perturbs the history once rather than accumulating. $S^{\mathrm{hist}}$ stays in
+double: it is read by every element kernel, whose interface carries one scalar type.
+
+\begin{table}
+\caption{FF200's persistent Prony state by part (MB) per storage of the stress slots and the
+history, against the tangent and the mesh. Means over 16 elements for the average-and-deviation
+format.}
+\label{tab:prony-memory}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\input{tables/prony_memory}
+\end{table}
+
+\subsection{A bar in torsion}
+
+The bar of~\cite{yang2026prony}, \SI{100}{\milli\metre} long with a $\SI{20}{\milli\metre}$ square
+section, is clamped at one end and twisted at the other by \SI{1.5}{\radian} over \SI{0.5}{\second},
+held until \SI{0.65}{\second}, released, and followed to \SI{1}{\second}, with the valves' material
+and series and BDF2 at $\Delta t=\SI{1}{\milli\second}$, where again four terms keep a tensor. There is
+no contact, and on Grace the runs reproduce to a median displacement difference of
+\hsTorsionNoiseMax\%, so the comparison measures the storage alone. Table~\ref{tab:prony-torsion}
+gives, per format, the median over 72 instants of
+$e_u = 100\,\lVert u - u_{\mathrm{double}}\rVert_2/\lVert u_{\mathrm{double}}\rVert_2$ (in percent) on
+HEX8 (eight quadrature points), TET10 (eleven) and TET4 (one, averages over 16 elements), and the
+share of updates a format rounds away. int8 loses \hsLostInt\% of them on HEX8 and float16
+\hsLostHalf\%; their error grows through the twist and jumps when the released bar recovers from the
+stress the history holds (Figure~\ref{fig:prony-torsion}). With an average, int8 loses \hsLostMd\% and is
+\hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more accurate on HEX8 and TET10, float16
+\hsTorsionHalfGainMin{} to \hsTorsionHalfGainMax{} times. On TET4, whose average is over neighbouring
+elements, the gain is \hsTorsionTetGain-fold. On the finer HEX8 mesh int8 with averages takes
+\hsTorsionMdBytes\,MB for $H_i$ and $D$ against float16's \hsTorsionHalfBytes\,MB, at about twice
+float16's error.
+
+\begin{table*}
+\caption{The bar in torsion on Grace: median $e_u$ against double storage per history format and
+mesh (dofs), the bytes of $H_i$ and $D$ on the finer HEX8 mesh, and the share of the history updates
+the format rounds away there. a.+d.: average and deviation.}
+\label{tab:prony-torsion}
+\small
+\input{tables/prony_torsion}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\input{figures/prony_torsion}
+\caption{$e_u(t)$ on the finer HEX8 bar (\hsDofsHexF{} dofs) per history format; the twist is held
+from \SI{0.5}{\second} and released at \SI{0.65}{\second}.}
+\label{fig:prony-torsion}
+\end{figure}
+
+\subsection{The valves}
+
+Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage. The GPU assembles
+with atomic additions, so two runs in double already differ, by a median $e_u$ of
+\hsValveNoise\%; the largest $e_u$ over the strokes, up to \hsValveMaxNoise\% between those two runs,
+measures when a valve meets its seat rather than the storage, and is not used. Single precision for
+the history (\hsValveSingle\%), the slots (\hsValveFullSlots\%) or both (\hsValveSingleSlots\%) stays at
+that floor; the 16-bit formats lie \hsValveSixteen{} to \hsValveHalf\%, int8 at \hsValveInt\%. Averages
+over runs of 16 elements make int8 \hsValveMdGain{} times more accurate (\hsValveMd\%), less than on the
+bar: neighbouring elements of a valve in contact differ more than the points of one element. For
+float16, whose rounding is relative to each value, subtracting an average turns small values into
+large deviations, and the error grows to \hsValveHalfMd\%. Every run takes \hsValveTimeMin{} to
+\hsValveTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's two passes over the
+history: averages make them \hsCostMdHost{} times as expensive as int8 on Grace and \hsCostMdDevice{}
+times on the GPU, \hsCostMdDeviceUs\,\si{\micro\second} on FF200's size, \hsCostShare\% of a stroke
+step's \hsStepMs\,\si{\milli\second}.
+
+\begin{table}
+\caption{FF200 through \trStrokes{} strokes on one GPU per storage of the history and of the stress
+slots: the Prony state (MB), the median $e_u$ against the first run in double, steps, failed
+attempts and the time stepping took (\si{\second}). The first row repeats that run; a.+d.\ $P$: average
+and deviation over runs of $P$ elements.}
+\label{tab:prony-valves}
+\small
+\setlength{\tabcolsep}{2.5pt}
+\input{tables/prony_valves}
+\end{table}
+
+\begin{table*}
+\caption{A step's two passes over the history (\si{\micro\second}, the frozen history and the update)
+per format: the valves' series at $\Delta t=\SI{0.1}{\milli\second}$, four stored terms and $D$,
+on a synthetic smooth stress (drivers/bench/bench\_prony\_history).}
+\label{tab:prony-cost}
+\small
+\input{tables/prony_cost}
+\end{table*}
+
 \section{Limitations}
 
 In the single-process runs \qpCappedClause{}. The Newton budget
@@ -567,6 +710,8 @@ The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for
 a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
 valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
 without a step-size study.
+The frozen history $S^{\mathrm{hist}}$ stays in double, and the valves' comparison of history
+formats is bounded below by the GPU's run-to-run differences.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
