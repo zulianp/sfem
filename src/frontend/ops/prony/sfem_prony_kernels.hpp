@@ -20,11 +20,113 @@
 // twice -- once for the scale and once to store.  The arithmetic is one fused
 // multiply-add per value, which is cheaper than holding a block of decoded
 // tensors in scratch.
+//
+// The mean-deviation codecs keep, beside the codes, a mean per (tensor,
+// component, group of `Means::elements` consecutive elements' points), and code
+// each value's deviation from it.  Re-encoding them runs the arithmetic three
+// times -- for the means, the deviations' scale, and to store -- and a group
+// never straddles a block (`elements` divides BLOCK), so each pass stays within
+// the block that owns the group.
 
 namespace sfem {
     namespace prony {
 
         static constexpr ptrdiff_t BLOCK = 64;
+
+        static_assert(BLOCK % MAX_ELEMENTS_PER_MEAN == 0, "a group of elements must not straddle a block");
+
+        namespace detail {
+            static constexpr int MAX_COMPONENTS = 9;
+
+            /// Store the values z(r, l) of one tensor (row r, element e0 + l) on the block of
+            /// elements [e0, e0 + nb) as means and deviations: per component and group the mean
+            /// of its values over the group's points, rounded to history_mean_t, and per element
+            /// the base codec's scale of the largest deviation.  `z` may read the tensor being
+            /// written: each value is read before it is overwritten, and the scales and means are
+            /// written last.  With COUNT, the values whose stored value `old(r, l)` did not move
+            /// although z did are counted (sfem_prony_diagnostics.hpp).
+            template <class Codec, bool COUNT, class Z, class Old>
+            void store_mean_deviation(const ptrdiff_t                          rows,
+                                      const ptrdiff_t                          n,
+                                      const ptrdiff_t                          e0,
+                                      const ptrdiff_t                          nb,
+                                      const Means                             &m,
+                                      Z                                      &&z,
+                                      Old                                    &&old,
+                                      typename Codec::storage_t *const H,  // read by z: not restrict
+                                      scaling_t *const                 scales,
+                                      history_mean_t *const            means) {
+                (void)old;
+                const ptrdiff_t nc  = rows / m.n_qp;
+                const ptrdiff_t g0  = e0 / m.elements;
+                const ptrdiff_t ngb = (nb + m.elements - 1) / m.elements;
+
+                real_t         mean[MAX_COMPONENTS][BLOCK];
+                history_mean_t group_mean[MAX_COMPONENTS][BLOCK];
+                for (ptrdiff_t c = 0; c < nc; c++) {
+                    real_t sum[BLOCK];
+                    for (ptrdiff_t l = 0; l < nb; l++) sum[l] = 0;
+                    for (int q = 0; q < m.n_qp; q++) {
+                        const ptrdiff_t r = c * m.n_qp + q;
+                        for (ptrdiff_t l = 0; l < nb; l++) sum[l] += z(r, l);
+                    }
+                    for (ptrdiff_t g = 0; g < ngb; g++) {
+                        const ptrdiff_t lo = g * m.elements, hi = std::min(lo + m.elements, nb);
+                        real_t          s  = 0;
+                        for (ptrdiff_t l = lo; l < hi; l++) s += sum[l];
+                        group_mean[c][g] = static_cast<history_mean_t>(s / static_cast<real_t>((hi - lo) * m.n_qp));
+                        for (ptrdiff_t l = lo; l < hi; l++) mean[c][l] = group_mean[c][g];
+                    }
+                }
+
+                real_t max_abs[BLOCK];
+                for (ptrdiff_t l = 0; l < nb; l++) max_abs[l] = 0;
+                for (ptrdiff_t r = 0; r < rows; r++) {
+                    const real_t *const mc = mean[r / m.n_qp];
+                    for (ptrdiff_t l = 0; l < nb; l++) max_abs[l] = std::max(max_abs[l], std::abs(z(r, l) - mc[l]));
+                }
+
+                scaling_t scale[BLOCK];
+                real_t    inv[BLOCK];
+                for (ptrdiff_t l = 0; l < nb; l++) {
+                    scale[l] = Codec::scale_for(max_abs[l]);
+                    inv[l]   = 1 / static_cast<real_t>(scale[l]);
+                }
+
+                SFEM_PRONY_COUNTERS;
+                for (ptrdiff_t r = 0; r < rows; r++) {
+                    const real_t *const              mc = mean[r / m.n_qp];
+                    typename Codec::storage_t *const h  = &H[r * n + e0];
+                    for (ptrdiff_t l = 0; l < nb; l++) {
+                        if constexpr (COUNT) {
+                            SFEM_PRONY_DIAGNOSTIC(const real_t before = old(r, l));
+                            const real_t v = z(r, l);
+                            h[l]           = Codec::encode(v - mc[l], inv[l]);
+                            SFEM_PRONY_COUNT(before, v, mc[l] + Codec::decode(h[l], scale[l]));
+                        } else {
+                            h[l] = Codec::encode(z(r, l) - mc[l], inv[l]);
+                        }
+                    }
+                }
+                if constexpr (COUNT) SFEM_PRONY_COMMIT_COUNTS;
+
+                for (ptrdiff_t l = 0; l < nb; l++) scales[e0 + l] = scale[l];
+                for (ptrdiff_t c = 0; c < nc; c++) {
+                    for (ptrdiff_t g = 0; g < ngb; g++) means[c * m.n_groups + g0 + g] = group_mean[c][g];
+                }
+            }
+
+            /// Value (r, e) of a mean-deviation tensor.
+            template <class Codec>
+            inline real_t mean_deviation_value(const typename Codec::storage_t code,
+                                               const scaling_t                 scale,
+                                               const history_mean_t *const     means,
+                                               const Means                    &m,
+                                               const ptrdiff_t                 r,
+                                               const ptrdiff_t                 e) {
+                return static_cast<real_t>(means[(r / m.n_qp) * m.n_groups + e / m.elements]) + Codec::decode(code, scale);
+            }
+        }  // namespace detail
 
         /// Encode `rows` rows of real_t values into one tensor of a store.
         template <class Codec>
@@ -32,7 +134,27 @@ namespace sfem {
                     const ptrdiff_t                  n,
                     const real_t *const SFEM_RESTRICT values,
                     typename Codec::storage_t *const SFEM_RESTRICT out,
-                    scaling_t *const SFEM_RESTRICT    scales) {
+                    scaling_t *const SFEM_RESTRICT    scales,
+                    const Means                      &m = Means{}) {
+            if constexpr (Codec::mean_deviation) {
+#pragma omp parallel for
+                for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                    const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    detail::store_mean_deviation<Codec, false>(
+                            rows,
+                            n,
+                            e0,
+                            nb,
+                            m,
+                            [&](const ptrdiff_t r, const ptrdiff_t l) { return values[r * n + e0 + l]; },
+                            [](const ptrdiff_t, const ptrdiff_t) { return real_t(0); },
+                            out,
+                            scales,
+                            m.data);
+                }
+                return;
+            }
+
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
@@ -72,14 +194,21 @@ namespace sfem {
                     const ptrdiff_t                               n,
                     const typename Codec::storage_t *const SFEM_RESTRICT in,
                     const scaling_t *const SFEM_RESTRICT          scales,
-                    real_t *const SFEM_RESTRICT                   values) {
+                    real_t *const SFEM_RESTRICT                   values,
+                    const Means                                  &m = Means{}) {
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
                 for (ptrdiff_t r = 0; r < rows; r++) {
                     const typename Codec::storage_t *const s = &in[r * n + e0];
                     real_t *const                          v = &values[r * n + e0];
-                    for (ptrdiff_t l = 0; l < nb; l++) v[l] = Codec::decode(s[l], scales[e0 + l]);
+                    if constexpr (Codec::mean_deviation) {
+                        for (ptrdiff_t l = 0; l < nb; l++) {
+                            v[l] = detail::mean_deviation_value<Codec>(s[l], scales[e0 + l], m.data, m, r, e0 + l);
+                        }
+                    } else {
+                        for (ptrdiff_t l = 0; l < nb; l++) v[l] = Codec::decode(s[l], scales[e0 + l]);
+                    }
                 }
             }
         }
@@ -92,7 +221,30 @@ namespace sfem {
                    const ptrdiff_t                            n,
                    const real_t                               factor,
                    typename Codec::storage_t *const SFEM_RESTRICT H,
-                   scaling_t *const SFEM_RESTRICT             H_scales) {
+                   scaling_t *const SFEM_RESTRICT             H_scales,
+                   const Means                               &m = Means{}) {
+            if constexpr (Codec::mean_deviation) {
+#pragma omp parallel for
+                for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                    const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    detail::store_mean_deviation<Codec, false>(
+                            rows,
+                            n,
+                            e0,
+                            nb,
+                            m,
+                            [&](const ptrdiff_t r, const ptrdiff_t l) {
+                                return factor *
+                                       detail::mean_deviation_value<Codec>(H[r * n + e0 + l], H_scales[e0 + l], m.data, m, r, e0 + l);
+                            },
+                            [](const ptrdiff_t, const ptrdiff_t) { return real_t(0); },
+                            H,
+                            H_scales,
+                            m.data);
+                }
+                return;
+            }
+
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
@@ -141,7 +293,8 @@ namespace sfem {
                             const typename HCodec::storage_t *const SFEM_RESTRICT H,
                             const scaling_t *const SFEM_RESTRICT             H_scales,
                             const real_t *const SFEM_RESTRICT                S_n,
-                            real_t *const SFEM_RESTRICT                      out) {
+                            real_t *const SFEM_RESTRICT                      out,
+                            const Means                                     &m = Means{}) {
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
@@ -154,7 +307,14 @@ namespace sfem {
                         const typename HCodec::storage_t *const h  = &H[(i * rows + r) * n + e0];
                         const scaling_t *const                  hs = &H_scales[i * n + e0];
                         const real_t                            a  = alpha[i];
-                        for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], hs[l]);
+                        if constexpr (HCodec::mean_deviation) {
+                            const history_mean_t *const mi = m.tensor(i, rows);
+                            for (ptrdiff_t l = 0; l < nb; l++) {
+                                o[l] += a * detail::mean_deviation_value<HCodec>(h[l], hs[l], mi, m, r, e0 + l);
+                            }
+                        } else {
+                            for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], hs[l]);
+                        }
                     }
                 }
             }
@@ -174,7 +334,39 @@ namespace sfem {
                      const real_t *const SFEM_RESTRICT          S_n,
                      const real_t *const SFEM_RESTRICT          S_new,
                      typename HCodec::storage_t *const SFEM_RESTRICT H,
-                     scaling_t *const SFEM_RESTRICT             H_scales) {
+                     scaling_t *const SFEM_RESTRICT             H_scales,
+                     const Means                               &m = Means{}) {
+            if constexpr (HCodec::mean_deviation) {
+#pragma omp parallel for
+                for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                    const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    for (int i = 0; i < n_terms; i++) {
+                        typename HCodec::storage_t *const h_i  = &H[i * rows * n];
+                        scaling_t *const                  hs_i = &H_scales[i * n];
+                        history_mean_t *const             m_i  = m.tensor(i, rows);
+                        const real_t                      a    = alpha[i];
+                        const real_t                      bi   = b[i];
+                        const auto stored = [&](const ptrdiff_t r, const ptrdiff_t l) {
+                            return detail::mean_deviation_value<HCodec>(h_i[r * n + e0 + l], hs_i[e0 + l], m_i, m, r, e0 + l);
+                        };
+                        detail::store_mean_deviation<HCodec, true>(
+                                rows,
+                                n,
+                                e0,
+                                nb,
+                                m,
+                                [&](const ptrdiff_t r, const ptrdiff_t l) {
+                                    return a * stored(r, l) + bi * (S_new[r * n + e0 + l] - S_n[r * n + e0 + l]);
+                                },
+                                stored,
+                                h_i,
+                                hs_i,
+                                m_i);
+                    }
+                }
+                return;
+            }
+
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);

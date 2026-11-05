@@ -46,6 +46,9 @@ namespace sfem {
         if (options_.execution_space == EXECUTION_SPACE_DEVICE && series_.n_terms() > cu_prony_max_terms()) {
             SFEM_ERROR("PronyRelaxation: %d terms, the device loops take at most %d\n", series_.n_terms(), cu_prony_max_terms());
         }
+        if (options_.execution_space == EXECUTION_SPACE_DEVICE && is_mean_deviation(options_.history_storage)) {
+            SFEM_ERROR("PronyRelaxation: history_storage %s is host only for now\n", to_string(options_.history_storage));
+        }
 #endif
         zero_history();
     }
@@ -61,7 +64,13 @@ namespace sfem {
         // Grown to exactly what the step stores: a term comes back only when
         // the step shrinks, so the store holds the most terms any step kept.
         auto grown = std::make_shared<QuadratureState>(
-                n_slots, n_components_, n_qp_, n_elements_, options_.history_storage, options_.execution_space);
+                n_slots,
+                n_components_,
+                n_qp_,
+                n_elements_,
+                options_.history_storage,
+                options_.execution_space,
+                options_.history_elements_per_mean);
         for (int s = 0; s < n_live_; s++) grown->copy_tensor(*H_, s, s, options_.stream);
         H_ = grown;
     }
@@ -158,7 +167,8 @@ namespace sfem {
                                               H_ ? H_->data<HCodec>() : nullptr,
                                               H_ ? H_->scales() : nullptr,
                                               relaxed_stress_n,
-                                              history_->data());
+                                              history_->data(),
+                                              H_ ? H_->means_view() : prony::Means{});
                 return 0;
             });
         }
@@ -185,7 +195,13 @@ namespace sfem {
         static const real_t zero = 0, one = 1;
         if (any_relaxed && !D_) {
             D_ = std::make_shared<QuadratureState>(
-                    1, n_components_, n_qp_, n_elements_, options_.history_storage, options_.execution_space);
+                    1,
+                    n_components_,
+                    n_qp_,
+                    n_elements_,
+                    options_.history_storage,
+                    options_.execution_space,
+                    options_.history_elements_per_mean);
         }
 
         const ptrdiff_t rows = n_components_ * n_qp_;
@@ -229,11 +245,20 @@ namespace sfem {
                                            relaxed_stress_n,
                                            relaxed_stress,
                                            H_->data<HCodec>(),
-                                           H_->scales());
+                                           H_->scales(),
+                                           H_->means_view());
                 }
                 if (any_relaxed) {
-                    prony::advance<HCodec>(
-                            1, rows, n_elements_, &zero, &one, relaxed_stress_n, relaxed_stress, D_->data<HCodec>(), D_->scales());
+                    prony::advance<HCodec>(1,
+                                           rows,
+                                           n_elements_,
+                                           &zero,
+                                           &one,
+                                           relaxed_stress_n,
+                                           relaxed_stress,
+                                           D_->data<HCodec>(),
+                                           D_->scales(),
+                                           D_->means_view());
                 }
                 return 0;
             });

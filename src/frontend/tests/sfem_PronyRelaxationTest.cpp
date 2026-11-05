@@ -19,7 +19,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace {
 
@@ -326,9 +331,22 @@ int test_reduced_storage_tracks_full_storage() {
     // to an entry rather than to the largest, it is amplified by the spread of
     // the entries of an element.  That worst case is the bound; rounding that
     // does not always fall the same way stays well inside it.
-    const sfem::HistoryStorage formats[] = {
-            sfem::HistoryStorage::FLOAT32, sfem::HistoryStorage::FLOAT16_SCALED, sfem::HistoryStorage::INT16_SCALED, sfem::HistoryStorage::INT8_SCALED};
-    const real_t eps[] = {real_t(std::ldexp(1.0, -24)), real_t(std::ldexp(1.0, -11)), real_t(0.5 / 32767), real_t(0.5 / 127)};
+    //
+    // A mean-deviation format rounds the deviation from a mean, at most twice the
+    // largest entry, and the mean to float: twice its base codec's eps plus float's.
+    const sfem::HistoryStorage formats[] = {sfem::HistoryStorage::FLOAT32,
+                                            sfem::HistoryStorage::FLOAT16_SCALED,
+                                            sfem::HistoryStorage::INT16_SCALED,
+                                            sfem::HistoryStorage::INT8_SCALED,
+                                            sfem::HistoryStorage::FLOAT16_MD,
+                                            sfem::HistoryStorage::INT8_MD};
+    const real_t f32   = real_t(std::ldexp(1.0, -24));
+    const real_t eps[] = {f32,
+                          real_t(std::ldexp(1.0, -11)),
+                          real_t(0.5 / 32767),
+                          real_t(0.5 / 127),
+                          2 * real_t(std::ldexp(1.0, -11)) + f32,
+                          2 * real_t(0.5 / 127) + f32};
 
     // dt = 0.3 and the ramp ends on the grid, so full storage is exact and
     // what is measured is the storage alone.
@@ -349,7 +367,7 @@ int test_reduced_storage_tracks_full_storage() {
     real_t carried = 0;
     for (int i = 0; i < series().n_terms(); i++) carried += series().g(i) / (1 - std::exp(-dt / series().tau(i)));
 
-    for (int f = 0; f < 4; f++) {
+    for (int f = 0; f < 6; f++) {
         sfem::PronyRelaxation::Options options;
         options.history_storage = formats[f];
         sfem::PronyRelaxation relaxation(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
@@ -363,6 +381,98 @@ int test_reduced_storage_tracks_full_storage() {
                relaxation.bytes());
         SFEM_TEST_ASSERT(err < bound);
     }
+    return SFEM_TEST_SUCCESS;
+}
+
+// A history that varies little over an element's points, as a smooth field
+// does: per component a level spanning decades, and a variation of 1e-3 of it
+// over the points.
+std::vector<real_t> smooth_amplitudes(const int n_qp, const ptrdiff_t n_elements, const real_t variation) {
+    std::vector<real_t> a(size_t(N_COMPONENTS) * n_qp * n_elements);
+    for (int c = 0; c < N_COMPONENTS; c++) {
+        for (int q = 0; q < n_qp; q++) {
+            for (ptrdiff_t e = 0; e < n_elements; e++) {
+                const real_t level = std::pow(real_t(10), real_t(e % 9) - 3) * (c % 2 ? -1 : 1) * (1 + c);
+                const real_t x     = n_qp > 1 ? real_t(q) / (n_qp - 1) : real_t(e % 16) / 15;
+                a[(size_t(c) * n_qp + q) * n_elements + e] = level * (1 + variation * (x - real_t(0.5)));
+            }
+        }
+    }
+    return a;
+}
+
+// The worst error of `storage` on `a`, relative to the largest entry of each element.
+real_t round_trip_error(const sfem::HistoryStorage storage, const int n_qp, const ptrdiff_t n_elements, const std::vector<real_t> &a, const int elements_per_mean = 0) {
+    sfem::QuadratureState state(1, N_COMPONENTS, n_qp, n_elements, storage, sfem::EXECUTION_SPACE_HOST, elements_per_mean);
+    state.encode(0, a.data());
+    std::vector<real_t> back(a.size());
+    state.decode(0, back.data());
+    std::vector<real_t> max_abs(n_elements, 0);
+    for (size_t k = 0; k < a.size(); k++) max_abs[k % n_elements] = std::max(max_abs[k % n_elements], std::abs(a[k]));
+    real_t worst = 0;
+    for (size_t k = 0; k < a.size(); k++) worst = std::max(worst, std::abs(back[k] - a[k]) / max_abs[k % n_elements]);
+    return worst;
+}
+
+int test_mean_deviation_codes_the_variation() {
+    // Over an element's points the deviation from the mean is 1e-3 of the
+    // value, so its codes resolve 1e-3 of what the plain codes do: the error
+    // is the mean's float rounding and a thousandth of the plain codec's.
+    const auto a = smooth_amplitudes(N_QP, N_ELEMENTS, real_t(1e-3));
+    const sfem::HistoryStorage plain[] = {sfem::HistoryStorage::FLOAT16_SCALED, sfem::HistoryStorage::INT8_SCALED};
+    const sfem::HistoryStorage md[]    = {sfem::HistoryStorage::FLOAT16_MD, sfem::HistoryStorage::INT8_MD};
+    for (int f = 0; f < 2; f++) {
+        const real_t p = round_trip_error(plain[f], N_QP, N_ELEMENTS, a);
+        const real_t m = round_trip_error(md[f], N_QP, N_ELEMENTS, a);
+        printf("%-15s %g   %-15s %g\n", sfem::to_string(plain[f]), (double)p, sfem::to_string(md[f]), (double)m);
+        SFEM_TEST_ASSERT(m < p / 100);
+        SFEM_TEST_ASSERT(m <= real_t(1e-3) * p * 2 + real_t(std::ldexp(1.0, -24)));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_mean_over_one_point_elements() {
+    // One point per element: the mean is over runs of elements, 16 here, the
+    // last run short (100 = 6 x 16 + 4).
+    // A level shared by the run, varying by 1e-3 of itself along it: the codes
+    // resolve the variation.  (A run whose elements differ by decades is the
+    // opposite case: its mean fits none of them, and the small ones' deviations
+    // are the large ones' size.)
+    const int per_mean = 16;
+    std::vector<real_t> level(size_t(N_COMPONENTS) * N_ELEMENTS);
+    for (int c = 0; c < N_COMPONENTS; c++) {
+        for (ptrdiff_t e = 0; e < N_ELEMENTS; e++) level[c * N_ELEMENTS + e] = (1 + c) * (1 + real_t(1e-3) * real_t(e % 16) / 15);
+    }
+    const real_t p_level = round_trip_error(sfem::HistoryStorage::INT8_SCALED, 1, N_ELEMENTS, level);
+    const real_t m_level = round_trip_error(sfem::HistoryStorage::INT8_MD, 1, N_ELEMENTS, level, per_mean);
+    printf("one-point elements, shared level: int8_scaled %g, int8_md %g\n", (double)p_level, (double)m_level);
+    SFEM_TEST_ASSERT(m_level < p_level / 100);
+
+    sfem::QuadratureState state(1, N_COMPONENTS, 1, N_ELEMENTS, sfem::HistoryStorage::INT8_MD, sfem::EXECUTION_SPACE_HOST, per_mean);
+    SFEM_TEST_ASSERT(state.bytes() == size_t(N_COMPONENTS * N_ELEMENTS) + N_ELEMENTS * sizeof(scaling_t) +
+                                              size_t(N_COMPONENTS * 7) * sizeof(sfem::history_mean_t));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_mean_deviation_is_thread_count_invariant() {
+    // Each element's means, scale and codes are computed by the thread that
+    // owns its block, from its values alone: no reduction crosses threads.
+#ifdef _OPENMP
+    const int           max_threads = omp_get_max_threads();
+    std::vector<real_t> H[2];
+    const int           threads[2] = {1, 7};
+    for (int run = 0; run < 2; run++) {
+        omp_set_num_threads(threads[run]);
+        sfem::PronyRelaxation::Options options;
+        options.history_storage = sfem::HistoryStorage::INT8_MD;
+        sfem::PronyRelaxation relaxation(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+        drive(relaxation, uniform_grid(5, 17), real_t(0.9));
+        H[run].resize(N_ENTRIES * series().n_terms());
+        for (int i = 0; i < series().n_terms(); i++) relaxation.decode_history(i, &H[run][i * N_ENTRIES]);
+    }
+    omp_set_num_threads(max_threads);
+    SFEM_TEST_ASSERT(std::memcmp(H[0].data(), H[1].data(), H[0].size() * sizeof(real_t)) == 0);
+#endif
     return SFEM_TEST_SUCCESS;
 }
 
@@ -395,6 +505,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_every_codec_round_trips_within_its_bound);
     SFEM_RUN_TEST(test_unscaled_float16_round_trips_below_its_range);
     SFEM_RUN_TEST(test_reduced_storage_tracks_full_storage);
+    SFEM_RUN_TEST(test_mean_deviation_codes_the_variation);
+    SFEM_RUN_TEST(test_mean_over_one_point_elements);
+    SFEM_RUN_TEST(test_mean_deviation_is_thread_count_invariant);
     SFEM_RUN_TEST(test_reset_restarts_from_a_prestressed_state);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

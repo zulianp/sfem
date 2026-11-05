@@ -61,7 +61,8 @@ namespace sfem {
     ///         wlf: {C1: 8.86, C2: 101.6, T_ref: 0}
     ///         temperature: 10
     ///         history_storage: full      # full, float32, float16, float16_scaled,
-    ///                                    # int16_scaled, int8_scaled
+    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md
+    ///         history_elements_per_mean: 16  # *_md on one-point elements (QuadratureState)
     ///
     /// An entry overrides only the keys it names, so a block can change the
     /// temperature and keep the spectrum the top level gave it.  Any other key
