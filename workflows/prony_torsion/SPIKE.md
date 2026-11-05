@@ -87,7 +87,7 @@ One document describes the whole experiment. `cases/torsion_release.yaml` is the
 | block | meaning |
 | --- | --- |
 | `mesh` | SFEM mesh folder. **HEX8 only** -- `GeneratedMooneyRivlinProny` is generated for HEX8 (through PROTEUS_HEX8) and nothing else. |
-| `material` | `C10`, `C01`, `K`, a `prony` sequence of `{g, tau}` terms, optional `wlf` time-temperature superposition, and `history_storage`: `float32` (default), `full`, `float16`, `float16_scaled`, `int16_scaled` or `int8_scaled`. |
+| `material` | `C10`, `C01`, `K`, a `prony` sequence of `{g, tau}` terms, optional `wlf` time-temperature superposition, and `history_storage`: `full` (default), `float32`, `float16`, `float16_scaled`, `int16_scaled`, `int8_scaled`, `float16_md` or `int8_md` (see docs/playground/case-reference.md). |
 | `time` | `dt`, `t_end`. `dt` is fixed for the whole run: the Prony coefficients `alpha_i = exp(-dt/tau_i)` are computed from it once. |
 | `dynamics` | `quasi_static` (default), `bdf2` or `newmark`, with `density` and — for Newmark — `beta` and `gamma`. See **Integrators** below. |
 | `torsion` | `sideset`, `axis`, `rotation_center`, a `release` block, a `profile` (`ramp` with `ramp_time`, or `cyclic` with `period`), and a `control`: `angle` (default, prescribing `angle`) or `torque` (prescribing `torque` and solving for the twist). |
