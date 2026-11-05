@@ -46,9 +46,6 @@ namespace sfem {
         if (options_.execution_space == EXECUTION_SPACE_DEVICE && series_.n_terms() > cu_prony_max_terms()) {
             SFEM_ERROR("PronyRelaxation: %d terms, the device loops take at most %d\n", series_.n_terms(), cu_prony_max_terms());
         }
-        if (options_.execution_space == EXECUTION_SPACE_DEVICE && is_mean_deviation(options_.history_storage)) {
-            SFEM_ERROR("PronyRelaxation: history_storage %s is host only for now\n", to_string(options_.history_storage));
-        }
 #endif
         zero_history();
     }
@@ -152,6 +149,7 @@ namespace sfem {
                                         H_ ? H_->scales() : nullptr,
                                         relaxed_stress_n,
                                         history_->data(),
+                                        H_ ? H_->means_view() : prony::Means{},
                                         options_.stream) != SFEM_SUCCESS) {
                 SFEM_ERROR("PronyRelaxation::begin_step failed on the device\n");
             }
@@ -217,6 +215,7 @@ namespace sfem {
                                                  relaxed_stress,
                                                  H_->raw(),
                                                  H_->scales(),
+                                                 H_->means_view(),
                                                  options_.stream) != SFEM_SUCCESS) ||
                 (any_relaxed && cu_prony_advance(options_.history_storage,
                                                  1,
@@ -228,6 +227,7 @@ namespace sfem {
                                                  relaxed_stress,
                                                  D_->raw(),
                                                  D_->scales(),
+                                                 D_->means_view(),
                                                  options_.stream) != SFEM_SUCCESS)) {
                 SFEM_ERROR("PronyRelaxation::advance failed on the device\n");
             }
