@@ -1,0 +1,80 @@
+# The LDP valves' EPDM in torsion: twist, hold, release, recover.
+#
+# The bar of the WCCM 2026 proceedings on Prony history storage (Yang, Marchi, Zulian): 100 x 20 x 20
+# mm, clamped at x = 0, its other end twisted about the axis by 1.5 rad over 0.5 s, held until 0.65 s,
+# then released and followed to 1 s. Here in SI with the material of the valves'
+# simulation 2 (workflows/ldp_containment/transient/*/sim2.yaml): Mooney-Rivlin with the
+# 15-term EPDM series on the isochoric part, density 1150, BDF2. At dt = 1e-3 s four terms are
+# stored (tau >= 9.89e-4 s) and eleven relax within a step, as at the valves' 1e-4 s.
+#
+# The controlled counterpart of the valve strokes for the history formats: no contact, so no impact
+# whose timing moves with the last bits. The mesh (mesh/, from box_mesh.py, 0.1 x 0.02 x 0.02) sets
+# the element: HEX8 directly, TET10 with mesh.promote_to_p2 on a TET4 box.
+
+mesh:
+  path: mesh
+  packed: false
+  # By plane, so a TET4 box (which box_mesh.py writes no sidesets for) serves as well as a HEX8 one.
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+
+material:
+  type: GeneratedMooneyRivlinProny
+  C10: 1.460e8
+  C01: 5.853e8
+  K: 1.529e7
+  relaxation:
+    iso:
+      prony:
+        - {g: 2.83e-04, tau: 1.61e+03}
+        - {g: 3.12e-04, tau: 1.29e+01}
+        - {g: 4.45e-04, tau: 1.53e-01}
+        - {g: 1.03e-03, tau: 9.89e-04}
+        - {g: 6.09e-03, tau: 1.18e-06}
+        - {g: 6.74e-02, tau: 8.51e-09}
+        - {g: 2.22e-01, tau: 1.42e-10}
+        - {g: 1.90e-01, tau: 1.80e-12}
+        - {g: 1.12e-01, tau: 1.27e-14}
+        - {g: 5.07e-02, tau: 2.00e-16}
+        - {g: 6.91e-02, tau: 1.10e-19}
+        - {g: 4.59e-02, tau: 1.38e-22}
+        - {g: 8.62e-02, tau: 1.62e-24}
+        - {g: 6.76e-02, tau: 6.62e-26}
+        - {g: 7.87e-02, tau: 1.82e-27}
+      history_storage: full
+
+regime: dynamic
+dynamics: {scheme: bdf2, density: 1150, mass: lumped}
+time: {dt: 1.0e-3, t_end: 1.0, max_cutbacks: 6}
+
+constraints:
+  - type: rotation
+    sideset: right
+    axis: x
+    center: [0.1, 0.01, 0.01]
+    angle: 1.5
+    profile: {type: linear_ramp, start_time: 0, end_time: 0.5, start_value: 0, end_value: 1}
+    release: 0.65
+
+solver:
+  newton: {max_it: 40, atol: 1.0e-6, rtol: 1.0e-10, verbose: false}
+  linear: {type: cg, preconditioner: jacobi, max_it: 20000}
+
+output:
+  path: results
+  export_freq: 1
+  history_csv: results/history.csv
+  probes:
+    - {type: control_point, name: corner, at: [0.1, 0.02, 0.02]}
+    - {type: control_point, name: mid, at: [0.05, 0.02, 0.02]}
+    - {type: torque, constraint: 0}
+    - {type: prony}
+    - {type: memory}
+
+dirichlet_conditions:
+  - type: sideset
+    format: name
+    name: left
+    value: [0, 0, 0]
+    component: [0, 1, 2]
