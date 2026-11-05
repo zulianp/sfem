@@ -14,6 +14,7 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{groupplots}
+\usepgfplotslibrary{fillbetween}
 \usepackage{booktabs}
 \usepackage{siunitx}
 \sisetup{group-separator={,},group-minimum-digits=4,group-digits=integer}
@@ -644,7 +645,10 @@ stress the history holds (Figure~\ref{fig:prony-torsion}). With an average, int8
 \hsTorsionHalfGainMin{} to \hsTorsionHalfGainMax{} times. On TET4, whose average is over neighbouring
 elements, the gain is \hsTorsionTetGain-fold. On the finer HEX8 mesh int8 with averages takes
 \hsTorsionMdBytes\,MB for $H_i$ and $D$ against float16's \hsTorsionHalfBytes\,MB, at about twice
-float16's error.
+float16's error. In the relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, left) the medians
+order the formats as $e_u$ does; the largest values come at the release, where float16 with averages
+reaches \hsInfMaxHalfMd\% on the finer HEX8 mesh against float16's \hsInfMaxHalf\%, and fall back to its
+median within the next \SI{0.05}{\second} while float16's keep growing (Figure~\ref{fig:prony-torsion}).
 
 \begin{table*}
 \caption{The bar in torsion on Grace: median $e_u$ against double storage per history format and
@@ -663,6 +667,16 @@ from \SI{0.5}{\second} and released at \SI{0.65}{\second}.}
 \label{fig:prony-torsion}
 \end{figure}
 
+\begin{figure*}
+\centering
+\input{figures/prony_infinity}
+\caption{$\lVert u-u_{\mathrm{double}}\rVert_\infty/\lVert u_{\mathrm{double}}\rVert_\infty$ per history
+format over the 72 instants: the median (marks) and the range from the smallest to the largest
+(shaded). Left the bar in torsion per mesh (dofs), right the valves (stress slots in double,
+averages over 16 elements). a.+d.: average and deviation.}
+\label{fig:prony-infinity}
+\end{figure*}
+
 \subsection{The valves}
 
 Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage. The GPU assembles
@@ -674,7 +688,10 @@ that floor; the 16-bit formats lie \hsValveSixteen{} to \hsValveHalf\%, int8 at 
 over runs of 16 elements make int8 \hsValveMdGain{} times more accurate (\hsValveMd\%), less than on the
 bar: neighbouring elements of a valve in contact differ more than the points of one element. For
 float16, whose rounding is relative to each value, subtracting an average turns small values into
-large deviations, and the error grows to \hsValveHalfMd\%. Every run takes \hsValveTimeMin{} to
+large deviations, and the error grows to \hsValveHalfMd\%. The relative $\infty$-norm
+(Figure~\ref{fig:prony-infinity}, right) orders the formats as $e_u$ does; its largest values, like
+$e_u$'s, are set by the impacts: \hsInfValveNoiseMax\% for the repeat in double and every format but
+int8 and float16 with averages, which reach \hsInfValveIntMax\%. Every run takes \hsValveTimeMin{} to
 \hsValveTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's two passes over the
 history: averages make them \hsCostMdHost{} times as expensive as int8 on Grace and \hsCostMdDevice{}
 times on the GPU, \hsCostMdDeviceUs\,\si{\micro\second} on FF200's size, \hsCostShare\% of a stroke

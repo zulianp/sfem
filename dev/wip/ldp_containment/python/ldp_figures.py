@@ -1383,6 +1383,52 @@ def figure_prony_torsion(series):
     return "\n".join(out) + "\n"
 
 
+def figure_prony_infinity(prony):
+    """The relative infinity norm of the displacement's difference from double storage, per history
+    format: its median over the instants, and a band from its smallest to its largest. Left the
+    torsion bar per mesh, right the valves."""
+    torsion_runs = [("full_b", "double, repeat")] + [(f, l) for f, l in HISTORY_FORMATS if f != "full"]
+    valve_runs = [("full_b", "double, repeat"), ("float32", "float32"), ("int16_scaled", "int16"),
+                  ("float16_scaled", "float16"), ("int8_scaled", "int8"), ("float16_md_p16", "float16 a.+d."),
+                  ("int8_md_p16", "int8 a.+d.")]
+    common = [r"  ymode=log, ytickten={-14,-12,...,2}, minor ytick={1e-13,1e-11,1e-9,1e-7,1e-5,1e-3,1e-1,1e1},",
+              r"  ymajorgrids, yminorgrids, xmajorgrids,",
+              r"  major grid style={draw=gray!60, line width=0.3pt},",
+              r"  minor grid style={draw=gray!40, line width=0.2pt, opacity=0.5},",
+              r"  xticklabel style={font=\scriptsize, rotate=35, anchor=north east, inner sep=1pt},",
+              r"  tick label style={font=\scriptsize}, label style={font=\footnotesize},",
+              r"  enlarge x limits=0.06, ymin=1e-14, ymax=1e3,"]
+    out = [PREAMBLE,
+           r"\begin{tikzpicture}",
+           r"\begin{groupplot}[group style={group size=2 by 1, horizontal sep=1.2cm},",
+           r"  width=0.5\textwidth, height=6.0cm,",
+           r"  legend style={font=\scriptsize, at={(0.5,1.03)}, anchor=south, legend columns=-1, draw=none}]"]
+
+    def band(runs, set_name, color, label, panel):
+        lo = " ".join("(%s,%.4e)" % (c, max(float(prony[(set_name, r)]["e_inf_min"]), 1e-14)) for c, (r, _) in zip(panel, runs))
+        hi = " ".join("(%s,%.4e)" % (c, max(float(prony[(set_name, r)]["e_inf_max"]), 1e-14)) for c, (r, _) in zip(panel, runs))
+        md = " ".join("(%s,%.4e)" % (c, max(float(prony[(set_name, r)]["e_inf_median"]), 1e-14)) for c, (r, _) in zip(panel, runs))
+        key = set_name.replace("_", "")
+        return [r"\addplot[draw=none, name path=hi%s, forget plot] coordinates {%s};" % (key, hi),
+                r"\addplot[draw=none, name path=lo%s, forget plot] coordinates {%s};" % (key, lo),
+                r"\addplot[fill=%s, fill opacity=0.15, draw=none, forget plot] fill between[of=hi%s and lo%s];" % (color, key, key),
+                r"\addplot[%s, semithick, mark=*, mark size=1.2pt] coordinates {%s};" % (color, md),
+                r"\addlegendentry{%s}" % label]
+
+    tcoords = ["t%d" % i for i in range(len(torsion_runs))]
+    out += [r"\nextgroupplot[title={torsion bar}, title style={font=\footnotesize},",
+            r"  symbolic x coords={%s}, xtick=data, xticklabels={%s}," % (",".join(tcoords), ",".join("{%s}" % l for _, l in torsion_runs)),
+            r"  ylabel={$\lVert u-u_{\mathrm{double}}\rVert_\infty/\lVert u_{\mathrm{double}}\rVert_\infty$ (\%)},"] + common[:-1] + [common[-1] + "]"]
+    for (set_name, el, _), color in zip(TORSION_SETS, COLORS):
+        out += band(torsion_runs, set_name, color, r"%s, \num{%s}" % (el, prony[(set_name, "full_b")]["dofs"]), tcoords)
+    vcoords = ["v%d" % i for i in range(len(valve_runs))]
+    out += [r"\nextgroupplot[title={FF200 valves, \num{%s} dofs}, title style={font=\footnotesize}," % prony[("FF200", "full_b")]["dofs"],
+            r"  symbolic x coords={%s}, xtick=data, xticklabels={%s}," % (",".join(vcoords), ",".join("{%s}" % l for _, l in valve_runs))] + common[:-1] + [common[-1] + "]"]
+    out += band(valve_runs, "FF200", "black", "FF200", vcoords)[:-1]
+    out += [r"\end{groupplot}", r"\end{tikzpicture}"]
+    return "\n".join(out) + "\n"
+
+
 def prony_macros(valves, torsion, diag, tangent, refined, bench):
     out = []
 
@@ -1439,6 +1485,10 @@ def prony_macros(valves, torsion, diag, tangent, refined, bench):
         m("hsDofs" + key, integer(torsion[(s, "full_b")]["dofs"]))
     hf = lambda fmt: torsion[("torsion_HEX8_80", fmt)]
     m("hsTorsionMdBytes", num((float(hf("int8_md")["bytes_history"]) + float(hf("int8_md")["bytes_increment"])) / MB, 3))
+    m("hsInfValveNoiseMax", integer(float(v("full_b")["e_inf_max"])))
+    m("hsInfValveIntMax", integer(max(float(v("int8_scaled")["e_inf_max"]), float(v("float16_md_p16")["e_inf_max"]))))
+    m("hsInfMaxHalfMd", num(float(hf("float16_md")["e_inf_max"]), 2))
+    m("hsInfMaxHalf", num(float(hf("float16_scaled")["e_inf_max"]), 2))
     m("hsTorsionHalfBytes", num((float(hf("float16_scaled")["bytes_history"]) + float(hf("float16_scaled")["bytes_increment"])) / MB, 3))
     for fmt, key in (("float16_scaled", "Half"), ("int8_scaled", "Int"), ("int8_md", "Md"), ("float16_md", "HalfMd")):
         m("hsLost" + key, num(100 * lost(diag[("diag_HEX8_80", fmt)]), 2))
@@ -1505,6 +1555,7 @@ def generate(out, tables):
     write(os.path.join(tables, "prony_torsion.tex"), table_prony_torsion(prony, diag))
     write(os.path.join(tables, "prony_cost.tex"), table_prony_cost(bench))
     write(os.path.join(out, "prony_torsion.tex"), figure_prony_torsion(read_csv("prony_series.csv")))
+    write(os.path.join(out, "prony_infinity.tex"), figure_prony_infinity(prony))
 
 
 def selftest():

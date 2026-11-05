@@ -17,13 +17,14 @@ label <set>:
   e_u_max, e_u_median   100 |u - u_ref|_2 / |u_ref|_2 over the sample times [%]: the max, and the
                         median, which a valve event shifted by a step does not dominate
   E_inf                 max over the samples of max |u - u_ref| [m]
+  e_inf_median, e_inf_min, e_inf_max   100 |u - u_ref|_inf / |u_ref|_inf over the sample times [%]
   cp                    max over time of the control points' |u - u_ref| over max |u_ref| of that point
   event_shift_ms, peak_rel   the valve events of ldp_figures.py (LIFT_OPEN, STROKE), if the run has valves
   bytes_*               the Prony probe's last row: H_i, D, frozen history, stress slots (all ranks)
   stepper_s             the traced Stepper::run
   updates, updates_lost the diagnostics build's counts, when present
 
-<series.csv> gets e_u(t) per run and sample time.
+<series.csv> gets e_u(t) and the relative infinity norm e_inf(t) per run and sample time.
 
 `tangent`: the bytes of the float32 BSR tangent (3x3 blocks, int32 column indices and row pointers)
 and of the mesh (int32 connectivity, float32 coordinates) of a mesh folder, from its node graph.
@@ -132,13 +133,15 @@ def runs(argv):
         run = path(r)
         rows = history(run, a.sub)
         t = np.array([float(x["t"]) for x in rows])
-        e_us, e_inf = [], 0.0
+        e_us, e_infs, e_inf = [], [], 0.0
         for s in samples:
             d = at_time(run, a.sub, t, s) - ref_frames[s]
             e = 100 * np.linalg.norm(d) / np.linalg.norm(ref_frames[s])
+            ei = 100 * float(np.abs(d).max()) / float(np.abs(ref_frames[s]).max())
             e_us.append(e)
+            e_infs.append(ei)
             e_inf = max(e_inf, float(np.abs(d).max()))
-            series.append({"set": a.set, "run": r, "t": "%.6g" % s, "e_u": "%.4e" % e})
+            series.append({"set": a.set, "run": r, "t": "%.6g" % s, "e_u": "%.4e" % e, "e_inf": "%.4e" % ei})
         cp = 0.0
         for p in cps:
             for c in ("ux", "uy", "uz"):
@@ -171,6 +174,9 @@ def runs(argv):
             "e_u_max": "%.4e" % max(e_us),
             "e_u_median": "%.4e" % float(np.median(e_us)),
             "E_inf": "%.4e" % e_inf,
+            "e_inf_median": "%.4e" % float(np.median(e_infs)),
+            "e_inf_min": "%.4e" % min(e_infs),
+            "e_inf_max": "%.4e" % max(e_infs),
             "cp": "%.4e" % cp,
             "event_shift_ms": "%.4g" % (1e3 * shift) if valves else "",
             "peak_rel": "%.4e" % peak if valves else "",
