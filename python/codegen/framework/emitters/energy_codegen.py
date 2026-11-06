@@ -9226,13 +9226,13 @@ def _holding_one_element_hessian_matrix_assembly_function(
         )
     )
 
-    # The projected tangent is a BSR assembly's, and only where there is a point
-    # tangent to project: not in the closed form a lowest-order simplex folds.
+    # The projected tangent is a BSR assembly's. A lowest-order simplex folds its
+    # point tangent into the closed form, which has none to project: projected, it
+    # takes the generic per-point kernel instead, at its one point.
     projected = bool(
         matrix_format_plan is not None
         and matrix_format_plan.tangent_projection
         and "bsr" in formats
-        and constant_p1_hessian is None
     )
     is_affine_assembly = geometry_mode == "affine"
     function_base = _sfem_soa_hessian_matrix_public_function_base(
@@ -9497,26 +9497,84 @@ def _holding_one_element_hessian_matrix_assembly_function(
         lines.append("    }")
 
     lines.append("")
-    lines.extend(
-        _sfem_soa_direct_hessian_element_matrix_call_lines(
-            direct_hessian_function_name,
-            dim,
-            material_parameter_names,
-            uses_current,
-            use_tensor_product_reference,
-            use_reference_gradient_vectors,
-            reference_inputs,
-            tensor_shape_name,
-            tensor_grad_name,
-            tensor_weight_name,
-            scalar_weight_name,
-            reference_prefix,
-            "    ",
-            constant_p1=constant_p1_hessian is not None,
-            quadrature_streams=quadrature_fields.quadrature_field_streams(form),
-            project=projected,
+    if projected and constant_p1_hessian is not None:
+        # The closed form's point, spelled for the generic kernel: its constant
+        # reference gradients and weight as the tables that kernel reads.
+        gradients = constant_p1_simplex_reference_gradients(constant_p1_hessian.quadrature_rule)
+        weight = sp.nsimplify(constant_p1_hessian.quadrature_rule.weights[0])
+        lines.append("    if constexpr (PROJECT) {")
+        for component in range(dim):
+            lines.append(
+                "      const s_t projected_%s[NS] = {%s};"
+                % (
+                    _sfem_reference_gradient_vector_name(component),
+                    ", ".join("s_t(%s)" % sp.ccode(g[component]) for g in gradients),
+                )
+            )
+        lines.append(
+            "      const s_t projected_q_weight[1] = {s_t(%s) / s_t(%s)};" % (sp.fraction(weight)[0], sp.fraction(weight)[1])
         )
-    )
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_call_lines(
+                _sfem_soa_direct_hessian_function_name(local_prefix, False),
+                dim,
+                material_parameter_names,
+                uses_current,
+                False,
+                True,
+                reference_inputs,
+                tensor_shape_name,
+                tensor_grad_name,
+                tensor_weight_name,
+                "projected_q_weight",
+                "projected_",
+                "      ",
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+                project=True,
+            )
+        )
+        lines.append("    } else {")
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_call_lines(
+                direct_hessian_function_name,
+                dim,
+                material_parameter_names,
+                uses_current,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                tensor_shape_name,
+                tensor_grad_name,
+                tensor_weight_name,
+                scalar_weight_name,
+                reference_prefix,
+                "      ",
+                constant_p1=True,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+            )
+        )
+        lines.append("    }")
+    else:
+        lines.extend(
+            _sfem_soa_direct_hessian_element_matrix_call_lines(
+                direct_hessian_function_name,
+                dim,
+                material_parameter_names,
+                uses_current,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_inputs,
+                tensor_shape_name,
+                tensor_grad_name,
+                tensor_weight_name,
+                scalar_weight_name,
+                reference_prefix,
+                "    ",
+                constant_p1=constant_p1_hessian is not None,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+                project=projected,
+            )
+        )
     lines.append("")
     lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
     lines.extend(

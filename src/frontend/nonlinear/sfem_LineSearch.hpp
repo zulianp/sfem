@@ -28,8 +28,10 @@ namespace sfem {
         /// the step, this many in all (Grippo, Lampariello and Lucidi, "A nonmonotone line search
         /// technique for Newton's method", SIAM J. Numer. Anal. 23, 1986). 1 is Armijo's rule. More
         /// lets a semismooth Newton step through the small rise of a residual merit where a few
-        /// contacts switch near the tolerance, which the monotone rule turns into a failed step.
-        int nonmonotone{1};
+        /// contacts switch near the tolerance, which the monotone rule turns into a failed step and
+        /// a cut-back: on the LDP valves (FF200) 8-18 per stroke monotone, none at 5, and repeats
+        /// that agree to 7e-6 instead of 2.4e-1, on Grace and on the GPU alike.
+        int nonmonotone{5};
         /// Evaluate the whole schedule in one call, where the merit can (`Merit::batched`): one pass
         /// over the mesh with the steps vectorised in its inner loop. Off, the steps are evaluated
         /// one at a time, stopping at the first accepted; the step taken is the same either way.

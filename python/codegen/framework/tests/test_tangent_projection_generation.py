@@ -117,11 +117,22 @@ class TangentProjectionGenerationTest(unittest.TestCase):
         name = "neohookean_ogden_tet10_hessian_bsr_i_msoa"
         self.assertEqual(_entry_point(plain, name), _entry_point(opted, name))
 
-    def test_the_closed_form_has_nothing_to_project(self):
+    def test_the_closed_form_projects_through_the_generic_kernel(self):
+        """TET4 folds its point tangent into a closed form, which has none to project: projected, it
+        calls the generic per-point kernel at its one point, with its constant gradients; the exact
+        assembly keeps the closed form."""
         files = self.files("TET4", True)
         source = files["d3/tet4/neohookean_ogden_tet4_operator.cpp"]
-        self.assertNotIn("_psd_", source)
-        self.assertNotIn("tangent_projection_supported", files["op/sfem_GeneratedNeoHookeanOgden.hpp"])
+        self.assertIn('extern "C" int neohookean_ogden_tet4_hessian_bsr_psd_a_msoa(', source)
+        body = source[source.index("if constexpr (PROJECT) {") :]
+        self.assertIn("const s_t projected_grad_ref_x[NS] = {s_t(-1), s_t(1), s_t(0), s_t(0)};", body)
+        self.assertIn("const s_t projected_q_weight[1] = {s_t(1) / s_t(6)};", body)
+        self.assertIn("direct_hessian_reference_element_matrix<s_t, NQ, NS, PROJECT>(", body)
+        exact = body[body.index("} else {") :]
+        self.assertIn("tet4_direct_hessian_element_matrix<s_t, NS>(", exact)
+        self.assertIn("tangent_projection_supported", files["op/sfem_GeneratedNeoHookeanOgden.hpp"])
+        op = files["op/sfem_GeneratedNeoHookeanOgden.cpp"]
+        self.assertIn("return neohookean_ogden_hessian_bsr_psd_3d_a_msoa(", op)
 
     def test_the_tensor_product_point_tangent_is_projected(self):
         files = self.files("HEX8", True)
