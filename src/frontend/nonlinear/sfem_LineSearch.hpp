@@ -22,8 +22,14 @@ namespace sfem {
         real_t damping{1};
         /// The step lengths tried, in order.
         std::vector<real_t> steps{1, real_t(1) / 2, real_t(1) / 4, real_t(1) / 8, real_t(1) / 16, real_t(1) / 32, real_t(1) / 64, real_t(1) / 128};
-        /// Armijo's constant: a step s is accepted when m(s) <= m0 + c1 s m'(0).
+        /// Armijo's constant: a step s is accepted when m(s) <= m_ref + c1 s m'(0).
         real_t c1{real_t(1e-4)};
+        /// The merits m_ref is the largest of: the iterate's and those of the iterates before it in
+        /// the step, this many in all (Grippo, Lampariello and Lucidi, "A nonmonotone line search
+        /// technique for Newton's method", SIAM J. Numer. Anal. 23, 1986). 1 is Armijo's rule. More
+        /// lets a semismooth Newton step through the small rise of a residual merit where a few
+        /// contacts switch near the tolerance, which the monotone rule turns into a failed step.
+        int nonmonotone{1};
         /// Evaluate the whole schedule in one call, where the merit can (`Merit::batched`): one pass
         /// over the mesh with the steps vectorised in its inner loop. Off, the steps are evaluated
         /// one at a time, stopping at the first accepted; the step taken is the same either way.
@@ -60,11 +66,16 @@ namespace sfem {
     public:
         explicit LineSearch(const LineSearchOptions &options = LineSearchOptions());
 
+        /// `reference` is m_ref (nonmonotone), m0 where omitted.
         LineSearchResult search(Merit              &merit,
                                 const real_t *const x,
                                 const real_t *const h,
                                 const real_t        m0,
-                                const real_t        slope);
+                                const real_t        slope,
+                                const real_t        reference);
+        LineSearchResult search(Merit &merit, const real_t *const x, const real_t *const h, const real_t m0, const real_t slope) {
+            return search(merit, x, h, m0, slope, m0);
+        }
 
         const LineSearchOptions &options() const { return options_; }
 

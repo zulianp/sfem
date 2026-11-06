@@ -126,6 +126,22 @@ int test_damped_ignores_the_merit() {
     return SFEM_TEST_SUCCESS;
 }
 
+// Nonmonotone (Grippo-Lampariello-Lucidi): measured against a larger earlier merit, the full step
+// that overshoots the current one (0.49 > m0 = 0.09) is accepted; against m0 itself the rule is
+// Armijo's and takes s = 1/2.
+int test_nonmonotone_reference() {
+    Parabola         m(0.3, true);
+    sfem::LineSearch ls;
+    const real_t     m0    = m.at(nullptr, nullptr);
+    const real_t     slope = m.slope(nullptr, nullptr, nullptr, 0);
+    auto             r     = ls.search(m, nullptr, nullptr, m0, slope, real_t(0.5));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED);
+    SFEM_TEST_ASSERT(r.alpha == real_t(1));
+    auto a = ls.search(m, nullptr, nullptr, m0, slope, m0);
+    SFEM_TEST_ASSERT(a.alpha == real_t(0.5));
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_disabled_takes_the_full_step() {
     Parabola                m(0.3, true);
     sfem::LineSearchOptions options;
@@ -146,6 +162,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_at_resolution);
     SFEM_RUN_TEST(test_best_decrease);
     SFEM_RUN_TEST(test_disabled_takes_the_full_step);
+    SFEM_RUN_TEST(test_nonmonotone_reference);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

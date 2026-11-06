@@ -111,6 +111,7 @@ namespace sfem {
                 "solver.newton.line_search.steps",
                 "solver.newton.line_search.c1",
                 "solver.newton.line_search.batched",
+                "solver.newton.line_search.nonmonotone",
                 "solver.newton.line_search.rule",
                 "solver.newton.line_search.damping",
                 "solver.linear.type",
