@@ -30,7 +30,8 @@ namespace sfem {
                                         const real_t *const x,
                                         const real_t *const h,
                                         const real_t        m0,
-                                        const real_t        slope) {
+                                        const real_t        slope,
+                                        const real_t        reference) {
         SFEM_TRACE_SCOPE("LineSearch::search");
 
         LineSearchResult result;
@@ -66,7 +67,7 @@ namespace sfem {
 
         // Armijo needs a descent direction; along an ascent one only a measured decrease counts.
         auto armijo = [&](const int i) {
-            return slope < 0 && values_[i] <= m0 + options_.c1 * steps[i] * slope;
+            return slope < 0 && values_[i] <= reference + options_.c1 * steps[i] * slope;
         };
 
         int accepted = -1;

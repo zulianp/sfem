@@ -152,6 +152,9 @@ namespace sfem {
         const bool linear = impl.f->is_linear() && impl.step->solves_linear_function_exactly();
 
         NewtonIteration log;
+        // The merits of this step's iterates, the last line_search.nonmonotone of them: the
+        // nonmonotone line search measures a step against their largest.
+        std::vector<real_t> recent;
         real_t          tol = 0;
         int             count = 0;
         log.x               = x;
@@ -201,7 +204,10 @@ namespace sfem {
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
                     const real_t slope = merit->slope(x, r, dx, m0);
-                    log.line_search    = line_search.search(*merit, x, dx, m0, slope);
+                    recent.push_back(m0);
+                    if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    const real_t reference = *std::max_element(recent.begin(), recent.end());
+                    log.line_search        = line_search.search(*merit, x, dx, m0, slope, reference);
                 } else {
                     log.line_search        = LineSearchResult();
                     log.line_search.status = LineSearchResult::Status::ACCEPTED;

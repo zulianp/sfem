@@ -956,6 +956,11 @@ namespace sfem {
                 newton_options.line_search.steps   = read_list<real_t>(ls, "steps", newton_options.line_search.steps);
                 newton_options.line_search.c1      = read<real_t>(ls, "c1", newton_options.line_search.c1);
                 newton_options.line_search.batched = read<bool>(ls, "batched", newton_options.line_search.batched);
+                newton_options.line_search.nonmonotone = read<int>(ls, "nonmonotone", newton_options.line_search.nonmonotone);
+                if (newton_options.line_search.nonmonotone < 1) {
+                    fprintf(stderr, "Playground: solver.newton.line_search.nonmonotone must be at least 1\n");
+                    return SFEM_FAILURE;
+                }
                 const auto rule                    = read_string(ls, "rule", "armijo");
                 if (rule != "armijo" && rule != "damped") {
                     fprintf(stderr, "Playground: unknown solver.newton.line_search.rule \"%s\" (armijo, damped)\n", rule.c_str());
