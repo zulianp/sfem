@@ -584,6 +584,17 @@ namespace sfem {
         for (auto &op : impl_->ops) op->set_inexact_options(resolved);
     }
 
+    bool Function::tangent_projection_supported() const {
+        for (auto &op : impl_->ops) {
+            if (!op->tangent_projection_supported()) return false;
+        }
+        return true;
+    }
+
+    void Function::set_tangent_projection(const bool on) {
+        for (auto &op : impl_->ops) op->set_tangent_projection(on);
+    }
+
     int Function::inexact_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("Function::inexact_diag");
         for (auto &op : impl_->ops) {

@@ -13,6 +13,20 @@ namespace sfem {
 
     class Function;
 
+    /// Which tangent the Newton directions are computed on (LinearizedStep::set_tangent_projection).
+    enum class TangentProjection {
+        /// The tangent itself.
+        NONE,
+        /// The tangent itself, until a direction along which the merit does not decrease: that
+        /// iteration is repeated from the same iterate on the tangent projected to positive
+        /// semidefinite, which is kept to the end of the step ("project on demand", Longva et
+        /// al., "Pitfalls of Projection", 2023). A tangent that is positive definite where the
+        /// iterates converge keeps Newton's rate.
+        ON_FAILURE,
+        /// The projected tangent at every iteration (projected Newton).
+        ALWAYS
+    };
+
     struct NewtonOptions {
         int max_it{30};
         /// max_it iterations are the scheme, not a cap: the step ends after them and its state is
@@ -29,6 +43,7 @@ namespace sfem {
         /// "auto", "energy" or "residual"; a step with a merit of its own overrides it.
         std::string       merit{"auto"};
         LineSearchOptions line_search;
+        TangentProjection tangent_projection{TangentProjection::NONE};
     };
 
     /// One measured Newton iterate as a monitor sees it. The linear solve and the line search are
@@ -39,6 +54,8 @@ namespace sfem {
         real_t                   tolerance{0};
         int                      linear_iterations{0};
         bool                     linear_capped{false};
+        /// The direction was computed on the projected tangent.
+        bool                     projected{false};
         LineSearchResult         line_search;
         const real_t            *x{nullptr};
         const real_t            *residual{nullptr};

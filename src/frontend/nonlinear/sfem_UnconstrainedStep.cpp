@@ -128,6 +128,12 @@ namespace sfem {
         return ret;
     }
 
+    bool UnconstrainedStep::tangent_projection_supported() const {
+        return impl_->tangent && impl_->f->tangent_projection_supported();
+    }
+
+    void UnconstrainedStep::set_tangent_projection(const bool on) { impl_->f->set_tangent_projection(on); }
+
     StepMeasure UnconstrainedStep::measure(const real_t *const, const real_t *const r) {
         StepMeasure m;
         m.value     = impl_->blas->norm2(impl_->ndofs, r);

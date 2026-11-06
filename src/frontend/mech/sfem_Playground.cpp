@@ -932,6 +932,21 @@ namespace sfem {
             newton_options.rtol              = read<real_t>(nn, "rtol", newton_options.rtol);
             newton_options.divergence_factor = read<real_t>(nn, "divergence_factor", newton_options.divergence_factor);
             newton_options.merit             = read_string(nn, "merit", newton_options.merit);
+            {
+                const auto projection = read_string(nn, "tangent_projection", "none");
+                if (projection == "none") {
+                    newton_options.tangent_projection = TangentProjection::NONE;
+                } else if (projection == "on_failure") {
+                    newton_options.tangent_projection = TangentProjection::ON_FAILURE;
+                } else if (projection == "always") {
+                    newton_options.tangent_projection = TangentProjection::ALWAYS;
+                } else {
+                    fprintf(stderr,
+                            "Playground: unknown solver.newton.tangent_projection \"%s\" (none, on_failure, always)\n",
+                            projection.c_str());
+                    return SFEM_FAILURE;
+                }
+            }
             verbose                          = read<bool>(nn, "verbose", true);
             // A linear problem is solved by its first step, which needs no merit to judge it.
             newton_options.line_search.enabled = !f->is_linear();
@@ -1037,6 +1052,13 @@ namespace sfem {
                 step = UnconstrainedStep::create(f, es, linear);
             }
             if (!step) return SFEM_FAILURE;
+            if (newton_options.tangent_projection != TangentProjection::NONE && !step->tangent_projection_supported()) {
+                fprintf(stderr,
+                        "Playground: solver.newton.tangent_projection needs solver.linear.format BSR, a material that "
+                        "projects its tangent and a build with LAPACK (SFEM_ENABLE_LAPACK); the %s step has not\n",
+                        step->name());
+                return SFEM_FAILURE;
+            }
             newton = std::make_shared<NewtonSolver>(f, step, newton_options);
             nonlinear = newton;
             if (torque_controlled) {
@@ -1047,11 +1069,12 @@ namespace sfem {
                     if (it.iteration == 0) {
                         printf("  Newton %2d: |r| = %.6e (tol %.3e)\n", it.iteration, (double)it.measure.value, (double)it.tolerance);
                     } else {
-                        printf("  Newton %2d: |r| = %.6e, %d linear%s, alpha = %g (%s)\n",
+                        printf("  Newton %2d: |r| = %.6e, %d linear%s%s, alpha = %g (%s)\n",
                                it.iteration,
                                (double)it.measure.value,
                                it.linear_iterations,
                                it.linear_capped ? " (max iterations)" : "",
+                               it.projected ? " projected" : "",
                                (double)it.line_search.alpha,
                                to_string(it.line_search.status));
                     }
