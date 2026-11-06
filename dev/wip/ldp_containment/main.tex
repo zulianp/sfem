@@ -123,10 +123,11 @@ mesh's boundary. $\phi$ and its derivatives are evaluated through a cubic B-spli
 coefficients come from the recursive prefilter of the samples~\cite{unser1999}, so the sampled
 field is $C^2$. A skin node $i$ with reference position $X_i$ and displacement $u_i$ satisfies
 \begin{equation}
-  \phi(X_i + u_i) + s \le 0 ,
+  g_i = -\frac{\phi(X_i + u_i)}{|\nabla\phi(X_i + u_i)|} \ge s ,
 \end{equation}
-with a clearance $s=\SI{10}{\micro\metre}$; nodes farther than \SI{100}{\micro\metre} beyond
-the clearance are unconstrained. The overlap is removed in a single load step.
+with a clearance $s=\SI{10}{\micro\metre}$; the gap $g_i$ is the distance to the obstacle where
+$|\nabla\phi| = 1$. Nodes farther than \SI{100}{\micro\metre} beyond the clearance are
+unconstrained. The overlap is removed in a single load step.
 
 \paragraph{Newton step.} At the iterate $u$ the constraint is linearised in a frame per contact
 node whose first axis is $n_i=\nabla\phi(X_i+u_i)$, so it bounds one component of the increment.
@@ -236,7 +237,7 @@ reductions moves, and a state reached after a fixed number of steps keeps the di
 same reason QP iteration counts differ by up to \qpSpreadMax\% between configurations.
 
 \paragraph{Utopia.} Table~\ref{tab:accuracy} compares SFEM's single-process result with utopia's on
-the valve nodes. SFEM's contact nodes stay outside the obstacle, $\max\phi \le \abSdfSfemMax$\,\si{\metre},
+the valve nodes, both evaluated through the spline of $\phi$ above. SFEM's contact nodes stay outside the obstacle, $\max\phi \le \abSdfSfemMax$\,\si{\metre},
 while utopia's penetrate by up to \abPenUtopiaMax\,\si{\metre}. The contact sets overlap with a
 Jaccard index of at least \abJaccardMin{}. The KKT measure, the residual of the optimality
 conditions evaluated at each final state, separates the two. Where SFEM's Newton iteration
@@ -720,9 +721,7 @@ on a synthetic smooth stress (drivers/bench/bench\_prony\_history).}
 \section{Limitations}
 
 In the single-process runs \qpCappedClause{}. The Newton budget
-of \unconvergedCases{} ends before the KKT tolerance is reached. The comparison with utopia samples
-the distance field trilinearly for both states, so penetrations below the grid's interpolation
-error are not resolved. All measurements are on one system; utopia was not rerun on it.
+of \unconvergedCases{} ends before the KKT tolerance is reached. All measurements are on one system; utopia was not rerun on it.
 The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for FF200, apply it as
 a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
 valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
