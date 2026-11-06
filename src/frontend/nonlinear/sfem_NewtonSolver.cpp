@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 #include "sfem_Function.hpp"
@@ -132,6 +133,20 @@ namespace sfem {
             }
         }
 
+        // Every step starts on the tangent the options name.
+        bool projected = opts.tangent_projection == TangentProjection::ALWAYS;
+        if (opts.tangent_projection != TangentProjection::NONE) {
+            if (!impl.step->tangent_projection_supported()) {
+                fprintf(stderr,
+                        "NewtonSolver: the %s step cannot project its tangent (an assembled BSR tangent, operators "
+                        "that project theirs, and LAPACK)\n",
+                        impl.step->name());
+                report.status = NonlinearReport::Status::STEP_FAILED;
+                return report;
+            }
+            impl.step->set_tangent_projection(projected);
+        }
+
         // A linear function is solved by one full step whose linear solve met its tolerance: its
         // accuracy is the linear solver's, and a second step would only repeat the solve.
         const bool linear = impl.f->is_linear() && impl.step->solves_linear_function_exactly();
@@ -163,6 +178,7 @@ namespace sfem {
                 if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::Status::DIVERGED;
                 if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::Status::ITERATIONS_DONE : NonlinearReport::Status::MAX_IT;
 
+                log.projected = projected;
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
                     if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::Status::STEP_FAILED;
@@ -200,6 +216,14 @@ namespace sfem {
                         return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;
                     case LineSearchResult::Status::NO_DECREASE:
                     case LineSearchResult::Status::NON_FINITE:
+                        if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected) {
+                            // The tangent is indefinite here: the iteration again from x, on the
+                            // projected tangent.
+                            projected = true;
+                            impl.step->set_tangent_projection(true);
+                            known = false;
+                            continue;
+                        }
                         return NonlinearReport::Status::LINE_SEARCH_FAILED;
                 }
 

@@ -98,6 +98,21 @@ namespace sfem {
         virtual bool tangent_is_symmetric() const { return true; }
 
         /**
+         * @brief Whether `set_tangent_projection` makes the assembled tangent positive semidefinite
+         *
+         * A linear operator has nothing to project; its tangent is taken as it is.
+         */
+        virtual bool tangent_projection_supported() const { return is_linear(); }
+
+        /**
+         * @brief The assembled tangents that follow projected to positive semidefinite, per
+         * quadrature point (`project_abs_symmetric`), or not
+         *
+         * Only the assembled (BSR) tangent is projected; the applies are the function's own.
+         */
+        virtual void set_tangent_projection(const bool /*on*/) {}
+
+        /**
          * @brief What the stored tangent stores and how it is applied
          *
          * Takes effect at the next `inexact_update`; an operator without the

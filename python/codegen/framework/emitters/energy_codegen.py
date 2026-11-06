@@ -789,6 +789,9 @@ def generate_sfem_soa_cpp_files(
                     math_name,
                     tensor_product_name,
                     source_builder,
+                    tangent_projection=bool(
+                        matrix_format_plan is not None and matrix_format_plan.tangent_projection
+                    ),
                 ),
             )
         )
@@ -1130,6 +1133,7 @@ def _sfem_soa_hessian_header(
     math_name="kernel_math.hpp",
     tensor_product_name="tensor_product_kernels.hpp",
     source_builder=None,
+    tangent_projection=False,
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -1173,6 +1177,8 @@ def _sfem_soa_hessian_header(
     if tensor_include not in lines:
         math_include = '#include "%s"' % math_name
         lines.insert(lines.index(math_include) + 1, tensor_include)
+    if tangent_projection:
+        lines.insert(lines.index(tensor_include) + 1, '#include "%s"' % TANGENT_PROJECTION_HEADER)
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     emitted = set()
@@ -1199,6 +1205,7 @@ def _sfem_soa_hessian_header(
                 use_tensor_product_reference,
                 use_reference_gradient_vectors,
                 source_builder,
+                project=tangent_projection,
             )
         )
         lines.append("")
@@ -1238,7 +1245,16 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     use_reference_gradient_vectors,
     source_builder,
     constant_p1=None,
+    project=False,
 ):
+    """The element matrix of one element, as `element_matrix[NDOFS * NDOFS]`.
+
+    With `project` it takes the `PROJECT` flag (`PROJECT_TEMPLATE_PARAMETER`) that
+    projects each point's tangent; the closed form has no point tangent to
+    project and never takes it.
+    """
+    if project and constant_p1 is not None:
+        raise ValueError("the closed-form element matrix has no point tangent to project")
     n_field_components = form_n_field_components(form, dim)
     params = [
         *(
@@ -1335,6 +1351,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 "",
                 "  ",
                 emit_tensor_product_static_constants=False,
+                project=project,
             )
         )
     else:
@@ -1349,6 +1366,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 "",
                 "  ",
                 emit_tensor_product_static_constants=False,
+                project=project,
             )
         )
     lines.append("}")
@@ -1371,7 +1389,8 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             # The header the IR actually prints; the `lines` built above
             # only supply the body slice, which is why changing the literal
             # there left the emitted `int NQ` in place.
-            template_params=_block_template_params(constant_p1 is not None, ()),
+            template_params=_block_template_params(constant_p1 is not None, ())
+            + ((PROJECT_TEMPLATE_PARAMETER,) if project else ()),
         )
     )
 
@@ -7992,7 +8011,7 @@ def _sfem_soa_direct_hessian_point_geometry_lines(dim, indent):
     return lines
 
 
-def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True):
+def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True, project=False):
     """The point's physical tangent D, as `s_t D[(NC * ND) * (NC * ND)]`.
 
     `material` is the response to a trial gradient and is linear in it, so its
@@ -8001,6 +8020,11 @@ def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True):
     matrix of an energy is symmetric and so is D: the upper triangle is
     eliminated and mirrored, which roughly halves the elimination.  The
     symmetry is checked at a pseudo-random point before it is relied on.
+
+    With `project`, D is then projected to positive semidefinite where the
+    kernel's `PROJECT` flag is set (`project_abs_symmetric`), so the element
+    matrix contracted from it is too.  The flag is a template parameter: the
+    exact assembly instantiates it off and compiles to what it was without it.
     """
     n = len(material)
     trial = [sp.Symbol("trial_grad[%d]" % j) for j in range(n)]
@@ -8017,7 +8041,23 @@ def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True):
     lines.extend(
         "%sD[%d] = D[%d];" % (indent, b * n + a, a * n + b) for a in range(n) for b in range(a + 1, n)
     )
+    if project:
+        lines.extend(
+            [
+                "%sif constexpr (PROJECT) {" % indent,
+                "%s  project_abs_symmetric(%d, D);" % (indent, n),
+                "%s}" % indent,
+            ]
+        )
     return lines
+
+
+#: The template flag of an element-matrix kernel and of its assembly that
+#: selects the projected tangent, and its default: off, which is the exact one.
+PROJECT_TEMPLATE_PARAMETER = "bool PROJECT = false"
+
+#: The header that declares `project_abs_symmetric`.
+TANGENT_PROJECTION_HEADER = "sfem_TangentProjection.hpp"
 
 
 def _check_tangent_symmetry(material, trial):
@@ -8256,6 +8296,7 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     reference_prefix,
     indent,
     emit_tensor_product_static_constants=True,
+    project=False,
 ):
     """The element matrix of a tensor-product element, accumulated as the rule is walked.
 
@@ -8342,7 +8383,7 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
                 reference_prefix, point_indent,
             )
         )
-    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False))
+    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False, project=project))
     lines.extend(
         "%sadj_q[%d] = %s;" % (point_indent, c, current_target().work_item_name("adj", c))
         for c in range(dim * dim)
@@ -8457,6 +8498,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
     reference_prefix,
     indent,
     emit_tensor_product_static_constants=True,
+    project=False,
 ):
     n_field_components = form_n_field_components(form, dim)
     uses_current = form_reads_current(form, default=True)
@@ -8532,7 +8574,7 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
                 "%s  " % indent,
             )
         )
-    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, "%s  " % indent))
+    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, "%s  " % indent, project=project))
     # The point's reference gradients, every shape, laid out [k][s].
     lines.extend(
         [
@@ -8589,6 +8631,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     indent,
     constant_p1=False,
     quadrature_streams=(),
+    project=False,
 ):
     args = [
         *("badj%d" % i for i in range(dim * dim)),
@@ -8623,7 +8666,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         % (
             indent,
             function_name,
-            _block_template_arguments(constant_p1, ()),
+            _block_template_arguments(constant_p1, ("PROJECT",) if project else ()),
             ", ".join(args),
         ),
     )
@@ -9081,6 +9124,14 @@ def _holding_one_element_hessian_matrix_assembly_function(
         )
     )
 
+    # The projected tangent is a BSR assembly's, and only where there is a point
+    # tangent to project: not in the closed form a lowest-order simplex folds.
+    projected = bool(
+        matrix_format_plan is not None
+        and matrix_format_plan.tangent_projection
+        and "bsr" in formats
+        and constant_p1_hessian is None
+    )
     is_affine_assembly = geometry_mode == "affine"
     function_base = _sfem_soa_hessian_matrix_public_function_base(
         prefix,
@@ -9109,7 +9160,8 @@ def _holding_one_element_hessian_matrix_assembly_function(
         [
             # The matrix values are of their own type v_t (the BSR scatter's);
             # the other formats are instantiated with v_t = s_t.
-            "template <typename s_t, typename v_t, typename g_t, int FORMAT>",
+            "template <typename s_t, typename v_t, typename g_t, int FORMAT%s>"
+            % (", %s" % PROJECT_TEMPLATE_PARAMETER if projected else ""),
             # A device kernel is declared as the target declares one; the host
             # keeps the spelling its tracked tree has.
             (
@@ -9360,6 +9412,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
             "    ",
             constant_p1=constant_p1_hessian is not None,
             quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+            project=projected,
         )
     )
     lines.append("")
@@ -9422,6 +9475,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
             crs_passes,
             geometry_mode=geometry_mode,
             quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+            projected=projected,
         )
     )
     return lines
@@ -10046,6 +10100,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     packed_crs_passes=(),
     geometry_mode="isoparametric",
     quadrature_streams=(),
+    projected=False,
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -10072,6 +10127,24 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     quadrature_streams=quadrature_streams,
                 )
             )
+    if projected:
+        # The same BSR assembly on the projected tangent, under a verb of its
+        # own (`hessian_bsr_psd`), so the exact entry point keeps its name and
+        # its code.
+        lines.extend(
+            _sfem_soa_hessian_matrix_public_wrapper(
+                function_base.replace("_hessian_", "_hessian_bsr_psd_"),
+                implementation_name,
+                dim,
+                "bsr",
+                format_tags["bsr"],
+                material_parameter_names,
+                uses_current,
+                geometry_mode=geometry_mode,
+                quadrature_streams=quadrature_streams,
+                projected=True,
+            )
+        )
     if "crs" in formats:
         if "one_pass" in packed_crs_passes:
             lines.extend(
@@ -10188,6 +10261,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     uses_current,
     geometry_mode="isoparametric",
     quadrature_streams=(),
+    projected=False,
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -10215,7 +10289,8 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         lambda scalar_type, _positional, values_type=None: list(
             current_target().mesh_launch_lines(
                 implementation_name,
-                "%s, %s, geom_t, %d" % (scalar_type, values_type or scalar_type, format_tag),
+                "%s, %s, geom_t, %d%s"
+                % (scalar_type, values_type or scalar_type, format_tag, ", true" if projected else ""),
                 cast_arguments(params, impl_args, scalar_type, values_type),
                 indent="  ",
             )

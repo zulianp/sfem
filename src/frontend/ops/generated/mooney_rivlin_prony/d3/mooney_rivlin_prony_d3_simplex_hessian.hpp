@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.hpp"
 #include "tensor_product_kernels.hpp"
+#include "sfem_TangentProjection.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -30,7 +31,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS>
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
 static SFEM_INLINE void mooney_rivlin_prony_d3_simplex_direct_hessian_reference_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -452,6 +453,9 @@ static SFEM_INLINE void mooney_rivlin_prony_d3_simplex_direct_hessian_reference_
     D[69] = D[61];
     D[78] = D[62];
     D[79] = D[71];
+    if constexpr (PROJECT) {
+      project_abs_symmetric(9, D);
+    }
     s_t g_ref[ND * NS];
     for (int shape = 0; shape < NS; ++shape) {
       g_ref[0 * NS + shape] = grad_ref_x[q * NS + shape];

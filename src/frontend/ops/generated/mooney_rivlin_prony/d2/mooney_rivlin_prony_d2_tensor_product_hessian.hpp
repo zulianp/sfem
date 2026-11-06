@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.hpp"
 #include "tensor_product_kernels.hpp"
+#include "sfem_TangentProjection.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -30,7 +31,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS>
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
 static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -155,6 +156,9 @@ static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_ten
     D[9] = D[6];
     D[13] = D[7];
     D[14] = D[11];
+    if constexpr (PROJECT) {
+      project_abs_symmetric(4, D);
+    }
     adj_q[0] = adj_lane0;
     adj_q[1] = adj_lane1;
     adj_q[2] = adj_lane2;

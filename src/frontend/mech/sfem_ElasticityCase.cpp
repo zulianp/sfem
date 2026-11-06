@@ -105,6 +105,7 @@ namespace sfem {
                 "solver.newton.rtol",
                 "solver.newton.divergence_factor",
                 "solver.newton.merit",
+                "solver.newton.tangent_projection",
                 "solver.newton.verbose",
                 "solver.newton.line_search.enabled",
                 "solver.newton.line_search.steps",
