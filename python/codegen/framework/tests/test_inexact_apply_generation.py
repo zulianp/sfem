@@ -123,9 +123,25 @@ class InexactApplyOpWrapperTest(InexactApplyGenerationTest):
                 self.assertIn(declaration, header)
         self.assertIn("inexact::create_store<codegen::linear_elasticity_tet4_inexact>", source)
 
+    @staticmethod
+    def _apply_body(source):
+        """The body that applies the stored tangent: `team_inexact_apply` where the Op has a team
+        product (its `inexact_apply` opens the threads' region and hands it over), `inexact_apply`
+        where it has none."""
+        name = "::team_inexact_apply(" if "::team_inexact_apply(" in source else "::inexact_apply("
+        start = source.index(name)
+        return source[start : source.index("\n  }", start)]
+
+    def test_the_apply_runs_on_the_team_product(self):
+        _header, source = self._op_files(opt_in=True)
+        self.assertIn("::team_inexact_apply(", source)
+        start = source.index("::inexact_apply(")
+        body = source[start : source.index("\n  }", start)]
+        self.assertIn("team_inexact_apply(team, h, out, ElementScope::ALL)", body)
+
     def test_the_apply_prefers_the_packed_mesh_when_there_is_one(self):
         _header, source = self._op_files(opt_in=True)
-        body = source[source.index("::inexact_apply("):]
+        body = self._apply_body(source)
         self.assertIn("has_packed_mesh()", body)
         self.assertIn("packed_view(", body)
 
@@ -138,8 +154,7 @@ class InexactApplyOpWrapperTest(InexactApplyGenerationTest):
 
     def test_the_op_refuses_a_stale_apply_and_takes_no_state(self):
         _header, source = self._op_files(opt_in=True)
-        start = source.index("::inexact_apply(")
-        body = source[start:source.index("\n  }", start)]
+        body = self._apply_body(source)
         self.assertIn("requires inexact_update first", body)
         for absent in ("require_real_value", "input.u", "jacobian"):
             with self.subTest(absent=absent):
