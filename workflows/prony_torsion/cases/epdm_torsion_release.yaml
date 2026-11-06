@@ -58,7 +58,10 @@ constraints:
     release: 0.65
 
 solver:
-  newton: {max_it: 40, atol: 1.0e-6, rtol: 1.0e-10, verbose: false}
+  # The release leaves the tangent indefinite where the bar is compressed: an iteration whose line
+  # search finds no decrease is repeated on the tangent projected to positive semidefinite, so no
+  # step is cut back and every run keeps the same time grid.
+  newton: {max_it: 40, atol: 1.0e-6, rtol: 1.0e-10, verbose: false, tangent_projection: on_failure}
   linear: {type: cg, preconditioner: jacobi, max_it: 20000}
 
 output:

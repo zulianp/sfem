@@ -740,8 +740,9 @@ def _projected_tangent_elements(material, kernel_sources):
             {
                 element
                 for dim in (2, 3)
+                for geometry in ("i", "a")
                 for element in _c_abi_public_dispatch_case_elements(
-                    kernel_sources, "%s_hessian_bsr_psd_%dd_i_msoa" % (material.name, dim)
+                    kernel_sources, "%s_hessian_bsr_psd_%dd_%s_msoa" % (material.name, dim, geometry)
                 )
             }
         )
@@ -11645,26 +11646,31 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     _element_condition("domain.element_type", affine_by_dim[dim]),
                 )
             )
-            lines.append(
-                "%s    return %s(%s);"
-                % (
-                    indent, _entry_point_name(affine_function), _with_stream(", ".join(
-                        [
-                            "domain.element_type",
-                            *_runtime_type_arguments(operation),
-                            "domain.block->n_elements()",
-                            "mesh->n_nodes()",
-                            "element_connectivity(domain)",
-                            *_affine_geometry_call_args(
-                                kernel_sources, affine_function, dim
-                            ),
-                            *parameter_args,
-                            *current_args,
-                            *tail_args,
-                        ]
-                    )),
+            affine_arguments = _with_stream(", ".join(
+                [
+                    "domain.element_type",
+                    *_runtime_type_arguments(operation),
+                    "domain.block->n_elements()",
+                    "mesh->n_nodes()",
+                    "element_connectivity(domain)",
+                    *_affine_geometry_call_args(
+                        kernel_sources, affine_function, dim
+                    ),
+                    *parameter_args,
+                    *current_args,
+                    *tail_args,
+                ]
+            ))
+            projected_affine = "%s_%s_psd_%dd_a_msoa" % (material_name, operation, dim)
+            if projected and _c_abi_function_exists(kernel_sources, projected_affine, public_only=True):
+                lines.extend(
+                    [
+                        "%s    if (impl_->project_tangent) {" % indent,
+                        "%s      return %s(%s);" % (indent, _entry_point_name(projected_affine), affine_arguments),
+                        "%s    }" % indent,
+                    ]
                 )
-            )
+            lines.append("%s    return %s(%s);" % (indent, _entry_point_name(affine_function), affine_arguments))
             lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             arguments = _with_stream(", ".join(

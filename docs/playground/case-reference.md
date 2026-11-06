@@ -265,12 +265,12 @@ obstacle:
 | `newton.divergence_factor` | `1e4` | |
 | `newton.merit` | `auto` | `auto`, `energy`, `residual`. |
 | `newton.fixed_iterations` | `false` | `true` accepts the state after `max_it` iterations. |
-| `newton.tangent_projection` | `none` | `on_failure`: where the line search finds no decrease along Newton's direction, the iteration is repeated from the same state on the tangent projected to positive semidefinite at every quadrature point (its eigenvalues replaced by their absolute values), kept to the end of the step. `always`: the projected tangent at every iteration. Needs `linear.format: BSR`, no obstacle, and GeneratedMooneyRivlinProny on HEX8, TET10 or QUAD4; host or device. |
+| `newton.tangent_projection` | `none` | `on_failure`: where the line search finds no decrease along Newton's direction, the iteration is repeated from the same state on the tangent projected to positive semidefinite at every quadrature point (its eigenvalues replaced by their absolute values), kept to the end of the step. `always`: the projected tangent at every iteration. Needs `linear.format: BSR`, no obstacle, and GeneratedMooneyRivlinProny; host or device. |
 | `newton.verbose` | `true` | One line per Newton iteration. |
 | `newton.line_search.enabled` | on for nonlinear materials | |
 | `newton.line_search.steps` | `[1, 1/2, ..., 1/128]` | |
 | `newton.line_search.c1` | `1e-4` | |
-| `newton.line_search.nonmonotone` | `1` | Armijo against the largest merit of the step's last this-many iterates rather than the current one (Grippo-Lampariello-Lucidi); `1` is monotone. |
+| `newton.line_search.nonmonotone` | `5` | Armijo against the largest merit of the step's last this-many iterates rather than the current one (Grippo-Lampariello-Lucidi); `1` is the monotone rule. |
 | `newton.line_search.batched` | `true` | |
 | `newton.line_search.rule` | `armijo` | Or `damped`: `damping` (in (0, 1]) times the step, shortened only past an inverted element. |
 | `linear.type` | `cg` | Or `bcgs`. |
