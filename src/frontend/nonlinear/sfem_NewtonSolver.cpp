@@ -138,8 +138,8 @@ namespace sfem {
         if (opts.tangent_projection != TangentProjection::NONE) {
             if (!impl.step->tangent_projection_supported()) {
                 fprintf(stderr,
-                        "NewtonSolver: the %s step cannot project its tangent (an assembled BSR tangent, operators "
-                        "that project theirs, and LAPACK)\n",
+                        "NewtonSolver: the %s step cannot project its tangent (an assembled BSR tangent and operators "
+                        "that project theirs)\n",
                         impl.step->name());
                 report.status = NonlinearReport::Status::STEP_FAILED;
                 return report;

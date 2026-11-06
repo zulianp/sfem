@@ -749,13 +749,12 @@ def _projected_tangent_elements(material, kernel_sources):
 
 
 def _tangent_projection_definitions(op_name, elements):
-    """The switch's definitions: supported where LAPACK is and every element of
-    the space has the projected assembly; on, the BSR assembly takes it."""
+    """The switch's definitions: supported where every element of the space has
+    the projected assembly; on, the BSR assembly takes it."""
     if not elements:
         return ""
     return """
   bool %(op)s::tangent_projection_supported() const {
-    if (!tangent_projection_available()) return false;
     for (auto type : impl_->space->element_types()) {
       if (!(%(condition)s)) return false;
     }
@@ -1753,7 +1752,7 @@ def _hyperelastic_op(
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
-%(inexact_include)s%(tangent_projection_include)s%(relaxation_include)s
+%(inexact_include)s%(relaxation_include)s
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -2515,9 +2514,6 @@ namespace sfem {
         ),
         "inexact_include": _inexact_includes(material, kernel_sources),
         "inexact_impl_field": _inexact_impl_field(material, kernel_sources),
-        "tangent_projection_include": (
-            '#include "sfem_TangentProjection.hpp"\n' if projected_elements else ""
-        ),
         "tangent_projection_impl_field": "    bool project_tangent{false};\n" if projected_elements else "",
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(

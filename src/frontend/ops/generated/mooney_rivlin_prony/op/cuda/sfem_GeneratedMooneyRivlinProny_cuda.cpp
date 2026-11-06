@@ -419,6 +419,7 @@ namespace sfem {
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
     inexact::OpState inexact{EXECUTION_SPACE_DEVICE};
+    bool project_tangent{false};
   };
 
   std::unique_ptr<Op> GPUGeneratedMooneyRivlinProny::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1045,11 +1046,17 @@ namespace sfem {
         if (domain.element_type == smesh::TRI3) {
           return cu_mooney_rivlin_prony_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, stream);
         }
+        if (impl_->project_tangent) {
+          return cu_mooney_rivlin_prony_hessian_bsr_psd_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, stream);
+        }
         return cu_mooney_rivlin_prony_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, stream);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
           return cu_mooney_rivlin_prony_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
+        }
+        if (impl_->project_tangent) {
+          return cu_mooney_rivlin_prony_hessian_bsr_psd_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
         }
         return cu_mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, stream);
       }
@@ -1342,4 +1349,13 @@ namespace sfem {
       return SFEM_SUCCESS;
     });
   }
+  bool GPUGeneratedMooneyRivlinProny::tangent_projection_supported() const {
+    for (auto type : impl_->space->element_types()) {
+      if (!(type == smesh::HEX8 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10)) return false;
+    }
+    return true;
+  }
+
+  void GPUGeneratedMooneyRivlinProny::set_tangent_projection(const bool on) { impl_->project_tangent = on; }
+
 }  // namespace sfem
