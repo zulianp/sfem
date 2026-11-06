@@ -344,9 +344,10 @@ if(SFEM_ENABLE_SRESAMPLE)
     else()
         set(SRESAMPLE_ENABLE_SMESH ON CACHE BOOL "" FORCE)
     endif()
-    # The templates are instantiated for sfem's real_t, geom_t and idx_t too.
+    # The templates are instantiated for sfem's real_t, geom_t and idx_t too, and for double
+    # coordinates (sresample's mesh-mesh intersection, whose callers pass double meshes).
     set(SRESAMPLE_INSTANTIATIONS
-        "float64,float32,int32,float32;float64,float32,int32,float64;float32,float32,int32,float32;${SFEM_REAL_TYPE},${SFEM_GEOM_TYPE},${SFEM_IDX_TYPE},${SFEM_GEOM_TYPE}"
+        "float64,float32,int32,float32;float64,float32,int32,float64;float32,float32,int32,float32;float64,float64,int32,float64;${SFEM_REAL_TYPE},${SFEM_GEOM_TYPE},${SFEM_IDX_TYPE},${SFEM_GEOM_TYPE}"
         CACHE STRING "" FORCE)
 
     set(SFEM_SRESAMPLE_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sresample")
