@@ -8045,7 +8045,7 @@ def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True, 
         lines.extend(
             [
                 "%sif constexpr (PROJECT) {" % indent,
-                "%s  project_abs_symmetric(%d, D);" % (indent, n),
+                "%s  project_abs_symmetric<s_t, %d>(D);" % (indent, n),
                 "%s}" % indent,
             ]
         )

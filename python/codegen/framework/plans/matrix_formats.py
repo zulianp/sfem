@@ -248,7 +248,8 @@ class MatrixFormatPlan:
     #: semidefinite per quadrature point (`project_abs_symmetric`), as a second
     #: entry point beside the exact one, `<stem>_hessian_bsr_psd_<geometry>`.  The
     #: exact assembly is unchanged: the projection is a compile-time branch of a
-    #: template flag that it instantiates off.  Host only (LAPACK).
+    #: template flag that it instantiates off.  Host and device alike: the
+    #: projection is a per-point inline function (`sfem_TangentProjection.hpp`).
     tangent_projection: bool = False
 
     def __post_init__(self):

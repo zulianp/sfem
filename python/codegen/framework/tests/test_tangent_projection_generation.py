@@ -30,14 +30,14 @@ def _material(name):
     return importlib.import_module(name).material
 
 
-def _generate(name, element, opt_in):
+def _generate(name, element, opt_in, target="openmp"):
     import tempfile
 
     from sfem import gen
 
     material = dataclasses.replace(_material(name), tangent_projection=opt_in)
     with tempfile.TemporaryDirectory() as out_dir:
-        result = gen.generate(material, out_dir, elements=(element,), clean=True)
+        result = gen.generate(material, out_dir, elements=(element,), clean=True, target=target)
         files = {}
         for path in result.sources:
             relative = os.path.relpath(path, out_dir)
@@ -88,7 +88,7 @@ class TangentProjectionGenerationTest(unittest.TestCase):
         # After D is complete, its last mirrored entry included.
         self.assertRegex(
             source,
-            r"D\[79\] = D\[71\];\n\s*if constexpr \(PROJECT\) \{\n\s*project_abs_symmetric\(9, D\);\n\s*\}",
+            r"D\[79\] = D\[71\];\n\s*if constexpr \(PROJECT\) \{\n\s*project_abs_symmetric<s_t, 9>\(D\);\n\s*\}",
         )
 
     def test_the_projected_assembly_is_a_second_entry_point(self):
@@ -122,7 +122,7 @@ class TangentProjectionGenerationTest(unittest.TestCase):
         files = self.files("HEX8", True)
         hessian = files["d3/neohookean_ogden_d3_tensor_product_hessian.hpp"]
         self.assertIn("if constexpr (PROJECT) {", hessian)
-        self.assertIn("project_abs_symmetric(9, D);", hessian)
+        self.assertIn("project_abs_symmetric<s_t, 9>(D);", hessian)
         # HEX8 reaches its PROTEUS twin through the node permutation, projected or not.
         operator = files["d3/hex8/neohookean_ogden_hex8_operator.cpp"]
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_bsr_psd_i_msoa(", operator)
@@ -141,6 +141,17 @@ class TangentProjectionGenerationTest(unittest.TestCase):
             body,
             r"if \(impl_->project_tangent\) \{\n\s*return neohookean_ogden_hessian_bsr_psd_3d_i_msoa\(",
         )
+
+    def test_the_device_projects_as_the_host_does(self):
+        files = _generate("neohookean_ogden", "TET10", True, target="cuda")
+        hessian = files["d3/cuda/neohookean_ogden_d3_simplex_hessian.cuh"]
+        self.assertIn('#include "sfem_TangentProjection.hpp"', hessian)
+        self.assertIn("project_abs_symmetric<s_t, 9>(D);", hessian)
+        operator = files["d3/tet10/cuda/neohookean_ogden_tet10_operator.cu"]
+        self.assertIn('extern "C" int cu_neohookean_ogden_tet10_hessian_bsr_psd_i_msoa(', operator)
+        source = files["op/cuda/sfem_GeneratedNeoHookeanOgden_cuda.cpp"]
+        self.assertIn("::set_tangent_projection(const bool on)", source)
+        self.assertIn("return cu_neohookean_ogden_hessian_bsr_psd_3d_i_msoa(", source)
 
     def test_an_op_without_it_declares_nothing(self):
         files = self.files("TET10", False)

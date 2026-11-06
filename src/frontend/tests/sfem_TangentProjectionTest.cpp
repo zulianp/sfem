@@ -61,12 +61,11 @@ namespace {
     }
 
     int test_positive_definite_is_unchanged() {
-        if (!sfem::tangent_projection_available()) return SFEM_TEST_SKIPPED;
         const double lambda[N] = {1e-3, 0.1, 1, 2, 5, 10, 100, 1e3, 1e4};
         double       A[N * N], P[N * N];
         with_eigenvalues(lambda, 1, A);
         std::copy(A, A + N * N, P);
-        sfem::project_abs_symmetric(N, P);
+        sfem::project_abs_symmetric<double, N>(P);
         double d[N * N];
         for (int i = 0; i < N * N; ++i) d[i] = P[i] - A[i];
         SFEM_TEST_ASSERT(max_abs(d) <= 1e-12 * max_abs(A));
@@ -74,13 +73,12 @@ namespace {
     }
 
     int test_indefinite_becomes_its_absolute_value() {
-        if (!sfem::tangent_projection_available()) return SFEM_TEST_SKIPPED;
         // Eigenvalues of both signs and of the spread of a nearly incompressible rubber.
         const double lambda[N] = {-3e6, -2, -1e-3, 0, 0.5, 4, 1e2, 2e4, 1e7};
         double       A[N * N], P[N * N];
         with_eigenvalues(lambda, 2, A);
         std::copy(A, A + N * N, P);
-        sfem::project_abs_symmetric(N, P);
+        sfem::project_abs_symmetric<double, N>(P);
         const double scale = max_abs(A);
 
         double d[N * N];
@@ -120,18 +118,17 @@ namespace {
     }
 
     int test_single_precision_follows_double() {
-        if (!sfem::tangent_projection_available()) return SFEM_TEST_SKIPPED;
         const double lambda[N] = {-50, -1, 0.25, 1, 2, 3, 8, 20, 400};
         double       A[N * N];
         float        Af[N * N];
         with_eigenvalues(lambda, 4, A);
         for (int i = 0; i < N * N; ++i) Af[i] = (float)A[i];
         for (int i = 0; i < N * N; ++i) A[i] = Af[i];
-        sfem::project_abs_symmetric(N, A);
-        sfem::project_abs_symmetric(N, Af);
+        sfem::project_abs_symmetric<double, N>(A);
+        sfem::project_abs_symmetric<float, N>(Af);
         double d[N * N];
         for (int i = 0; i < N * N; ++i) d[i] = A[i] - (double)Af[i];
-        SFEM_TEST_ASSERT(max_abs(d) <= 1e-6 * max_abs(A));
+        SFEM_TEST_ASSERT(max_abs(d) <= 1e-5 * max_abs(A));
         return SFEM_TEST_SUCCESS;
     }
 

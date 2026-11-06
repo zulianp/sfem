@@ -1,22 +1,242 @@
 #ifndef SFEM_TANGENT_PROJECTION_HPP
 #define SFEM_TANGENT_PROJECTION_HPP
 
+// The projection of a quadrature point's tangent to positive semidefinite, |A| = Q |Lambda| Q^T.
+//
+// One header for the host and the device: the kernels call it per point, inside their element
+// loops, so it is inline, allocation-free and templated on the scalar and the size (dP/dF is
+// 9 x 9 in 3D, 4 x 4 in 2D). The eigensolver is Householder tridiagonalisation followed by the
+// implicit QL iteration (tred2 and tql2 of EISPACK, as in JAMA), what LAPACK's dsyev does inside
+// without the library call, whose locks serialise a threaded element loop. On Grace
+// (bench_tangent_projection, 9 x 9) it takes 1.6-3.0 us per matrix on every thread at once, against
+// 8 us for a cyclic Jacobi solver and 110 us for dsyev; computing the eigenpairs of the negative
+// eigenvalues only (tridiagonal eigenvalues, inverse iteration, as dsyevx) was slower, 2.8-4.6 us.
+
+#include <math.h>
+
+#if defined(__CUDACC__) || defined(__HIPCC__)
+#define SFEM_TANGENT_PROJECTION_FUNCTION __host__ __device__ inline
+#else
+#define SFEM_TANGENT_PROJECTION_FUNCTION inline
+#endif
+
 namespace sfem {
+    namespace tangent_projection {
 
-    /// Whether this build can project a tangent: LAPACK (SFEM_ENABLE_LAPACK).
-    bool tangent_projection_available();
+        template <typename T>
+        SFEM_TANGENT_PROJECTION_FUNCTION T abs_(const T x) {
+            return x < T(0) ? -x : x;
+        }
 
-    /// A <- Q |Lambda| Q^T for the symmetric n x n matrix A = Q Lambda Q^T, n <= 9: positive
+        /// Whether the symmetric A (row major) is positive definite: its Cholesky factorisation
+        /// exists. A NaN fails the test.
+        template <typename T, int N>
+        SFEM_TANGENT_PROJECTION_FUNCTION bool positive_definite(const T *const A) {
+            T L[N * N];
+            for (int j = 0; j < N; ++j) {
+                T d = A[j * N + j];
+                for (int k = 0; k < j; ++k) d -= L[j * N + k] * L[j * N + k];
+                if (!(d > T(0))) return false;
+                const T l    = sqrt(d);
+                L[j * N + j] = l;
+                const T inv  = T(1) / l;
+                for (int i = j + 1; i < N; ++i) {
+                    T s = A[i * N + j];
+                    for (int k = 0; k < j; ++k) s -= L[i * N + k] * L[j * N + k];
+                    L[i * N + j] = s * inv;
+                }
+            }
+            return true;
+        }
+
+        /// The eigensystem of the symmetric V (row major, N x N, entries of order one): on return
+        /// d holds the eigenvalues and column k of V, V[i * N + k], the eigenvector of d[k].
+        /// Returns false where the QL iteration takes more than 30 sweeps for an eigenvalue.
+        template <typename T, int N>
+        SFEM_TANGENT_PROJECTION_FUNCTION bool symmetric_eigensystem(T *const V, T *const d) {
+            T e[N];
+            // Householder reduction to tridiagonal form, the transformation accumulated in V.
+            for (int j = 0; j < N; ++j) d[j] = V[(N - 1) * N + j];
+            for (int i = N - 1; i > 0; --i) {
+                T scale = 0, h = 0;
+                for (int k = 0; k < i; ++k) scale += abs_(d[k]);
+                if (scale == T(0)) {
+                    e[i] = d[i - 1];
+                    for (int j = 0; j < i; ++j) {
+                        d[j]         = V[(i - 1) * N + j];
+                        V[i * N + j] = 0;
+                        V[j * N + i] = 0;
+                    }
+                } else {
+                    const T inv_scale = T(1) / scale;
+                    for (int k = 0; k < i; ++k) {
+                        d[k] *= inv_scale;
+                        h += d[k] * d[k];
+                    }
+                    T f = d[i - 1];
+                    T g = sqrt(h);
+                    if (f > T(0)) g = -g;
+                    e[i]     = scale * g;
+                    h        = h - f * g;
+                    d[i - 1] = f - g;
+                    for (int j = 0; j < i; ++j) e[j] = 0;
+                    for (int j = 0; j < i; ++j) {
+                        f            = d[j];
+                        V[j * N + i] = f;
+                        g            = e[j] + V[j * N + j] * f;
+                        for (int k = j + 1; k <= i - 1; ++k) {
+                            g += V[k * N + j] * d[k];
+                            e[k] += V[k * N + j] * f;
+                        }
+                        e[j] = g;
+                    }
+                    f             = 0;
+                    const T inv_h = T(1) / h;
+                    for (int j = 0; j < i; ++j) {
+                        e[j] *= inv_h;
+                        f += e[j] * d[j];
+                    }
+                    const T hh = f / (h + h);
+                    for (int j = 0; j < i; ++j) e[j] -= hh * d[j];
+                    for (int j = 0; j < i; ++j) {
+                        f = d[j];
+                        g = e[j];
+                        for (int k = j; k <= i - 1; ++k) V[k * N + j] -= (f * e[k] + g * d[k]);
+                        d[j]         = V[(i - 1) * N + j];
+                        V[i * N + j] = 0;
+                    }
+                }
+                d[i] = h;
+            }
+            for (int i = 0; i < N - 1; ++i) {
+                V[(N - 1) * N + i] = V[i * N + i];
+                V[i * N + i]       = 1;
+                const T h          = d[i + 1];
+                if (h != T(0)) {
+                    const T inv_h = T(1) / h;
+                    for (int k = 0; k <= i; ++k) d[k] = V[k * N + i + 1] * inv_h;
+                    for (int j = 0; j <= i; ++j) {
+                        T g = 0;
+                        for (int k = 0; k <= i; ++k) g += V[k * N + i + 1] * V[k * N + j];
+                        for (int k = 0; k <= i; ++k) V[k * N + j] -= g * d[k];
+                    }
+                }
+                for (int k = 0; k <= i; ++k) V[k * N + i + 1] = 0;
+            }
+            for (int j = 0; j < N; ++j) {
+                d[j]               = V[(N - 1) * N + j];
+                V[(N - 1) * N + j] = 0;
+            }
+            V[N * N - 1] = 1;
+            e[0]         = 0;
+
+            // The implicit QL iteration on the tridiagonal matrix, the rotations applied to V.
+            for (int i = 1; i < N; ++i) e[i - 1] = e[i];
+            e[N - 1]    = 0;
+            T       f    = 0;
+            T       tst1 = 0;
+            const T eps  = sizeof(T) == sizeof(float) ? T(1.1920929e-7) : T(2.220446049250313e-16);
+            for (int l = 0; l < N; ++l) {
+                const T t = abs_(d[l]) + abs_(e[l]);
+                if (t > tst1) tst1 = t;
+                int m = l;
+                while (m < N) {
+                    if (abs_(e[m]) <= eps * tst1) break;
+                    ++m;
+                }
+                if (m > l) {
+                    int sweeps = 0;
+                    do {
+                        if (++sweeps > 30) return false;
+                        T g = d[l];
+                        T p = (d[l + 1] - g) / (T(2) * e[l]);
+                        T r = sqrt(p * p + T(1));
+                        if (p < T(0)) r = -r;
+                        d[l]        = e[l] / (p + r);
+                        d[l + 1]    = e[l] * (p + r);
+                        const T dl1 = d[l + 1];
+                        T       h   = g - d[l];
+                        for (int i = l + 2; i < N; ++i) d[i] -= h;
+                        f += h;
+                        p           = d[m];
+                        T       c = 1, c2 = 1, c3 = 1, s = 0, s2 = 0;
+                        const T el1 = e[l + 1];
+                        for (int i = m - 1; i >= l; --i) {
+                            c3       = c2;
+                            c2       = c;
+                            s2       = s;
+                            g        = c * e[i];
+                            h        = c * p;
+                            r        = sqrt(p * p + e[i] * e[i]);
+                            e[i + 1] = s * r;
+                            s        = e[i] / r;
+                            c        = p / r;
+                            p        = c * d[i] - s * g;
+                            d[i + 1] = h + s * (c * g + s * d[i]);
+                            for (int k = 0; k < N; ++k) {
+                                h                = V[k * N + i + 1];
+                                V[k * N + i + 1] = s * V[k * N + i] + c * h;
+                                V[k * N + i]     = c * V[k * N + i] - s * h;
+                            }
+                        }
+                        p    = -s * s2 * c3 * el1 * e[l] / dl1;
+                        e[l] = s * p;
+                        d[l] = c * p;
+                    } while (abs_(e[l]) > eps * tst1);
+                }
+                d[l] += f;
+                e[l] = 0;
+            }
+            return true;
+        }
+
+    }  // namespace tangent_projection
+
+    /// A <- Q |Lambda| Q^T for the symmetric N x N matrix A = Q Lambda Q^T (row major): positive
     /// semidefinite, and A itself where A already is. The absolute value rather than a clamp at
     /// zero keeps the curvature of a direction along which the energy is concave (Chen et al.,
     /// "Stabler Neo-Hookean Simulation: Absolute Eigenvalue Filtering for Projected Newton",
-    /// SIGGRAPH 2024). The tangent dP/dF of a quadrature point is projected so; the element
-    /// matrix, a weighted sum of B^T (dP/dF) B, is then positive semidefinite too.
-    /// A positive definite A (a Cholesky factorisation exists) is returned as it is; any other
-    /// goes through LAPACK dsyev, in double precision. Without LAPACK, or where dsyev fails, such
-    /// an A becomes NaN, which the solve that reads it reports.
-    void project_abs_symmetric(const int n, double *const A);
-    void project_abs_symmetric(const int n, float *const A);
+    /// SIGGRAPH 2024). The tangent dP/dF of a quadrature point is projected so; the element matrix,
+    /// a weighted sum of B^T (dP/dF) B, is then positive semidefinite too.
+    ///
+    /// A positive definite A (its Cholesky factorisation exists) is returned as it is. Otherwise
+    /// |A| = A - 2 sum_{lambda_k < 0} lambda_k q_k q_k^T, which leaves A's positive part as it was;
+    /// the eigensystem is computed on A scaled to entries of order one. Where it fails, or A is not
+    /// finite, A becomes NaN, which the solve that reads it reports.
+    template <typename T, int N>
+    SFEM_TANGENT_PROJECTION_FUNCTION void project_abs_symmetric(T *const A) {
+        static_assert(N > 0, "N must be positive");
+        if (tangent_projection::positive_definite<T, N>(A)) return;
+        const T inf    = T(INFINITY);
+        T       scale  = 0;
+        bool    finite = true;
+        for (int i = 0; i < N * N; ++i) {
+            const T a = tangent_projection::abs_(A[i]);
+            finite    = finite && a < inf;
+            if (a > scale) scale = a;
+        }
+        if (finite && scale == T(0)) return;
+        T V[N * N], d[N];
+        if (finite) {
+            const T inv_scale = T(1) / scale;
+            for (int i = 0; i < N * N; ++i) V[i] = A[i] * inv_scale;
+        }
+        if (!finite || !tangent_projection::symmetric_eigensystem<T, N>(V, d)) {
+            for (int i = 0; i < N * N; ++i) A[i] = T(NAN);
+            return;
+        }
+        for (int k = 0; k < N; ++k) {
+            if (!(d[k] < T(0))) continue;
+            const T w = T(-2) * d[k] * scale;
+            for (int i = 0; i < N; ++i) {
+                const T wi = w * V[i * N + k];
+                for (int j = i; j < N; ++j) A[i * N + j] += wi * V[j * N + k];
+            }
+        }
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j < i; ++j) A[i * N + j] = A[j * N + i];
+        }
+    }
 
 }  // namespace sfem
 

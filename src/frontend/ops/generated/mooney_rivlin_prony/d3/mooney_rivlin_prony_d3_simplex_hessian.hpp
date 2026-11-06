@@ -454,7 +454,7 @@ static SFEM_INLINE void mooney_rivlin_prony_d3_simplex_direct_hessian_reference_
     D[78] = D[62];
     D[79] = D[71];
     if constexpr (PROJECT) {
-      project_abs_symmetric(9, D);
+      project_abs_symmetric<s_t, 9>(D);
     }
     s_t g_ref[ND * NS];
     for (int shape = 0; shape < NS; ++shape) {

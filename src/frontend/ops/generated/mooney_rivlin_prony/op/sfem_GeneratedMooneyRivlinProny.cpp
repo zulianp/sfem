@@ -15,7 +15,6 @@
 #include "mooney_rivlin_prony_proteus_hex8_inexact.hpp"
 #include "mooney_rivlin_prony_tet10_inexact.hpp"
 #include "mooney_rivlin_prony_tet4_inexact.hpp"
-#include "sfem_TangentProjection.hpp"
 #include "sfem_RelaxationGroups.hpp"
 
 #include <algorithm>
@@ -1518,7 +1517,6 @@ namespace sfem {
     });
   }
   bool GeneratedMooneyRivlinProny::tangent_projection_supported() const {
-    if (!tangent_projection_available()) return false;
     for (auto type : impl_->space->element_types()) {
       if (!(type == smesh::HEX8 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10)) return false;
     }

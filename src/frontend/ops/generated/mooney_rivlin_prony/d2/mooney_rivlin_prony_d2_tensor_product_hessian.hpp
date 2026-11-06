@@ -157,7 +157,7 @@ static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_ten
     D[13] = D[7];
     D[14] = D[11];
     if constexpr (PROJECT) {
-      project_abs_symmetric(4, D);
+      project_abs_symmetric<s_t, 4>(D);
     }
     adj_q[0] = adj_lane0;
     adj_q[1] = adj_lane1;
