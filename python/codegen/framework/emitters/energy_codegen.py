@@ -8341,6 +8341,10 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
         ),
     )
     n_tangent = len(material)
+    # Projected point by point on a device; on the host every point of a walk's step at once, in
+    # lockstep across SIMD lanes (`project_abs_symmetric_lanes`), as in
+    # `_sfem_soa_direct_hessian_matrix_assembly_lines`.
+    lanes = project and not current_target().supports_device_kernels
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
         "%s  element_matrix[entry] = s_t(0);" % indent,
@@ -8383,7 +8387,9 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
                 reference_prefix, point_indent,
             )
         )
-    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False, project=project))
+    lines.extend(
+        _sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False, project=project and not lanes)
+    )
     lines.extend(
         "%sadj_q[%d] = %s;" % (point_indent, c, current_target().work_item_name("adj", c))
         for c in range(dim * dim)
@@ -8391,17 +8397,47 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     lines.extend(["%sweight = qw * idet;" % point_indent, "%s};" % indent])
 
     # One point at a time.
+    size = n_tangent * n_tangent
+
+    def point_walk(at):
+        return [
+            "%sfor (int q = 0; q < NQ; ++q) {" % at,
+            "%s  s_t D[%d], adj_q[ND * ND], weight;" % (at, size),
+            "%s  point_tangent(q, D, adj_q, weight);" % at,
+            "%s  s_t g_ref[ND * NS];" % at,
+            "%s  tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
+            % (at, reference_prefix, reference_prefix),
+            "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);" % at,
+            "%s}" % at,
+        ]
+
+    lines.append("%sif constexpr (NS1 == 2) {" % indent)
+    if lanes:
+        at = "%s    " % indent
+        lines.extend(
+            [
+                "%s  if constexpr (PROJECT) {" % indent,
+                "%ss_t Dq[NQ * %d], adjq[NQ * ND * ND], weights[NQ];" % (at, size),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+                "%s  point_tangent(q, &Dq[q * %d], &adjq[q * ND * ND], weights[q]);" % (at, size),
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NQ>(Dq);" % (at, n_tangent),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+                "%s  s_t g_ref[ND * NS];" % at,
+                "%s  tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
+                % (at, reference_prefix, reference_prefix),
+                "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, &adjq[q * ND * ND], weights[q], &Dq[q * %d], element_matrix);"
+                % (at, size),
+                "%s}" % at,
+                "%s  } else {" % indent,
+            ]
+            + point_walk(at)
+            + ["%s  }" % indent]
+        )
+    else:
+        lines.extend(point_walk("%s  " % indent))
     lines.extend(
         [
-            "%sif constexpr (NS1 == 2) {" % indent,
-            "%s  for (int q = 0; q < NQ; ++q) {" % indent,
-            "%s    s_t D[%d], adj_q[ND * ND], weight;" % (indent, n_tangent * n_tangent),
-            "%s    point_tangent(q, D, adj_q, weight);" % indent,
-            "%s    s_t g_ref[ND * NS];" % indent,
-            "%s    tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
-            % (indent, reference_prefix, reference_prefix),
-            "%s    point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);" % indent,
-            "%s  }" % indent,
             "%s  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent,
             "%s} else {" % indent,
         ]
@@ -8415,17 +8451,42 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
             "%ss_t slab_tangent[NP * %d];" % (walk, n_tangent * n_tangent),
             "%ss_t flux[NC * ND * NP];" % walk,
             "%sfor (int q_last = 0; q_last < NQ1; ++q_last) {" % walk,
-            "%s  for (int p = 0; p < NP; ++p) {" % walk,
-            "%s    s_t D[%d], adj_q[ND * ND], weight;" % (walk, n_tangent * n_tangent),
-            "%s    point_tangent(p + NP * q_last, D, adj_q, weight);" % walk,
         ]
     )
-    lines.extend(
-        _sfem_soa_direct_hessian_pullback_lines(
-            n_field_components, dim, "slab_tangent[p * %d + %%d]" % (n_tangent * n_tangent), "%s    " % walk
+
+    def slab_points(at):
+        return (
+            [
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  s_t D[%d], adj_q[ND * ND], weight;" % (at, size),
+                "%s  point_tangent(p + NP * q_last, D, adj_q, weight);" % at,
+            ]
+            + _sfem_soa_direct_hessian_pullback_lines(n_field_components, dim, "slab_tangent[p * %d + %%d]" % size, "%s  " % at)
+            + ["%s}" % at]
         )
-    )
-    lines.append("%s  }" % walk)
+
+    if lanes:
+        at = "%s    " % walk
+        lines.extend(
+            [
+                "%s  if constexpr (PROJECT) {" % walk,
+                "%ss_t Dp[NP * %d], adjp[NP * ND * ND], wp[NP];" % (at, size),
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  point_tangent(p + NP * q_last, &Dp[p * %d], &adjp[p * ND * ND], wp[p]);" % (at, size),
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NP>(Dp);" % (at, n_tangent),
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  const s_t *const RSTR D = &Dp[p * %d];" % (at, size),
+                "%s  const s_t *const RSTR adj_q = &adjp[p * ND * ND];" % at,
+                "%s  const s_t weight = wp[p];" % at,
+            ]
+            + _sfem_soa_direct_hessian_pullback_lines(n_field_components, dim, "slab_tangent[p * %d + %%d]" % size, "%s  " % at)
+            + ["%s}" % at, "%s  } else {" % walk]
+            + slab_points(at)
+            + ["%s  }" % walk]
+        )
+    else:
+        lines.extend(slab_points("%s  " % walk))
     lines.extend(
         [
             "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {" % walk,
@@ -8532,86 +8593,127 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         lines.extend(
             _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
         )
-    lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
-    if use_tensor_product_reference:
-        lines.extend(tensor_product_q_index_lines(dim, indent + "  "))
-        lines.append(
-            "%s  const s_t qw = %s;"
-            % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
-        )
-    else:
-        lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
-    # No work item opened: see `_sfem_soa_direct_hessian_point_geometry_lines`.
-    lines.append("%s  const ptrdiff_t goff = q;" % indent)
-    for component in range(dim * dim):
-        lines.append(
-            "%s  const s_t %s = badj%d[goff];"
-            % (indent, current_target().work_item_name("adj", component), component)
-        )
-    lines.extend(
-        [
-            "%s  const s_t %s = bdet0[goff];"
-            % (indent, current_target().work_item_name("det", 0)),
-            "%s  const s_t idet = s_t(1) / %s;"
-            % (indent, current_target().work_item_name("det", 0)),
-        ]
-    )
+    n_tangent = len(material)
     point_streams = quadrature_fields.quadrature_field_streams(form)
-    lines.extend(quadrature_fields.point_base_lines(point_streams, "%s  " % indent))
-    lines.extend(
-        quadrature_fields.load_lines(point_streams, "%s  " % indent, quadrature_fields.SINGLE_ELEMENT)
-    )
-    if uses_current:
-        lines.extend(
-            _sfem_soa_direct_hessian_current_gradient_lines(
-                weak_form,
-                dim,
-                n_field_components,
-                reference_inputs,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                reference_prefix,
-                "%s  " % indent,
+    # The projected tangent is projected point by point on a device, where a work item is a point's
+    # worth of registers already, and on the host for every point of the element at once, in
+    # lockstep across SIMD lanes (`project_abs_symmetric_lanes`): the points' tangents are
+    # gathered first, projected together, then contracted.
+    on_device = current_target().supports_device_kernels
+
+    def point_geometry(at, weight=True):
+        out = []
+        if use_tensor_product_reference:
+            out.extend(tensor_product_q_index_lines(dim, at))
+            if weight:
+                out.append(
+                    "%sconst s_t qw = %s;"
+                    % (at, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+                )
+        elif weight:
+            out.append("%sconst s_t qw = %sq_weight[q];" % (at, reference_prefix))
+        # No work item opened: see `_sfem_soa_direct_hessian_point_geometry_lines`.
+        out.append("%sconst ptrdiff_t goff = q;" % at)
+        for component in range(dim * dim):
+            out.append(
+                "%sconst s_t %s = badj%d[goff];"
+                % (at, current_target().work_item_name("adj", component), component)
             )
+        out.extend(
+            [
+                "%sconst s_t %s = bdet0[goff];" % (at, current_target().work_item_name("det", 0)),
+                "%sconst s_t idet = s_t(1) / %s;" % (at, current_target().work_item_name("det", 0)),
+            ]
         )
-    lines.extend(_sfem_soa_direct_hessian_tangent_lines(material, dim, "%s  " % indent, project=project))
-    # The point's reference gradients, every shape, laid out [k][s].
-    lines.extend(
-        [
-            "%s  s_t g_ref[ND * NS];" % indent,
-            "%s  for (int shape = 0; shape < NS; ++shape) {" % indent,
-        ]
-    )
-    if use_tensor_product_reference:
-        lines.extend(_tensor_product_shape_coordinate_lines(dim, "shape", "point", "%s    " % indent))
-    for k in range(dim):
-        lines.append(
-            "%s    g_ref[%d * NS + shape] = %s;"
-            % (
-                indent,
-                k,
-                _sfem_soa_reference_gradient_expr_for_shape(
+        return out
+
+    def point_state(at):
+        out = list(quadrature_fields.point_base_lines(point_streams, at))
+        out.extend(quadrature_fields.load_lines(point_streams, at, quadrature_fields.SINGLE_ELEMENT))
+        if uses_current:
+            out.extend(
+                _sfem_soa_direct_hessian_current_gradient_lines(
+                    weak_form,
                     dim,
-                    k,
+                    n_field_components,
+                    reference_inputs,
                     use_tensor_product_reference,
                     use_reference_gradient_vectors,
-                    reference_inputs,
-                    "shape",
-                    coord_prefix="point",
-                    reference_prefix=reference_prefix,
-                ),
+                    reference_prefix,
+                    at,
+                )
             )
+        return out
+
+    def point_contraction(at):
+        # The point's reference gradients, every shape, laid out [k][s].
+        out = ["%ss_t g_ref[ND * NS];" % at, "%sfor (int shape = 0; shape < NS; ++shape) {" % at]
+        if use_tensor_product_reference:
+            out.extend(_tensor_product_shape_coordinate_lines(dim, "shape", "point", "%s  " % at))
+        for k in range(dim):
+            out.append(
+                "%s  g_ref[%d * NS + shape] = %s;"
+                % (
+                    at,
+                    k,
+                    _sfem_soa_reference_gradient_expr_for_shape(
+                        dim,
+                        k,
+                        use_tensor_product_reference,
+                        use_reference_gradient_vectors,
+                        reference_inputs,
+                        "shape",
+                        coord_prefix="point",
+                        reference_prefix=reference_prefix,
+                    ),
+                )
+            )
+        out.extend(
+            [
+                "%s}" % at,
+                "%sconst s_t adj_q[ND * ND] = {%s};"
+                % (at, ", ".join(current_target().work_item_name("adj", c) for c in range(dim * dim))),
+                "%spoint_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);" % at,
+            ]
         )
-    lines.extend(
-        [
-            "%s  }" % indent,
-            "%s  const s_t adj_q[ND * ND] = {%s};"
-            % (indent, ", ".join(current_target().work_item_name("adj", c) for c in range(dim * dim))),
-            "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);" % indent,
-            "%s}" % indent,
-            "%smirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent,
-        ]
-    )
+        return out
+
+    def one_pass(at, hook):
+        inner = "%s  " % at
+        return (
+            ["%sfor (int q = 0; q < NQ; ++q) {" % at]
+            + point_geometry(inner)
+            + point_state(inner)
+            + _sfem_soa_direct_hessian_tangent_lines(material, dim, inner, project=hook)
+            + point_contraction(inner)
+            + ["%s}" % at]
+        )
+
+    if project and not on_device:
+        at = "%s  " % indent
+        inner = "%s    " % indent
+        size = n_tangent * n_tangent
+        lines.extend(
+            ["%sif constexpr (PROJECT) {" % indent, "%ss_t Dq[NQ * %d];" % (at, size), "%sfor (int q = 0; q < NQ; ++q) {" % at]
+            + point_geometry(inner, weight=False)
+            + point_state(inner)
+            + ["%ss_t *const RSTR D = &Dq[q * %d];" % (inner, size)]
+            + _sfem_soa_direct_hessian_tangent_lines(material, dim, inner, declare=False)
+            + [
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NQ>(Dq);" % (at, n_tangent),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+            ]
+            + point_geometry(inner)
+            + ["%sconst s_t *const RSTR D = &Dq[q * %d];" % (inner, size)]
+            + point_contraction(inner)
+            + ["%s}" % at, "%s} else {" % indent]
+            + one_pass(at, hook=False)
+            + ["%s}" % indent]
+        )
+    else:
+        lines.extend(one_pass(indent, hook=project))
+    lines.append("%smirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent)
     return lines
 
 

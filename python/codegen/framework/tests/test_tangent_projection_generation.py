@@ -81,15 +81,20 @@ class TangentProjectionGenerationTest(unittest.TestCase):
                 with self.subTest(file=name, absent=absent):
                     self.assertNotIn(absent, source)
 
-    def test_the_element_matrix_projects_each_point_tangent(self):
+    def test_the_element_matrix_projects_its_points_in_lockstep(self):
+        """On the host every point's tangent is gathered, the element's points are projected
+        together across SIMD lanes, and then contracted; the exact loop is the other branch."""
         source = self.files("TET10", True)["d3/neohookean_ogden_d3_simplex_hessian.hpp"]
         self.assertIn('#include "sfem_TangentProjection.hpp"', source)
         self.assertIn("template <typename s_t, int NQ, int NS, bool PROJECT = false>", source)
-        # After D is complete, its last mirrored entry included.
-        self.assertRegex(
-            source,
-            r"D\[79\] = D\[71\];\n\s*if constexpr \(PROJECT\) \{\n\s*project_abs_symmetric<s_t, 9>\(D\);\n\s*\}",
-        )
+        self.assertIn("if constexpr (PROJECT) {\n    s_t Dq[NQ * 81];", source)
+        self.assertIn("project_abs_symmetric_lanes<s_t, 9, NQ>(Dq);", source)
+        self.assertNotIn("project_abs_symmetric<s_t, 9>(D);", source)
+        projected = source[source.index("if constexpr (PROJECT) {") : source.index("} else {")]
+        exact = source[source.index("} else {") :]
+        self.assertEqual(projected.count("point_test_symmetric_scalar"), 1)
+        self.assertEqual(exact.count("point_test_symmetric_scalar"), 1)
+        self.assertNotIn("Dq", exact)
 
     def test_the_projected_assembly_is_a_second_entry_point(self):
         source = self.files("TET10", True)["d3/tet10/neohookean_ogden_tet10_operator.cpp"]
@@ -121,8 +126,10 @@ class TangentProjectionGenerationTest(unittest.TestCase):
     def test_the_tensor_product_point_tangent_is_projected(self):
         files = self.files("HEX8", True)
         hessian = files["d3/neohookean_ogden_d3_tensor_product_hessian.hpp"]
-        self.assertIn("if constexpr (PROJECT) {", hessian)
-        self.assertIn("project_abs_symmetric<s_t, 9>(D);", hessian)
+        # Both walks: the point walk projects the element's points, the slab walk a slab's.
+        self.assertIn("project_abs_symmetric_lanes<s_t, 9, NQ>(Dq);", hessian)
+        self.assertIn("project_abs_symmetric_lanes<s_t, 9, NP>(Dp);", hessian)
+        self.assertNotIn("project_abs_symmetric<s_t, 9>(D);", hessian)
         # HEX8 reaches its PROTEUS twin through the node permutation, projected or not.
         operator = files["d3/hex8/neohookean_ogden_hex8_operator.cpp"]
         self.assertIn("neohookean_ogden_proteus_hex8_hessian_bsr_psd_i_msoa(", operator)
@@ -145,8 +152,10 @@ class TangentProjectionGenerationTest(unittest.TestCase):
     def test_the_device_projects_as_the_host_does(self):
         files = _generate("neohookean_ogden", "TET10", True, target="cuda")
         hessian = files["d3/cuda/neohookean_ogden_d3_simplex_hessian.cuh"]
+        # A device work item is a point: projected where it is evaluated, no lanes.
         self.assertIn('#include "sfem_TangentProjection.hpp"', hessian)
         self.assertIn("project_abs_symmetric<s_t, 9>(D);", hessian)
+        self.assertNotIn("project_abs_symmetric_lanes", hessian)
         operator = files["d3/tet10/cuda/neohookean_ogden_tet10_operator.cu"]
         self.assertIn('extern "C" int cu_neohookean_ogden_tet10_hessian_bsr_psd_i_msoa(', operator)
         source = files["op/cuda/sfem_GeneratedNeoHookeanOgden_cuda.cpp"]

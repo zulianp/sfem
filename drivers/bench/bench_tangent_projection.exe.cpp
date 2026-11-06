@@ -1,7 +1,8 @@
 // The projection of a quadrature point's tangent to positive semidefinite (project_abs_symmetric,
 // 9 x 9): the library's eigensolver (Householder tridiagonalisation and the implicit QL
-// iteration), in double and in single precision, against a cyclic Jacobi solver and, in a build
-// with LAPACK, dsyev. Each arm projects the same matrices; rows report the arm, the family, the
+// iteration), in double and in single precision, one matrix at a time and B in lockstep across SIMD
+// lanes (project_abs_symmetric_lanes), against a cyclic Jacobi solver and, in a build with LAPACK,
+// dsyev. Each arm projects the same matrices; rows report the arm, the family, the
 // threads, nanoseconds per projection (median of 5 repetitions after a warm-up, per thread: the
 // wall time times the threads over the projections) and the largest difference from the reference
 // projection (dsyev where there is one, else Jacobi), relative to the matrix's largest entry.
@@ -121,6 +122,20 @@ namespace {
 
     void project_ql(double *const A) { sfem::project_abs_symmetric<double, N>(A); }
 
+    // B matrices in lockstep (project_abs_symmetric_lanes).
+    template <int B>
+    void project_lanes(double *const A) {
+        sfem::project_abs_symmetric_lanes<double, N, B>(A);
+    }
+
+    template <int B>
+    void project_lanes_f32(double *const A) {
+        float a[B * N * N];
+        for (int i = 0; i < B * N * N; ++i) a[i] = (float)A[i];
+        sfem::project_abs_symmetric_lanes<float, N, B>(a);
+        for (int i = 0; i < B * N * N; ++i) A[i] = a[i];
+    }
+
     void project_ql_f32(double *const A) {
         float a[N * N];
         for (int i = 0; i < N * N; ++i) a[i] = (float)A[i];
@@ -185,16 +200,23 @@ namespace {
 #endif
     }
 
+    // An arm projects `batch` consecutive matrices per call.
+    struct Arm {
+        const char                   *name;
+        int                           batch;
+        std::function<void(double *)> f;
+    };
+
     // Nanoseconds per projection per thread, median of 5 after a warm-up, on `nt` threads.
-    double time_arm(const std::function<void(double *)> &arm, const std::vector<double> &input, const int nt) {
-        const ptrdiff_t     count = (ptrdiff_t)(input.size() / (N * N));
+    double time_arm(const Arm &arm, const std::vector<double> &input, const int nt) {
+        const ptrdiff_t     count = (ptrdiff_t)(input.size() / (N * N)) / arm.batch * arm.batch;
         std::vector<double> work(input.size());
         std::vector<double> samples;
         for (int rep = 0; rep < 6; ++rep) {
             std::copy(input.begin(), input.end(), work.begin());
             const auto start = std::chrono::steady_clock::now();
 #pragma omp parallel for num_threads(nt) schedule(static)
-            for (ptrdiff_t m = 0; m < count; ++m) arm(&work[m * N * N]);
+            for (ptrdiff_t m = 0; m < count; m += arm.batch) arm.f(&work[m * N * N]);
             const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
             if (rep > 0) samples.push_back(s);
         }
@@ -202,19 +224,17 @@ namespace {
         return 1e9 * samples[samples.size() / 2] * nt / count;
     }
 
-    double max_difference(const std::function<void(double *)> &arm,
-                          const std::function<void(double *)> &reference,
-                          const std::vector<double>           &input) {
-        const size_t count = input.size() / (N * N);
-        double       worst = 0;
-        for (size_t m = 0; m < std::min<size_t>(count, 4096); ++m) {
-            double a[N * N], r[N * N], scale = 0;
-            std::copy(&input[m * N * N], &input[(m + 1) * N * N], a);
-            std::copy(a, a + N * N, r);
-            for (int i = 0; i < N * N; ++i) scale = std::max(scale, std::fabs(a[i]));
-            arm(a);
+    double max_difference(const Arm &arm, const std::function<void(double *)> &reference, const std::vector<double> &input) {
+        const size_t        count = std::min<size_t>(input.size() / (N * N), 4096) / arm.batch * arm.batch;
+        double              worst = 0;
+        std::vector<double> a(input.begin(), input.begin() + count * N * N);
+        for (size_t m = 0; m < count; m += arm.batch) arm.f(&a[m * N * N]);
+        for (size_t m = 0; m < count; ++m) {
+            double r[N * N], scale = 0;
+            std::copy(&input[m * N * N], &input[(m + 1) * N * N], r);
+            for (int i = 0; i < N * N; ++i) scale = std::max(scale, std::fabs(r[i]));
             reference(r);
-            for (int i = 0; i < N * N; ++i) worst = std::max(worst, std::fabs(a[i] - r[i]) / scale);
+            for (int i = 0; i < N * N; ++i) worst = std::max(worst, std::fabs(a[m * N * N + i] - r[i]) / scale);
         }
         return worst;
     }
@@ -222,13 +242,16 @@ namespace {
 
 int main(int argc, char *argv[]) {
     const size_t count = argc > 1 ? (size_t)std::atol(argv[1]) : (size_t)1 << 16;
-    struct Arm {
-        const char                  *name;
-        std::function<void(double *)> f;
-    };
-    std::vector<Arm> arms = {{"ql_f64", project_ql}, {"ql_f32", project_ql_f32}, {"jacobi_f64", project_jacobi}};
+    std::vector<Arm> arms = {{"ql_f64", 1, project_ql},
+                             {"ql_f32", 1, project_ql_f32},
+                             {"lanes4_f64", 4, project_lanes<4>},
+                             {"lanes8_f64", 8, project_lanes<8>},
+                             {"lanes16_f64", 16, project_lanes<16>},
+                             {"lanes8_f32", 8, project_lanes_f32<8>},
+                             {"lanes16_f32", 16, project_lanes_f32<16>},
+                             {"jacobi_f64", 1, project_jacobi}};
 #ifdef SFEM_ENABLE_LAPACK
-    arms.push_back({"dsyev_f64", project_lapack});
+    arms.push_back({"dsyev_f64", 1, project_lapack});
     const auto reference = project_lapack;
 #else
     const auto reference = project_jacobi;
@@ -237,9 +260,9 @@ int main(int argc, char *argv[]) {
     for (const char *fam : {"uniform", "rubber", "degenerate", "nearly_psd"}) {
         const auto input = family(fam, count);
         for (auto &arm : arms) {
-            const double difference = max_difference(arm.f, reference, input);
+            const double difference = max_difference(arm, reference, input);
             for (const int nt : {1, threads()}) {
-                printf("%s,%s,%d,%.1f,%.2e,%zu\n", arm.name, fam, nt, time_arm(arm.f, input, nt), difference, count);
+                printf("%s,%s,%d,%.1f,%.2e,%zu\n", arm.name, fam, nt, time_arm(arm, input, nt), difference, count);
                 fflush(stdout);
             }
         }
