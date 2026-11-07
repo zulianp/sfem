@@ -24,13 +24,15 @@ namespace sfem {
         std::vector<real_t> steps{1, real_t(1) / 2, real_t(1) / 4, real_t(1) / 8, real_t(1) / 16, real_t(1) / 32, real_t(1) / 64, real_t(1) / 128};
         /// Armijo's constant: a step s is accepted when m(s) <= m_ref + c1 s m'(0).
         real_t c1{real_t(1e-4)};
-        /// The merits m_ref is the largest of: the iterate's and those of the iterates before it in
-        /// the step, this many in all (Grippo, Lampariello and Lucidi, "A nonmonotone line search
-        /// technique for Newton's method", SIAM J. Numer. Anal. 23, 1986). 1 is Armijo's rule. More
-        /// lets a semismooth Newton step through the small rise of a residual merit where a few
-        /// contacts switch near the tolerance, which the monotone rule turns into a failed step and
-        /// a cut-back: on the LDP valves (FF200) 8-18 per stroke monotone, none at 5, and repeats
-        /// that agree to 7e-6 instead of 2.4e-1, on Grace and on the GPU alike.
+        /// Where no step of the schedule decreases the merit, m_ref is the largest of the iterate's
+        /// merit and those of the iterates before it in the step, this many in all (Grippo,
+        /// Lampariello and Lucidi, "A nonmonotone line search technique for Newton's method", SIAM
+        /// J. Numer. Anal. 23, 1986); otherwise it is the iterate's. 1 is Armijo's rule. More lets
+        /// a semismooth Newton step through the small rise of a residual merit where a few contacts
+        /// switch near the tolerance, which the monotone rule turns into a failed step and a
+        /// cut-back, and leaves every step the monotone rule takes as it is: a reference that also
+        /// accepts rising full steps where a shorter one decreases lets Newton cycle between two
+        /// active sets in a quasi-static contact release (LDP simulation 1).
         int nonmonotone{5};
         /// Evaluate the whole schedule in one call, where the merit can (`Merit::batched`): one pass
         /// over the mesh with the steps vectorised in its inner loop. Off, the steps are evaluated
@@ -44,6 +46,9 @@ namespace sfem {
             ACCEPTED,
             /// None does, but the best of them decreases the merit.
             BEST_DECREASE,
+            /// None decreases the merit, but one satisfies Armijo against the largest merit of the
+            /// last iterates (`LineSearchOptions::nonmonotone`).
+            NONMONOTONE,
             /// None decreases it, and the decrease the slope predicts is below the merit's
             /// resolution: converged as far as this merit can tell.
             AT_RESOLUTION,

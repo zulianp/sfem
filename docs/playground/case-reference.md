@@ -270,7 +270,7 @@ obstacle:
 | `newton.line_search.enabled` | on for nonlinear materials | |
 | `newton.line_search.steps` | `[1, 1/2, ..., 1/128]` | |
 | `newton.line_search.c1` | `1e-4` | |
-| `newton.line_search.nonmonotone` | `5` | Armijo against the largest merit of the step's last this-many iterates rather than the current one (Grippo-Lampariello-Lucidi); `1` is the monotone rule. |
+| `newton.line_search.nonmonotone` | `5` | Where no step of the schedule decreases the merit, Armijo against the largest merit of the step's last this-many iterates (Grippo-Lampariello-Lucidi); every other step is the monotone rule's. `1` is the monotone rule. |
 | `newton.line_search.batched` | `true` | |
 | `newton.line_search.rule` | `armijo` | Or `damped`: `damping` (in (0, 1]) times the step, shortened only past an inverted element. |
 | `linear.type` | `cg` | Or `bcgs`. |
