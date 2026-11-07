@@ -1,6 +1,6 @@
 run,case,gpus,job,what,steps,failed,newton,linear,t_end,contact_nodes,stepper_s,newton_s,qp_s,export_s
 newmark,FF200_ExodusMesh,1,5131942,"contact-stabilised Newmark, gamma 0.6, every field written",2619,1699,32299,7874553,0.18000000000000002,18780,1675.02,1378.14,1349.37,219.304
 bdf2,FF200_ExodusMesh,1,5132710,"BDF2, every field written",2156,604,14484,2660426,0.18000000000000002,18780,560.078,326.672,316.258,166.916
-final,FF200_ExodusMesh,1,5284752,"BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written, non-monotone line search",1800,0,9362,1942180,0.18000000000000002,18780,211.496,110.301,104.986,48.0479
-final_mono,FF200_ExodusMesh,1,5284752,"as final, with the monotone line search (solver.newton.line_search.nonmonotone=1)",1809,15,9490,1894092,0.18000000000000002,18780,208.22,106.367,100.923,48.4133
-refined,FF200_mesh_refined,4,5284753,"as final, on the refined mesh, four ranks (MPRGP's device runs are single-rank)",1801,1,9738,3665743,0.18000000000000002,57066,810.971,617.678,607.245,62.3841
+final,FF200_ExodusMesh,1,5290458,"BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written, non-monotone line search",1800,0,9353,1865176,0.18000000000000002,18780,98.8213,97.4625,92.3771,0.207055
+final_mono,FF200_ExodusMesh,1,5290458,"as final, with the monotone line search (solver.newton.line_search.nonmonotone=1)",1810,15,9465,1868380,0.18000000000000002,18780,98.0044,96.6092,91.4719,0.207745
+refined,FF200_mesh_refined,4,5290459,"as final, on the refined mesh, four ranks (MPRGP's device runs are single-rank)",1801,1,9699,3606108,0.18000000000000002,57066,603.446,596.565,586.746,4.5939

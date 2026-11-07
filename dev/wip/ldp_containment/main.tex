@@ -477,8 +477,9 @@ rule's. With the current build it removes the \trFailedMonoWindow{} failed attem
 monotone rule over \trWindowNonmono\,\si{\milli\second}, and the \trFailedFinalMono{} over the
 \trStrokes{} strokes, at the same time (\trSteppingFinal{} against \trSteppingFinalMono\,\si{\second}).
 Measured against the largest earlier merit at every step, Newton cycles between two active sets in
-simulation 1's release. Writing only the displacement instead of every field
-lowers the output from \trWritePerStepBdf{} to \trWritePerStepFinal\,\si{\milli\second} per step.
+simulation 1's release. Writing only the displacement instead of every field, from a thread of its
+own while the next step is solved, lowers the output's time in a step from \trWritePerStepBdf{} to
+\trWritePerStepFinal\,\si{\milli\second}.
 Together the \trStrokes{} strokes take \trSteppingFinal\,\si{\second}, \trSpeedBdf{} times less
 than the first BDF2 run and \trSpeedNewmark{} times less than Newmark, with \trFailedFinal{} failed
 attempts in \trStepsFinal{} steps; the QP takes \trQpShareFinal\% of it, and
@@ -502,9 +503,9 @@ growth a conjugate-gradient iteration count shows on a second-order operator. An
 ranks add a ghost exchange and two global reductions to every iteration
 (Section~\ref{sec:parallel}), and MPRGP's device runs, which need a single rank, are not used. The
 refined run fails \trFailedRefined{} attempt against FF200's \trFailedFinal{}, a line search as the
-pressure valve reaches its seat, \trResFailFirst\,\si{\milli\second} into the third stroke
-(Figure~\ref{fig:strokes}, bottom). Writing the displacement, gathered on rank 0, takes
-\trResWriteRatio{} times as long per step.
+pressure valve leaves its seat, \trResFailFirst\,\si{\milli\second} into the third stroke
+(Figure~\ref{fig:strokes}, bottom). Writing the displacement takes \trResWriteRatio{} times as long
+per step: the step waits for its gather on rank 0, not for the file.
 
 \begin{figure*}
 \centering
@@ -540,7 +541,7 @@ wall's section. Rendered by ParaView from the run's raw output.}
 \caption{FF200 through \trStrokes{} strokes, \trStepsNominal{} nominal steps, on one GPU:
 steps, failed attempts, Newton steps (those of failed attempts included) and time in the
 QPs, in writing the output and in total. The first two runs wrote every field, the last the
-displacement only.}
+displacement only, from a thread of its own (its time: the step's copy).}
 \label{tab:strokes}
 \small
 \setlength{\tabcolsep}{3pt}
@@ -625,8 +626,10 @@ has $\alpha_i\approx1$ and $b_i\approx g_i$, so by~\eqref{eq:prony} its history 
 $g_i(S^n-R)$, $R$ the relaxed stress at which it was last zero: the start of the run, or of a
 restart from rest. The quantity a code must resolve is the remainder
 \begin{equation}
-  G_i = H_i - g_i\bigl(S^n - R\bigr),\qquad
-  G_i^{n+1} = \alpha_iG_i^n + \bigl(\alpha_ig_i - b_i\bigr)\bigl(S^n-R\bigr) + \bigl(b_i - g_i\bigr)\bigl(S^{n+1}-R\bigr),
+\begin{aligned}
+  G_i &= H_i - g_i\bigl(S^n - R\bigr),\\
+  G_i^{n+1} &= \alpha_iG_i^n + \bigl(\alpha_ig_i - b_i\bigr)\bigl(S^n-R\bigr) + \bigl(b_i - g_i\bigr)\bigl(S^{n+1}-R\bigr),
+\end{aligned}
 \end{equation}
 which is~\eqref{eq:prony} rewritten, not an approximation, and a small fraction of $H_i$. Every
 narrow format stores the terms with $\tau_i a_T>T$ ($a_T$ the time--temperature shift) this way

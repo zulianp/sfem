@@ -34,12 +34,12 @@ FOUR = [
     ("newmark", "FF200_ExodusMesh", 1, "5131942", CASES + "/transient_strokes4_damped",
      "contact-stabilised Newmark, gamma 0.6, every field written"),
     ("bdf2", "FF200_ExodusMesh", 1, "5132710", CASES + "/transient_strokes4_bdf2", "BDF2, every field written"),
-    ("final", "FF200_ExodusMesh", 1, "5284752", SCRATCH + "/ldp_strokes6/final",
+    ("final", "FF200_ExodusMesh", 1, "5290458", SCRATCH + "/ldp_strokes7/final",
      "BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written, "
      "non-monotone line search"),
-    ("final_mono", "FF200_ExodusMesh", 1, "5284752", SCRATCH + "/ldp_strokes6/final_mono",
+    ("final_mono", "FF200_ExodusMesh", 1, "5290458", SCRATCH + "/ldp_strokes7/final_mono",
      "as final, with the monotone line search (solver.newton.line_search.nonmonotone=1)"),
-    ("refined", "FF200_mesh_refined", 4, "5284753", REFINED + "/transient_strokes6",
+    ("refined", "FF200_mesh_refined", 4, "5290459", REFINED + "/transient_strokes7",
      "as final, on the refined mesh, four ranks (MPRGP's device runs are single-rank)"),
 ]
 # (change, variant, job, folder): each change against the build before it, FF200 on one GPU.
@@ -52,8 +52,8 @@ ABLATION = [
     ("runs", "runs", "5133192", SCRATCH + "/ldp_fuse/runs_f32"),
     ("start", "u_n", "5133342", SCRATCH + "/ldp_kind1/base"),
     ("start", "u_n+dt v_n", "5133342", SCRATCH + "/ldp_kind1/start"),
-    ("nonmonotone", "monotone", "5284752", SCRATCH + "/ldp_strokes6/w30_mono"),
-    ("nonmonotone", "non-monotone", "5284752", SCRATCH + "/ldp_strokes6/w30_nm"),
+    ("nonmonotone", "monotone", "5290458", SCRATCH + "/ldp_strokes7/w30_mono"),
+    ("nonmonotone", "non-monotone", "5290458", SCRATCH + "/ldp_strokes7/w30_nm"),
 ]
 # The valve centres' probes (sim2.yaml). With several ranks the probe sampled rank 0's nearest node
 # (fixed with the commit that adds this note); those runs' series are read from the written
