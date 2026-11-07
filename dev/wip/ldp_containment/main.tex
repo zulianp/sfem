@@ -634,8 +634,13 @@ The bar of~\cite{yang2026prony}, \SI{100}{\milli\metre} long with a $\SI{20}{\mi
 section, is clamped at one end and twisted at the other by \SI{1.5}{\radian} over \SI{0.5}{\second},
 held until \SI{0.65}{\second}, released, and followed to \SI{1}{\second}, with the valves' material
 and series and BDF2 at $\Delta t=\SI{1}{\milli\second}$, where again four terms keep a tensor. There is
-no contact, and on Grace the runs reproduce to a median displacement difference of
-\hsTorsionNoiseMax\%, so the comparison measures the storage alone. Table~\ref{tab:prony-torsion}
+no contact. At the release the tangent turns indefinite: where the conjugate gradients meet negative
+curvature, Newton repeats the iteration on the tangent whose derivative of the first
+Piola--Kirchhoff stress by the deformation gradient, $\partial P/\partial F$, has at every
+quadrature point its eigenvalues replaced by their absolute values~\cite{chen2024abs,longva2023},
+and takes the tangent itself back after a full step. No step is cut back, and on Grace the runs
+reproduce to a median displacement difference of \hsTorsionNoiseMax\%, so the comparison measures the
+storage alone. Table~\ref{tab:prony-torsion}
 gives, per format, the median over 72 instants of
 $e_u = 100\,\lVert u - u_{\mathrm{double}}\rVert_2/\lVert u_{\mathrm{double}}\rVert_2$ (in percent) on
 HEX8 (eight quadrature points), TET10 (eleven) and TET4 (one, averages over 16 elements), and the
@@ -647,9 +652,8 @@ stress the history holds (Figure~\ref{fig:prony-torsion}). With an average, int8
 elements, the gain is \hsTorsionTetGain-fold. On the finer HEX8 mesh int8 with averages takes
 \hsTorsionMdBytes\,MB for $H_i$ and $D$ against float16's \hsTorsionHalfBytes\,MB, at about twice
 float16's error. In the relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, left) the medians
-order the formats as $e_u$ does; the largest values come at the release, where float16 with averages
-reaches \hsInfMaxHalfMd\% on the finer HEX8 mesh against float16's \hsInfMaxHalf\%, and fall back to its
-median within the next \SI{0.05}{\second} while float16's keep growing (Figure~\ref{fig:prony-torsion}).
+order the formats as $e_u$ does; they jump at the release and grow to the end, where float16 with
+averages reaches \hsInfMaxHalfMd\% on the finer HEX8 mesh against float16's \hsInfMaxHalf\%.
 
 \begin{table*}
 \caption{The bar in torsion on Grace: median $e_u$ against double storage per history format and
@@ -680,19 +684,21 @@ averages over 16 elements). a.+d.: average and deviation.}
 
 \subsection{The valves}
 
-Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage. The GPU assembles
-with atomic additions, so two runs in double already differ, by a median $e_u$ of
-\hsValveNoise\%; the largest $e_u$ over the strokes, up to \hsValveMaxNoise\% between those two runs,
-measures when a valve meets its seat rather than the storage, and is not used. Single precision for
+Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage with a non-monotone
+line search: a step is accepted against the largest merit of the last five Newton iterates rather
+than the current one's~\cite{grippo1986}, so the Newton steps that switch a few contacts near the
+tolerance, which need not decrease the merit, are no longer refused and no step is cut back. Two runs
+in double then differ by a median $e_u$ of \hsValveNoise\% and by at most \hsValveMaxNoise\%, although
+the GPU assembles with atomic additions. Single precision for
 the history (\hsValveSingle\%), the slots (\hsValveFullSlots\%) or both (\hsValveSingleSlots\%) stays at
 that floor; the 16-bit formats lie \hsValveSixteen{} to \hsValveHalf\%, int8 at \hsValveInt\%. Averages
-over runs of 16 elements make int8 \hsValveMdGain{} times more accurate (\hsValveMd\%), less than on the
-bar: neighbouring elements of a valve in contact differ more than the points of one element. For
-float16, whose rounding is relative to each value, subtracting an average turns small values into
-large deviations, and the error grows to \hsValveHalfMd\%. The relative $\infty$-norm
-(Figure~\ref{fig:prony-infinity}, right) orders the formats as $e_u$ does; its largest values, like
-$e_u$'s, are set by the impacts: \hsInfValveNoiseMax\% for the repeat in double and every format but
-int8 and float16 with averages, which reach \hsInfValveIntMax\%. Every run takes \hsValveTimeMin{} to
+over runs of 16 elements make int8 \hsValveMdGain{} times more accurate (\hsValveMd\%), over runs of 4
+\hsValveMdFourGain{} times, less than on the bar: neighbouring elements of a valve in contact differ
+more than the points of one element. float16 with averages is \hsValveHalfMdGain{} times more accurate
+than float16 (\hsValveHalfMd\%). The relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, right)
+orders the formats as $e_u$ does; its largest values come with the impacts: \hsInfValveNoiseMax\% for
+the repeat in double, \hsInfValveHalfMdMax\% and \hsInfValveHalfMax\% for float16 with and without
+averages, \hsInfValveMdMax\% and \hsInfValveIntMax\% for int8. Every run takes \hsValveTimeMin{} to
 \hsValveTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's two passes over the
 history: averages make them \hsCostMdHost{} times as expensive as int8 on Grace and \hsCostMdDevice{}
 times on the GPU, \hsCostMdDeviceUs\,\si{\micro\second} on FF200's size, \hsCostShare\% of a stroke
@@ -726,8 +732,7 @@ The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for
 a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
 valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
 without a step-size study.
-The frozen history $S^{\mathrm{hist}}$ stays in double, and the valves' comparison of history
-formats is bounded below by the GPU's run-to-run differences.
+The frozen history $S^{\mathrm{hist}}$ stays in double.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}

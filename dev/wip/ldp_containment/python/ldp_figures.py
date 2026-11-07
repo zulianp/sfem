@@ -1466,6 +1466,8 @@ def prony_macros(valves, torsion, diag, tangent, refined, bench):
                      ("int8_scaled_s32", "IntSlots"), ("int8_md_p16_s32", "MdSlots")):
         m("hsValve" + key, num(float(v(run)["e_u_median"]), 2))
     m("hsValveMdGain", num(float(v("int8_scaled")["e_u_median"]) / float(v("int8_md_p16")["e_u_median"]), 2))
+    m("hsValveMdFourGain", num(float(v("int8_scaled")["e_u_median"]) / float(v("int8_md_p4")["e_u_median"]), 2))
+    m("hsValveHalfMdGain", integer(float(v("float16_scaled")["e_u_median"]) / float(v("float16_md_p16")["e_u_median"])))
     m("hsValveMaxNoise", num(float(v("full_b")["e_u_max"]), 2))
     times = [float(v(r)["stepper_s"]) for r in VALVE_RUNS]
     m("hsValveTimeMin", integer(min(times)))
@@ -1485,8 +1487,11 @@ def prony_macros(valves, torsion, diag, tangent, refined, bench):
         m("hsDofs" + key, integer(torsion[(s, "full_b")]["dofs"]))
     hf = lambda fmt: torsion[("torsion_HEX8_80", fmt)]
     m("hsTorsionMdBytes", num((float(hf("int8_md")["bytes_history"]) + float(hf("int8_md")["bytes_increment"])) / MB, 3))
-    m("hsInfValveNoiseMax", integer(float(v("full_b")["e_inf_max"])))
-    m("hsInfValveIntMax", integer(max(float(v("int8_scaled")["e_inf_max"]), float(v("float16_md_p16")["e_inf_max"]))))
+    m("hsInfValveNoiseMax", num(float(v("full_b")["e_inf_max"]), 2))
+    m("hsInfValveHalfMax", num(float(v("float16_scaled")["e_inf_max"]), 2))
+    m("hsInfValveHalfMdMax", num(float(v("float16_md_p16")["e_inf_max"]), 2))
+    m("hsInfValveIntMax", integer(float(v("int8_scaled")["e_inf_max"])))
+    m("hsInfValveMdMax", integer(float(v("int8_md_p16")["e_inf_max"])))
     m("hsInfMaxHalfMd", num(float(hf("float16_md")["e_inf_max"]), 2))
     m("hsInfMaxHalf", num(float(hf("float16_scaled")["e_inf_max"]), 2))
     m("hsTorsionHalfBytes", num((float(hf("float16_scaled")["bytes_history"]) + float(hf("float16_scaled")["bytes_increment"])) / MB, 3))
