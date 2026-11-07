@@ -80,9 +80,6 @@ namespace sfem {
         gap_              = create_buffer<real_t>(n, es);
         mu_               = create_buffer<real_t>(n, es);
         frames_           = create_buffer<real_t>(9 * n, es);
-        ahead_            = create_buffer<real_t>(ndofs, es);
-        ahead_gap_        = create_buffer<real_t>(n, es);
-        ahead_normals_    = create_buffer<real_t>(3 * n, es);
         complementarity_  = create_buffer<real_t>(n, es);
         penetration_      = create_buffer<real_t>(n, es);
     }
@@ -145,6 +142,13 @@ namespace sfem {
 
     void NodeObstacleContact::upper_bound(const real_t unbounded, real_t *const ub) const {
         node_obstacle_upper_bound(view(normals_, gap_), ndofs_, unbounded, ub);
+    }
+
+    void NodeObstacleContact::scaling(const real_t *const ub,
+                                      real_t *const       inverse_scale,
+                                      real_t *const       scale,
+                                      real_t *const       scaled_bound) const {
+        node_obstacle_scaling(view(normals_, gap_), ndofs_, ub, inverse_scale, scale, scaled_bound);
     }
 
     real_t NodeObstacleContact::kkt_residual(const real_t *const r,
@@ -220,6 +224,12 @@ namespace sfem {
     void NodeObstacleContact::project_velocity(const real_t *const x, real_t *const v, const real_t dt) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::project_velocity");
 
+        // Only a scheme that projects its velocity (Newmark's) needs them.
+        if (!ahead_) {
+            ahead_         = create_buffer<real_t>(ndofs_, execution_space());
+            ahead_gap_     = create_buffer<real_t>(size(), execution_space());
+            ahead_normals_ = create_buffer<real_t>(3 * size(), execution_space());
+        }
         sfem::blas<real_t>(context_)->zaxpby(ndofs_, 1, x, dt, v, ahead_->data());
         real_t *an[3];
         rows(ahead_normals_, 3, an);
