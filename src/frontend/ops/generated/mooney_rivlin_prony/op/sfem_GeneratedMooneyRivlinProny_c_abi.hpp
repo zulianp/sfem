@@ -1043,6 +1043,12 @@ extern "C" int mooney_rivlin_prony_hessian_bsr_psd_3d_i_msoa(
         void *const RSTR values
 );
 
+extern "C" void mooney_rivlin_prony_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_prony_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int mooney_rivlin_prony_hex27_matrix_assembly_variant_count();
+
 extern "C" void mooney_rivlin_prony_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_prony_hex8_matrix_assembly_variant(const int variant);
@@ -1236,6 +1242,12 @@ extern "C" int mooney_rivlin_prony_objective_steps_packed_3d_i_msoa(
         const void *const RSTR steps,
         void *const RSTR value
 );
+
+extern "C" void mooney_rivlin_prony_proteus_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_prony_proteus_hex27_matrix_assembly_variant(const int variant);
+
+extern "C" int mooney_rivlin_prony_proteus_hex27_matrix_assembly_variant_count();
 
 extern "C" void mooney_rivlin_prony_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 

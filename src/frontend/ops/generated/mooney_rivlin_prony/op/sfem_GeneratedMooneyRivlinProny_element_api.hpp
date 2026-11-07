@@ -5,7 +5,9 @@
 #include "mooney_rivlin_prony_proteus_quad4_element.hpp"
 #include "mooney_rivlin_prony_quad4_element.hpp"
 #include "mooney_rivlin_prony_tri3_element.hpp"
+#include "mooney_rivlin_prony_hex27_element.hpp"
 #include "mooney_rivlin_prony_hex8_element.hpp"
+#include "mooney_rivlin_prony_proteus_hex27_element.hpp"
 #include "mooney_rivlin_prony_proteus_hex8_element.hpp"
 #include "mooney_rivlin_prony_tet10_element.hpp"
 #include "mooney_rivlin_prony_tet4_element.hpp"
@@ -58,8 +60,12 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_esoa(
       return mooney_rivlin_prony_tet10_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 8:
       return mooney_rivlin_prony_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 27:
+      return mooney_rivlin_prony_hex27_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_energy_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -110,8 +116,12 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_ecoords_soa(
       return mooney_rivlin_prony_tet10_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 8:
       return mooney_rivlin_prony_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 27:
+      return mooney_rivlin_prony_hex27_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_energy_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -164,8 +174,12 @@ static SFEM_INLINE int mooney_rivlin_prony_energy_3d_egeometry_soa(
       return mooney_rivlin_prony_tet10_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 8:
       return mooney_rivlin_prony_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 27:
+      return mooney_rivlin_prony_hex27_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_energy_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, values);
     default:
       return SFEM_FAILURE;
   }
@@ -216,8 +230,12 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_esoa(
       return mooney_rivlin_prony_tet10_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 8:
       return mooney_rivlin_prony_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_gradient_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -268,8 +286,12 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_ecoords_soa(
       return mooney_rivlin_prony_tet10_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 8:
       return mooney_rivlin_prony_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_gradient_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -322,8 +344,12 @@ static SFEM_INLINE int mooney_rivlin_prony_gradient_3d_egeometry_soa(
       return mooney_rivlin_prony_tet10_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 8:
       return mooney_rivlin_prony_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, out_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -374,8 +400,12 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_esoa(
       return mooney_rivlin_prony_tet10_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 8:
       return mooney_rivlin_prony_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_hessian_esoa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -426,8 +456,12 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_ecoords_soa(
       return mooney_rivlin_prony_tet10_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 8:
       return mooney_rivlin_prony_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_hessian_ecoords_soa<s_t, VS>(nelements, coords, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
@@ -480,8 +514,12 @@ static SFEM_INLINE int mooney_rivlin_prony_hessian_3d_egeometry_soa(
       return mooney_rivlin_prony_tet10_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 8:
       return mooney_rivlin_prony_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 27:
+      return mooney_rivlin_prony_hex27_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     case 100008:
       return mooney_rivlin_prony_proteus_hex8_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
+    case 270000:
+      return mooney_rivlin_prony_proteus_hex27_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, C01, C10, K, iso_relaxation_gamma, iso_history, u_streams, matrix_streams);
     default:
       return SFEM_FAILURE;
   }
