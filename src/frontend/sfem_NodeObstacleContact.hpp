@@ -103,13 +103,15 @@ namespace sfem {
         // in kkt_residual. Adds each node's 3x3 block to the diagonal block of the BSR tangent.
         //
         // Away from the solution that estimate can be large, and on a convex obstacle the term is
-        // negative across it, enough to make the tangent indefinite. With `capped`, each node's
-        // share is scaled so that its most negative part (bounded by row sums) stays within half
-        // of the node's inertia stiffness k_i = c0 m_i. `sign` -1 takes back an earlier call.
+        // negative across it, enough to make the tangent indefinite. `curvature`
+        // (NodeObstacleCurvature) takes the whole term; or each node's share scaled so that its
+        // most negative part (bounded by row sums) stays within half of the node's inertia
+        // stiffness k_i = c0 m_i; or each node's share without its negative eigenvalues. `sign` -1
+        // takes back an earlier call.
         void add_curvature(const real_t *const  x,
                            const real_t *const  r,
                            const real_t *const  k,
-                           const bool           capped,
+                           const int            curvature,
                            const real_t         sign,
                            const count_t *const       rowptr,
                            const idx_t *const         colidx,
@@ -120,7 +122,7 @@ namespace sfem {
         // (node_obstacle_curvature_blocks, 6 * size() entries, overwritten), for a tangent that
         // applies it on its own; apply_blocks adds B_i in_i to out_i at each contact node,
         // blocks_diagonal their diagonals to d.
-        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped, real_t *const blocks);
+        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature, real_t *const blocks);
         void apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const;
         // The same at the contact nodes of the calling thread's rows (a region's Team, the host).
         void apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const;

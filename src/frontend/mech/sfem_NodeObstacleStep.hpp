@@ -65,6 +65,12 @@ namespace sfem {
         int                    solve(const real_t *const x, const real_t *const r, real_t *const dx) override;
         std::shared_ptr<Merit> merit() override;
         int                    iterations() const override;
+        /// The material's tangent projected to positive semidefinite (NewtonOptions::tangent_projection):
+        /// an assembled tangent of operators that project theirs.
+        bool tangent_projection_supported() const override;
+        void set_tangent_projection(const bool on) override;
+        /// The last solve's QP met a direction of no positive curvature.
+        bool met_negative_curvature() const override;
         /// The obstacle's gap is linearised: Newton measures every iterate.
         bool solves_linear_function_exactly() const override { return false; }
 

@@ -18,6 +18,7 @@
 #include "sfem_Merit.hpp"
 #include "sfem_TimeScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_node_obstacle_kernels.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_mprgp.hpp"
@@ -77,6 +78,11 @@ namespace sfem {
         real_t                               merit{0};
         bool                                 first_measure{true};
         int                                  iterations{0};
+        // Newton manages the tangent's projection (set_tangent_projection was called), and
+        // whether it is projected now; whether the last QP met negative curvature.
+        bool                                 projection_managed{false};
+        bool                                 tangent_projected{false};
+        bool                                 negative_curvature{false};
 
         real_t kkt(const real_t *const r, real_t &penetration) {
             return contact->kkt_residual(r, k->data(), projected->data(), &penetration);
@@ -331,7 +337,10 @@ namespace sfem {
         // y = K x: the QP's product writes tmp whole.
         impl.tangent_op   = impl.tangent->op();
         impl.tangent_team = impl.tangent->team();
-        if (impl.options.curvature && impl.tangent->set_curvature(x, r, impl.k->data(), false) != SFEM_SUCCESS) return SFEM_FAILURE;
+        // On the projected tangent the obstacle's curvature is projected too, node by node: the QP
+        // is then convex, as the material's share alone would leave it.
+        const int curvature = impl.tangent_projected ? NODE_OBSTACLE_CURVATURE_PSD : NODE_OBSTACLE_CURVATURE_FULL;
+        if (impl.options.curvature && impl.tangent->set_curvature(x, r, impl.k->data(), curvature) != SFEM_SUCCESS) return SFEM_FAILURE;
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
         return SFEM_SUCCESS;
     }
@@ -346,11 +355,20 @@ namespace sfem {
 
         int        status = impl.solve_qp(r);
         const bool capped = status != SFEM_SUCCESS && impl.qp->iterations() >= impl.options.qp_max_it;
+        impl.negative_curvature = impl.qp->met_negative_curvature();
+        if (status != SFEM_SUCCESS && impl.negative_curvature && impl.projection_managed && !impl.tangent_projected) {
+            // The material's tangent is indefinite here: Newton repeats the iteration on the
+            // projected one (tangent_projection: on_failure) rather than on a shifted one.
+            impl.contact->from_frame(impl.scale->data(), impl.framed->data(), dx);
+            impl.f->copy_constrained_dofs(impl.lift->data(), dx);
+            return status;
+        }
         if (status != SFEM_SUCCESS && !(capped && impl.options.qp_accept_capped)) {
             // MPRGP stops at negative curvature. Away from the solution the residual overstates the
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
-            if (impl.options.curvature && tangent.set_curvature(x, r, impl.k->data(), true) != SFEM_SUCCESS) return SFEM_FAILURE;
+            const int capped = impl.tangent_projected ? NODE_OBSTACLE_CURVATURE_PSD : NODE_OBSTACLE_CURVATURE_CAPPED;
+            if (impl.options.curvature && tangent.set_curvature(x, r, impl.k->data(), capped) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             // The material's tangent can be indefinite too (a hyperelastic block under
             // compression, on a mesh fine enough that c0 M no longer outweighs it): shift its
@@ -387,6 +405,18 @@ namespace sfem {
     }
 
     int NodeObstacleStep::iterations() const { return impl_->iterations; }
+
+    bool NodeObstacleStep::tangent_projection_supported() const {
+        return impl_->options.tangent.format == op_type::BSR && impl_->f->tangent_projection_supported();
+    }
+
+    void NodeObstacleStep::set_tangent_projection(const bool on) {
+        impl_->projection_managed = true;
+        impl_->tangent_projected  = on;
+        impl_->f->set_tangent_projection(on);
+    }
+
+    bool NodeObstacleStep::met_negative_curvature() const { return impl_->negative_curvature; }
 
     void NodeObstacleStep::reaction(real_t *const out) const { impl_->contact->reaction(out); }
 
