@@ -68,8 +68,10 @@ namespace sfem {
     /// history was last zero at -- the start of the run or the last `reset`.
     /// Such a term is stored as the remainder G_i = H_i - g_i (S_r^n - R), much
     /// smaller than H_i, and its codes resolve it that much finer.  R is held
-    /// once, in the stress slots' precision; it only reparametrises the store,
-    /// so its own rounding costs nothing.
+    /// once, in the stress slots' precision.  The identity H_i = G_i + g_i (S_r^n
+    /// - R) holds for the R stored, but G_i starts at g_i times R's rounding, and
+    /// that must stay below the remainder: in int8 it costs most of the gain, in
+    /// float32 nothing measurable.
     ///
     /// Arrays are laid out [component][qp][element] like `QuadratureState`;
     /// the integration-point order is the kernels' and is never interpreted
