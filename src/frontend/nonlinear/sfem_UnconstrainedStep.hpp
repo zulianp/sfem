@@ -50,6 +50,7 @@ namespace sfem {
         int         linearize(const real_t *const x, const real_t *const r) override;
         int         solve(const real_t *const x, const real_t *const r, real_t *const dx) override;
         int         iterations() const override;
+        bool        met_negative_curvature() const override;
 
         /// On the assembled (BSR) tangent only.
         bool tangent_projection_supported() const override;

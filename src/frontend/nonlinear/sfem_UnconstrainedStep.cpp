@@ -31,6 +31,7 @@ namespace sfem {
         std::shared_ptr<ShiftableJacobi<real_t>>          jacobi;
         SharedBuffer<real_t>                              rhs;
         int                                               iterations{0};
+        bool                                              negative_curvature{false};
 
         bool is_bsr() const { return options.format == op_type::BSR && f->space()->block_size() > 1; }
 
@@ -212,10 +213,14 @@ namespace sfem {
         impl.f->copy_constrained_dofs(impl.rhs->data(), dx);
         const int status = impl.solver->apply(impl.rhs->data(), dx);
         impl.iterations  = impl.solver->iterations();
+        auto cg          = std::dynamic_pointer_cast<ConjugateGradient<real_t>>(impl.solver);
+        impl.negative_curvature = cg && cg->negative_curvature();
         return status;
     }
 
     int UnconstrainedStep::iterations() const { return impl_->iterations; }
+
+    bool UnconstrainedStep::met_negative_curvature() const { return impl_->negative_curvature; }
 
     void UnconstrainedStep::set_rtol(const real_t rtol) {
         impl_->options.rtol = rtol;

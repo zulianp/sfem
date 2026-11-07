@@ -135,6 +135,9 @@ namespace sfem {
 
         // Every step starts on the tangent the options name.
         bool projected = opts.tangent_projection == TangentProjection::ALWAYS;
+        // The tangent itself is taken back once: indefinite again, it is so where the iterates
+        // converge and the projection stays.
+        bool taken_back = false;
         if (opts.tangent_projection != TangentProjection::NONE) {
             if (!impl.step->tangent_projection_supported()) {
                 fprintf(stderr,
@@ -201,6 +204,15 @@ namespace sfem {
 
                 if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::Status::STEP_FAILED;
 
+                if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected && impl.step->met_negative_curvature()) {
+                    // The tangent is indefinite here (CG's curvature is a global sum, the same on
+                    // every rank): the iteration again from x on the projected tangent, rather than
+                    // along the truncated direction CG returned.
+                    projected = true;
+                    impl.step->set_tangent_projection(true);
+                    continue;
+                }
+
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
                     const real_t slope = merit->slope(x, r, dx, m0);
@@ -235,6 +247,14 @@ namespace sfem {
 
                 report.min_alpha = std::min(report.min_alpha, log.line_search.alpha);
                 impl.blas->axpy(ndofs, log.line_search.alpha, dx, x);
+                if (projected && !taken_back && opts.tangent_projection == TangentProjection::ON_FAILURE &&
+                    log.line_search.alpha == 1) {
+                    // A full step: back to the tangent itself, whose Newton converges quadratically
+                    // where it is positive definite; a failure there is retried projected again.
+                    projected  = false;
+                    taken_back = true;
+                    impl.step->set_tangent_projection(false);
+                }
                 solved = linear && !log.linear_capped && log.line_search.alpha == 1;
                 known  = merit && merit->residual_at(log.line_search.alpha, r);
             }
