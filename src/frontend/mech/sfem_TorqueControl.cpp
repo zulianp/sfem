@@ -131,8 +131,13 @@ namespace sfem {
                 angle_    = released_ ? real_t(0) : rotation_->angle();
                 if (material_torque(*material_, *rotation_, record.x, scratch_, torque_) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-                flips_ = measured_ && torque_ * previous_ < 0 ? flips_ + 1 : 0;
-                previous_ = torque_;
+                // A change of sign counts only above round-off: a free end, once released, holds a torque
+                // of 1e-9 of its peak whose sign is noise.
+                largest_           = std::max(largest_, std::abs(torque_));
+                const real_t floor = real_t(1e-6) * largest_;
+                const bool   flip  = measured_ && torque_ * previous_ < 0 && std::abs(torque_) > floor && std::abs(previous_) > floor;
+                flips_             = flip ? flips_ + 1 : 0;
+                previous_          = torque_;
                 measured_ = true;
                 if (flips_ == 8) {
                     fprintf(stderr,
@@ -170,6 +175,7 @@ namespace sfem {
             real_t                    angle_{0};
             real_t                    torque_{0};
             real_t                    previous_{0};
+            real_t                    largest_{0};  ///< the largest |torque| so far
             int                       flips_{0};
         };
     }  // namespace
