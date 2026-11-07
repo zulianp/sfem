@@ -172,7 +172,7 @@ namespace sfem {
     void NodeObstacleContact::add_curvature(const real_t *const  x,
                                             const real_t *const  r,
                                             const real_t *const  k,
-                                            const bool           capped,
+                                            const int            curvature,
                                             const real_t         sign,
                                             const count_t *const       rowptr,
                                             const idx_t *const         colidx,
@@ -183,20 +183,20 @@ namespace sfem {
         real_t *Crows[6];
         rows(curvature_, 6, Crows);
         obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
-        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, capped, sign, rowptr, colidx, values_type, values);
+        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, curvature, sign, rowptr, colidx, values_type, values);
     }
 
     void NodeObstacleContact::curvature_blocks(const real_t *const x,
                                                const real_t *const r,
                                                const real_t *const k,
-                                               const bool          capped,
+                                               const int           curvature,
                                                real_t *const       blocks) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::curvature_blocks");
 
         real_t *Crows[6];
         rows(curvature_, 6, Crows);
         obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
-        node_obstacle_curvature_blocks(view(normals_, gap_), r, k, capped, blocks);
+        node_obstacle_curvature_blocks(view(normals_, gap_), r, k, curvature, blocks);
     }
 
     void NodeObstacleContact::apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const {

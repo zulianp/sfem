@@ -42,8 +42,9 @@ namespace sfem {
         /// The material's tangent at x, without curvature or shift.
         virtual int assemble(const real_t *const x) = 0;
         /// The obstacle's curvature at x for the reactions of r (NodeObstacleContact::add_curvature),
-        /// in place of any the tangent carries.
-        virtual int set_curvature(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped) = 0;
+        /// as much of it as `curvature` takes (NodeObstacleCurvature), in place of any the tangent
+        /// carries.
+        virtual int set_curvature(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature) = 0;
         /// K_dd += factor |reference_d|, cumulative until the next assemble; `reference` is the
         /// same at every call between two assembles.
         virtual int shift_diagonal(const real_t factor, const real_t *const reference) = 0;

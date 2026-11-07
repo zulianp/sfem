@@ -50,6 +50,9 @@ namespace sfem {
 
         int iterations_{0};
         int iterations() const override { return iterations_; }
+        /// The last solve stopped at a direction of no positive curvature that no bound limits.
+        bool negative_curvature_{false};
+        bool met_negative_curvature() const { return negative_curvature_; }
 
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
@@ -594,12 +597,13 @@ namespace sfem {
             int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
-            iterations_ = 0;
+            iterations_         = 0;
+            negative_curvature_ = false;
 
             if (team_op_) {
                 // The whole iteration in one region.
                 int counts[3] = {0, 0, 0};
-                team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
+                negative_curvature_ = !team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
                 count_cg_steps            = counts[0];
                 count_expansion_steps     = counts[1];
                 count_proportioning_steps = counts[2];
@@ -626,6 +630,7 @@ namespace sfem {
                     // directions, held only by the bounds.
                     if (c.move == T(MPRGPMove::UNBOUNDED)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
+                        negative_curvature_ = true;
                         break;
                     }
 
@@ -641,6 +646,7 @@ namespace sfem {
                     // apply_op inside!
                     if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                        negative_curvature_ = true;
                         break;
                     }
 
