@@ -229,6 +229,7 @@ namespace sfem {
                 switch (log.line_search.status) {
                     case LineSearchResult::Status::ACCEPTED:
                     case LineSearchResult::Status::BEST_DECREASE:
+                    case LineSearchResult::Status::NONMONOTONE:
                         break;
                     case LineSearchResult::Status::AT_RESOLUTION:
                         return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;
