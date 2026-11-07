@@ -128,7 +128,7 @@ namespace sfem {
         // history the material already reads, and the acceleration is the
         // separable half the inertia already assembles.
         blas->zaxpby(ndofs, impl_->shift, x, 1, impl_->z->data(), velocity);
-        blas->zaxpby(ndofs, impl_->alpha_a, x, -impl_->alpha_a, impl_->u_hat->data(), acceleration);
+        if (acceleration) blas->zaxpby(ndofs, impl_->alpha_a, x, -impl_->alpha_a, impl_->u_hat->data(), acceleration);
     }
 
     void BDF2Scheme::advance(const real_t *const x) {
