@@ -1,16 +1,18 @@
 // The Prony history's storage formats: bytes, the cost of a step's two passes, and what the format
 // does to the history, on the host or the device (SFEM_EXECUTION_SPACE=device).
 //
-//   bench_prony_history <n_elements> <n_qp> [steps] [elements_per_mean]
+//   bench_prony_history <n_elements> <n_qp> [steps] [elements_per_mean] [remainder_horizon]
 //
 // The series is the LDP valves' EPDM (15 terms, workflows/ldp_containment/transient) at their step,
-// dt = 1e-4 s: four terms are stored and eleven relax within the step and share the increment D.
+// dt = 1e-4 s: four terms are stored and eleven relax within the step.  With a remainder horizon
+// (seconds; 0, the default, for none) the terms slower than it are stored as remainders.
 // The relaxed stress is synthetic and smooth: per component a level, varying along the elements
 // (as a field on a mesh ordered along a space-filling curve does) and by 1% over an element's
 // points, driven by a ramp and an oscillation in time.  Every row reports the elements, points and
-// threads, the stored terms, the bytes of H, D and the frozen history, begin_step and advance per
-// call (synchronized), advance per stored value, and the frozen history's largest difference from
-// full storage's after the last step, relative to its largest entry.
+// threads, the stored terms, the bytes of H, of the remainder form's reference R and of the frozen
+// history, begin_step and advance per call (synchronized), advance per stored value, and the frozen
+// history's largest difference from full storage's after the last step, relative to its largest
+// entry.
 
 #include <chrono>
 #include <cmath>
@@ -86,13 +88,14 @@ namespace {
 int main(int argc, char *argv[]) {
     auto ctx = sfem::initialize(argc, argv);
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <n_elements> <n_qp> [steps] [elements_per_mean]\n", argv[0]);
+        fprintf(stderr, "usage: %s <n_elements> <n_qp> [steps] [elements_per_mean] [remainder_horizon]\n", argv[0]);
         return EXIT_FAILURE;
     }
     const ptrdiff_t ne       = atol(argv[1]);
     const int       nq       = atoi(argv[2]);
     const int       steps    = argc > 3 ? atoi(argv[3]) : 50;
     const int       per_mean = argc > 4 ? atoi(argv[4]) : 0;
+    const real_t    horizon  = argc > 5 ? (real_t)atof(argv[5]) : real_t(0);
     const int       nc       = 6;
     const real_t    dt       = real_t(1e-4);
 
@@ -114,14 +117,15 @@ int main(int argc, char *argv[]) {
                                             sfem::HistoryStorage::FLOAT16_MD,
                                             sfem::HistoryStorage::INT8_MD};
 
-    printf("format,space,elements,n_qp,threads,elements_per_mean,stored,bytes_history,bytes_increment,bytes_frozen,"
-           "begin_step_us,advance_us,advance_ns_per_value,frozen_rel_diff\n");
+    printf("format,space,elements,n_qp,threads,elements_per_mean,remainder_horizon,stored,bytes_history,bytes_reference,"
+           "bytes_frozen,begin_step_us,advance_us,advance_ns_per_value,frozen_rel_diff\n");
     std::vector<real_t> reference;
     for (const auto storage : formats) {
         sfem::PronyRelaxation::Options options;
         options.history_storage           = storage;
         options.execution_space           = es;
         options.history_elements_per_mean = per_mean;
+        options.remainder_horizon         = horizon;
         sfem::PronyRelaxation relaxation(epdm(), nc, nq, ne, options);
 
         double                     t_begin = 0, t_advance = 0;
@@ -156,17 +160,18 @@ int main(int argc, char *argv[]) {
         }
 
         const int    timed  = steps - 1;
-        const double values = double(relaxation.n_stored_terms() + 1) * n;  // the stored terms and D
-        printf("%s,%s,%td,%d,%d,%d,%d,%zu,%zu,%zu,%.3f,%.3f,%.4f,%.3e\n",
+        const double values = double(relaxation.n_stored_terms()) * n;
+        printf("%s,%s,%td,%d,%d,%d,%g,%d,%zu,%zu,%zu,%.3f,%.3f,%.4f,%.3e\n",
                sfem::to_string(storage),
                es == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
                ne,
                nq,
                threads,
                per_mean,
+               (double)horizon,
                relaxation.n_stored_terms(),
                relaxation.history_bytes(),
-               relaxation.increment_bytes(),
+               relaxation.reference_bytes(),
                relaxation.frozen_bytes(),
                1e6 * t_begin / timed,
                1e6 * t_advance / timed,

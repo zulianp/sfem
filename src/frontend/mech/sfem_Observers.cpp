@@ -432,7 +432,7 @@ namespace sfem {
                     names.push_back(d.group + "_stored");
                 }
                 // Persistent bytes over every rank, by what holds them (RelaxationGroups::Bytes).
-                for (const char *what : {"bytes_history", "bytes_increment", "bytes_frozen", "bytes_stress"}) names.push_back(what);
+                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"}) names.push_back(what);
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
                 // Cumulative over the run, host loops only (sfem_prony_diagnostics.hpp).
                 names.push_back("updates");
@@ -456,7 +456,7 @@ namespace sfem {
                             const auto     &r      = relaxations_.relaxation(b, d.group);
                             const ptrdiff_t points = static_cast<ptrdiff_t>(r.n_qp()) * r.n_elements();
                             H.resize(static_cast<size_t>(r.n_components()) * points);
-                            r.decode_history(k, H.data());
+                            relaxations_.decode_history(b, d.group, k, H.data());
                             for (int comp = 0; comp < r.n_components(); ++comp) {
                                 const real_t weight = comp < n_diagonal ? 1 : 2;
                                 const real_t *const h = &H[comp * points];
@@ -474,7 +474,7 @@ namespace sfem {
                     values[c++] = relaxations_.relaxation(blocks_[0], d.group).n_stored_terms();
                 }
                 const auto bytes   = relaxations_.bytes_breakdown();
-                real_t     held[4] = {real_t(bytes.history), real_t(bytes.increment), real_t(bytes.frozen), real_t(bytes.stress)};
+                real_t     held[4] = {real_t(bytes.history), real_t(bytes.reference), real_t(bytes.frozen), real_t(bytes.stress)};
                 if (comm_->size() > 1) comm_->sum(held, 4, smesh::TypeToEnum<real_t>::value());
                 for (int k = 0; k < 4; ++k) values[c++] = held[k];
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS

@@ -149,30 +149,6 @@ namespace sfem {
         }
     }
 
-    void QuadratureState::scale_tensor(const int t, const real_t factor, void *const stream) {
-        void *const      data = data_->data() + t * values_per_tensor() * n_elements_ * bytes_per_value(storage_);
-        scaling_t *const s    = scales_->data() + t * n_elements_;
-#ifndef SFEM_ENABLE_CUDA
-        (void)stream;
-#else
-        if (es_ == EXECUTION_SPACE_DEVICE) {
-            prony::Means m = means_view();
-            m.data         = means_ ? m.tensor(t, values_per_tensor()) : nullptr;
-            if (cu_prony_scale(storage_, values_per_tensor(), n_elements_, factor, data, s, m, stream) != SFEM_SUCCESS) {
-                SFEM_ERROR("QuadratureState::scale_tensor failed on the device\n");
-            }
-            return;
-        }
-#endif
-        dispatch_history_codec(storage_, [&](auto codec) {
-            using Codec = decltype(codec);
-            prony::Means m = means_view();
-            m.data         = means_ ? m.tensor(t, values_per_tensor()) : nullptr;
-            prony::scale<Codec>(values_per_tensor(), n_elements_, factor, static_cast<typename Codec::storage_t *>(data), s, m);
-            return 0;
-        });
-    }
-
     void QuadratureState::encode(const int t, const real_t *const values) {
         if (es_ != EXECUTION_SPACE_HOST) SFEM_ERROR("QuadratureState::encode is a host convenience\n");
         dispatch_history_codec(storage_, [&](auto codec) {

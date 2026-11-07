@@ -77,7 +77,8 @@ namespace {
     void configure(OpType                      &op,
                    const std::shared_ptr<Mesh> &mesh,
                    const HistoryStorage         storage,
-                   const HistoryStorage         stress = HistoryStorage::FULL) {
+                   const HistoryStorage         stress  = HistoryStorage::FULL,
+                   const real_t                 horizon = 0) {
         for (const auto &block : mesh->blocks()) {
             op.set_value_in_block(block->name(), "C10", test_C10);
             op.set_value_in_block(block->name(), "C01", test_C01);
@@ -85,14 +86,16 @@ namespace {
         }
         PronyRelaxation::Options options;
         options.history_storage = storage;
-        options.stress_storage  = stress;
+        options.stress_storage    = stress;
+        options.remainder_horizon = horizon;
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
     int host_vs_device(const HistoryStorage  storage,
                        const real_t          tolerance,
                        const smesh::ElemType element = smesh::HEX8,
-                       const HistoryStorage  stress  = HistoryStorage::FULL) {
+                       const HistoryStorage  stress  = HistoryStorage::FULL,
+                       const real_t          horizon = 0) {
         const int n = 6;
         std::shared_ptr<Mesh> mesh;
         if (element == smesh::HEX8) {
@@ -111,8 +114,8 @@ namespace {
                 create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_DEVICE));
         SFEM_TEST_ASSERT(host_op != nullptr);
         SFEM_TEST_ASSERT(device_op != nullptr);
-        configure(*host_op, mesh, storage, stress);
-        configure(*device_op, mesh, storage, stress);
+        configure(*host_op, mesh, storage, stress, horizon);
+        configure(*device_op, mesh, storage, stress, horizon);
 
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
@@ -157,9 +160,10 @@ namespace {
             const real_t value_error    = std::abs(v_h - v_d) / std::max(std::abs(v_h), real_t(1e-30));
             const real_t gradient_error = relative_difference(g_h, g_d);
             const real_t apply_error    = relative_difference(a_h, a_d);
-            printf("  %-6s %-15s step %d ndof=%td: value %.3e (host %.6g) gradient %.3e apply %.3e\n",
+            printf("  %-6s %-15s%s step %d ndof=%td: value %.3e (host %.6g) gradient %.3e apply %.3e\n",
                    smesh::type_to_string(element),
                    to_string(storage),
+                   horizon > 0 ? " remainder" : "",
                    step,
                    ndofs,
                    (double)value_error,
@@ -218,6 +222,19 @@ int test_device_matches_host_float16_md_storage() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The remainder form (tau = 10 beyond the horizon 5, tau = 1 within it), with real_t and float32
+// stress slots and so R in each: the same arithmetic on both sides, within the codecs' ties.
+int test_device_matches_host_remainder_form() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT16_SCALED, real_t(1e-6), element, HistoryStorage::FULL, 5) != SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::FLOAT16_MD, real_t(1e-4), element, HistoryStorage::FLOAT32, 5) != SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // Any generated energy material on HEX8 goes through the same HEX8 -> PROTEUS_HEX8 forwarding
 // as this one, so the existing modified Mooney-Rivlin is checked on the device too: its gradient
 // against the host's.  If this fails as well, a failure above is the forwarding's, not Prony's.
@@ -256,6 +273,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_float32_stress_slots);
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
+    SFEM_RUN_TEST(test_device_matches_host_remainder_form);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

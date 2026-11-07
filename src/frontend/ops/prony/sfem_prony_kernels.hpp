@@ -231,81 +231,15 @@ namespace sfem {
             }
         }
 
-        /// Multiply one tensor of a store by `factor` in place:
-        ///     H <- factor * H,
-        /// re-encoded under fresh scales.
-        template <class Codec>
-        void scale(const ptrdiff_t                            rows,
-                   const ptrdiff_t                            n,
-                   const real_t                               factor,
-                   typename Codec::storage_t *const SFEM_RESTRICT H,
-                   scaling_t *const SFEM_RESTRICT             H_scales,
-                   const Means                               &m = Means{}) {
-            if constexpr (Codec::mean_deviation) {
-#pragma omp parallel for
-                for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
-                    const ptrdiff_t nb = std::min(BLOCK, n - e0);
-                    ptrdiff_t groups[BLOCK];
-                    real_t    old_mean[detail::MAX_COMPONENTS][BLOCK];
-                    detail::lane_groups(e0, nb, m, groups);
-                    detail::lane_means(rows / m.n_qp, nb, m, m.data, groups, old_mean);
-                    detail::store_mean_deviation<Codec, false>(
-                            rows,
-                            n,
-                            e0,
-                            nb,
-                            m,
-                            [&](const ptrdiff_t r, const ptrdiff_t l) {
-                                return factor * (old_mean[r / m.n_qp][l] + Codec::decode(H[r * n + e0 + l], H_scales[e0 + l]));
-                            },
-                            [](const ptrdiff_t, const ptrdiff_t) { return real_t(0); },
-                            H,
-                            H_scales,
-                            m.data);
-                }
-                return;
-            }
-
-#pragma omp parallel for
-            for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
-                const ptrdiff_t nb = std::min(BLOCK, n - e0);
-
-                real_t old_scale[BLOCK];
-                real_t inv[BLOCK];
-                for (ptrdiff_t l = 0; l < nb; l++) old_scale[l] = H_scales[e0 + l];
-
-                if constexpr (Codec::scaled) {
-                    real_t max_abs[BLOCK];
-                    for (ptrdiff_t l = 0; l < nb; l++) max_abs[l] = 0;
-
-                    for (ptrdiff_t r = 0; r < rows; r++) {
-                        const typename Codec::storage_t *const h = &H[r * n + e0];
-                        for (ptrdiff_t l = 0; l < nb; l++) {
-                            max_abs[l] = std::max(max_abs[l], std::abs(factor * Codec::decode(h[l], old_scale[l])));
-                        }
-                    }
-
-                    for (ptrdiff_t l = 0; l < nb; l++) {
-                        H_scales[e0 + l] = Codec::scale_for(max_abs[l]);
-                        inv[l]           = 1 / static_cast<real_t>(H_scales[e0 + l]);
-                    }
-                } else {
-                    for (ptrdiff_t l = 0; l < nb; l++) inv[l] = 1;
-                }
-
-                for (ptrdiff_t r = 0; r < rows; r++) {
-                    typename Codec::storage_t *const h = &H[r * n + e0];
-                    for (ptrdiff_t l = 0; l < nb; l++) h[l] = Codec::encode(factor * Codec::decode(h[l], old_scale[l]), inv[l]);
-                }
-            }
-        }
-
         /// The frozen history of a step:
         ///     out = sum_i alpha_i H_i - b_sum * S_n.
         ///
         /// `S_n` is the relaxed stress at the start of the step, evaluated from
         /// the converged displacement: real_t, or float when the stress slots are
         /// (`PronyRelaxation::Options::stress_storage`).
+        ///
+        /// A store in remainder form (`beta`, `ref`; see `advance`) holds
+        /// G_i = H_i - beta_i (S_n - R), and H_i is read as G_i + beta_i (S_n - R).
         template <class HCodec, typename S_t = real_t>
         void frozen_history(const int                                        n_terms,
                             const ptrdiff_t                                  rows,
@@ -316,7 +250,9 @@ namespace sfem {
                             const scaling_t *const SFEM_RESTRICT             H_scales,
                             const S_t *const SFEM_RESTRICT                   S_n,
                             real_t *const SFEM_RESTRICT                      out,
-                            const Means                                     &m = Means{}) {
+                            const Means                                     &m    = Means{},
+                            const real_t *const SFEM_RESTRICT                beta = nullptr,
+                            const S_t *const SFEM_RESTRICT                   ref  = nullptr) {
 #pragma omp parallel for
             for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
                 const ptrdiff_t nb = std::min(BLOCK, n - e0);
@@ -339,6 +275,13 @@ namespace sfem {
                         } else {
                             for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], hs[l]);
                         }
+                        const real_t ab = beta ? a * beta[i] : real_t(0);
+                        if (ab != 0) {
+                            const S_t *const R = &ref[r * n + e0];
+                            for (ptrdiff_t l = 0; l < nb; l++) {
+                                o[l] += ab * (static_cast<real_t>(s[l]) - static_cast<real_t>(R[l]));
+                            }
+                        }
                     }
                 }
             }
@@ -349,6 +292,14 @@ namespace sfem {
         ///
         /// Both stresses are evaluated, in real_t, from the displacements at the
         /// two ends of the step; only H_i is stored, and only it is re-encoded.
+        ///
+        /// Remainder form: with beta_i != 0 the store holds
+        ///     G_i = H_i - beta_i (S_n - R),
+        /// R a fixed reference stress (`ref`), and the same recursion reads
+        ///     G_i <- alpha_i G_i + (alpha_i beta_i - b_i) (S_n - R) + (b_i - beta_i) (S_new - R).
+        /// A term that barely relaxes over the run has H_i close to b_i (S_n - R),
+        /// R the stress its history was last zero at, so G_i is small and its codes
+        /// resolve it finer.  With beta_i = 0 the store is H_i, computed as above.
         template <class HCodec, typename S_t = real_t>
         void advance(const int                                  n_terms,
                      const ptrdiff_t                            rows,
@@ -359,7 +310,17 @@ namespace sfem {
                      const S_t *const SFEM_RESTRICT             S_new,
                      typename HCodec::storage_t *const SFEM_RESTRICT H,
                      scaling_t *const SFEM_RESTRICT             H_scales,
-                     const Means                               &m = Means{}) {
+                     const Means                               &m    = Means{},
+                     const real_t *const SFEM_RESTRICT          beta = nullptr,
+                     const S_t *const SFEM_RESTRICT             ref  = nullptr) {
+            // The increment of term i at value k.
+            const auto increment = [&](const int i, const ptrdiff_t k) {
+                const real_t sp = static_cast<real_t>(S_n[k]), sn = static_cast<real_t>(S_new[k]);
+                const real_t be = beta ? beta[i] : real_t(0);
+                if (be == 0) return b[i] * (sn - sp);
+                const real_t R = static_cast<real_t>(ref[k]);
+                return (alpha[i] * be - b[i]) * (sp - R) + (b[i] - be) * (sn - R);
+            };
             if constexpr (HCodec::mean_deviation) {
 #pragma omp parallel for
                 for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
@@ -372,7 +333,6 @@ namespace sfem {
                         scaling_t *const                  hs_i = &H_scales[i * n];
                         history_mean_t *const             m_i  = m.tensor(i, rows);
                         const real_t                      a    = alpha[i];
-                        const real_t                      bi   = b[i];
                         detail::lane_means(rows / m.n_qp, nb, m, m_i, groups, old_mean);
                         const auto stored = [&](const ptrdiff_t r, const ptrdiff_t l) {
                             return old_mean[r / m.n_qp][l] + HCodec::decode(h_i[r * n + e0 + l], hs_i[e0 + l]);
@@ -384,8 +344,7 @@ namespace sfem {
                                 nb,
                                 m,
                                 [&](const ptrdiff_t r, const ptrdiff_t l) {
-                                    return a * stored(r, l) + bi * (static_cast<real_t>(S_new[r * n + e0 + l]) -
-                                                                    static_cast<real_t>(S_n[r * n + e0 + l]));
+                                    return a * stored(r, l) + increment(i, r * n + e0 + l);
                                 },
                                 stored,
                                 h_i,
@@ -405,7 +364,6 @@ namespace sfem {
                     typename HCodec::storage_t *const h_i  = &H[i * rows * n];
                     scaling_t *const                  hs_i = &H_scales[i * n + e0];
                     const real_t                      a    = alpha[i];
-                    const real_t                      bi   = b[i];
 
                     real_t old_scale[BLOCK];
                     real_t inv[BLOCK];
@@ -416,11 +374,9 @@ namespace sfem {
                         for (ptrdiff_t l = 0; l < nb; l++) max_abs[l] = 0;
 
                         for (ptrdiff_t r = 0; r < rows; r++) {
-                            const typename HCodec::storage_t *const h  = &h_i[r * n + e0];
-                            const S_t *const                        sp = &S_n[r * n + e0];
-                            const S_t *const                        sn = &S_new[r * n + e0];
+                            const typename HCodec::storage_t *const h = &h_i[r * n + e0];
                             for (ptrdiff_t l = 0; l < nb; l++) {
-                                const real_t v = a * HCodec::decode(h[l], old_scale[l]) + bi * (static_cast<real_t>(sn[l]) - static_cast<real_t>(sp[l]));
+                                const real_t v = a * HCodec::decode(h[l], old_scale[l]) + increment(i, r * n + e0 + l);
                                 max_abs[l]     = std::max(max_abs[l], std::abs(v));
                             }
                         }
@@ -434,12 +390,10 @@ namespace sfem {
                     }
 
                     for (ptrdiff_t r = 0; r < rows; r++) {
-                        typename HCodec::storage_t *const h  = &h_i[r * n + e0];
-                        const S_t *const                  sp = &S_n[r * n + e0];
-                        const S_t *const                  sn = &S_new[r * n + e0];
+                        typename HCodec::storage_t *const h = &h_i[r * n + e0];
                         for (ptrdiff_t l = 0; l < nb; l++) {
                             SFEM_PRONY_DIAGNOSTIC(const real_t before = HCodec::decode(h[l], old_scale[l]));
-                            const real_t v = a * HCodec::decode(h[l], old_scale[l]) + bi * (static_cast<real_t>(sn[l]) - static_cast<real_t>(sp[l]));
+                            const real_t v = a * HCodec::decode(h[l], old_scale[l]) + increment(i, r * n + e0 + l);
                             h[l]           = HCodec::encode(v, inv[l]);
                             SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], hs_i[l]));
                         }
