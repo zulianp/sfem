@@ -79,6 +79,8 @@ namespace sfem {
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.
         void upper_bound(const real_t unbounded, real_t *const ub) const;
+        /// node_obstacle_scaling at the contact nodes: the diagonal in `inverse_scale` on entry.
+        void scaling(const real_t *const ub, real_t *const inverse_scale, real_t *const scale, real_t *const scaled_bound) const;
 
         // First-order optimality of the step. At the solution the residual r is the obstacle's
         // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),

@@ -1,5 +1,6 @@
 #include "sfem_base.hpp"
 #include "sfem_MPRGPKernels_cuda.hpp"
+#include "sfem_aliases.hpp"
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_mprgp_bounds.hpp"
@@ -495,6 +496,7 @@ namespace sfem {
             }
 
             bool build(const MPRGPRun<T>& r) {
+                SFEM_TRACE_SCOPE("MPRGPRunGraph::build");
                 stream = static_cast<cudaStream_t>(r.stream);
                 SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
                 SFEM_CUDA_CHECK(cudaGraphCreate(&graph, 0));

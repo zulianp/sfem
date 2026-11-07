@@ -11,6 +11,12 @@ namespace sfem {
     void d_node_obstacle_to_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
     void d_node_obstacle_from_frame(const NodeObstacleView &c, const real_t *const s, const real_t *const in, real_t *const out);
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
+    void d_node_obstacle_scaling(const NodeObstacleView &c,
+                                 const ptrdiff_t         ndofs,
+                                 const real_t *const     ub,
+                                 real_t *const           inverse_scale,
+                                 real_t *const           scale,
+                                 real_t *const           scaled_bound);
 
     void d_node_obstacle_offset_gap(const ptrdiff_t      size,
                                     const real_t         shift,

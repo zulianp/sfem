@@ -54,6 +54,15 @@ namespace sfem {
                                     const ptrdiff_t         first,
                                     const ptrdiff_t         end);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
+    // The QP's diagonal scaling from a diagonal d, which `inverse_scale` holds on entry: each
+    // contact node's three entries replaced by their mean, then root = sqrt(d) (1 where d <= 0),
+    // inverse_scale = root, scale = 1 / root, scaled_bound = ub root.
+    void node_obstacle_scaling(const NodeObstacleView &c,
+                               const ptrdiff_t         ndofs,
+                               const real_t *const     ub,
+                               real_t *const           inverse_scale,
+                               real_t *const           scale,
+                               real_t *const           scaled_bound);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and
     // -gap into penetration, per contact node.

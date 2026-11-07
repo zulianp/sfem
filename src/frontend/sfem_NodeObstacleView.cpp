@@ -1,6 +1,7 @@
 #include "sfem_NodeObstacleView.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -100,6 +101,31 @@ namespace sfem {
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < c.size; ++i) {
             ub[(ptrdiff_t)c.idx[i] * 3] = c.gap[i];
+        }
+    }
+
+    void node_obstacle_scaling(const NodeObstacleView &c,
+                               const ptrdiff_t         ndofs,
+                               const real_t *const     ub,
+                               real_t *const           inverse_scale,
+                               real_t *const           scale,
+                               real_t *const           scaled_bound) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_scaling(c, ndofs, ub, inverse_scale, scale, scaled_bound);
+#endif
+        real_t *const d = inverse_scale;
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < c.size; ++i) {
+            const ptrdiff_t node = c.idx[i];
+            const real_t    mean = (d[node * 3] + d[node * 3 + 1] + d[node * 3 + 2]) / 3;
+            for (int k = 0; k < 3; ++k) d[node * 3 + k] = mean;
+        }
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            const real_t root = d[i] > 0 ? std::sqrt(d[i]) : real_t(1);
+            scale[i]          = 1 / root;
+            inverse_scale[i]  = root;
+            scaled_bound[i]   = ub[i] * root;
         }
     }
 
