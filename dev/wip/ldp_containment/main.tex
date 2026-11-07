@@ -457,7 +457,8 @@ Figure~\ref{fig:stills} shows the valves at rest, on the cage, both seated betwe
 suction, and the suction valve on its stop. The three runs of Table~\ref{tab:strokes} open and close
 the valves within \trEventSpread\,\si{\milli\second} of each other and agree on the largest lift per
 stroke to \trPeakSpread\%. A run is not reproducible to the bit, since the GPU assembles with
-atomic additions, and the impacts amplify the rounding differences.
+atomic additions; without cut-backs two runs agree to the Newton tolerance
+(Table~\ref{tab:prony-valves}).
 
 \paragraph{Cost.} Table~\ref{tab:strokes} gives the cost of the \trStrokes{} strokes on one GPU
 with \machineCores{} cores, and Table~\ref{tab:changes} the effect of each change since the first
@@ -468,8 +469,15 @@ second kernel saves \trFinishGain\% per Newton step, storing the tangent in floa
 graph whose loop the GPU decides without returning to the host, \trRunsGain\%. Newton's start at
 $u_n+\Delta t\,v_n$ cuts the failed attempts over \trWindowStart\,\si{\milli\second} from
 \trFailedBaseWindow{} to \trFailedStartWindow{} and the QP time from \trQpBaseWindow{} to
-\trQpStartWindow\,\si{\second}; a non-monotone line search on its own fails \trFailedNonmonoWindow{}
-times and gains nothing in combination. Writing only the displacement instead of every field
+\trQpStartWindow\,\si{\second}. The attempts that still fail are line searches in which no step
+decreases the merit, where a few contacts switch near the tolerance. There a non-monotone line search
+measures the steps against the largest merit of the step's last five Newton iterates~\cite{grippo1986}
+and takes the first that satisfies Armijo's condition against it; every other step is the monotone
+rule's. With the current build it removes the \trFailedMonoWindow{} failed attempts of the
+monotone rule over \trWindowNonmono\,\si{\milli\second}, and the \trFailedFinalMono{} over the
+\trStrokes{} strokes, at the same time (\trSteppingFinal{} against \trSteppingFinalMono\,\si{\second}).
+Measured against the largest earlier merit at every step, Newton cycles between two active sets in
+simulation 1's release. Writing only the displacement instead of every field
 lowers the output from \trWritePerStepBdf{} to \trWritePerStepFinal\,\si{\milli\second} per step.
 Together the \trStrokes{} strokes take \trSteppingFinal\,\si{\second}, \trSpeedBdf{} times less
 than the first BDF2 run and \trSpeedNewmark{} times less than Newmark, with \trFailedFinal{} failed
@@ -493,8 +501,8 @@ growth a conjugate-gradient iteration count shows on a second-order operator. An
 \trResPerItRatio{} times as much: each GPU holds \trResWorkPerGpu{} times FF200's unknowns, the
 ranks add a ghost exchange and two global reductions to every iteration
 (Section~\ref{sec:parallel}), and MPRGP's device runs, which need a single rank, are not used. The
-refined run fails \trFailedRefined{} attempts against \trFailedFinal{}, all of them line searches at
-the pressure valve's impacts, \trResFailFirst{} to \trResFailLast\,\si{\milli\second} into a stroke
+refined run fails \trFailedRefined{} attempt against FF200's \trFailedFinal{}, a line search as the
+pressure valve reaches its seat, \trResFailFirst\,\si{\milli\second} into the third stroke
 (Figure~\ref{fig:strokes}, bottom). Writing the displacement, gathered on rank 0, takes
 \trResWriteRatio{} times as long per step.
 
@@ -550,10 +558,9 @@ lift of the centre, the suction valve's bounce on closing not counted.}
 
 \begin{table}
 \caption{One change at a time, FF200 on one GPU over the first \trWindowFinish\,\si{\milli\second}
-of the strokes (\trWindowStart\,\si{\milli\second} for Newton's start), each against the build
-before it: steps, failed attempts, QP time and QP time per Newton step. Whole runs are not
-reproducible to the bit, so their step counts can differ by a few. n.-m.\ LS: non-monotone line
-search.}
+of the strokes (\trWindowStart\,\si{\milli\second} for Newton's start and the line search), each
+against the build before it, the line search with the current build and either rule: steps, failed
+attempts, QP time and QP time per Newton step.}
 \label{tab:changes}
 \footnotesize
 \setlength{\tabcolsep}{2.5pt}
@@ -684,11 +691,9 @@ averages over 16 elements). a.+d.: average and deviation.}
 
 \subsection{The valves}
 
-Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage with a non-monotone
-line search: a step is accepted against the largest merit of the last five Newton iterates rather
-than the current one's~\cite{grippo1986}, so the Newton steps that switch a few contacts near the
-tolerance, which need not decrease the merit, are no longer refused and no step is cut back. Two runs
-in double then differ by a median $e_u$ of \hsValveNoise\% and by at most \hsValveMaxNoise\%, although
+Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage with the
+non-monotone line search of Section~\ref{sec:strokes}, so no step is cut back. Two runs in double
+differ by a median $e_u$ of \hsValveNoise\% and by at most \hsValveMaxNoise\%, although
 the GPU assembles with atomic additions. Single precision for
 the history (\hsValveSingle\%), the slots (\hsValveFullSlots\%) or both (\hsValveSingleSlots\%) stays at
 that floor; the 16-bit formats lie \hsValveSixteen{} to \hsValveHalf\%, int8 at \hsValveInt\%. Averages

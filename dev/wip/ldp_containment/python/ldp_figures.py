@@ -841,18 +841,19 @@ CHANGES = [
     ("finish", "Reduction end", "Finish", [("separate", "2nd kernel"), ("fused", "last block")]),
     ("float32", "Tangent", "Float", [("float64", "float64"), ("float32", "float32")]),
     ("runs", "CG steps", "Runs", [("steps", "one by one"), ("runs", "device runs")]),
-    ("start", "Newton's start", "Start", [("u_n", r"$u_n$"), ("u_n+dt v_n", r"$u_n+\Delta t\,v_n$"),
-                                           ("nonmonotone", r"$u_n$, n.-m.\ LS"),
-                                           ("both", r"$u_n+\Delta t\,v_n$, n.-m.\ LS")]),
+    ("start", "Newton's start", "Start", [("u_n", r"$u_n$"), ("u_n+dt v_n", r"$u_n+\Delta t\,v_n$")]),
+    ("nonmonotone", "Line search", "Nonmono", [("monotone", "monotone"), ("non-monotone", "non-monotone")]),
 ]
+# The changes measured over the window of Newton's start rather than the others'.
+LONG_WINDOW = ("start", "nonmonotone")
 STROKE = 0.045      # the pump's period (s), the pressure table's cycle
 OUTLET = 90543.0    # the outlet pressure (Pa), FP70's FSI cases
 LIFT_OPEN = 50e-6   # a valve is open while its centre is this far (m) from where it rests at t = 0
 # Frames of the final run rendered by render_strokes.py --panels (figures/stills/<frame>_<view>.png)
 # and the colour range that script fixes for the vertical displacement (mm).
-STILLS = [0, 38, 261, 276]
+STILLS = [0, 38, 260, 275]
 # The refined run's frames at the same times (figures/stills_refined), in its numbering.
-STILLS_REFINED = [0, 42, 297, 312]
+STILLS_REFINED = [0, 38, 260, 275]
 STILL_VIEWS = [("overview", "overview"), ("top", "from above"),
                ("pressure_valve", "pressure valve"), ("suction_valve", "suction valve")]
 UY_RANGE = (-1.4, 1.1)
@@ -987,6 +988,10 @@ def transient_macros(runs, ablation, history):
     m("trSpeedNewmark", num(stepping("newmark") / stepping("final"), 2))
     m("trSpeedBdf", num(stepping("bdf2") / stepping("final"), 2))
     m("trQpShareFinal", integer(100 * float(final["qp_s"]) / stepping("final")))
+    mono = runs["final_mono"]
+    m("trFailedFinalMono", integer(mono["failed"]))
+    m("trStepsFinalMono", integer(mono["steps"]))
+    m("trSteppingFinalMono", seconds(float(mono["stepper_s"])))
 
     # The valves: the final run per stroke, and how far the other runs are from it.
     events = {run: {key: valve_events(history[run], col, sign) for col, sign, key in VALVES}
@@ -1040,15 +1045,20 @@ def transient_macros(runs, ablation, history):
     m("trResRest", num(rest * 1e6, 1))
 
     # One change at a time; the caption names one window for all but Newton's start.
-    if len({ablation[(c, v[0][0])]["t_end"] for c, _, _, v in CHANGES if c != "start"}) != 1:
+    # The window in whole milliseconds: a run that cut back ends a rounding error short of t_end.
+    window = lambda c, v: round(float(ablation[(c, v)]["t_end"]) * 1e3)
+    if len({window(c, v) for c, _, _, variants in CHANGES if c not in LONG_WINDOW for v, _ in variants}) != 1:
         sys.exit("ldp_figures: the changes before Newton's start ran over different windows")
+    if len({window(c, v) for c, _, _, variants in CHANGES if c in LONG_WINDOW for v, _ in variants}) != 1:
+        sys.exit("ldp_figures: Newton's start and the line search ran over different windows")
     for change, _, key, variants in CHANGES:
         before, after = (ablation[(change, v)] for v, _ in variants[:2])
         m("trWindow" + key, integer(float(before["t_end"]) * 1e3))
-        if change != "start":
+        if change not in LONG_WINDOW:
             m("tr%sGain" % key, num(100 * (1 - per_newton(after) / per_newton(before)), 2))
-    for variant, key in (("u_n", "Base"), ("u_n+dt v_n", "Start"), ("nonmonotone", "Nonmono"), ("both", "Both")):
-        r = ablation[("start", variant)]
+    for change, variant, key in (("start", "u_n", "Base"), ("start", "u_n+dt v_n", "Start"),
+                                 ("nonmonotone", "monotone", "Mono"), ("nonmonotone", "non-monotone", "Nonmono")):
+        r = ablation[(change, variant)]
         m("trFailed" + key + "Window", integer(r["failed"]))
         m("trQp" + key + "Window", num(float(r["qp_s"]), 3))
         m("trStepping" + key + "Window", num(float(r["stepper_s"]), 3))
