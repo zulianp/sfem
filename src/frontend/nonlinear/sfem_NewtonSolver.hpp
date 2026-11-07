@@ -17,11 +17,14 @@ namespace sfem {
     enum class TangentProjection {
         /// The tangent itself.
         NONE,
-        /// The tangent itself, until a direction along which the merit does not decrease: that
-        /// iteration is repeated from the same iterate on the tangent projected to positive
-        /// semidefinite, which is kept to the end of the step ("project on demand", Longva et
-        /// al., "Pitfalls of Projection", 2023). A tangent that is positive definite where the
-        /// iterates converge keeps Newton's rate.
+        /// The tangent itself, until it shows indefinite (CG meets negative curvature) or gives a
+        /// direction along which the merit does not decrease: that iteration is repeated from the
+        /// same iterate on the tangent projected to positive semidefinite, which is kept until a
+        /// step is taken whole ("project on demand", Longva et al., "Pitfalls of Projection",
+        /// 2023). Newton on the projected tangent converges only linearly, so the tangent itself
+        /// is taken back once, as soon as the line search trusts a full step; a tangent that is
+        /// positive definite where the iterates converge then keeps Newton's rate. Failing again,
+        /// it is projected for the rest of the step.
         ON_FAILURE,
         /// The projected tangent at every iteration (projected Newton).
         ALWAYS

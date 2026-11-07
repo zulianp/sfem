@@ -62,6 +62,10 @@ namespace sfem {
         /// Inner iterations of the last `solve`.
         virtual int iterations() const = 0;
 
+        /// Whether the last `solve` stopped on a direction of non-positive curvature: the
+        /// linearisation is indefinite at the iterate.
+        virtual bool met_negative_curvature() const { return false; }
+
         /// Whether a converged solve of a linear function lands on its solution: true when the
         /// linearisation is the function's own, false for a constraint the step linearises (an
         /// obstacle's gap), whose iterate Newton must measure like any other.

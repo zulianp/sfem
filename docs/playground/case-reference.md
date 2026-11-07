@@ -265,7 +265,7 @@ obstacle:
 | `newton.divergence_factor` | `1e4` | |
 | `newton.merit` | `auto` | `auto`, `energy`, `residual`. |
 | `newton.fixed_iterations` | `false` | `true` accepts the state after `max_it` iterations. |
-| `newton.tangent_projection` | `none` | `on_failure`: where the line search finds no decrease along Newton's direction, the iteration is repeated from the same state on the tangent projected to positive semidefinite at every quadrature point (its eigenvalues replaced by their absolute values), kept to the end of the step. `always`: the projected tangent at every iteration. Needs `linear.format: BSR`, no obstacle, and GeneratedMooneyRivlinProny; host or device. |
+| `newton.tangent_projection` | `none` | `on_failure`: where CG meets negative curvature or the line search finds no decrease along Newton's direction, the iteration is repeated from the same state on the tangent projected to positive semidefinite at every quadrature point (its eigenvalues replaced by their absolute values), kept until the line search takes a full step; the tangent itself is taken back once per time step, and failing again the projection stays. `always`: the projected tangent at every iteration. Needs `linear.format: BSR`, no obstacle, and GeneratedMooneyRivlinProny; host or device. |
 | `newton.verbose` | `true` | One line per Newton iteration. |
 | `newton.line_search.enabled` | on for nonlinear materials | |
 | `newton.line_search.steps` | `[1, 1/2, ..., 1/128]` | |
