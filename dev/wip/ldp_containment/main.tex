@@ -631,9 +631,10 @@ restart from rest. The quantity a code must resolve is the remainder
 which is~\eqref{eq:prony} rewritten, not an approximation, and a small fraction of $H_i$. Every
 narrow format stores the terms with $\tau_i a_T>T$ ($a_T$ the time--temperature shift) this way
 and reads $H_i = G_i + g_i(S^n-R)$; a shift that moves a term across $T$ re-expresses its store,
-$G_i\leftarrow G_i\pm g_i(S^n-R)$. $R$ is kept once per group in the slots' precision. It only
-reparametrises the store, so its own rounding costs nothing; without it, taken as zero, $G_i$ would
-hold $g_iR$, larger than $H_i$ itself on a valve prestressed by its seat. In the strokes ($T=$
+$G_i\leftarrow G_i\pm g_i(S^n-R)$. $R$ is kept once per group in the slots' precision. The identity
+holds for the $R$ stored, but $G_i$ starts at $g_i$ times its rounding, which must stay below the
+remainder: in single precision it does, while an int8 $R$ costs most of the gain. Without $R$,
+taken as zero, $G_i$ would hold $g_iR$, larger than $H_i$ itself on a valve prestressed by its seat. In the strokes ($T=$
 \SI{0.18}{\second}) two of the \hsStored{} stored terms ($\tau=\SI{1.61e3}{}$ and
 \SI{12.9}{\second}) are remainders, in the bar ($T=\SI{1}{\second}$) the same two. A term that
 relaxes within the span, such as $\tau=\SI{0.153}{\second}$ in the bar, is not: its history leaves
