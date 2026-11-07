@@ -238,6 +238,69 @@ namespace sfem {
             }
         }
 
+        constexpr int NORM_BLOCK = 256;
+
+        /// The block's partial sum into *out (atomically: a probe's value, whose summation order
+        /// is free).
+        __device__ inline void add_block_sum(real_t s, real_t *const out) {
+            __shared__ real_t part[NORM_BLOCK];
+            part[threadIdx.x] = s;
+            __syncthreads();
+            for (int half = NORM_BLOCK / 2; half > 0; half /= 2) {
+                if ((int)threadIdx.x < half) part[threadIdx.x] += part[threadIdx.x + half];
+                __syncthreads();
+            }
+            if (threadIdx.x == 0) atomicAdd(out, part[0]);
+        }
+
+        /// Per term (blockIdx.y), the weighted sum of squares of H_i, prony::squared_norms.
+        template <class Codec, typename S_t>
+        __global__ void squared_norms_kernel(const ptrdiff_t                                       rows,
+                                             const ptrdiff_t                                       n,
+                                             const int                                             n_qp,
+                                             const int                                             n_diagonal,
+                                             const Weights                                         w,
+                                             const typename Codec::storage_t *const SFEM_RESTRICT H,
+                                             const scaling_t *const SFEM_RESTRICT                 H_scales,
+                                             const prony::Means                                    m,
+                                             const S_t *const SFEM_RESTRICT                       S_n,
+                                             const S_t *const SFEM_RESTRICT                       ref,
+                                             real_t *const SFEM_RESTRICT                          out) {
+            const int       i     = blockIdx.y;
+            const ptrdiff_t total = rows * n;
+            real_t          s     = 0;
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const ptrdiff_t r = k / n;
+                const ptrdiff_t e = k - r * n;
+                real_t          v = Codec::decode(H[(i * rows + r) * n + e], H_scales[i * n + e]);
+                if constexpr (Codec::mean_deviation) {
+                    v += static_cast<real_t>(m.data[(i * (rows / m.n_qp) + r / m.n_qp) * m.n_groups + e / m.elements]);
+                }
+                if (w.beta[i] != 0) v += w.beta[i] * (static_cast<real_t>(S_n[k]) - static_cast<real_t>(ref[k]));
+                s += (r / n_qp < n_diagonal ? real_t(1) : real_t(2)) * v * v;
+            }
+            add_block_sum(s, &out[i]);
+        }
+
+        /// The weighted sum of squares of S_new - S_old, prony::squared_increment.
+        template <typename S_t>
+        __global__ void squared_increment_kernel(const ptrdiff_t                rows,
+                                                 const ptrdiff_t                n,
+                                                 const int                      n_qp,
+                                                 const int                      n_diagonal,
+                                                 const S_t *const SFEM_RESTRICT S_new,
+                                                 const S_t *const SFEM_RESTRICT S_old,
+                                                 real_t *const SFEM_RESTRICT    out) {
+            const ptrdiff_t total = rows * n;
+            real_t          s     = 0;
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const ptrdiff_t r = k / n;
+                const real_t    d = static_cast<real_t>(S_new[k]) - static_cast<real_t>(S_old[k]);
+                s += (r / n_qp < n_diagonal ? real_t(1) : real_t(2)) * d * d;
+            }
+            add_block_sum(s, out);
+        }
+
         /// Call `f` with a null pointer of the stress type `stress_bytes` names.
         template <class F>
         int dispatch_stress(const int stress_bytes, F &&f) {
@@ -337,6 +400,75 @@ namespace sfem {
         });
         SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
+    }
+
+    int cu_prony_squared_norms(const HistoryStorage   storage,
+                               const int              n_terms,
+                               const ptrdiff_t        rows,
+                               const ptrdiff_t        n,
+                               const int              n_qp,
+                               const int              n_diagonal,
+                               const void *const      H,
+                               const scaling_t *const H_scales,
+                               const prony::Means    &means,
+                               const real_t *const    beta,
+                               const int              stress_bytes,
+                               const void *const      S_n,
+                               const void *const      ref,
+                               real_t *const          scratch,
+                               real_t *const          out,
+                               void *const            stream) {
+        if (n_terms > MAX_TERMS) return SFEM_FAILURE;
+        if (n_terms == 0) return SFEM_SUCCESS;
+        const cudaStream_t s = (cudaStream_t)stream;
+        if (cudaMemsetAsync(scratch, 0, n_terms * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
+        Weights w{};
+        for (int i = 0; i < n_terms; i++) w.beta[i] = beta ? beta[i] : real_t(0);
+        const int ret = dispatch(storage, [&](auto codec) {
+            using Codec = decltype(codec);
+            return dispatch_stress(stress_bytes, [&](auto stress) {
+                using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+                const dim3 grid(std::min<unsigned>(grid_for(rows * n, NORM_BLOCK), 1024u), (unsigned)n_terms);
+                squared_norms_kernel<Codec, S_t><<<grid, NORM_BLOCK, 0, s>>>(rows,
+                                                                             n,
+                                                                             n_qp,
+                                                                             n_diagonal,
+                                                                             w,
+                                                                             static_cast<const typename Codec::storage_t *>(H),
+                                                                             H_scales,
+                                                                             means,
+                                                                             (const S_t *)S_n,
+                                                                             (const S_t *)ref,
+                                                                             scratch);
+                return launched();
+            });
+        });
+        if (ret != SFEM_SUCCESS) return ret;
+        if (cudaMemcpyAsync(out, scratch, n_terms * sizeof(real_t), cudaMemcpyDeviceToHost, s) != cudaSuccess) return SFEM_FAILURE;
+        return cudaStreamSynchronize(s) == cudaSuccess ? SFEM_SUCCESS : SFEM_FAILURE;
+    }
+
+    int cu_prony_squared_increment(const ptrdiff_t   rows,
+                                   const ptrdiff_t   n,
+                                   const int         n_qp,
+                                   const int         n_diagonal,
+                                   const int         stress_bytes,
+                                   const void *const S_new,
+                                   const void *const S_old,
+                                   real_t *const     scratch,
+                                   real_t *const     out,
+                                   void *const       stream) {
+        const cudaStream_t s = (cudaStream_t)stream;
+        if (cudaMemsetAsync(scratch, 0, sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
+        const int ret = dispatch_stress(stress_bytes, [&](auto stress) {
+            using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+            squared_increment_kernel<S_t><<<std::min<unsigned>(grid_for(rows * n, NORM_BLOCK), 1024u), NORM_BLOCK, 0, s>>>(
+                    rows, n, n_qp, n_diagonal, (const S_t *)S_new, (const S_t *)S_old, scratch);
+            return launched();
+        });
+        if (ret != SFEM_SUCCESS) return ret;
+        if (cudaMemcpyAsync(out, scratch, sizeof(real_t), cudaMemcpyDeviceToHost, s) != cudaSuccess) return SFEM_FAILURE;
+        return cudaStreamSynchronize(s) == cudaSuccess ? SFEM_SUCCESS : SFEM_FAILURE;
     }
 
     int cu_prony_narrow(const ptrdiff_t n, const real_t *const in, float *const out, void *const stream) {

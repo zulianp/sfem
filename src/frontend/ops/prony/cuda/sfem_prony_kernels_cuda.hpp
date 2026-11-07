@@ -56,6 +56,37 @@ namespace sfem {
                          const void *const    ref,
                          void *const          stream);
 
+    /// Per term, prony::squared_norms into the host array `out` (n_terms), through the device
+    /// array `scratch` (n_terms); synchronises `stream`.
+    int cu_prony_squared_norms(const HistoryStorage   storage,
+                               const int              n_terms,
+                               const ptrdiff_t        rows,
+                               const ptrdiff_t        n,
+                               const int              n_qp,
+                               const int              n_diagonal,
+                               const void *const      H,
+                               const scaling_t *const H_scales,
+                               const prony::Means    &means,
+                               const real_t *const    beta,
+                               const int              stress_bytes,
+                               const void *const      S_n,
+                               const void *const      ref,
+                               real_t *const          scratch,
+                               real_t *const          out,
+                               void *const            stream);
+
+    /// prony::squared_increment into the host scalar *out, through the device scalar *scratch.
+    int cu_prony_squared_increment(const ptrdiff_t   rows,
+                                   const ptrdiff_t   n,
+                                   const int         n_qp,
+                                   const int         n_diagonal,
+                                   const int         stress_bytes,
+                                   const void *const S_new,
+                                   const void *const S_old,
+                                   real_t *const     scratch,
+                                   real_t *const     out,
+                                   void *const       stream);
+
     /// out = (float) in: a relaxed stress into a float32 slot.
     int cu_prony_narrow(const ptrdiff_t n, const real_t *const in, float *const out, void *const stream);
 

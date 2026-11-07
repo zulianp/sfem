@@ -1245,11 +1245,12 @@ namespace sfem {
             const bool root    = mesh->comm()->rank() == 0;
             auto       history = std::make_shared<StepHistory>(root ? csv : "", root);
             if (has(output, "probes")) {
+                auto rates = create_carried_rates(f);
                 for (auto p : output["probes"].children()) {
                     const auto             type = read_string(p, "type", "");
                     std::shared_ptr<Probe> probe;
                     if (type == "control_point") {
-                        probe = create_control_point_probe(f, read_list<real_t>(p, "at", {}), read<bool>(p, "rates", scheme != nullptr));
+                        probe = create_control_point_probe(f, read_list<real_t>(p, "at", {}), read<bool>(p, "rates", scheme != nullptr), rates);
                     } else if (type == "torque") {
                         const int which = read<int>(p, "constraint", 0);
                         if (which < 0 || which >= (int)rotations.size()) {
