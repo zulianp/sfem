@@ -15,7 +15,9 @@
 
 namespace sfem {
   namespace codegen {
+    std::unique_ptr<InexactStore> mooney_rivlin_prony_hex27_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
     std::unique_ptr<InexactStore> mooney_rivlin_prony_hex8_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
+    std::unique_ptr<InexactStore> mooney_rivlin_prony_proteus_hex27_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
     std::unique_ptr<InexactStore> mooney_rivlin_prony_proteus_hex8_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
     std::unique_ptr<InexactStore> mooney_rivlin_prony_tet10_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
     std::unique_ptr<InexactStore> mooney_rivlin_prony_tet4_inexact_store(const ptrdiff_t nelements, const InexactOptions &options, void *const stream);
@@ -67,10 +69,14 @@ namespace sfem {
           return 11;
         case smesh::HEX8:
           return 8;
+        case smesh::HEX27:
+          return 64;
         case smesh::PROTEUS_QUAD4:
           return 4;
         case smesh::PROTEUS_HEX8:
           return 8;
+        case smesh::PROTEUS_HEX27:
+          return 64;
         default:
           break;
       }
@@ -1223,8 +1229,12 @@ namespace sfem {
                                                        const InexactOptions &options,
                                                        void *const stream) {
       switch (element_type) {
+        case smesh::HEX27:
+          return codegen::mooney_rivlin_prony_hex27_inexact_store(nelements, options, stream);
         case smesh::HEX8:
           return codegen::mooney_rivlin_prony_hex8_inexact_store(nelements, options, stream);
+        case smesh::PROTEUS_HEX27:
+          return codegen::mooney_rivlin_prony_proteus_hex27_inexact_store(nelements, options, stream);
         case smesh::PROTEUS_HEX8:
           return codegen::mooney_rivlin_prony_proteus_hex8_inexact_store(nelements, options, stream);
         case smesh::TET10:
@@ -1238,7 +1248,9 @@ namespace sfem {
 
     bool inexact_element(const smesh::ElemType element_type) {
       switch (element_type) {
+        case smesh::HEX27:
         case smesh::HEX8:
+        case smesh::PROTEUS_HEX27:
         case smesh::PROTEUS_HEX8:
         case smesh::TET10:
         case smesh::TET4:
@@ -1357,7 +1369,7 @@ namespace sfem {
   }
   bool GPUGeneratedMooneyRivlinProny::tangent_projection_supported() const {
     for (auto type : impl_->space->element_types()) {
-      if (!(type == smesh::HEX8 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10 || type == smesh::TET4 || type == smesh::TRI3)) return false;
+      if (!(type == smesh::HEX27 || type == smesh::HEX8 || type == smesh::PROTEUS_HEX27 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10 || type == smesh::TET4 || type == smesh::TRI3)) return false;
     }
     return true;
   }

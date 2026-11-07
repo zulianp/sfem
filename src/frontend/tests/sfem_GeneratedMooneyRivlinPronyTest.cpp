@@ -93,16 +93,18 @@ namespace {
         return tau;
     }
 
-    /// The unit cube in `n` cells per side, of HEX8, TET4 or TET10 elements, its interior
+    /// The unit cube in `n` cells per side, of HEX8, TET4, TET10 or HEX27 elements, its interior
     /// distorted.  TET10 is the distorted TET4 mesh promoted, so its elements stay straight
     /// sided: moving its edge nodes on their own curves elements this coarse until some of
-    /// their points invert.
+    /// their points invert.  HEX27 likewise, from the distorted HEX8 mesh.
     std::shared_ptr<sfem::Mesh> unit_cube(const smesh::ElemType element, const int n, const real_t distortion) {
         auto comm = sfem::Communicator::world();
-        auto mesh = element == smesh::HEX8 ? sfem::Mesh::create_hex8_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1)
-                                           : sfem::Mesh::create_tet4_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1);
+        const bool hex  = element == smesh::HEX8 || element == smesh::HEX27;
+        auto       mesh = hex ? sfem::Mesh::create_hex8_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1)
+                              : sfem::Mesh::create_tet4_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1);
         distort_interior(mesh, n, distortion);
-        return element == smesh::TET10 ? smesh::promote_to(smesh::TET10, mesh) : mesh;
+        if (element == smesh::TET10 || element == smesh::HEX27) return smesh::promote_to(element, mesh);
+        return mesh;
     }
 
     /// Both operators on one mesh, driven through `n_history_steps` committed steps of a
@@ -163,7 +165,7 @@ namespace {
         s.ndofs = s.fs->n_dofs();
         s.u     = sfem::create_host_buffer<real_t>(s.ndofs);
         // TET10's nodes are twice as dense, so the same random field would invert its elements.
-        fill_pseudo_random(s.ndofs, element == smesh::TET10 ? 0.025 : 0.05, s.u->data());
+        fill_pseudo_random(s.ndofs, element == smesh::TET10 || element == smesh::HEX27 ? 0.025 : 0.05, s.u->data());
 
         auto   blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
         real_t t    = 0;
@@ -366,6 +368,7 @@ int test_consistency_elastic() { return consistency(0, 0.15); }
 int test_consistency_prony_distorted() { return consistency(2, 0.15); }
 int test_consistency_prony_tet4() { return consistency(2, 0.15, smesh::TET4); }
 int test_consistency_prony_tet10() { return consistency(2, 0.15, smesh::TET10); }
+int test_consistency_prony_hex27() { return consistency(2, 0.15, smesh::HEX27); }
 
 
 
@@ -504,6 +507,7 @@ int test_homogeneous_relaxation_hex8() { return homogeneous_relaxation(smesh::HE
 int test_homogeneous_relaxation_tet4() { return homogeneous_relaxation(smesh::TET4); }
 int test_homogeneous_relaxation_tet10() { return homogeneous_relaxation(smesh::TET10); }
 int test_homogeneous_relaxation_tet10_affine() { return homogeneous_relaxation(smesh::TET10, true); }
+int test_homogeneous_relaxation_hex27() { return homogeneous_relaxation(smesh::HEX27); }
 int test_homogeneous_relaxation_tri3() { return homogeneous_relaxation(smesh::TRI3); }
 int test_homogeneous_relaxation_quad4() { return homogeneous_relaxation(smesh::QUAD4); }
 int test_homogeneous_relaxation_hex8_float32_stress() {
@@ -773,10 +777,12 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_consistency_prony_distorted);
     SFEM_RUN_TEST(test_consistency_prony_tet4);
     SFEM_RUN_TEST(test_consistency_prony_tet10);
+    SFEM_RUN_TEST(test_consistency_prony_hex27);
     SFEM_RUN_TEST(test_homogeneous_relaxation_hex8);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet4);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet10);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet10_affine);
+    SFEM_RUN_TEST(test_homogeneous_relaxation_hex27);
     SFEM_RUN_TEST(test_homogeneous_relaxation_hex8_float32_stress);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tet4_float32_stress);
     SFEM_RUN_TEST(test_homogeneous_relaxation_tri3);

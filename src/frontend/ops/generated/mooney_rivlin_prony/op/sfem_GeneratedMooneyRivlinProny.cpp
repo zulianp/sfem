@@ -11,7 +11,9 @@
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
 #include "sfem_InexactStore.hpp"
+#include "mooney_rivlin_prony_hex27_inexact.hpp"
 #include "mooney_rivlin_prony_hex8_inexact.hpp"
+#include "mooney_rivlin_prony_proteus_hex27_inexact.hpp"
 #include "mooney_rivlin_prony_proteus_hex8_inexact.hpp"
 #include "mooney_rivlin_prony_tet10_inexact.hpp"
 #include "mooney_rivlin_prony_tet4_inexact.hpp"
@@ -61,10 +63,14 @@ namespace sfem {
           return 11;
         case smesh::HEX8:
           return 8;
+        case smesh::HEX27:
+          return 64;
         case smesh::PROTEUS_QUAD4:
           return 4;
         case smesh::PROTEUS_HEX8:
           return 8;
+        case smesh::PROTEUS_HEX27:
+          return 64;
         default:
           break;
       }
@@ -1362,8 +1368,12 @@ namespace sfem {
                                                        const ptrdiff_t nelements,
                                                        const InexactOptions &options) {
       switch (element_type) {
+        case smesh::HEX27:
+          return inexact::create_store<codegen::mooney_rivlin_prony_hex27_inexact>(nelements, options);
         case smesh::HEX8:
           return inexact::create_store<codegen::mooney_rivlin_prony_hex8_inexact>(nelements, options);
+        case smesh::PROTEUS_HEX27:
+          return inexact::create_store<codegen::mooney_rivlin_prony_proteus_hex27_inexact>(nelements, options);
         case smesh::PROTEUS_HEX8:
           return inexact::create_store<codegen::mooney_rivlin_prony_proteus_hex8_inexact>(nelements, options);
         case smesh::TET10:
@@ -1377,7 +1387,9 @@ namespace sfem {
 
     bool inexact_element(const smesh::ElemType element_type) {
       switch (element_type) {
+        case smesh::HEX27:
         case smesh::HEX8:
+        case smesh::PROTEUS_HEX27:
         case smesh::PROTEUS_HEX8:
         case smesh::TET10:
         case smesh::TET4:
@@ -1524,7 +1536,7 @@ namespace sfem {
   }
   bool GeneratedMooneyRivlinProny::tangent_projection_supported() const {
     for (auto type : impl_->space->element_types()) {
-      if (!(type == smesh::HEX8 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10 || type == smesh::TET4 || type == smesh::TRI3)) return false;
+      if (!(type == smesh::HEX27 || type == smesh::HEX8 || type == smesh::PROTEUS_HEX27 || type == smesh::PROTEUS_HEX8 || type == smesh::PROTEUS_QUAD4 || type == smesh::QUAD4 || type == smesh::TET10 || type == smesh::TET4 || type == smesh::TRI3)) return false;
     }
     return true;
   }
