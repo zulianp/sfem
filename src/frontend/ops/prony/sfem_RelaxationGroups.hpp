@@ -95,6 +95,14 @@ namespace sfem {
 
         void set_temperature(const std::string &block, const std::string &group, const real_t temperature);
 
+        /// The remainder form's horizon (`PronyRelaxation::Options::remainder_horizon`) of every
+        /// group that has none set: the span of time the caller is about to simulate.
+        void set_default_remainder_horizon(const real_t horizon);
+
+        /// Term `i` of `group`'s committed history on `block`, decoded on the host into
+        /// `values` (laid out [c][q][e]) from the stress slots.
+        void decode_history(const std::string &block, const std::string &group, const int i, real_t *const values) const;
+
         /// The blocks registered, in name order.
         std::vector<std::string> block_names() const;
         PronyRelaxation       &relaxation(const std::string &block, const std::string &group);
@@ -140,10 +148,10 @@ namespace sfem {
         /// The persistent bytes by what holds them, summed over blocks and groups.
         struct Bytes {
             std::size_t history{0};    ///< the stored terms H_i, scales included
-            std::size_t increment{0};  ///< the shared increment D of the completely relaxed terms
+            std::size_t reference{0};  ///< the remainder form's reference stress R
             std::size_t frozen{0};     ///< the frozen history the kernels read
             std::size_t stress{0};     ///< the two relaxed-stress slots
-            std::size_t total() const { return history + increment + frozen + stress; }
+            std::size_t total() const { return history + reference + frozen + stress; }
         };
         Bytes bytes_breakdown() const;
 

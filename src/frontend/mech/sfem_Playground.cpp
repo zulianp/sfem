@@ -30,6 +30,7 @@
 #include "sfem_NodeObstacleStep.hpp"
 #include "sfem_ObstacleShape.hpp"
 #include "sfem_Observers.hpp"
+#include "sfem_RelaxationGroups.hpp"
 #include "sfem_Rotation.hpp"
 #include "sfem_StateField.hpp"
 #include "sfem_TorqueControl.hpp"
@@ -1123,7 +1124,13 @@ namespace sfem {
 
             stepper = std::make_unique<Stepper>(f, nonlinear, options);
             stepper->set_time_scheme(scheme);
-            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) stepper->add_history(history);
+            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) {
+                stepper->add_history(history);
+                // A Prony term slower than the run is stored as a remainder (PronyRelaxation).
+                if (auto *relaxations = history->relaxation_state()) {
+                    relaxations->set_default_remainder_horizon(options.steps * options.dt);
+                }
+            }
             for (auto &set : time_dependent) stepper->add_time_dependent(set);
             for (auto &release : releases) stepper->add_release(release.first, release.second);
 

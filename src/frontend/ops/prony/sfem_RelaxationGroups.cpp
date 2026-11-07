@@ -7,6 +7,8 @@
 #include "sfem_logger.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
+#include <cuda_runtime_api.h>
+
 #include "sfem_prony_kernels_cuda.hpp"
 #endif
 
@@ -207,14 +209,15 @@ namespace sfem {
     }
 
     void RelaxationGroups::begin_group(Block &b, const size_t g, const real_t t, const real_t dt) {
+        // Slot 1 holds the stress the last committed step started from (the slots swapped).
         if (b.stress.empty()) {
             b.groups[g]->begin_step(t, dt, static_cast<const real_t *>(nullptr));
         } else if (narrow(b, g)) {
 #if SFEM_REAL_T_IS_FLOAT64
-            b.groups[g]->begin_step(t, dt, b.stress[0][g].narrow->data());
+            b.groups[g]->begin_step(t, dt, b.stress[0][g].narrow->data(), b.stress[1][g].narrow->data());
 #endif
         } else {
-            b.groups[g]->begin_step(t, dt, b.stress[0][g].full->data());
+            b.groups[g]->begin_step(t, dt, b.stress[0][g].full->data(), b.stress[1][g].full->data());
         }
     }
 
@@ -271,6 +274,55 @@ namespace sfem {
         start_unknown_        = !relaxing;
     }
 
+    void RelaxationGroups::set_default_remainder_horizon(const real_t horizon) {
+        for (auto &entry : blocks_) {
+            for (auto &group : entry.second.groups) {
+                if (group->options().remainder_horizon < 0) group->set_remainder_horizon(horizon);
+            }
+        }
+    }
+
+    namespace {
+        /// `n` values of `src`, in `es`, as real_t on the host.
+        template <typename T>
+        std::vector<real_t> slot_on_host(const T *const src, const ptrdiff_t n, const ExecutionSpace es) {
+            std::vector<T> copy;
+            const T       *host = src;
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                copy.resize(n);
+                if (cudaMemcpy(copy.data(), src, n * sizeof(T), cudaMemcpyDeviceToHost) != cudaSuccess) {
+                    SFEM_ERROR("RelaxationGroups: copying a stress slot from the device failed\n");
+                }
+                host = copy.data();
+            }
+#else
+            (void)es;
+#endif
+            return std::vector<real_t>(host, host + n);
+        }
+    }  // namespace
+
+    void RelaxationGroups::decode_history(const std::string &block_name,
+                                          const std::string &group,
+                                          const int          i,
+                                          real_t *const      values) const {
+        const Block           &b = block(block_name);
+        const size_t           g = group_index(group);
+        const PronyRelaxation &r = *b.groups[g];
+        const ptrdiff_t        n = static_cast<ptrdiff_t>(r.n_components()) * r.n_qp() * r.n_elements();
+        if (b.stress.empty()) {
+            const std::vector<real_t> none(n, real_t(0));
+            r.decode_history(i, values, none.data(), none.data());
+            return;
+        }
+        const auto slot = [&](const int s) {
+            return narrow(b, g) ? slot_on_host(b.stress[s][g].narrow->data(), n, es_) : slot_on_host(b.stress[s][g].full->data(), n, es_);
+        };
+        const std::vector<real_t> S_n = slot(0), S_prev = slot(1);
+        r.decode_history(i, values, S_n.data(), S_prev.data());
+    }
+
     std::vector<std::string> RelaxationGroups::block_names() const {
         std::vector<std::string> names;
         for (const auto &entry : blocks_) names.push_back(entry.first);
@@ -293,7 +345,7 @@ namespace sfem {
         for (const auto &entry : blocks_) {
             for (const auto &group : entry.second.groups) {
                 ret.history += group->history_bytes();
-                ret.increment += group->increment_bytes();
+                ret.reference += group->reference_bytes();
                 ret.frozen += group->frozen_bytes();
             }
             for (const auto &slots : entry.second.stress) {
@@ -326,7 +378,8 @@ namespace sfem {
         if (!node.has_child("relaxation")) return;
 
         static const char *const keys[] = {
-                "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean", "stress_storage"};
+                "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean", "stress_storage",
+                "remainder_horizon"};
 
         for (auto group_node : node["relaxation"].children()) {
             const auto        key   = group_node.key();
@@ -340,7 +393,7 @@ namespace sfem {
                 for (const char *const allowed : keys) known = known || name == allowed;
                 if (!known) {
                     SFEM_ERROR("relaxation.%s: unknown key \"%s\" (expected prony, integrator, wlf, temperature, "
-                               "history_storage, history_elements_per_mean, stress_storage)\n",
+                               "history_storage, history_elements_per_mean, stress_storage, remainder_horizon)\n",
                                group.c_str(),
                                name.c_str());
                 }
@@ -383,6 +436,9 @@ namespace sfem {
                         SFEM_ERROR("relaxation.%s.stress_storage: full or float32, not %s\n", group.c_str(), to_string(storage));
                     }
                     options.stress_storage = storage;
+                }
+                if (group_node.has_child("remainder_horizon")) {
+                    options.remainder_horizon = read_real(group_node, "remainder_horizon");
                 }
                 if (group_node.has_child("history_elements_per_mean")) {
                     options.history_elements_per_mean = static_cast<int>(read_real(group_node, "history_elements_per_mean"));

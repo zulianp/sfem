@@ -20,7 +20,8 @@ namespace sfem {
 
     int cu_prony_max_terms();
 
-    /// out = sum_i alpha_i H_i - b_sum * S_n.
+    /// out = sum_i alpha_i H_i - b_sum * S_n.  `beta` (host, per term, null for none) and `ref`
+    /// (device, the stress type): the remainder form of `prony::frozen_history`.
     int cu_prony_frozen_history(const HistoryStorage storage,
                                 const int            n_terms,
                                 const ptrdiff_t      rows,
@@ -33,9 +34,12 @@ namespace sfem {
                                 const void *const    S_n,
                                 real_t *const        out,
                                 const prony::Means  &means,
+                                const real_t *const  beta,
+                                const void *const    ref,
                                 void *const          stream);
 
-    /// H_i <- alpha_i H_i + b_i (S_new - S_n), re-encoding H_i with a fresh scale.
+    /// H_i <- alpha_i H_i + b_i (S_new - S_n), re-encoding H_i with a fresh scale; with `beta`
+    /// and `ref`, the remainder form of `prony::advance`.
     int cu_prony_advance(const HistoryStorage storage,
                          const int            n_terms,
                          const ptrdiff_t      rows,
@@ -48,20 +52,9 @@ namespace sfem {
                          void *const          H,
                          scaling_t *const     H_scales,
                          const prony::Means  &means,
+                         const real_t *const  beta,
+                         const void *const    ref,
                          void *const          stream);
-
-    /// H <- factor H, re-encoded.
-    ///
-    /// The mean-deviation formats (`means` non-empty) take the means of the tensors H holds,
-    /// device pointers, and update them with the codes.
-    int cu_prony_scale(const HistoryStorage storage,
-                       const ptrdiff_t      rows,
-                       const ptrdiff_t      n,
-                       const real_t         factor,
-                       void *const          H,
-                       scaling_t *const     H_scales,
-                       const prony::Means  &means,
-                       void *const          stream);
 
     /// out = (float) in: a relaxed stress into a float32 slot.
     int cu_prony_narrow(const ptrdiff_t n, const real_t *const in, float *const out, void *const stream);

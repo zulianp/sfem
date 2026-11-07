@@ -75,10 +75,6 @@ namespace sfem {
         /// tensor and one storage format; `src` may be this store.
         void copy_tensor(const QuadratureState &src, const int from, const int to, void *const stream = nullptr);
 
-        /// Multiply tensor `t` by `factor`, re-encoding it (and recomputing its
-        /// scales) in the store's format.
-        void scale_tensor(const int t, const real_t factor, void *const stream = nullptr);
-
         /// Encode tensor `t` from the real_t array `values` (laid out
         /// [c][q][e]), recomputing its scales.
         void encode(const int t, const real_t *const values);

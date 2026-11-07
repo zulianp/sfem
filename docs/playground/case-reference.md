@@ -100,6 +100,8 @@ material:
                                     # | float16_md | int8_md (a float mean per group, the deviations coded)
       history_elements_per_mean: 16 # *_md on one-point elements: the elements a mean is taken over (power of two, <= 64)
       stress_storage: full          # the two relaxed-stress slots kept between steps: full | float32
+      remainder_horizon: 0.18       # reduced history_storage: the terms with tau a_T above it (s) are stored
+                                    # as remainders G = H - g (S_n - R); default the run's span, 0 for none
       wlf: {C1: 17.4, C2: 51.6, T_ref: 20}   # optional time-temperature shift
       temperature: 20
 ```
