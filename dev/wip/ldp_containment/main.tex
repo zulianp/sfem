@@ -63,13 +63,13 @@ iteration by up to \singleMax\%. Then the FF200 valves run through \trStrokes{} 
 transient contact with a 15-term Prony series, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
 on one GPU. There the viscoelastic history, not the tangent, dominates the operator's memory: in
 double precision it takes \hsStateOverTangent{} times the bytes of the single-precision tangent.
-Storing the history and the stress slots it keeps between steps in single precision moves the
-solution no more than repeated runs differ and takes FF200's history from \hsStateFullMB{} to
-\hsStateSingleSlotsMB\,MB. Narrower codes round away updates of the slowly relaxing terms, a
-quarter of them with 8 bits. Storing per element an average in single precision and 8-bit deviations from it keeps
-them, and is \hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more accurate than 8-bit codes
-alone on elements with several quadrature points, and \hsValveMdGain{} times on the valves'
-one-point tetrahedra, at \hsStateMdSlotsMB\,MB.
+Narrow codes round away the updates of the terms that relax slowly. Storing such a term as its
+remainder from the history it would hold if it did not relax, measured from the stress at which
+the history was last zero, makes every narrow format \hsRemGainMin{} to \hsRemGainMax{} times
+more accurate on a twisted bar of HEX8, HEX27, TET10 and TET4 elements. With 16-bit codes,
+these remainders and single-precision stress slots, FF200's history takes
+\hsStateSixteenSlotsMB{} instead of \hsStateFullMB\,MB and moves the solution less than the Newton
+tolerance itself does.
 \end{abstract}
 
 \maketitle
@@ -587,18 +587,20 @@ step of length $\Delta t$ in which $S$ varies linearly,
 \begin{equation}
   H_i^{n+1} = \alpha_i H_i^n + b_i\bigl(S^{n+1} - S^n\bigr),\qquad
   \alpha_i = e^{-\Delta t/\tau_i},\quad b_i = g_i\frac{\tau_i}{\Delta t}(1-\alpha_i),
+  \label{eq:prony}
 \end{equation}
 and within the step the history the element kernels read,
-$S^{\mathrm{hist}} = \sum_i\alpha_iH_i^n - \bigl(\sum_ib_i\bigr)S^n$, is fixed. A term whose $\alpha_i$
-lies below half a unit of double precision relaxes completely within the step; such terms keep no
-tensor of their own but a coefficient on one increment $D=S^{n+1}-S^n$ that they share. At the strokes'
-step \hsStored{} of the 15 terms keep a tensor. $S^n$ and $S^{n+1}$ are evaluated from the
-displacements at the two ends of a step into two slots kept between steps, so that the next step
-starts from the very tensor this one ended at and the increments telescope. The persistent state
-per relaxation group is therefore the $H_i$, $D$, $S^{\mathrm{hist}}$ and the two slots.
-Table~\ref{tab:prony-memory} gives their bytes on FF200 (\hsElements{} tetrahedra, one quadrature
-point each): \hsStateFullMB\,MB in double precision, \hsStateOverTangent{} times the
-single-precision tangent of Section~\ref{sec:problem} and more than the tangent in double.
+$S^{\mathrm{hist}} = \sum_i\alpha_iH_i^n - \bigl(\sum_ib_i\bigr)S^n$, is fixed. $S^n$ and $S^{n+1}$
+are evaluated from the displacements at the two ends of a step into two slots kept between steps,
+so that the next step starts from the very tensor this one ended at and the increments telescope.
+A term whose $\alpha_i$ lies below half a unit of double precision relaxes completely within the
+step; it keeps no tensor of its own but a coefficient on the last increment $S^n-S^{n-1}$, which the
+two slots hold. At the strokes' step \hsStored{} of the 15 terms keep a tensor. The persistent state
+per relaxation group is therefore the $H_i$, $S^{\mathrm{hist}}$, the two slots and, below, one
+reference stress $R$. Table~\ref{tab:prony-memory} gives their bytes on FF200 (\hsElements{}
+tetrahedra, one quadrature point each): \hsStateFullMB\,MB in double precision,
+\hsStateOverTangent{} times the single-precision tangent of Section~\ref{sec:problem} and more than
+the tangent in double.
 
 \paragraph{Formats.} Arithmetic stays in double; only the store is narrowed. Single precision
 rounds each value. The scaled formats keep one single-precision scale per term and element: int8
@@ -615,9 +617,27 @@ applies to the history: per term, component and group of points, the average $\b
 precision, and per element the deviations $H-\bar H$ in int8 or scaled float16 under one scale.
 Decoding is $\bar H + s\,c$. A group is an element's quadrature points; on elements with one point
 it is a run of $P$ consecutive elements, neighbours since the meshes are ordered along a
-space-filling curve. The part of an update shared by the group lands in $\bar H$, so a slow drift is
-not rounded away. Encoding takes three passes over the values instead of two: the averages, the
+space-filling curve. Encoding takes three passes over the values instead of two: the averages, the
 deviations' scale, and the codes.
+
+\paragraph{Remainder form.} A term that barely relaxes over the simulated span $T$, $\tau_i\gg T$,
+has $\alpha_i\approx1$ and $b_i\approx g_i$, so by~\eqref{eq:prony} its history stays close to
+$g_i(S^n-R)$, $R$ the relaxed stress at which it was last zero: the start of the run, or of a
+restart from rest. The quantity a code must resolve is the remainder
+\begin{equation}
+  G_i = H_i - g_i\bigl(S^n - R\bigr),\qquad
+  G_i^{n+1} = \alpha_iG_i^n + \bigl(\alpha_ig_i - b_i\bigr)\bigl(S^n-R\bigr) + \bigl(b_i - g_i\bigr)\bigl(S^{n+1}-R\bigr),
+\end{equation}
+which is~\eqref{eq:prony} rewritten, not an approximation, and a small fraction of $H_i$. Every
+narrow format stores the terms with $\tau_i a_T>T$ ($a_T$ the time--temperature shift) this way
+and reads $H_i = G_i + g_i(S^n-R)$; a shift that moves a term across $T$ re-expresses its store,
+$G_i\leftarrow G_i\pm g_i(S^n-R)$. $R$ is kept once per group in the slots' precision. It only
+reparametrises the store, so its own rounding costs nothing; without it, taken as zero, $G_i$ would
+hold $g_iR$, larger than $H_i$ itself on a valve prestressed by its seat. In the strokes ($T=$
+\SI{0.18}{\second}) two of the \hsStored{} stored terms ($\tau=\SI{1.61e3}{}$ and
+\SI{12.9}{\second}) are remainders, in the bar ($T=\SI{1}{\second}$) the same two. A term that
+relaxes within the span, such as $\tau=\SI{0.153}{\second}$ in the bar, is not: its history leaves
+$g_i(S^n-R)$, and a remainder would be larger than $H_i$.
 
 \paragraph{Stress slots in single precision.} The kernel that evaluates $S$ writes it in double to a
 scratch that exists only during the evaluation; it is rounded once into a single-precision slot,
@@ -627,8 +647,8 @@ double: it is read by every element kernel, whose interface carries one scalar t
 
 \begin{table}
 \caption{FF200's persistent Prony state by part (MB) per storage of the stress slots and the
-history, against the tangent and the mesh. Means over 16 elements for the average-and-deviation
-format.}
+history, against the tangent and the mesh. The narrow formats store the two slow terms as
+remainders; $R$ is their reference stress. Averages over runs of 16 elements.}
 \label{tab:prony-memory}
 \small
 \setlength{\tabcolsep}{3.5pt}
@@ -646,36 +666,50 @@ curvature, Newton repeats the iteration on the tangent whose derivative of the f
 Piola--Kirchhoff stress by the deformation gradient, $\partial P/\partial F$, has at every
 quadrature point its eigenvalues replaced by their absolute values~\cite{chen2024abs,longva2023},
 and takes the tangent itself back after a full step. No step is cut back, and on Grace the runs
-reproduce to a median displacement difference of \hsTorsionNoiseMax\%, so the comparison measures the
-storage alone. Table~\ref{tab:prony-torsion}
-gives, per format, the median over 72 instants of
-$e_u = 100\,\lVert u - u_{\mathrm{double}}\rVert_2/\lVert u_{\mathrm{double}}\rVert_2$ (in percent) on
-HEX8 (eight quadrature points), TET10 (eleven) and TET4 (one, averages over 16 elements), and the
-share of updates a format rounds away. int8 loses \hsLostInt\% of them on HEX8 and float16
-\hsLostHalf\%; their error grows through the twist and jumps when the released bar recovers from the
-stress the history holds (Figure~\ref{fig:prony-torsion}). With an average, int8 loses \hsLostMd\% and is
-\hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more accurate on HEX8 and TET10, float16
-\hsTorsionHalfGainMin{} to \hsTorsionHalfGainMax{} times. On TET4, whose average is over neighbouring
-elements, the gain is \hsTorsionTetGain-fold. On the finer HEX8 mesh int8 with averages takes
-\hsTorsionMdBytes\,MB for $H_i$ and $D$ against float16's \hsTorsionHalfBytes\,MB, at about twice
-float16's error. In the relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, left) the medians
-order the formats as $e_u$ does; they jump at the release and grow to the end, where float16 with
-averages reaches \hsInfMaxHalfMd\% on the finer HEX8 mesh against float16's \hsInfMaxHalf\%.
+reproduce to a median displacement difference of \hsTorsionNoiseMax\%. The Newton tolerance moves the
+HEX8 solution by \hsTolTorsion\% in the median (\hsTolTorsionMax\% at most) against the same run at
+\SI{1e-9}{\newton}, and the narrow formats' errors are the same at either tolerance: the comparison
+measures the storage. Four elements discretise the bar: HEX8 (eight quadrature points), HEX27 (64), TET10
+(eleven) and TET4 (one, averages over 16 elements), the first three on meshes with the same nodes.
+Table~\ref{tab:prony-torsion} gives, per format, the median over 72 instants of
+$e_u = 100\,\lVert u - u_{\mathrm{double}}\rVert_2/\lVert u_{\mathrm{double}}\rVert_2$ (in percent),
+with the history stored as itself ($H$) and with the slow terms as remainders ($G$).
+
+Stored as itself, int8 rounds away \hsLostIntHexF\% of the updates on HEX8 and float16
+\hsLostHalfHexF\%; their error grows through the twist and jumps when the released bar recovers from
+the stress the history holds (Figure~\ref{fig:prony-torsion}). Averages keep the updates: int8 with
+averages loses \hsLostMdHexF\%. The remainder form makes every narrow format \hsRemGainMin{} to
+\hsRemGainMax{} times more accurate on the four meshes, and \hsRemGainCoarseMin{} to
+\hsRemGainCoarseMax{} times on the coarser HEX8 and HEX27 meshes (\hsDofsHexC{} dofs): int16 from
+\hsTorsionSixteenPlainMin{}--\hsTorsionSixteenPlainMax\% to \hsTorsionSixteenMin{}--\hsTorsionSixteenMax\%,
+float16 with averages from \hsTorsionHalfMdPlainMin{}--\hsTorsionHalfMdPlainMax\% to
+\hsTorsionHalfMdMin{}--\hsTorsionHalfMdMax\%, int8 with averages from
+\hsTorsionMdPlainMin{}--\hsTorsionMdPlainMax\% to \hsTorsionMdMin{}--\hsTorsionMdMax\%. The gains of the two
+add up: as remainders, averages make int8 \hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more
+accurate on the elements with several points, \hsTorsionTetGain{} times on TET4, whose average is over
+neighbouring elements. In the relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, left) the
+medians order the formats as $e_u$ does; float16 with averages reaches \hsInfMaxHalfMd\% on HEX8,
+against \hsInfMaxHalfMdPlain\% as itself. $R$ adds \hsTorsionReferenceMB\,MB on the HEX8 mesh, in
+the slots' double here, to int16's \hsTorsionSixteenMB\,MB of $H_i$.
 
 \begin{table*}
 \caption{The bar in torsion on Grace: median $e_u$ against double storage per history format and
-mesh (dofs), the bytes of $H_i$ and $D$ on the finer HEX8 mesh, and the share of the history updates
-the format rounds away there. a.+d.: average and deviation.}
+mesh (dofs), the history stored as itself ($H$) and with the slow terms as remainders ($G$); on
+HEX8 the bytes of $H_i$ and $R$ with the remainders, and the share of the history updates the format
+rounds away stored as itself. a.+d.: average and deviation.}
 \label{tab:prony-torsion}
 \small
+\setlength{\tabcolsep}{3.5pt}
 \input{tables/prony_torsion}
 \end{table*}
 
 \begin{figure}[t]
 \centering
 \input{figures/prony_torsion}
-\caption{$e_u(t)$ on the finer HEX8 bar (\hsDofsHexF{} dofs) per history format; the twist is held
-from \SI{0.5}{\second} and released at \SI{0.65}{\second}.}
+\caption{$e_u(t)$ on the HEX8 bar (\hsDofsHexF{} dofs) per history format with the slow terms as
+remainders; the light lines store the history as itself. Grey: double at the Newton tolerance of
+\SI{1e-6}{\newton} against double at \SI{1e-9}{\newton}, the solver's own error. The twist is held from \SI{0.5}{\second}
+and released at \SI{0.65}{\second}.}
 \label{fig:prony-torsion}
 \end{figure}
 
@@ -683,47 +717,57 @@ from \SI{0.5}{\second} and released at \SI{0.65}{\second}.}
 \centering
 \input{figures/prony_infinity}
 \caption{$\lVert u-u_{\mathrm{double}}\rVert_\infty/\lVert u_{\mathrm{double}}\rVert_\infty$ per history
-format over the 72 instants: the median (marks) and the range from the smallest to the largest
-(shaded). Left the bar in torsion per mesh (dofs), right the valves (stress slots in double,
-averages over 16 elements). a.+d.: average and deviation.}
+format with the slow terms as remainders over the 72 instants: the median (marks) and the range
+from the smallest to the largest (bars), one mark per mesh. Left the bar in torsion per mesh (dofs), right the
+valves per mesh (stress slots in double, averages over 16 elements on TET4). a.+d.: average and
+deviation.}
 \label{fig:prony-infinity}
 \end{figure*}
 
 \subsection{The valves}
 
-Table~\ref{tab:prony-valves} repeats FF200's four strokes on one GPU per storage with the
-non-monotone line search of Section~\ref{sec:strokes}, so no step is cut back. Two runs in double
-differ by a median $e_u$ of \hsValveNoise\% and by at most \hsValveMaxNoise\%, although
-the GPU assembles with atomic additions. Single precision for
-the history (\hsValveSingle\%), the slots (\hsValveFullSlots\%) or both (\hsValveSingleSlots\%) stays at
-that floor; the 16-bit formats lie \hsValveSixteen{} to \hsValveHalf\%, int8 at \hsValveInt\%. Averages
-over runs of 16 elements make int8 \hsValveMdGain{} times more accurate (\hsValveMd\%), over runs of 4
-\hsValveMdFourGain{} times, less than on the bar: neighbouring elements of a valve in contact differ
-more than the points of one element. float16 with averages is \hsValveHalfMdGain{} times more accurate
-than float16 (\hsValveHalfMd\%). The relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, right)
-orders the formats as $e_u$ does; its largest values come with the impacts: \hsInfValveNoiseMax\% for
-the repeat in double, \hsInfValveHalfMdMax\% and \hsInfValveHalfMax\% for float16 with and without
-averages, \hsInfValveMdMax\% and \hsInfValveIntMax\% for int8. Every run takes \hsValveTimeMin{} to
-\hsValveTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's two passes over the
-history: averages make them \hsCostMdHost{} times as expensive as int8 on Grace and \hsCostMdDevice{}
-times on the GPU, \hsCostMdDeviceUs\,\si{\micro\second} on FF200's size, \hsCostShare\% of a stroke
-step's \hsStepMs\,\si{\milli\second}.
+Table~\ref{tab:prony-valves} repeats FF200's \trStrokes{} strokes on one GPU per storage, on the
+TET4 mesh and on its TET10 promotion (\hsTenDofs{} dofs). An impact compresses the quadratic elements
+until the contact QP is indefinite: MPRGP meets negative curvature, which comes from the obstacle's
+curvature term $-\mu_i\nabla^2\mathrm{gap}_i$. There Newton repeats the iteration on the tangent
+projected to positive semidefinite, the material's per quadrature point as in the bar and each
+contact node's $3\times3$ curvature block without its negative eigenvalues, and takes the tangent
+back after a full step: the first impact converges in 8 iterations instead of 20, and no step is
+cut back on either mesh. Two runs in double differ by a median $e_u$ of \hsValveNoise\% on TET4 and
+\hsTenNoise\% on TET10. The Newton tolerance of \SI{1e-6}{\newton} itself moves the TET4 solution
+by more: against the same run at \SI{1e-9}{\newton}, \hsTolValve\% in the median and
+\hsTolValveMax\% at most over the first \hsTolValveWindowMs\,\si{\milli\second} (the tighter
+tolerance cannot be met at the impact after). Single precision for the history or the slots stays
+within that, and so does int16 with remainders (\hsValveSixteen\% on TET4, \hsTenSixteen\% on TET10),
+with float32 slots too (\hsValveSixteenSlots\% and \hsTenSixteenSlots\%): FF200's state then takes
+\hsStateSixteenSlotsMB\,MB instead of \hsStateFullMB, \hsStateSixteenSlotsShare\% of it, and on TET10
+\hsTenStateSixteenSlotsMB{} instead of \hsTenStateFullMB\,MB. The remainders make float16
+\hsValveHalfPlain\% $\to$ \hsValveHalf\%, float16 with averages \hsValveHalfMdPlain\% $\to$
+\hsValveHalfMd\% and int8 with averages \hsValveMdPlain\% $\to$ \hsValveMd\% on TET4, and
+\hsTenMdPlain\% $\to$ \hsTenMd\% on TET10; on the valves' one-point tetrahedra the neighbours a mean
+spans differ more than the points of one element, and 8-bit codes stay above the floor. The
+relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, right) orders the formats as $e_u$ does.
+Every TET4 run takes \hsValveTimeMin{} to \hsValveTimeMax\,\si{\second}, every TET10 run
+\hsTenTimeMin{} to \hsTenTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's
+two passes over the history: the remainders make int16's \hsCostRemHost{} times as expensive on
+Grace and \hsCostRemDevice{} times on the GPU, \hsCostSixteenDeviceUs\,\si{\micro\second} on FF200's
+size, \hsCostShare\% of a stroke step's \hsStepMs\,\si{\milli\second}.
 
-\begin{table}
+\begin{table*}
 \caption{FF200 through \trStrokes{} strokes on one GPU per storage of the history and of the stress
-slots: the Prony state (MB), the median $e_u$ against the first run in double, steps, failed
-attempts and the time stepping took (\si{\second}). The first row repeats that run; a.+d.\ $P$: average
-and deviation over runs of $P$ elements.}
+slots: the Prony state (MB) and the median $e_u$ (\%) against the first run in double, the history
+stored as itself ($H$) and with the slow terms as remainders ($G$, the MB). The first row repeats
+that run. a.+d.: average and deviation, over runs of 16 elements on TET4.}
 \label{tab:prony-valves}
 \small
-\setlength{\tabcolsep}{2.5pt}
 \input{tables/prony_valves}
-\end{table}
+\end{table*}
 
 \begin{table*}
 \caption{A step's two passes over the history (\si{\micro\second}, the frozen history and the update)
-per format: the valves' series at $\Delta t=\SI{0.1}{\milli\second}$, four stored terms and $D$,
-on a synthetic smooth stress (drivers/bench/bench\_prony\_history).}
+per format, with the remainder form: the valves' series at $\Delta t=\SI{0.1}{\milli\second}$, four
+stored terms, two of them remainders, on a synthetic smooth stress
+(drivers/bench/bench\_prony\_history), per points per element and elements.}
 \label{tab:prony-cost}
 \small
 \input{tables/prony_cost}
@@ -737,7 +781,8 @@ The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for
 a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
 valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
 without a step-size study.
-The frozen history $S^{\mathrm{hist}}$ stays in double.
+The frozen history $S^{\mathrm{hist}}$ stays in double, and the remainder form's horizon is the
+simulated span, which a solver advancing without a known end would have to choose.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}

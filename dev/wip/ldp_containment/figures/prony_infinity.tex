@@ -6,47 +6,73 @@
   width=0.5\textwidth, height=6.0cm,
   legend style={font=\scriptsize, at={(0.5,1.03)}, anchor=south, legend columns=-1, draw=none}]
 \nextgroupplot[title={torsion bar}, title style={font=\footnotesize},
-  symbolic x coords={t0,t1,t2,t3,t4,t5,t6}, xtick=data, xticklabels={{double, repeat},{float32},{int16},{float16},{int8},{float16 a.+d.},{int8 a.+d.}},
+  xmin=-0.5, xmax=6.5, xtick={0,1,2,3,4,5,6}, xticklabels={{double, repeat},{float32},{int16},{float16},{int8},{float16 a.+d.},{int8 a.+d.}},
+  extra x ticks={0.5,1.5,2.5,3.5,4.5,5.5}, extra x tick labels={}, extra x tick style={grid=major, major grid style={draw=gray!50}},
   ylabel={$\lVert u-u_{\mathrm{double}}\rVert_\infty/\lVert u_{\mathrm{double}}\rVert_\infty$ (\%)},
   ymode=log, ytickten={-14,-12,...,2}, minor ytick={1e-13,1e-11,1e-9,1e-7,1e-5,1e-3,1e-1,1e1},
-  ymajorgrids, yminorgrids, xmajorgrids,
+  ymajorgrids, yminorgrids,
   major grid style={draw=gray!60, line width=0.3pt},
   minor grid style={draw=gray!40, line width=0.2pt, opacity=0.5},
   xticklabel style={font=\scriptsize, rotate=35, anchor=north east, inner sep=1pt},
   tick label style={font=\scriptsize}, label style={font=\footnotesize},
-  enlarge x limits=0.06, ymin=1e-14, ymax=1e3,]
-\addplot[draw=none, name path=hitorsionHEX840, forget plot] coordinates {(t0,3.7330e-06) (t1,2.4888e-05) (t2,1.7860e-01) (t3,1.0833e+00) (t4,9.4473e+01) (t5,1.6250e-01) (t6,9.2661e+00)};
-\addplot[draw=none, name path=lotorsionHEX840, forget plot] coordinates {(t0,9.0024e-14) (t1,2.3467e-08) (t2,3.2127e-05) (t3,4.4503e-04) (t4,2.0016e-02) (t5,2.2639e-05) (t6,1.2772e-03)};
-\addplot[fill=LdpA, fill opacity=0.15, draw=none, forget plot] fill between[of=hitorsionHEX840 and lotorsionHEX840];
-\addplot[LdpA, semithick, mark=*, mark size=1.2pt] coordinates {(t0,1.3007e-10) (t1,8.6353e-08) (t2,1.5110e-03) (t3,5.9350e-03) (t4,5.9161e-01) (t5,6.0441e-04) (t6,5.8405e-02)};
-\addlegendentry{HEX8, \num{9963}}
-\addplot[draw=none, name path=hitorsionHEX880, forget plot] coordinates {(t0,2.3072e-07) (t1,3.1500e-05) (t2,2.2196e-01) (t3,3.3690e+00) (t4,8.8234e+01) (t5,3.3606e-02) (t6,2.4531e+00)};
-\addplot[draw=none, name path=lotorsionHEX880, forget plot] coordinates {(t0,2.4126e-14) (t1,9.2498e-09) (t2,2.7604e-05) (t3,1.0594e-04) (t4,1.9207e-02) (t5,3.9215e-06) (t6,4.7238e-04)};
-\addplot[fill=LdpB, fill opacity=0.15, draw=none, forget plot] fill between[of=hitorsionHEX880 and lotorsionHEX880];
-\addplot[LdpB, semithick, mark=*, mark size=1.2pt] coordinates {(t0,3.9699e-11) (t1,5.7459e-08) (t2,1.4426e-03) (t3,3.8052e-03) (t4,5.8690e-01) (t5,1.2367e-04) (t6,1.1352e-02)};
+  ymin=1e-14, ymax=1e3,]
+\addplot[LdpA, only marks, mark=*, mark size=1.3pt] coordinates {(-0.240,1.3598e-10) (0.760,1.2191e-08) (1.760,2.0933e-04) (2.760,1.1221e-03) (3.760,9.9437e-02) (4.760,2.1902e-05) (5.760,1.2953e-03)};
 \addlegendentry{HEX8, \num{70227}}
-\addplot[draw=none, name path=hitorsionTET1040, forget plot] coordinates {(t0,4.3513e-05) (t1,6.8692e-05) (t2,1.8095e-01) (t3,5.0601e+00) (t4,9.3025e+01) (t5,2.0959e-01) (t6,6.1903e+00)};
-\addplot[draw=none, name path=lotorsionTET1040, forget plot] coordinates {(t0,2.1914e-11) (t1,9.6374e-09) (t2,2.5860e-05) (t3,6.6160e-05) (t4,2.0097e-02) (t5,1.1195e-05) (t6,1.5003e-03)};
-\addplot[fill=LdpC, fill opacity=0.15, draw=none, forget plot] fill between[of=hitorsionTET1040 and lotorsionTET1040];
-\addplot[LdpC, semithick, mark=*, mark size=1.2pt] coordinates {(t0,9.9572e-10) (t1,4.0047e-08) (t2,1.8897e-03) (t3,3.4727e-03) (t4,5.9612e-01) (t5,2.6382e-04) (t6,2.2846e-02)};
+\draw[LdpA, semithick] (axis cs:-0.240,3.2736e-14) -- (axis cs:-0.240,4.4892e-07);
+\draw[LdpA, semithick] (axis cs:0.760,4.0044e-09) -- (axis cs:0.760,5.0767e-07);
+\draw[LdpA, semithick] (axis cs:1.760,1.1505e-05) -- (axis cs:1.760,4.0898e-02);
+\draw[LdpA, semithick] (axis cs:2.760,9.6086e-05) -- (axis cs:2.760,1.8359e-01);
+\draw[LdpA, semithick] (axis cs:3.760,6.6645e-03) -- (axis cs:3.760,4.3134e-01);
+\draw[LdpA, semithick] (axis cs:4.760,3.0727e-06) -- (axis cs:4.760,2.7313e-03);
+\draw[LdpA, semithick] (axis cs:5.760,2.0852e-04) -- (axis cs:5.760,8.3513e-02);
+\addplot[LdpB, only marks, mark=*, mark size=1.3pt] coordinates {(-0.080,5.7922e-10) (0.920,1.2343e-08) (1.920,4.5448e-04) (2.920,9.2687e-04) (3.920,1.0151e-01) (4.920,8.4007e-05) (5.920,9.0953e-03)};
+\addlegendentry{HEX27, \num{70227}}
+\draw[LdpB, semithick] (axis cs:-0.080,3.6318e-11) -- (axis cs:-0.080,4.8878e-06);
+\draw[LdpB, semithick] (axis cs:0.920,4.2734e-09) -- (axis cs:0.920,2.6101e-06);
+\draw[LdpB, semithick] (axis cs:1.920,8.2169e-06) -- (axis cs:1.920,9.8154e-02);
+\draw[LdpB, semithick] (axis cs:2.920,6.2106e-05) -- (axis cs:2.920,1.2231e-01);
+\draw[LdpB, semithick] (axis cs:3.920,7.1808e-03) -- (axis cs:3.920,4.6296e-01);
+\draw[LdpB, semithick] (axis cs:4.920,1.2062e-05) -- (axis cs:4.920,1.2694e-02);
+\draw[LdpB, semithick] (axis cs:5.920,7.3505e-04) -- (axis cs:5.920,8.4448e-01);
+\addplot[LdpC, only marks, mark=*, mark size=1.3pt] coordinates {(0.080,1.2756e-09) (1.080,1.1059e-08) (2.080,3.4901e-04) (3.080,1.0106e-03) (4.080,1.0533e-01) (5.080,3.6563e-05) (6.080,3.7295e-03)};
 \addlegendentry{TET10, \num{70227}}
-\addplot[draw=none, name path=hitorsionTET440, forget plot] coordinates {(t0,1.6931e-05) (t1,4.3453e-05) (t2,1.1536e+00) (t3,4.5203e+00) (t4,8.6247e+01) (t5,8.1204e-01) (t6,2.5036e+01)};
-\addplot[draw=none, name path=lotorsionTET440, forget plot] coordinates {(t0,6.7330e-12) (t1,1.5995e-08) (t2,8.5286e-06) (t3,1.3361e-04) (t4,4.8765e-02) (t5,2.5095e-05) (t6,4.7141e-03)};
-\addplot[fill=LdpD, fill opacity=0.15, draw=none, forget plot] fill between[of=hitorsionTET440 and lotorsionTET440];
-\addplot[LdpD, semithick, mark=*, mark size=1.2pt] coordinates {(t0,8.2798e-10) (t1,5.5727e-08) (t2,2.0335e-03) (t3,6.4211e-03) (t4,7.0816e-01) (t5,1.2990e-03) (t6,2.0109e-01)};
+\draw[LdpC, semithick] (axis cs:0.080,6.1943e-12) -- (axis cs:0.080,4.8985e-05);
+\draw[LdpC, semithick] (axis cs:1.080,4.9882e-09) -- (axis cs:1.080,5.0155e-05);
+\draw[LdpC, semithick] (axis cs:2.080,1.1383e-05) -- (axis cs:2.080,6.2175e-02);
+\draw[LdpC, semithick] (axis cs:3.080,4.2143e-05) -- (axis cs:3.080,1.3883e-01);
+\draw[LdpC, semithick] (axis cs:4.080,7.0218e-03) -- (axis cs:4.080,4.6171e-01);
+\draw[LdpC, semithick] (axis cs:5.080,6.2786e-06) -- (axis cs:5.080,2.9384e-03);
+\draw[LdpC, semithick] (axis cs:6.080,6.7092e-04) -- (axis cs:6.080,2.8340e-01);
+\addplot[LdpD, only marks, mark=*, mark size=1.3pt] coordinates {(0.240,1.5467e-09) (1.240,1.8446e-08) (2.240,1.8988e-04) (3.240,1.2599e-03) (4.240,1.2062e-01) (5.240,2.1907e-04) (6.240,3.4332e-02)};
 \addlegendentry{TET4, \num{9963}}
-\nextgroupplot[title={FF200 valves, \num{150525} dofs}, title style={font=\footnotesize},
-  symbolic x coords={v0,v1,v2,v3,v4,v5,v6}, xtick=data, xticklabels={{double, repeat},{float32},{int16},{float16},{int8},{float16 a.+d.},{int8 a.+d.}},
+\draw[LdpD, semithick] (axis cs:0.240,8.3913e-12) -- (axis cs:0.240,4.1037e-05);
+\draw[LdpD, semithick] (axis cs:1.240,9.6970e-09) -- (axis cs:1.240,5.2188e-05);
+\draw[LdpD, semithick] (axis cs:2.240,4.4760e-06) -- (axis cs:2.240,9.0308e-03);
+\draw[LdpD, semithick] (axis cs:3.240,9.1801e-05) -- (axis cs:3.240,1.2527e-01);
+\draw[LdpD, semithick] (axis cs:4.240,1.6920e-02) -- (axis cs:4.240,1.8695e+01);
+\draw[LdpD, semithick] (axis cs:5.240,1.9400e-05) -- (axis cs:5.240,2.3083e-02);
+\draw[LdpD, semithick] (axis cs:6.240,1.8247e-03) -- (axis cs:6.240,1.7078e+00);
+\nextgroupplot[title={FF200 valves}, title style={font=\footnotesize},
+  xmin=-0.5, xmax=3.5, xtick={0,1,2,3}, xticklabels={{double, repeat},{int16},{float16 a.+d.},{int8 a.+d.}},
+  extra x ticks={0.5,1.5,2.5}, extra x tick labels={}, extra x tick style={grid=major, major grid style={draw=gray!50}},
   ymode=log, ytickten={-14,-12,...,2}, minor ytick={1e-13,1e-11,1e-9,1e-7,1e-5,1e-3,1e-1,1e1},
-  ymajorgrids, yminorgrids, xmajorgrids,
+  ymajorgrids, yminorgrids,
   major grid style={draw=gray!60, line width=0.3pt},
   minor grid style={draw=gray!40, line width=0.2pt, opacity=0.5},
   xticklabel style={font=\scriptsize, rotate=35, anchor=north east, inner sep=1pt},
   tick label style={font=\scriptsize}, label style={font=\footnotesize},
-  enlarge x limits=0.06, ymin=1e-14, ymax=1e3,]
-\addplot[draw=none, name path=hiFF200, forget plot] coordinates {(v0,3.8111e-04) (v1,9.6120e-04) (v2,8.2060e-04) (v3,3.0514e-01) (v4,1.1176e+01) (v5,3.0843e-02) (v6,9.7692e+00)};
-\addplot[draw=none, name path=loFF200, forget plot] coordinates {(v0,7.3418e-06) (v1,2.4987e-06) (v2,3.2772e-05) (v3,9.6305e-05) (v4,1.4554e-02) (v5,1.0445e-04) (v6,3.2606e-03)};
-\addplot[fill=black, fill opacity=0.15, draw=none, forget plot] fill between[of=hiFF200 and loFF200];
-\addplot[black, semithick, mark=*, mark size=1.2pt] coordinates {(v0,2.8813e-05) (v1,3.0072e-05) (v2,1.4837e-04) (v3,8.3279e-03) (v4,6.0379e-01) (v5,1.7939e-03) (v6,2.8571e-01)};
+  ymin=1e-14, ymax=1e3,]
+\addplot[LdpA, only marks, mark=*, mark size=1.3pt] coordinates {(-0.080,3.0923e-05) (0.920,4.9430e-05) (1.920,7.4466e-04) (2.920,1.1693e-01)};
+\addlegendentry{TET4, \num{150525}}
+\draw[LdpA, semithick] (axis cs:-0.080,6.1448e-06) -- (axis cs:-0.080,2.9212e-04);
+\draw[LdpA, semithick] (axis cs:0.920,1.6911e-05) -- (axis cs:0.920,1.3617e-03);
+\draw[LdpA, semithick] (axis cs:1.920,6.7840e-05) -- (axis cs:1.920,1.3075e-02);
+\draw[LdpA, semithick] (axis cs:2.920,1.5622e-03) -- (axis cs:2.920,3.1020e+00);
+\addplot[LdpB, only marks, mark=*, mark size=1.3pt] coordinates {(0.080,9.0726e-05) (1.080,1.1267e-04) (2.080,4.8800e-04) (3.080,4.7721e-02)};
+\addlegendentry{TET10, \num{1084416}}
+\draw[LdpB, semithick] (axis cs:0.080,1.7632e-05) -- (axis cs:0.080,6.5137e-04);
+\draw[LdpB, semithick] (axis cs:1.080,4.7110e-05) -- (axis cs:1.080,7.3795e-04);
+\draw[LdpB, semithick] (axis cs:2.080,7.7194e-05) -- (axis cs:2.080,6.1617e-03);
+\draw[LdpB, semithick] (axis cs:3.080,2.0249e-03) -- (axis cs:3.080,1.5942e-01);
 \end{groupplot}
 \end{tikzpicture}

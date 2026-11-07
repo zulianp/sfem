@@ -43,11 +43,16 @@ SAMPLES = 72
 
 
 def parse_run(name):
+    """format, repeat, elements per mean, stress slots and remainder form of a run named
+    <format>[_<repeat>][_p<elements per mean>][_plain][_s32]: _plain without the remainder form,
+    which every reduced format has otherwise, _s32 with float32 stress slots."""
     stress = "float32" if name.endswith("_s32") else "full"
     base = name[:-4] if name.endswith("_s32") else name
+    plain = base.endswith("_plain")
+    base = base[:-6] if plain else base
     m = re.match(r"^(.*?)(?:_([ab]))?(?:_p(\d+))?$", base)
     fmt, repeat, per_mean = m.group(1), m.group(2) or "a", int(m.group(3) or 0)
-    return fmt, repeat, per_mean, stress
+    return fmt, repeat, per_mean, stress, "no" if plain or fmt == "full" else "yes"
 
 
 def history(run, sub):
@@ -157,7 +162,7 @@ def runs(argv):
                     continue
                 shift = max(shift, abs(x["open"] - y["open"]), abs(x["close"] - y["close"]))
                 peak = max(peak, abs(x["peak"] - y["peak"]) / y["peak"])
-        fmt, repeat, per_mean, stress = parse_run(r)
+        fmt, repeat, per_mean, stress, remainder = parse_run(r)
         last = rows[-1]
         log = os.path.join(run, "run.log")
         row = {
@@ -167,6 +172,7 @@ def runs(argv):
             "repeat": repeat,
             "elements_per_mean": per_mean,
             "stress_storage": stress,
+            "remainder": remainder,
             "dofs": n_dofs,
             "steps": int(last["step"]),
             "failed": sum("attempt failed" in line for line in open(log)) if os.path.exists(log) else "",
@@ -181,12 +187,12 @@ def runs(argv):
             "event_shift_ms": "%.4g" % (1e3 * shift) if valves else "",
             "peak_rel": "%.4e" % peak if valves else "",
         }
-        for k in ("iso_stored", "bytes_history", "bytes_increment", "bytes_frozen", "bytes_stress", "host_peak_rss",
+        for k in ("iso_stored", "bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "host_peak_rss",
                   "device_used_peak", "updates", "updates_lost"):
             row[k] = int(float(last[k])) if k in last and last[k] != "" else ""
         out.append(row)
-        print("%-8s %-18s e_u median %s max %s  bytes H %s D %s F %s S %s" % (
-            a.set, r, row["e_u_median"], row["e_u_max"], row["bytes_history"], row["bytes_increment"],
+        print("%-8s %-18s e_u median %s max %s  bytes H %s R %s F %s S %s" % (
+            a.set, r, row["e_u_median"], row["e_u_max"], row["bytes_history"], row["bytes_reference"],
             row["bytes_frozen"], row["bytes_stress"]))
 
     for target, rows in ((a.out, out), (a.series, series)):
