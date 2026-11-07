@@ -168,6 +168,22 @@ namespace sfem {
                             const real_t *const relaxed_stress_n,
                             const real_t *const relaxed_stress_prev) const;
 
+        /// Per term, the sum over the points of the squared components of the committed H_i, the
+        /// components from `n_diagonal` on counted twice (a symmetric tensor's off-diagonal ones):
+        /// a probe's measure of the history, computed where the state lives. The stresses are those
+        /// `decode_history` takes, in the execution space and the slots' type; `out` is a host
+        /// array of n_terms.
+        void squared_norms(const real_t *const relaxed_stress_n,
+                           const real_t *const relaxed_stress_prev,
+                           const int           n_diagonal,
+                           real_t *const       out) const;
+#if SFEM_REAL_T_IS_FLOAT64
+        void squared_norms(const float *const relaxed_stress_n,
+                           const float *const relaxed_stress_prev,
+                           const int          n_diagonal,
+                           real_t *const      out) const;
+#endif
+
         /// Whether term `i` is stored as a remainder (the open or last step's choice).
         bool remainder(const int i) const { return slot_[i] >= 0 && slot_beta_[slot_[i]] != 0; }
 
@@ -212,6 +228,12 @@ namespace sfem {
         template <typename S_t>
         void take_reference(const S_t *const relaxed_stress_n);
 
+        template <typename S_t>
+        void squared_norms_typed(const S_t *const relaxed_stress_n,
+                                 const S_t *const relaxed_stress_prev,
+                                 const int        n_diagonal,
+                                 real_t *const    out) const;
+
         PronySeries                     series_;
         Options                         options_;
         int                             n_components_;
@@ -238,6 +260,10 @@ namespace sfem {
         std::vector<real_t>              slot_alpha_;
         std::vector<real_t>              slot_b_;
         std::shared_ptr<Buffer<real_t>>  history_;
+        //! squared_norms' device sums, one per term (allocated at its first call on the device).
+        mutable std::shared_ptr<Buffer<real_t>> norm_scratch_;
+        //! squared_norms' sums per slot, on the host.
+        mutable std::vector<real_t>             norm_slots_;
         std::vector<real_t>              alpha_;
         std::vector<real_t>              b_;
         real_t                           gamma_{1};

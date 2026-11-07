@@ -406,6 +406,104 @@ namespace sfem {
         }
     }
 
+    void PronyRelaxation::squared_norms(const real_t *const relaxed_stress_n,
+                                        const real_t *const relaxed_stress_prev,
+                                        const int           n_diagonal,
+                                        real_t *const       out) const {
+        squared_norms_typed(relaxed_stress_n, relaxed_stress_prev, n_diagonal, out);
+    }
+
+#if SFEM_REAL_T_IS_FLOAT64
+    void PronyRelaxation::squared_norms(const float *const relaxed_stress_n,
+                                        const float *const relaxed_stress_prev,
+                                        const int          n_diagonal,
+                                        real_t *const      out) const {
+        squared_norms_typed(relaxed_stress_n, relaxed_stress_prev, n_diagonal, out);
+    }
+#endif
+
+    template <typename S_t>
+    void PronyRelaxation::squared_norms_typed(const S_t *const relaxed_stress_n,
+                                              const S_t *const relaxed_stress_prev,
+                                              const int        n_diagonal,
+                                              real_t *const    out) const {
+        SFEM_TRACE_SCOPE("PronyRelaxation::squared_norms");
+        const int n_terms = series_.n_terms();
+        std::fill(out, out + n_terms, real_t(0));
+        if (n_elements_ == 0 || n_terms == 0) return;
+        const ptrdiff_t rows = static_cast<ptrdiff_t>(n_components_) * n_qp_;
+
+        // The stored terms, by slot; then the terms held as a coefficient on the last increment.
+        norm_slots_.assign(n_live_, real_t(0));
+        real_t *const slots     = norm_slots_.data();
+        real_t        increment = 0;
+        bool                any_coefficient = false;
+        for (int i = 0; i < n_terms; i++) any_coefficient = any_coefficient || (slot_[i] < 0 && coefficient_[i] != 0);
+#ifdef SFEM_ENABLE_CUDA
+        if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
+            if (!norm_scratch_) norm_scratch_ = create_buffer<real_t>(cu_prony_max_terms(), options_.execution_space);
+            if ((n_live_ > 0 && cu_prony_squared_norms(options_.history_storage,
+                                                       n_live_,
+                                                       rows,
+                                                       n_elements_,
+                                                       n_qp_,
+                                                       n_diagonal,
+                                                       H_->raw(),
+                                                       H_->scales(),
+                                                       H_->means_view(),
+                                                       slot_beta_.data(),
+                                                       (int)sizeof(S_t),
+                                                       relaxed_stress_n,
+                                                       reference<S_t>(),
+                                                       norm_scratch_->data(),
+                                                       slots,
+                                                       options_.stream) != SFEM_SUCCESS) ||
+                (any_coefficient && cu_prony_squared_increment(rows,
+                                                               n_elements_,
+                                                               n_qp_,
+                                                               n_diagonal,
+                                                               (int)sizeof(S_t),
+                                                               relaxed_stress_n,
+                                                               relaxed_stress_prev,
+                                                               norm_scratch_->data(),
+                                                               &increment,
+                                                               options_.stream) != SFEM_SUCCESS)) {
+                SFEM_ERROR("PronyRelaxation::squared_norms failed on the device\n");
+            }
+        } else
+#endif
+        {
+            if (n_live_ > 0) {
+                dispatch_history_codec(options_.history_storage, [&](auto h_codec) {
+                    using HCodec = decltype(h_codec);
+                    prony::squared_norms<HCodec>(n_live_,
+                                                 rows,
+                                                 n_elements_,
+                                                 n_qp_,
+                                                 n_diagonal,
+                                                 H_->data<HCodec>(),
+                                                 H_->scales(),
+                                                 H_->means_view(),
+                                                 slot_beta_.data(),
+                                                 relaxed_stress_n,
+                                                 reference<S_t>(),
+                                                 slots);
+                    return 0;
+                });
+            }
+            if (any_coefficient) {
+                increment = prony::squared_increment(rows, n_elements_, n_qp_, n_diagonal, relaxed_stress_n, relaxed_stress_prev);
+            }
+        }
+        for (int i = 0; i < n_terms; i++) {
+            if (slot_[i] >= 0) {
+                out[i] = slots[slot_[i]];
+            } else if (coefficient_[i] != 0) {
+                out[i] = coefficient_[i] * coefficient_[i] * increment;
+            }
+        }
+    }
+
     std::size_t PronyRelaxation::bytes() const { return history_bytes() + reference_bytes() + frozen_bytes(); }
 
     std::size_t PronyRelaxation::history_bytes() const { return H_ ? H_->bytes() : 0; }

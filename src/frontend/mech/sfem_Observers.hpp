@@ -36,8 +36,11 @@ namespace sfem {
         /// Collective.
         int gather_to(const std::shared_ptr<Mesh> &serial_mesh);
 
+        /// Writes from a thread of its own (see Impl); the last step and a failed one wait for
+        /// the files.
         int initial(const StepRecord &record) override;
         int committed(const StepRecord &record) override;
+        int failed(const StepRecord &record) override;
 
     private:
         class Impl;
@@ -83,11 +86,17 @@ namespace sfem {
         virtual int                      sample(const StepRecord &record, real_t *const values) = 0;
     };
 
+    /// A step's carried velocity and acceleration, evaluated once per step for every control
+    /// point that reads them (two vectors, allocated at the first read).
+    class CarriedRates;
+    std::shared_ptr<CarriedRates> create_carried_rates(const std::shared_ptr<Function> &f);
+
     /// The displacement at the node nearest to a point, and with a time scheme its carried
-    /// velocity and acceleration.
-    std::shared_ptr<Probe> create_control_point_probe(const std::shared_ptr<Function> &f,
-                                                      const std::vector<real_t>       &point,
-                                                      const bool                       with_rates);
+    /// velocity and acceleration, from `rates` (shared by the control points of a run; null: its own).
+    std::shared_ptr<Probe> create_control_point_probe(const std::shared_ptr<Function>     &f,
+                                                      const std::vector<real_t>           &point,
+                                                      const bool                           with_rates,
+                                                      const std::shared_ptr<CarriedRates> &rates = nullptr);
 
     /// The state of a Prony series, group by group (`relaxations`, the material's): the step's
     /// relaxation factor gamma (<group>_gamma) and, for each term k of the series, the RMS over the
