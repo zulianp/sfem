@@ -5,9 +5,16 @@
 #include <limits>
 #include <unordered_map>
 
+#include <sys/resource.h>
+
 #include "sfem_Function.hpp"
 #include "sfem_blas_factory.hpp"
+#include "sfem_prony_diagnostics.hpp"
 #include "smesh_glob.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_BLAS_cuda.hpp"
+#endif
 
 namespace sfem {
 
@@ -422,7 +429,15 @@ namespace sfem {
                     names.push_back(d.group + "_gamma");
                     const int n = relaxations_.relaxation(blocks_[0], d.group).series().n_terms();
                     for (int k = 0; k < n; ++k) names.push_back(d.group + "_H" + std::to_string(k));
+                    names.push_back(d.group + "_stored");
                 }
+                // Persistent bytes over every rank, by what holds them (RelaxationGroups::Bytes).
+                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"}) names.push_back(what);
+#ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
+                // Cumulative over the run, host loops only (sfem_prony_diagnostics.hpp).
+                names.push_back("updates");
+                names.push_back("updates_lost");
+#endif
                 return names;
             }
 
@@ -441,7 +456,7 @@ namespace sfem {
                             const auto     &r      = relaxations_.relaxation(b, d.group);
                             const ptrdiff_t points = static_cast<ptrdiff_t>(r.n_qp()) * r.n_elements();
                             H.resize(static_cast<size_t>(r.n_components()) * points);
-                            r.decode_history(k, H.data());
+                            relaxations_.decode_history(b, d.group, k, H.data());
                             for (int comp = 0; comp < r.n_components(); ++comp) {
                                 const real_t weight = comp < n_diagonal ? 1 : 2;
                                 const real_t *const h = &H[comp * points];
@@ -455,7 +470,19 @@ namespace sfem {
                         if (comm_->size() > 1) comm_->sum(sums, 2, smesh::TypeToEnum<real_t>::value());
                         values[c++] = sums[1] > 0 ? std::sqrt(sums[0] / sums[1]) : 0;
                     }
+                    // The terms holding a tensor: the same on every block and rank, the weights being.
+                    values[c++] = relaxations_.relaxation(blocks_[0], d.group).n_stored_terms();
                 }
+                const auto bytes   = relaxations_.bytes_breakdown();
+                real_t     held[4] = {real_t(bytes.history), real_t(bytes.reference), real_t(bytes.frozen), real_t(bytes.stress)};
+                if (comm_->size() > 1) comm_->sum(held, 4, smesh::TypeToEnum<real_t>::value());
+                for (int k = 0; k < 4; ++k) values[c++] = held[k];
+#ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
+                real_t counts[2] = {real_t(prony::update_counts().updated), real_t(prony::update_counts().lost)};
+                if (comm_->size() > 1) comm_->sum(counts, 2, smesh::TypeToEnum<real_t>::value());
+                values[c++] = counts[0];
+                values[c++] = counts[1];
+#endif
                 return SFEM_SUCCESS;
             }
 
@@ -463,6 +490,35 @@ namespace sfem {
             RelaxationGroups             &relaxations_;
             std::shared_ptr<Communicator> comm_;
             std::vector<std::string>      blocks_;
+        };
+
+        class MemoryProbe final : public Probe {
+        public:
+            explicit MemoryProbe(const std::shared_ptr<Communicator> &comm) : comm_(comm) {}
+
+            std::vector<std::string> columns() const override { return {"host_peak_rss", "device_used_peak"}; }
+
+            int sample(const StepRecord &, real_t *const values) override {
+                struct rusage usage;
+                getrusage(RUSAGE_SELF, &usage);
+#ifdef __APPLE__
+                const real_t rss = real_t(usage.ru_maxrss);  // bytes
+#else
+                const real_t rss = real_t(usage.ru_maxrss) * 1024;  // kilobytes
+#endif
+#ifdef SFEM_ENABLE_CUDA
+                device_peak_ = std::max(device_peak_, real_t(d_memory_in_use()));
+#endif
+                real_t sums[2] = {rss, device_peak_};
+                if (comm_->size() > 1) comm_->sum(sums, 2, smesh::TypeToEnum<real_t>::value());
+                values[0] = sums[0];
+                values[1] = sums[1];
+                return SFEM_SUCCESS;
+            }
+
+        private:
+            std::shared_ptr<Communicator> comm_;
+            real_t                        device_peak_{0};
         };
 
         class NamedProbe final : public Probe {
@@ -485,6 +541,10 @@ namespace sfem {
 
     std::shared_ptr<Probe> create_prony_probe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm) {
         return std::make_shared<PronyProbe>(relaxations, comm);
+    }
+
+    std::shared_ptr<Probe> create_memory_probe(const std::shared_ptr<Communicator> &comm) {
+        return std::make_shared<MemoryProbe>(comm);
     }
 
     std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe) {

@@ -130,6 +130,12 @@ namespace sfem {
         /// The stored tangent's format, for every operator that stores one.
         void set_inexact_options(const InexactOptions &options);
 
+        /// Whether every operator's assembled tangent can be projected to positive semidefinite.
+        bool tangent_projection_supported() const;
+
+        /// The assembled tangents that follow projected (Op::set_tangent_projection), or not.
+        void set_tangent_projection(const bool on);
+
         /// The diagonal of the operator `inexact_apply` applies: the stored ones, and the exact
         /// diagonal of the operators that store nothing; the constrained rows are 1.
         int inexact_diag(const real_t *const x, real_t *const values);

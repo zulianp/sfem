@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_TangentProjection.hpp"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -27,7 +28,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS>
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
 static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -443,6 +444,9 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_tensor_pr
     D[69] = D[61];
     D[78] = D[62];
     D[79] = D[71];
+    if constexpr (PROJECT) {
+      project_abs_symmetric<s_t, 9>(D);
+    }
     adj_q[0] = adj_value0;
     adj_q[1] = adj_value1;
     adj_q[2] = adj_value2;

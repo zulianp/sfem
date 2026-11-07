@@ -22,19 +22,52 @@ namespace sfem {
     /// The scaled formats carry one `scaling_t` per stored tensor and element,
     /// derived from the max-abs of that tensor over its components and
     /// integration points and recomputed whenever the tensor is written.
+    ///
+    /// The mean-deviation formats store, per tensor, component and group of
+    /// points, the mean in `history_mean_t`, and code only each value's
+    /// deviation from it, under the scaled codec's per-(tensor, element)
+    /// scale.  A group is an element's points, or on a one-point element a run
+    /// of consecutive elements (`QuadratureState`).  The rounding is then
+    /// relative to how much the history varies over a group rather than to its
+    /// size: the quantized tangent's mean+deviation, applied to the history.
     enum class HistoryStorage {
         FULL,            ///< real_t
         FLOAT32,         ///< float
         FLOAT16,         ///< half_t, unscaled: overflows to inf above 65504, so only for values known to stay below it
         FLOAT16_SCALED,  ///< half_t with a power-of-two scale per tensor and element
         INT16_SCALED,    ///< symmetric 16-bit quantisation, one scale per tensor and element
-        INT8_SCALED      ///< symmetric 8-bit quantisation, one scale per tensor and element
+        INT8_SCALED,     ///< symmetric 8-bit quantisation, one scale per tensor and element
+        FLOAT16_MD,      ///< a mean per group, the deviations as FLOAT16_SCALED
+        INT8_MD          ///< a mean per group, the deviations as INT8_SCALED
     };
+
+    /// The type a mean-deviation store holds its means in.
+    using history_mean_t = float;
+
+    namespace prony {
+        /// The largest group of one-point elements a mean is taken over; a power of two.
+        static constexpr int MAX_ELEMENTS_PER_MEAN = 64;
+
+        /// The means of a mean-deviation store, unused by every other codec: those of
+        /// tensor t at data + t * n_components * n_groups, component c of group g at
+        /// [c * n_groups + g], group g being the points of elements [g * elements,
+        /// (g + 1) * elements).  `elements` divides MAX_ELEMENTS_PER_MEAN.
+        struct Means {
+            history_mean_t *data{nullptr};
+            int             n_qp{1};
+            int             elements{1};
+            ptrdiff_t       n_groups{0};
+
+            ptrdiff_t       per_tensor(const ptrdiff_t rows) const { return rows / n_qp * n_groups; }
+            history_mean_t *tensor(const int t, const ptrdiff_t rows) const { return data + t * per_tensor(rows); }
+        };
+    }  // namespace prony
 
     HistoryStorage history_storage_from_string(const std::string &name);
     const char    *to_string(const HistoryStorage storage);
     std::size_t    bytes_per_value(const HistoryStorage storage);
     bool           is_scaled(const HistoryStorage storage);
+    bool           is_mean_deviation(const HistoryStorage storage);
 
     /// A codec is a compile-time policy for the pointwise loops: the loops are
     /// templated on it and the runtime `HistoryStorage` picks one once, at the
@@ -44,8 +77,9 @@ namespace sfem {
     /// the value belongs to; unscaled codecs ignore it.
     template <typename T>
     struct CastCodec {
-        using storage_t                = T;
-        static constexpr bool   scaled = false;
+        using storage_t                        = T;
+        static constexpr bool   scaled         = false;
+        static constexpr bool   mean_deviation = false;
         static inline real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
         static inline T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
         static inline scaling_t scale_for(const real_t) { return 1; }
@@ -56,8 +90,9 @@ namespace sfem {
     /// the smallest normal half at 2^-28 of it.  A power of two makes the
     /// rescaling exact, so the only error is half's own rounding.
     struct ScaledHalfCodec {
-        using storage_t              = half_t;
-        static constexpr bool scaled = true;
+        using storage_t                      = half_t;
+        static constexpr bool scaled         = true;
+        static constexpr bool mean_deviation = false;
 
         static inline real_t decode(const half_t s, const real_t scale) { return static_cast<real_t>(s) * scale; }
         static inline half_t encode(const real_t v, const real_t inv_scale) { return static_cast<half_t>(v * inv_scale); }
@@ -73,8 +108,9 @@ namespace sfem {
     /// the rounding error is at most scale / 2.
     template <typename T, int LARGEST_CODE>
     struct ScaledIntegerCodec {
-        using storage_t              = T;
-        static constexpr bool scaled = true;
+        using storage_t                      = T;
+        static constexpr bool scaled         = true;
+        static constexpr bool mean_deviation = false;
 
         static inline real_t decode(const T s, const real_t scale) { return static_cast<real_t>(s) * scale; }
 
@@ -90,11 +126,20 @@ namespace sfem {
         }
     };
 
+    /// A scaled codec for the deviations from a mean the loops keep beside
+    /// the codes; the codes and scales are the base codec's.
+    template <class Base>
+    struct MeanDeviationCodec : Base {
+        static constexpr bool mean_deviation = true;
+    };
+
     using FullCodec    = CastCodec<real_t>;
     using Float32Codec = CastCodec<float>;
     using Float16Codec = CastCodec<half_t>;
     using Int16Codec   = ScaledIntegerCodec<int16_t, 32767>;
     using Int8Codec    = ScaledIntegerCodec<int8_t, 127>;
+    using Float16MeanDeviationCodec = MeanDeviationCodec<ScaledHalfCodec>;
+    using Int8MeanDeviationCodec    = MeanDeviationCodec<Int8Codec>;
 
     /// Call `f(Codec{})` with the codec `storage` names.
     template <class F>
@@ -112,6 +157,10 @@ namespace sfem {
                 return f(Int16Codec{});
             case HistoryStorage::INT8_SCALED:
                 return f(Int8Codec{});
+            case HistoryStorage::FLOAT16_MD:
+                return f(Float16MeanDeviationCodec{});
+            case HistoryStorage::INT8_MD:
+                return f(Int8MeanDeviationCodec{});
         }
 
         SFEM_ERROR("dispatch_history_codec: unknown storage %d\n", static_cast<int>(storage));

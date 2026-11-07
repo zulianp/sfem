@@ -32,7 +32,7 @@ namespace sfem {
     void d_node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                    const real_t *const       r,
                                    const real_t *const       k,
-                                   const bool                capped,
+                                   const int                 curvature,
                                    const real_t              sign,
                                    const count_t *const      rowptr,
                                    const idx_t *const        colidx,
@@ -42,7 +42,7 @@ namespace sfem {
     void d_node_obstacle_curvature_blocks(const NodeObstacleView &c,
                                           const real_t *const     r,
                                           const real_t *const     k,
-                                          const bool              capped,
+                                          const int               curvature,
                                           real_t *const           blocks);
     void d_node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out);
     void d_node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d);

@@ -311,6 +311,11 @@ class CodeGenerator:
     #: exact apply is untouched, and the stored one is reached only through
     #: `inexact_update` and `inexact_apply`.
     inexact_apply: bool = False
+    #: Opt in to the BSR assembly on the tangent projected to positive
+    #: semidefinite per quadrature point (`MatrixFormatPlan.tangent_projection`).
+    #: Off by default and additive when on: the exact assembly is untouched, and
+    #: the projected one is reached only through `set_tangent_projection`.
+    tangent_projection: bool = False
 
     def __post_init__(self):
         _validate_name(self.name)
@@ -336,6 +341,7 @@ class CodeGenerator:
                 self.matrix_mesh_layouts,
                 self.matrix_packed_passes,
                 self.matrix_patch_node_index_filter,
+                self.tangent_projection,
             ),
         )
         _validate_op(self.op_name, self.parameter_defaults)
@@ -833,6 +839,7 @@ def generate(
     matrix_packed_passes=None,
     matrix_patch_node_index_filter=None,
     inexact_apply=None,
+    tangent_projection=None,
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
@@ -845,6 +852,9 @@ def generate(
     # tree came to contain kernels no generator run could reproduce.
     if inexact_apply is not None:
         material = replace(material, inexact_apply=bool(inexact_apply))
+    # The same tri-state for the projected assembly.
+    if tangent_projection is not None:
+        material = replace(material, tangent_projection=bool(tangent_projection))
 
     available_elements = _generation_available_elements(material.elements)
     selected = _parse_elements(elements, available_elements)
@@ -986,6 +996,20 @@ def run(material, default_out_dir, argv=None):
         action="store_false",
         help="Suppress the projected apply even if the material asks for it.",
     )
+    parser.add_argument(
+        "--tangent-projection",
+        dest="tangent_projection",
+        action="store_true",
+        default=None,
+        help="Emit the BSR assembly on the tangent projected to positive semidefinite beside the exact one. "
+        "Defaults to the material's own setting.",
+    )
+    parser.add_argument(
+        "--no-tangent-projection",
+        dest="tangent_projection",
+        action="store_false",
+        help="Suppress the projected assembly even if the material asks for it.",
+    )
     args = parser.parse_args(argv)
     try:
         result = generate(
@@ -1004,6 +1028,7 @@ def run(material, default_out_dir, argv=None):
             matrix_packed_passes=args.matrix_packed_passes,
             matrix_patch_node_index_filter=args.patch_node_index_filter,
             inexact_apply=args.inexact_apply,
+            tangent_projection=args.tangent_projection,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
@@ -1485,6 +1510,7 @@ def _selected_matrix_format_plan(
         mesh_layouts,
         packed_passes,
         patch_filter,
+        getattr(material, "tangent_projection", False),
     )
 
 

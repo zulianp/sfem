@@ -190,13 +190,28 @@ def read_final_objective(solution):
     return float(objective)
 
 
+def to_file_order(solution, values):
+    """`values` per node of the mesh the solve wrote in `solution/mesh`, in the input mesh's node
+    order: a mesh the driver renumbered (mesh.packed) names each node's input id in node_mapping."""
+    mappings = sorted((Path(solution) / "mesh").glob("node_mapping.*"))
+    if not mappings:
+        return values
+    ids = read_raw(mappings[0]).astype(np.int64)
+    if len(ids) != len(values) or len(np.unique(ids)) != len(ids) or ids.min() < 0 or ids.max() >= len(values):
+        raise ValueError(f"{mappings[0]} is not a permutation of {len(values)} nodes")
+    ordered = np.empty_like(values)
+    ordered[ids] = values
+    return ordered
+
+
 def read_mode_solution(solution_root, mode, dimension, node_count):
     """The displacement, the material reaction and the objective a solve left in
-    `solution_root/mode`: fields under `out/`, the objective in `quantities.yaml`."""
+    `solution_root/mode`: fields under `out/`, the objective in `quantities.yaml`, the fields in the
+    input mesh's node order."""
     solution = Path(solution_root) / mode
     field_dir = solution / "out"
-    displacement = read_component_output(field_dir, "disp", dimension, node_count)
-    reaction = read_component_output(field_dir, "material_reaction", dimension, node_count)
+    displacement = to_file_order(solution, read_component_output(field_dir, "disp", dimension, node_count))
+    reaction = to_file_order(solution, read_component_output(field_dir, "material_reaction", dimension, node_count))
     return displacement, reaction, read_final_objective(solution)
 
 

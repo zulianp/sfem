@@ -10,7 +10,7 @@ writes
   transient_runs.csv      the four strokes per time integrator, and on the refined mesh: steps,
                           failed attempts, Newton steps and the traced times of simulation 2
   transient_ablation.csv  FF200 over the first 16 or 30 ms on one GPU, each change against the
-                          build before it, same columns
+                          build before it (the line search: one build, its option), same columns
   transient_history.csv   the four strokes per time integrator, the start (t = 0, at rest) and every
                           converged step: time, step size, Newton and QP iterations, the valve
                           centres' vertical displacement
@@ -34,9 +34,12 @@ FOUR = [
     ("newmark", "FF200_ExodusMesh", 1, "5131942", CASES + "/transient_strokes4_damped",
      "contact-stabilised Newmark, gamma 0.6, every field written"),
     ("bdf2", "FF200_ExodusMesh", 1, "5132710", CASES + "/transient_strokes4_bdf2", "BDF2, every field written"),
-    ("final", "FF200_ExodusMesh", 1, "5133369", CASES + "/transient_strokes4_final",
-     "BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written"),
-    ("refined", "FF200_mesh_refined", 4, "5135347", REFINED + "/transient_strokes4",
+    ("final", "FF200_ExodusMesh", 1, "5284752", SCRATCH + "/ldp_strokes6/final",
+     "BDF2 started at u_n + dt v_n, float32 tangent, MPRGP runs on the device, the displacement written, "
+     "non-monotone line search"),
+    ("final_mono", "FF200_ExodusMesh", 1, "5284752", SCRATCH + "/ldp_strokes6/final_mono",
+     "as final, with the monotone line search (solver.newton.line_search.nonmonotone=1)"),
+    ("refined", "FF200_mesh_refined", 4, "5284753", REFINED + "/transient_strokes6",
      "as final, on the refined mesh, four ranks (MPRGP's device runs are single-rank)"),
 ]
 # (change, variant, job, folder): each change against the build before it, FF200 on one GPU.
@@ -49,8 +52,8 @@ ABLATION = [
     ("runs", "runs", "5133192", SCRATCH + "/ldp_fuse/runs_f32"),
     ("start", "u_n", "5133342", SCRATCH + "/ldp_kind1/base"),
     ("start", "u_n+dt v_n", "5133342", SCRATCH + "/ldp_kind1/start"),
-    ("start", "nonmonotone", "5133342", SCRATCH + "/ldp_kind1/nonmono"),
-    ("start", "both", "5133342", SCRATCH + "/ldp_kind1/both"),
+    ("nonmonotone", "monotone", "5284752", SCRATCH + "/ldp_strokes6/w30_mono"),
+    ("nonmonotone", "non-monotone", "5284752", SCRATCH + "/ldp_strokes6/w30_nm"),
 ]
 # The valve centres' probes (sim2.yaml). With several ranks the probe sampled rank 0's nearest node
 # (fixed with the commit that adds this note); those runs' series are read from the written

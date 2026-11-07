@@ -720,6 +720,52 @@ _INEXACT_TEAM_DECLARATION = {
 }
 
 
+#: The projected tangent's switch (`Op::set_tangent_projection`), where the
+#: material publishes the projected BSR assembly (`_projected_tangent_elements`).
+_HEADER_TANGENT_PROJECTION_METHODS = {
+    False: "",
+    True: """
+    bool tangent_projection_supported() const override;
+    void set_tangent_projection(const bool on) override;""",
+}
+
+
+def _projected_tangent_elements(material, kernel_sources):
+    """The mesh elements whose BSR assembly is also published on the tangent
+    projected to positive semidefinite (`MatrixFormatPlan.tangent_projection`):
+    those the `hessian_bsr_psd` dispatches switch on, none where it was not asked
+    for."""
+    return tuple(
+        sorted(
+            {
+                element
+                for dim in (2, 3)
+                for geometry in ("i", "a")
+                for element in _c_abi_public_dispatch_case_elements(
+                    kernel_sources, "%s_hessian_bsr_psd_%dd_%s_msoa" % (material.name, dim, geometry)
+                )
+            }
+        )
+    )
+
+
+def _tangent_projection_definitions(op_name, elements):
+    """The switch's definitions: supported where every element of the space has
+    the projected assembly; on, the BSR assembly takes it."""
+    if not elements:
+        return ""
+    return """
+  bool %(op)s::tangent_projection_supported() const {
+    for (auto type : impl_->space->element_types()) {
+      if (!(%(condition)s)) return false;
+    }
+    return true;
+  }
+
+  void %(op)s::set_tangent_projection(const bool on) { impl_->project_tangent = on; }
+""" % {"op": op_name, "condition": _element_condition("type", elements)}
+
+
 def _tangent_is_constant(form_collections):
     """Whether the material is linear: its tangent, the 2-form, reads no state.
 
@@ -754,7 +800,7 @@ def _tangent_is_constant(form_collections):
 
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
             holds_time_scheme=None, relaxes=False, state_independent=False, linear=False,
-            publishes_inexact=False, team=False):
+            publishes_inexact=False, team=False, projects_tangent=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -869,7 +915,7 @@ namespace sfem {
     int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;%(team_methods)s
-    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s%(relaxation_declarations)s
+    int value(const real_t *x, real_t *const out) override;%(value_steps)s%(inexact_methods)s%(tangent_projection_methods)s%(relaxation_declarations)s
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
@@ -913,6 +959,7 @@ namespace sfem {
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material, publishes_inexact, team),
+        "tangent_projection_methods": _HEADER_TANGENT_PROJECTION_METHODS[bool(projects_tangent)],
         "team_methods": _HEADER_TEAM_METHODS[bool(team)],
         "relaxation_include": _HEADER_RELAXATION_INCLUDE[bool(relaxes)],
         "relaxation_base": _HEADER_RELAXATION_BASE[bool(relaxes)],
@@ -1909,7 +1956,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
-%(inexact_impl_field)s  };
+%(inexact_impl_field)s%(tangent_projection_impl_field)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
@@ -2286,6 +2333,7 @@ namespace sfem {
         *apply_dispatch_bodies, what=material.name
     )
     apply_dispatch_body = apply_dispatch_bodies[team]
+    projected_elements = _projected_tangent_elements(material, kernel_sources)
     substitutions = {
         "op": _op_class_name(material),
         "derefine": _derefine_op_source(_op_class_name(material), True),
@@ -2438,6 +2486,7 @@ namespace sfem {
             ("rowptr", "colidx", "values"),
             indent="      ",
             n_field_components_by_dim=n_field_components_by_dim,
+            projected=bool(projected_elements),
         ),
         "hessian_bsr_current_parameter": _hyperelastic_hessian_current_parameter(
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
@@ -2466,6 +2515,7 @@ namespace sfem {
         ),
         "inexact_include": _inexact_includes(material, kernel_sources),
         "inexact_impl_field": _inexact_impl_field(material, kernel_sources),
+        "tangent_projection_impl_field": "    bool project_tangent{false};\n" if projected_elements else "",
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
@@ -2497,6 +2547,9 @@ namespace sfem {
             team=team,
         ),
     )
+    source = _append_inexact_definitions(
+        source, _tangent_projection_definitions(_op_class_name(material), projected_elements)
+    )
     return (
         _header(
             material,
@@ -2506,6 +2559,7 @@ namespace sfem {
             linear=_tangent_is_constant(form_collections),
             publishes_inexact=bool(_inexact_units(kernel_sources)),
             team=team,
+            projects_tangent=bool(projected_elements),
         ),
         _bind_team_views(source, _op_class_name(material)),
     )
@@ -9282,6 +9336,7 @@ def _is_replaced_tensor_product_source(path, kernel_sources):
 _RUNTIME_OPERATION_MARKERS = (
     ("jacobian_action", "_jacobian_action_"),
     ("hessian_block_diag_sym", "_hessian_block_diag_sym_"),
+    ("hessian_bsr_psd", "_hessian_bsr_psd_"),
     ("hessian_bsr", "_hessian_bsr_"),
     ("hessian_crs", "_hessian_crs_"),
     ("bsr_apply", "_bsr_apply_"),
@@ -9833,7 +9888,7 @@ def _runtime_type_arguments(operation):
     """The runtime types an operation's dispatcher takes: the scalar, and for a
     BSR assembly also its values (`_VALUES_TYPE_PARAMETER`), which the op's
     `hessian_bsr_typed` is handed."""
-    return ("real_type", "values_type") if operation == "hessian_bsr" else ("real_type",)
+    return ("real_type", "values_type") if operation in ("hessian_bsr", "hessian_bsr_psd") else ("real_type",)
 
 
 def _residual_hessian_dispatch_body(
@@ -11516,7 +11571,9 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
     return "\n".join(packed_blocks)
 
 
-def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent, n_field_components_by_dim=None):
+def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent, n_field_components_by_dim=None, projected=False):
+    # `projected`: the BSR assembly goes to its `hessian_bsr_psd` twin where the
+    # operator's projection is on (`_projected_tangent_elements`).
     lines = []
     # Assembly takes the element's own geometry, like every other kernel.  An
     # element with no isoparametric kernel assembles through its affine one,
@@ -11589,46 +11646,56 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     _element_condition("domain.element_type", affine_by_dim[dim]),
                 )
             )
-            lines.append(
-                "%s    return %s(%s);"
-                % (
-                    indent, _entry_point_name(affine_function), _with_stream(", ".join(
-                        [
-                            "domain.element_type",
-                            *_runtime_type_arguments(operation),
-                            "domain.block->n_elements()",
-                            "mesh->n_nodes()",
-                            "element_connectivity(domain)",
-                            *_affine_geometry_call_args(
-                                kernel_sources, affine_function, dim
-                            ),
-                            *parameter_args,
-                            *current_args,
-                            *tail_args,
-                        ]
-                    )),
+            affine_arguments = _with_stream(", ".join(
+                [
+                    "domain.element_type",
+                    *_runtime_type_arguments(operation),
+                    "domain.block->n_elements()",
+                    "mesh->n_nodes()",
+                    "element_connectivity(domain)",
+                    *_affine_geometry_call_args(
+                        kernel_sources, affine_function, dim
+                    ),
+                    *parameter_args,
+                    *current_args,
+                    *tail_args,
+                ]
+            ))
+            projected_affine = "%s_%s_psd_%dd_a_msoa" % (material_name, operation, dim)
+            if projected and _c_abi_function_exists(kernel_sources, projected_affine, public_only=True):
+                lines.extend(
+                    [
+                        "%s    if (impl_->project_tangent) {" % indent,
+                        "%s      return %s(%s);" % (indent, _entry_point_name(projected_affine), affine_arguments),
+                        "%s    }" % indent,
+                    ]
                 )
-            )
+            lines.append("%s    return %s(%s);" % (indent, _entry_point_name(affine_function), affine_arguments))
             lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
-            lines.append(
-                "%s  return %s(%s);"
-                % (
-                    indent, _entry_point_name(function), _with_stream(", ".join(
-                        [
-                            "domain.element_type",
-                            *_runtime_type_arguments(operation),
-                            "domain.block->n_elements()",
-                            "mesh->n_nodes()",
-                            "element_connectivity(domain)",
-                            "points",
-                            *parameter_args,
-                            *current_args,
-                            *tail_args,
-                        ]
-                    )),
+            arguments = _with_stream(", ".join(
+                [
+                    "domain.element_type",
+                    *_runtime_type_arguments(operation),
+                    "domain.block->n_elements()",
+                    "mesh->n_nodes()",
+                    "element_connectivity(domain)",
+                    "points",
+                    *parameter_args,
+                    *current_args,
+                    *tail_args,
+                ]
+            ))
+            projected_function = "%s_%s_psd_%dd_i_msoa" % (material_name, operation, dim)
+            if projected and _c_abi_function_exists(kernel_sources, projected_function, public_only=True):
+                lines.extend(
+                    [
+                        "%s  if (impl_->project_tangent) {" % indent,
+                        "%s    return %s(%s);" % (indent, _entry_point_name(projected_function), arguments),
+                        "%s  }" % indent,
+                    ]
                 )
-            )
+            lines.append("%s  return %s(%s);" % (indent, _entry_point_name(function), arguments))
         elif not affine_by_dim[dim]:
             lines.append('%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
             lines.append("%s  return SFEM_FAILURE;" % indent)

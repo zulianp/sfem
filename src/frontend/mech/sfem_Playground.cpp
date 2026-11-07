@@ -30,6 +30,7 @@
 #include "sfem_NodeObstacleStep.hpp"
 #include "sfem_ObstacleShape.hpp"
 #include "sfem_Observers.hpp"
+#include "sfem_RelaxationGroups.hpp"
 #include "sfem_Rotation.hpp"
 #include "sfem_StateField.hpp"
 #include "sfem_TorqueControl.hpp"
@@ -932,6 +933,21 @@ namespace sfem {
             newton_options.rtol              = read<real_t>(nn, "rtol", newton_options.rtol);
             newton_options.divergence_factor = read<real_t>(nn, "divergence_factor", newton_options.divergence_factor);
             newton_options.merit             = read_string(nn, "merit", newton_options.merit);
+            {
+                const auto projection = read_string(nn, "tangent_projection", "none");
+                if (projection == "none") {
+                    newton_options.tangent_projection = TangentProjection::NONE;
+                } else if (projection == "on_failure") {
+                    newton_options.tangent_projection = TangentProjection::ON_FAILURE;
+                } else if (projection == "always") {
+                    newton_options.tangent_projection = TangentProjection::ALWAYS;
+                } else {
+                    fprintf(stderr,
+                            "Playground: unknown solver.newton.tangent_projection \"%s\" (none, on_failure, always)\n",
+                            projection.c_str());
+                    return SFEM_FAILURE;
+                }
+            }
             verbose                          = read<bool>(nn, "verbose", true);
             // A linear problem is solved by its first step, which needs no merit to judge it.
             newton_options.line_search.enabled = !f->is_linear();
@@ -941,6 +957,11 @@ namespace sfem {
                 newton_options.line_search.steps   = read_list<real_t>(ls, "steps", newton_options.line_search.steps);
                 newton_options.line_search.c1      = read<real_t>(ls, "c1", newton_options.line_search.c1);
                 newton_options.line_search.batched = read<bool>(ls, "batched", newton_options.line_search.batched);
+                newton_options.line_search.nonmonotone = read<int>(ls, "nonmonotone", newton_options.line_search.nonmonotone);
+                if (newton_options.line_search.nonmonotone < 1) {
+                    fprintf(stderr, "Playground: solver.newton.line_search.nonmonotone must be at least 1\n");
+                    return SFEM_FAILURE;
+                }
                 const auto rule                    = read_string(ls, "rule", "armijo");
                 if (rule != "armijo" && rule != "damped") {
                     fprintf(stderr, "Playground: unknown solver.newton.line_search.rule \"%s\" (armijo, damped)\n", rule.c_str());
@@ -1037,6 +1058,13 @@ namespace sfem {
                 step = UnconstrainedStep::create(f, es, linear);
             }
             if (!step) return SFEM_FAILURE;
+            if (newton_options.tangent_projection != TangentProjection::NONE && !step->tangent_projection_supported()) {
+                fprintf(stderr,
+                        "Playground: solver.newton.tangent_projection needs solver.linear.format BSR, no obstacle and a "
+                        "material that projects its tangent on every element of the mesh; the %s step has not\n",
+                        step->name());
+                return SFEM_FAILURE;
+            }
             newton = std::make_shared<NewtonSolver>(f, step, newton_options);
             nonlinear = newton;
             if (torque_controlled) {
@@ -1047,11 +1075,12 @@ namespace sfem {
                     if (it.iteration == 0) {
                         printf("  Newton %2d: |r| = %.6e (tol %.3e)\n", it.iteration, (double)it.measure.value, (double)it.tolerance);
                     } else {
-                        printf("  Newton %2d: |r| = %.6e, %d linear%s, alpha = %g (%s)\n",
+                        printf("  Newton %2d: |r| = %.6e, %d linear%s%s, alpha = %g (%s)\n",
                                it.iteration,
                                (double)it.measure.value,
                                it.linear_iterations,
                                it.linear_capped ? " (max iterations)" : "",
+                               it.projected ? " projected" : "",
                                (double)it.line_search.alpha,
                                to_string(it.line_search.status));
                     }
@@ -1095,7 +1124,13 @@ namespace sfem {
 
             stepper = std::make_unique<Stepper>(f, nonlinear, options);
             stepper->set_time_scheme(scheme);
-            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) stepper->add_history(history);
+            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) {
+                stepper->add_history(history);
+                // A Prony term slower than the run is stored as a remainder (PronyRelaxation).
+                if (auto *relaxations = history->relaxation_state()) {
+                    relaxations->set_default_remainder_horizon(options.steps * options.dt);
+                }
+            }
             for (auto &set : time_dependent) stepper->add_time_dependent(set);
             for (auto &release : releases) stepper->add_release(release.first, release.second);
 
@@ -1230,6 +1265,8 @@ namespace sfem {
                             return SFEM_FAILURE;
                         }
                         probe = create_prony_probe(*relaxations, mesh->comm());
+                    } else if (type == "memory") {
+                        probe = create_memory_probe(mesh->comm());
                     } else if (type == "contact" && obstacle) {
                         std::function<real_t()> min_gap = [c = contact] { return c->min_gap(); };
                         if (ssmgc_step) min_gap = [s = ssmgc_step] { return s->min_gap(); };
@@ -1241,7 +1278,7 @@ namespace sfem {
                                                      contact_force_scale,
                                                      mesh->comm());
                     } else {
-                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque, prony; contact with an obstacle)\n", type.c_str());
+                        fprintf(stderr, "Playground: unknown probe \"%s\" (control_point, torque, prony, memory; contact with an obstacle)\n", type.c_str());
                         return SFEM_FAILURE;
                     }
                     history->add_probe(has(p, "name") ? create_named_probe(read_string(p, "name", ""), probe) : probe);

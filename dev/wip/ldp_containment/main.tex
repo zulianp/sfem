@@ -1,5 +1,6 @@
-%% Valve containment in liquid diaphragm pumps: contact on a signed distance field, on Grace and
-%% Hopper.
+%% Space-efficient simulation of the EPDM valves of liquid diaphragm pumps on Grace and Hopper:
+%% containment by contact on a signed distance field, pump strokes, and the viscoelastic history's
+%% storage.
 %%
 %% Build:  make          (latexmk -pdf)
 %%         make figures  (regenerate every figure, table and macro from data/)
@@ -13,6 +14,7 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepgfplotslibrary{groupplots}
+\usepgfplotslibrary{fillbetween}
 \usepackage{booktabs}
 \usepackage{siunitx}
 \sisetup{group-separator={,},group-minimum-digits=4,group-digits=integer}
@@ -26,8 +28,8 @@
 
 \begin{document}
 
-\title{Valve containment by obstacle contact on a signed distance field: a matrix-based
-Newton--MPRGP solver on Grace and Hopper}
+\title{Space-efficient simulation of the EPDM valves of liquid diaphragm pumps on Grace and
+Hopper}
 
 \author{Patrick Zulian}
 \orcid{0000-0002-5822-3288}
@@ -49,24 +51,25 @@ Newton--MPRGP solver on Grace and Hopper}
 \email{patrick.zulian@usi.ch}
 
 \begin{abstract}
-Before a fluid simulation of a liquid diaphragm pump can start, the valves of its solid model
-must be pushed out of the fluid domain into which the meshing has placed them. We solve this
-containment problem as hyperelastic contact with a rigid obstacle given by a signed distance
-field: Newton's method with a bound-constrained quadratic program per step, solved by MPRGP. The
-solver runs on Grace CPUs and Hopper GPUs, on one and two nodes of the Alps GH200 system, from a
-single implementation. On four industrial meshes with \dofsMin{} to \dofsMax{} degrees of
-freedom, all host and device configurations produce the same converged displacement to a
-relative \agreeParallel{}, and the converged solutions have a KKT residual \kktRatioMin{} to
-\kktRatioMax{} times smaller than the production solver they replace. The QP iteration is
-latency bound at these sizes: on the three smaller meshes the fastest Grace configuration and one
-GPU solve within \graceGpuCloseMax\% of each other, and several GPUs are the fastest on the
-largest. Storing the tangent in single precision lowers the cost per QP
-iteration by up to \singleMax\% and changes the solution less than repeated runs do. From the
-contained state, the same solver drives the FF200 valves through \trStrokes{} pump strokes of
-transient contact with a viscoelastic material, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
-on one GPU; on the refined mesh, \dofsFFf{} degrees of freedom on a node's \trGpusRefined{} GPUs, the
-valves open and close within \trResEventShift\,\si{\milli\second} of the coarse mesh's in
-\trSteppingRefined\,\si{\second}.
+The valves of a liquid diaphragm pump are EPDM bodies held only by the cavity around them. We
+simulate them in two stages with one solver, Newton's method with a bound-constrained quadratic
+program per step solved by MPRGP, against a rigid obstacle given by a signed distance field, on
+Grace CPUs and Hopper GPUs of the Alps GH200 system. First the valves are pushed out of the fluid
+domain into which the meshing has placed them: on four industrial meshes with \dofsMin{} to
+\dofsMax{} degrees of freedom, all host and device configurations reach the same displacement to
+a relative \agreeParallel{}, with a KKT residual \kktRatioMin{} to \kktRatioMax{} times smaller
+than the production solver's, and storing the tangent in single precision lowers the cost per QP
+iteration by up to \singleMax\%. Then the FF200 valves run through \trStrokes{} pump strokes of
+transient contact with a 15-term Prony series, \trStepsFinal{} steps in \trSteppingFinal\,\si{\second}
+on one GPU. There the viscoelastic history, not the tangent, dominates the operator's memory: in
+double precision it takes \hsStateOverTangent{} times the bytes of the single-precision tangent.
+Narrow codes round away the updates of the terms that relax slowly. Storing such a term as its
+remainder from the history it would hold if it did not relax, measured from the stress at which
+the history was last zero, makes every narrow format \hsRemGainMin{} to \hsRemGainMax{} times
+more accurate on a twisted bar of HEX8, HEX27, TET10 and TET4 elements. With 16-bit codes,
+these remainders and single-precision stress slots, FF200's history takes
+\hsStateSixteenSlotsMB{} instead of \hsStateFullMB\,MB and moves the solution less than the Newton
+tolerance itself does.
 \end{abstract}
 
 \maketitle
@@ -93,8 +96,18 @@ tolerance. The contributions are
 \item a comparison of every configuration with the single-process result and of the converged
   states with utopia's, by displacement, penetration, contact set and KKT residual;
 \item time to solution and cost per QP iteration on one Grace module up to eight Hopper GPUs on
-  two nodes, and with the tangent assembled in single precision.
+  two nodes, and with the tangent assembled in single precision;
+\item the EPDM valves through pump strokes with a broadband Prony series, and the storage of its
+  history: what it costs in memory, how narrow formats perturb the solution and why, and a format
+  that stores an average per element in single precision and the deviations from it in 8 bits.
 \end{itemize}
+
+The valves are viscoelastic, and a broadband Prony series keeps one stress-like tensor per term
+and quadrature point. A first assessment of reduced-precision storage for such histories, on a
+bar in torsion, found single precision indistinguishable from double and half precision, scaled or
+not, a few percent off~\cite{yang2026prony}. Here the question is the valves', where the history
+outweighs the tangent, and the formats include the average-and-deviation storage that compresses
+the stored tangent of a matrix-free operator.
 
 \section{Problem and method}
 \label{sec:problem}
@@ -110,10 +123,11 @@ mesh's boundary. $\phi$ and its derivatives are evaluated through a cubic B-spli
 coefficients come from the recursive prefilter of the samples~\cite{unser1999}, so the sampled
 field is $C^2$. A skin node $i$ with reference position $X_i$ and displacement $u_i$ satisfies
 \begin{equation}
-  \phi(X_i + u_i) + s \le 0 ,
+  g_i = -\frac{\phi(X_i + u_i)}{|\nabla\phi(X_i + u_i)|} \ge s ,
 \end{equation}
-with a clearance $s=\SI{10}{\micro\metre}$; nodes farther than \SI{100}{\micro\metre} beyond
-the clearance are unconstrained. The overlap is removed in a single load step.
+with a clearance $s=\SI{10}{\micro\metre}$; the gap $g_i$ is the distance to the obstacle where
+$|\nabla\phi| = 1$. Nodes farther than \SI{100}{\micro\metre} beyond the clearance are
+unconstrained. The overlap is removed in a single load step.
 
 \paragraph{Newton step.} At the iterate $u$ the constraint is linearised in a frame per contact
 node whose first axis is $n_i=\nabla\phi(X_i+u_i)$, so it bounds one component of the increment.
@@ -223,7 +237,7 @@ reductions moves, and a state reached after a fixed number of steps keeps the di
 same reason QP iteration counts differ by up to \qpSpreadMax\% between configurations.
 
 \paragraph{Utopia.} Table~\ref{tab:accuracy} compares SFEM's single-process result with utopia's on
-the valve nodes. SFEM's contact nodes stay outside the obstacle, $\max\phi \le \abSdfSfemMax$\,\si{\metre},
+the valve nodes, both evaluated through the spline of $\phi$ above. SFEM's contact nodes stay outside the obstacle, $\max\phi \le \abSdfSfemMax$\,\si{\metre},
 while utopia's penetrate by up to \abPenUtopiaMax\,\si{\metre}. The contact sets overlap with a
 Jaccard index of at least \abJaccardMin{}. The KKT measure, the residual of the optimality
 conditions evaluated at each final state, separates the two. Where SFEM's Newton iteration
@@ -443,7 +457,8 @@ Figure~\ref{fig:stills} shows the valves at rest, on the cage, both seated betwe
 suction, and the suction valve on its stop. The three runs of Table~\ref{tab:strokes} open and close
 the valves within \trEventSpread\,\si{\milli\second} of each other and agree on the largest lift per
 stroke to \trPeakSpread\%. A run is not reproducible to the bit, since the GPU assembles with
-atomic additions, and the impacts amplify the rounding differences.
+atomic additions; without cut-backs two runs agree to the Newton tolerance
+(Table~\ref{tab:prony-valves}).
 
 \paragraph{Cost.} Table~\ref{tab:strokes} gives the cost of the \trStrokes{} strokes on one GPU
 with \machineCores{} cores, and Table~\ref{tab:changes} the effect of each change since the first
@@ -454,8 +469,15 @@ second kernel saves \trFinishGain\% per Newton step, storing the tangent in floa
 graph whose loop the GPU decides without returning to the host, \trRunsGain\%. Newton's start at
 $u_n+\Delta t\,v_n$ cuts the failed attempts over \trWindowStart\,\si{\milli\second} from
 \trFailedBaseWindow{} to \trFailedStartWindow{} and the QP time from \trQpBaseWindow{} to
-\trQpStartWindow\,\si{\second}; a non-monotone line search on its own fails \trFailedNonmonoWindow{}
-times and gains nothing in combination. Writing only the displacement instead of every field
+\trQpStartWindow\,\si{\second}. The attempts that still fail are line searches in which no step
+decreases the merit, where a few contacts switch near the tolerance. There a non-monotone line search
+measures the steps against the largest merit of the step's last five Newton iterates~\cite{grippo1986}
+and takes the first that satisfies Armijo's condition against it; every other step is the monotone
+rule's. With the current build it removes the \trFailedMonoWindow{} failed attempts of the
+monotone rule over \trWindowNonmono\,\si{\milli\second}, and the \trFailedFinalMono{} over the
+\trStrokes{} strokes, at the same time (\trSteppingFinal{} against \trSteppingFinalMono\,\si{\second}).
+Measured against the largest earlier merit at every step, Newton cycles between two active sets in
+simulation 1's release. Writing only the displacement instead of every field
 lowers the output from \trWritePerStepBdf{} to \trWritePerStepFinal\,\si{\milli\second} per step.
 Together the \trStrokes{} strokes take \trSteppingFinal\,\si{\second}, \trSpeedBdf{} times less
 than the first BDF2 run and \trSpeedNewmark{} times less than Newmark, with \trFailedFinal{} failed
@@ -479,8 +501,8 @@ growth a conjugate-gradient iteration count shows on a second-order operator. An
 \trResPerItRatio{} times as much: each GPU holds \trResWorkPerGpu{} times FF200's unknowns, the
 ranks add a ghost exchange and two global reductions to every iteration
 (Section~\ref{sec:parallel}), and MPRGP's device runs, which need a single rank, are not used. The
-refined run fails \trFailedRefined{} attempts against \trFailedFinal{}, all of them line searches at
-the pressure valve's impacts, \trResFailFirst{} to \trResFailLast\,\si{\milli\second} into a stroke
+refined run fails \trFailedRefined{} attempt against FF200's \trFailedFinal{}, a line search as the
+pressure valve reaches its seat, \trResFailFirst\,\si{\milli\second} into the third stroke
 (Figure~\ref{fig:strokes}, bottom). Writing the displacement, gathered on rank 0, takes
 \trResWriteRatio{} times as long per step.
 
@@ -536,10 +558,9 @@ lift of the centre, the suction valve's bounce on closing not counted.}
 
 \begin{table}
 \caption{One change at a time, FF200 on one GPU over the first \trWindowFinish\,\si{\milli\second}
-of the strokes (\trWindowStart\,\si{\milli\second} for Newton's start), each against the build
-before it: steps, failed attempts, QP time and QP time per Newton step. Whole runs are not
-reproducible to the bit, so their step counts can differ by a few. n.-m.\ LS: non-monotone line
-search.}
+of the strokes (\trWindowStart\,\si{\milli\second} for Newton's start and the line search), each
+against the build before it, the line search with the current build and either rule: steps, failed
+attempts, QP time and QP time per Newton step.}
 \label{tab:changes}
 \footnotesize
 \setlength{\tabcolsep}{2.5pt}
@@ -557,16 +578,211 @@ section; coloured as Figure~\ref{fig:stills}.}
 \end{figure*}
 
 
+\section{Storing the viscoelastic history}
+\label{sec:history}
+
+\paragraph{The state.} Term $i$ of the Prony series relaxes the isochoric second Piola--Kirchhoff
+stress $S$ through a stress-like tensor $H_i$ at every quadrature point~\cite{simo1987}. Over a
+step of length $\Delta t$ in which $S$ varies linearly,
+\begin{equation}
+  H_i^{n+1} = \alpha_i H_i^n + b_i\bigl(S^{n+1} - S^n\bigr),\qquad
+  \alpha_i = e^{-\Delta t/\tau_i},\quad b_i = g_i\frac{\tau_i}{\Delta t}(1-\alpha_i),
+  \label{eq:prony}
+\end{equation}
+and within the step the history the element kernels read,
+$S^{\mathrm{hist}} = \sum_i\alpha_iH_i^n - \bigl(\sum_ib_i\bigr)S^n$, is fixed. $S^n$ and $S^{n+1}$
+are evaluated from the displacements at the two ends of a step into two slots kept between steps,
+so that the next step starts from the very tensor this one ended at and the increments telescope.
+A term whose $\alpha_i$ lies below half a unit of double precision relaxes completely within the
+step; it keeps no tensor of its own but a coefficient on the last increment $S^n-S^{n-1}$, which the
+two slots hold. At the strokes' step \hsStored{} of the 15 terms keep a tensor. The persistent state
+per relaxation group is therefore the $H_i$, $S^{\mathrm{hist}}$, the two slots and, below, one
+reference stress $R$. Table~\ref{tab:prony-memory} gives their bytes on FF200 (\hsElements{}
+tetrahedra, one quadrature point each): \hsStateFullMB\,MB in double precision,
+\hsStateOverTangent{} times the single-precision tangent of Section~\ref{sec:problem} and more than
+the tangent in double.
+
+\paragraph{Formats.} Arithmetic stays in double; only the store is narrowed. Single precision
+rounds each value. The scaled formats keep one single-precision scale per term and element: int8
+and int16 store $\mathrm{round}(v/s)$ with $s$ the element's largest $|v|$ over 127 or 32767, and
+float16 stores $v/s$ with a power of two $s$ that keeps it in range. Each step decodes, updates and
+re-encodes $H_i$, so the rounding of every step is carried on with weight $\alpha_i$. For a term
+with $\tau_i\gg\Delta t$, $\alpha_i$ is close to one and $b_i(S^{n+1}-S^n)$ is a small fraction of $H_i$;
+below half a code it is rounded away, and the history stops following the stress.
+
+\paragraph{Average and deviation.} The stored tangent of a matrix-free operator is compressed by
+keeping per element its average over the quadrature points in single precision and coding only the
+deviations from it, whose range is the variation over the element rather than its size. The same
+applies to the history: per term, component and group of points, the average $\bar H$ in single
+precision, and per element the deviations $H-\bar H$ in int8 or scaled float16 under one scale.
+Decoding is $\bar H + s\,c$. A group is an element's quadrature points; on elements with one point
+it is a run of $P$ consecutive elements, neighbours since the meshes are ordered along a
+space-filling curve. Encoding takes three passes over the values instead of two: the averages, the
+deviations' scale, and the codes.
+
+\paragraph{Remainder form.} A term that barely relaxes over the simulated span $T$, $\tau_i\gg T$,
+has $\alpha_i\approx1$ and $b_i\approx g_i$, so by~\eqref{eq:prony} its history stays close to
+$g_i(S^n-R)$, $R$ the relaxed stress at which it was last zero: the start of the run, or of a
+restart from rest. The quantity a code must resolve is the remainder
+\begin{equation}
+  G_i = H_i - g_i\bigl(S^n - R\bigr),\qquad
+  G_i^{n+1} = \alpha_iG_i^n + \bigl(\alpha_ig_i - b_i\bigr)\bigl(S^n-R\bigr) + \bigl(b_i - g_i\bigr)\bigl(S^{n+1}-R\bigr),
+\end{equation}
+which is~\eqref{eq:prony} rewritten, not an approximation, and a small fraction of $H_i$. Every
+narrow format stores the terms with $\tau_i a_T>T$ ($a_T$ the time--temperature shift) this way
+and reads $H_i = G_i + g_i(S^n-R)$; a shift that moves a term across $T$ re-expresses its store,
+$G_i\leftarrow G_i\pm g_i(S^n-R)$. $R$ is kept once per group in the slots' precision. It only
+reparametrises the store, so its own rounding costs nothing; without it, taken as zero, $G_i$ would
+hold $g_iR$, larger than $H_i$ itself on a valve prestressed by its seat. In the strokes ($T=$
+\SI{0.18}{\second}) two of the \hsStored{} stored terms ($\tau=\SI{1.61e3}{}$ and
+\SI{12.9}{\second}) are remainders, in the bar ($T=\SI{1}{\second}$) the same two. A term that
+relaxes within the span, such as $\tau=\SI{0.153}{\second}$ in the bar, is not: its history leaves
+$g_i(S^n-R)$, and a remainder would be larger than $H_i$.
+
+\paragraph{Stress slots in single precision.} The kernel that evaluates $S$ writes it in double to a
+scratch that exists only during the evaluation; it is rounded once into a single-precision slot,
+and both ends of every step read the rounded values. The increments therefore still telescope, and
+the rounding of $S$ perturbs the history once rather than accumulating. $S^{\mathrm{hist}}$ stays in
+double: it is read by every element kernel, whose interface carries one scalar type.
+
+\begin{table}
+\caption{FF200's persistent Prony state by part (MB) per storage of the stress slots and the
+history, against the tangent and the mesh. The narrow formats store the two slow terms as
+remainders; $R$ is their reference stress. Averages over runs of 16 elements.}
+\label{tab:prony-memory}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\input{tables/prony_memory}
+\end{table}
+
+\subsection{A bar in torsion}
+
+The bar of~\cite{yang2026prony}, \SI{100}{\milli\metre} long with a $\SI{20}{\milli\metre}$ square
+section, is clamped at one end and twisted at the other by \SI{1.5}{\radian} over \SI{0.5}{\second},
+held until \SI{0.65}{\second}, released, and followed to \SI{1}{\second}, with the valves' material
+and series and BDF2 at $\Delta t=\SI{1}{\milli\second}$, where again four terms keep a tensor. There is
+no contact. At the release the tangent turns indefinite: where the conjugate gradients meet negative
+curvature, Newton repeats the iteration on the tangent whose derivative of the first
+Piola--Kirchhoff stress by the deformation gradient, $\partial P/\partial F$, has at every
+quadrature point its eigenvalues replaced by their absolute values~\cite{chen2024abs,longva2023},
+and takes the tangent itself back after a full step. No step is cut back, and on Grace the runs
+reproduce to a median displacement difference of \hsTorsionNoiseMax\%. The Newton tolerance moves the
+HEX8 solution by \hsTolTorsion\% in the median (\hsTolTorsionMax\% at most) against the same run at
+\SI{1e-9}{\newton}, and the narrow formats' errors are the same at either tolerance: the comparison
+measures the storage. Four elements discretise the bar: HEX8 (eight quadrature points), HEX27 (64), TET10
+(eleven) and TET4 (one, averages over 16 elements), the first three on meshes with the same nodes.
+Table~\ref{tab:prony-torsion} gives, per format, the median over 72 instants of
+$e_u = 100\,\lVert u - u_{\mathrm{double}}\rVert_2/\lVert u_{\mathrm{double}}\rVert_2$ (in percent),
+with the history stored as itself ($H$) and with the slow terms as remainders ($G$).
+
+Stored as itself, int8 rounds away \hsLostIntHexF\% of the updates on HEX8 and float16
+\hsLostHalfHexF\%; their error grows through the twist and jumps when the released bar recovers from
+the stress the history holds (Figure~\ref{fig:prony-torsion}). Averages keep the updates: int8 with
+averages loses \hsLostMdHexF\%. The remainder form makes every narrow format \hsRemGainMin{} to
+\hsRemGainMax{} times more accurate on the four meshes, and \hsRemGainCoarseMin{} to
+\hsRemGainCoarseMax{} times on the coarser HEX8 and HEX27 meshes (\hsDofsHexC{} dofs): int16 from
+\hsTorsionSixteenPlainMin{}--\hsTorsionSixteenPlainMax\% to \hsTorsionSixteenMin{}--\hsTorsionSixteenMax\%,
+float16 with averages from \hsTorsionHalfMdPlainMin{}--\hsTorsionHalfMdPlainMax\% to
+\hsTorsionHalfMdMin{}--\hsTorsionHalfMdMax\%, int8 with averages from
+\hsTorsionMdPlainMin{}--\hsTorsionMdPlainMax\% to \hsTorsionMdMin{}--\hsTorsionMdMax\%. The gains of the two
+add up: as remainders, averages make int8 \hsTorsionMdGainMin{} to \hsTorsionMdGainMax{} times more
+accurate on the elements with several points, \hsTorsionTetGain{} times on TET4, whose average is over
+neighbouring elements. In the relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, left) the
+medians order the formats as $e_u$ does; float16 with averages reaches \hsInfMaxHalfMd\% on HEX8,
+against \hsInfMaxHalfMdPlain\% as itself. $R$ adds \hsTorsionReferenceMB\,MB on the HEX8 mesh, in
+the slots' double here, to int16's \hsTorsionSixteenMB\,MB of $H_i$.
+
+\begin{table*}
+\caption{The bar in torsion on Grace: median $e_u$ against double storage per history format and
+mesh (dofs), the history stored as itself ($H$) and with the slow terms as remainders ($G$); on
+HEX8 the bytes of $H_i$ and $R$ with the remainders, and the share of the history updates the format
+rounds away stored as itself. a.+d.: average and deviation.}
+\label{tab:prony-torsion}
+\small
+\setlength{\tabcolsep}{3.5pt}
+\input{tables/prony_torsion}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\input{figures/prony_torsion}
+\caption{$e_u(t)$ on the HEX8 bar (\hsDofsHexF{} dofs) per history format with the slow terms as
+remainders; the light lines store the history as itself. Grey: double at the Newton tolerance of
+\SI{1e-6}{\newton} against double at \SI{1e-9}{\newton}, the solver's own error. The twist is held from \SI{0.5}{\second}
+and released at \SI{0.65}{\second}.}
+\label{fig:prony-torsion}
+\end{figure}
+
+\begin{figure*}
+\centering
+\input{figures/prony_infinity}
+\caption{$\lVert u-u_{\mathrm{double}}\rVert_\infty/\lVert u_{\mathrm{double}}\rVert_\infty$ per history
+format with the slow terms as remainders over the 72 instants: the median (marks) and the range
+from the smallest to the largest (bars), one mark per mesh. Left the bar in torsion per mesh (dofs), right the
+valves per mesh (stress slots in double, averages over 16 elements on TET4). a.+d.: average and
+deviation.}
+\label{fig:prony-infinity}
+\end{figure*}
+
+\subsection{The valves}
+
+Table~\ref{tab:prony-valves} repeats FF200's \trStrokes{} strokes on one GPU per storage, on the
+TET4 mesh and on its TET10 promotion (\hsTenDofs{} dofs). An impact compresses the quadratic elements
+until the contact QP is indefinite: MPRGP meets negative curvature, which comes from the obstacle's
+curvature term $-\mu_i\nabla^2\mathrm{gap}_i$. There Newton repeats the iteration on the tangent
+projected to positive semidefinite, the material's per quadrature point as in the bar and each
+contact node's $3\times3$ curvature block without its negative eigenvalues, and takes the tangent
+back after a full step: the first impact converges in 8 iterations instead of 20, and no step is
+cut back on either mesh. Two runs in double differ by a median $e_u$ of \hsValveNoise\% on TET4 and
+\hsTenNoise\% on TET10. The Newton tolerance of \SI{1e-6}{\newton} itself moves the TET4 solution
+by more: against the same run at \SI{1e-9}{\newton}, \hsTolValve\% in the median and
+\hsTolValveMax\% at most over the first \hsTolValveWindowMs\,\si{\milli\second} (the tighter
+tolerance cannot be met at the impact after). Single precision for the history or the slots stays
+within that, and so does int16 with remainders (\hsValveSixteen\% on TET4, \hsTenSixteen\% on TET10),
+with float32 slots too (\hsValveSixteenSlots\% and \hsTenSixteenSlots\%): FF200's state then takes
+\hsStateSixteenSlotsMB\,MB instead of \hsStateFullMB, \hsStateSixteenSlotsShare\% of it, and on TET10
+\hsTenStateSixteenSlotsMB{} instead of \hsTenStateFullMB\,MB. The remainders make float16
+\hsValveHalfPlain\% $\to$ \hsValveHalf\%, float16 with averages \hsValveHalfMdPlain\% $\to$
+\hsValveHalfMd\% and int8 with averages \hsValveMdPlain\% $\to$ \hsValveMd\% on TET4, and
+\hsTenMdPlain\% $\to$ \hsTenMd\% on TET10; on the valves' one-point tetrahedra the neighbours a mean
+spans differ more than the points of one element, and 8-bit codes stay above the floor. The
+relative $\infty$-norm (Figure~\ref{fig:prony-infinity}, right) orders the formats as $e_u$ does.
+Every TET4 run takes \hsValveTimeMin{} to \hsValveTimeMax\,\si{\second}, every TET10 run
+\hsTenTimeMin{} to \hsTenTimeMax\,\si{\second}. Table~\ref{tab:prony-cost} gives the cost of a step's
+two passes over the history: the remainders make int16's \hsCostRemHost{} times as expensive on
+Grace and \hsCostRemDevice{} times on the GPU, \hsCostSixteenDeviceUs\,\si{\micro\second} on FF200's
+size, \hsCostShare\% of a stroke step's \hsStepMs\,\si{\milli\second}.
+
+\begin{table*}
+\caption{FF200 through \trStrokes{} strokes on one GPU per storage of the history and of the stress
+slots: the Prony state (MB) and the median $e_u$ (\%) against the first run in double, the history
+stored as itself ($H$) and with the slow terms as remainders ($G$, the MB). The first row repeats
+that run. a.+d.: average and deviation, over runs of 16 elements on TET4.}
+\label{tab:prony-valves}
+\small
+\input{tables/prony_valves}
+\end{table*}
+
+\begin{table*}
+\caption{A step's two passes over the history (\si{\micro\second}, the frozen history and the update)
+per format, with the remainder form: the valves' series at $\Delta t=\SI{0.1}{\milli\second}$, four
+stored terms, two of them remainders, on a synthetic smooth stress
+(drivers/bench/bench\_prony\_history), per points per element and elements.}
+\label{tab:prony-cost}
+\small
+\input{tables/prony_cost}
+\end{table*}
+
 \section{Limitations}
 
 In the single-process runs \qpCappedClause{}. The Newton budget
-of \unconvergedCases{} ends before the KKT tolerance is reached. The comparison with utopia samples
-the distance field trilinearly for both states, so penetrations below the grid's interpolation
-error are not resolved. All measurements are on one system; utopia was not rerun on it.
+of \unconvergedCases{} ends before the KKT tolerance is reached. All measurements are on one system; utopia was not rerun on it.
 The pump strokes of Section~\ref{sec:strokes} borrow FP70's chamber pressure for FF200, apply it as
 a dead vertical traction on a disc, ignore the fluid between the valve and its seat, and hold the
 valves by the cavity alone; the split $C_{01}/C_{10}=4$ is assumed, and the strokes were run
 without a step-size study.
+The frozen history $S^{\mathrm{hist}}$ stays in double, and the remainder form's horizon is the
+simulated span, which a solver advancing without a known end would have to choose.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{refs}
