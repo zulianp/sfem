@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "sfem_aliases.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "smesh_exchange.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
@@ -210,6 +211,22 @@ namespace sfem {
                 std::make_shared<CRSGraph>(smesh::Buffer<count_t>::own(n + 1, rowptr, free, smesh::MEMORY_SPACE_HOST),
                                            smesh::Buffer<idx_t>::own(rowptr[n], colidx, free, smesh::MEMORY_SPACE_HOST));
         return impl_->element_node_graph;
+    }
+
+    void FunctionSpace::account(MemoryLedger &ledger, const ExecutionSpace es) const {
+        auto &mesh = *impl_->mesh;
+        ledger.add(MemoryLedger::MESH, mesh.points());
+        for (auto &block : mesh.blocks()) ledger.add(MemoryLedger::MESH, block->elements());
+        if (es == EXECUTION_SPACE_DEVICE) {
+            // Built by the device operators at their set-up.
+            ledger.add(MemoryLedger::MESH, mesh.device_points_SoA());
+            for (auto &block : mesh.blocks()) ledger.add(MemoryLedger::MESH, block->device_elements_SoA());
+        }
+        for (auto &graph : {impl_->node_to_node_graph, impl_->dof_to_dof_graph, impl_->element_node_graph}) {
+            if (!graph) continue;
+            ledger.add(MemoryLedger::GRAPH, graph->rowptr());
+            ledger.add(MemoryLedger::GRAPH, graph->colidx());
+        }
     }
 
     smesh::ElemType FunctionSpace::element_type(const int block) const { return impl_->get_element_type_for_block(block); }

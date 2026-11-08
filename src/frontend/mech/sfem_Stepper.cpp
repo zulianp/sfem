@@ -102,18 +102,22 @@ namespace sfem {
 
         real_t t    = opts.t0;
         int    step = 0;
-        // While every step has its full length, step k ends at t0 + k dt exactly rather than at a
-        // sum that has gathered rounding.
-        bool   uniform = true;
+        // The grid: interval k ends at t0 + k dt exactly, rather than at a sum that has gathered
+        // rounding. A cut step is followed by the rest of its interval, in steps of at most its
+        // length (and of max_growth times the last), so the run is back on the grid at the
+        // interval's end.
+        int    grid    = 0;
+        bool   on_grid = true;
         real_t last_dt = opts.dt;
         while (t < t_end - tol) {
-            real_t dt   = uniform ? opts.dt : std::min({opts.dt, t_end - t, opts.max_growth * last_dt});
-            int    cuts = 0;
+            const real_t target = opts.t0 + (grid + 1) * opts.dt;
+            real_t       dt     = std::min(on_grid ? opts.dt : target - t, opts.max_growth * last_dt);
+            int          cuts   = 0;
 
             NonlinearReport report;
             int             attempts = 0;
             for (;;) {
-                const real_t t_new = uniform && cuts == 0 ? opts.t0 + (step + 1) * opts.dt : t + dt;
+                const real_t t_new = t + dt >= target - tol ? target : t + dt;
                 if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
                 if (impl.scheme) impl.scheme->begin_step(t, dt);
                 for (auto &h : impl.histories) h->begin_step(t_new, dt);
@@ -151,11 +155,12 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 cuts++;
-                uniform = false;
                 dt /= 2;
             }
 
-            t = uniform ? opts.t0 + (step + 1) * opts.dt : t + dt;
+            on_grid = t + dt >= target - tol;
+            t       = on_grid ? target : t + dt;
+            grid += on_grid;
             last_dt = dt;
             step++;
 

@@ -50,6 +50,16 @@ namespace sfem {
 
         int iterations_{0};
         int iterations() const override { return iterations_; }
+        /// The last solve stopped at a direction of no positive curvature that no bound limits.
+        bool negative_curvature_{false};
+        bool met_negative_curvature() const { return negative_curvature_; }
+
+        /// Bytes of the workspace kept between solves (4 vectors, the passes' work, the control
+        /// block), in the BLAS's memory space; 0 before the first solve.
+        std::size_t workspace_bytes() const {
+            if (workspace_n_ < 0) return 0;
+            return std::size_t(4 * workspace_n_ + std::max<ptrdiff_t>(workspace_work_, 0) + mprgp_control_size<T>()) * sizeof(T);
+        }
 
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
@@ -512,7 +522,11 @@ namespace sfem {
             r.product  = apply_op;
             r.reduce   = device_reduce_;
             r.stream                 = this->blas->context().stream();
-            const MPRGPRunResult run = impl.cg_run(r, iterations_, run_state_);
+            MPRGPRunResult run;
+            {
+                SFEM_TRACE_SCOPE("MPRGP::cg_run");  // the run's launch and its wait
+                run = impl.cg_run(r, iterations_, run_state_);
+            }
             if (!run.ran) return false;
             SFEM_TRACE_SCOPE("MPRGP::device_run");  // counts the runs taken on the device
 
@@ -536,6 +550,7 @@ namespace sfem {
         void set_max_eig(const T max_eig) { max_eig_ = max_eig; }
 
         int apply(const T* const b, T* const x) override {
+            SFEM_TRACE_SCOPE("MPRGP::apply");
             assert(good());
             if (!good()) {
                 fprintf(stderr, "[Error] MPRGP needs to be properly initialized!\n");
@@ -594,12 +609,13 @@ namespace sfem {
             int count_expansion_steps = 0;
             int count_proportioning_steps = 0;
 
-            iterations_ = 0;
+            iterations_         = 0;
+            negative_curvature_ = false;
 
             if (team_op_) {
                 // The whole iteration in one region.
                 int counts[3] = {0, 0, 0};
-                team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
+                negative_curvature_ = !team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
                 count_cg_steps            = counts[0];
                 count_expansion_steps     = counts[1];
                 count_proportioning_steps = counts[2];
@@ -626,6 +642,7 @@ namespace sfem {
                     // directions, held only by the bounds.
                     if (c.move == T(MPRGPMove::UNBOUNDED)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
+                        negative_curvature_ = true;
                         break;
                     }
 
@@ -633,14 +650,17 @@ namespace sfem {
                         grads = gradients(c);
                         count_cg_steps++;
                     } else {
+                        SFEM_TRACE_SCOPE("MPRGP::expansion_step");
                         // apply_op inside!
                         grads = this->expansion_step(c, b, p, Ap_or_Ag, g, x, work);
                         count_expansion_steps++;
                     }
                 } else {
+                    SFEM_TRACE_SCOPE("MPRGP::proportioning_step");
                     // apply_op inside!
                     if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                        negative_curvature_ = true;
                         break;
                     }
 

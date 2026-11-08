@@ -54,6 +54,15 @@ namespace sfem {
                                     const ptrdiff_t         first,
                                     const ptrdiff_t         end);
     void node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub);
+    // The QP's diagonal scaling from a diagonal d, which `inverse_scale` holds on entry: each
+    // contact node's three entries replaced by their mean, then root = sqrt(d) (1 where d <= 0),
+    // inverse_scale = root, scale = 1 / root, scaled_bound = ub root.
+    void node_obstacle_scaling(const NodeObstacleView &c,
+                               const ptrdiff_t         ndofs,
+                               const real_t *const     ub,
+                               real_t *const           inverse_scale,
+                               real_t *const           scale,
+                               real_t *const           scaled_bound);
 
     // projected (a copy of the residual) less the reaction, mu kept; complementarity into c and
     // -gap into penetration, per contact node.
@@ -68,7 +77,7 @@ namespace sfem {
     void node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                      const real_t *const     r,
                                      const real_t *const     k,
-                                     const bool              capped,
+                                     const int               curvature,
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
@@ -80,7 +89,7 @@ namespace sfem {
     void node_obstacle_curvature_blocks(const NodeObstacleView &c,
                                         const real_t *const     r,
                                         const real_t *const     k,
-                                        const bool              capped,
+                                        const int               curvature,
                                         real_t *const           blocks);
     // out += B_i in at each contact node, B the packed blocks of node_obstacle_curvature_blocks.
     void node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out);

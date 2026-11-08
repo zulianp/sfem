@@ -61,7 +61,9 @@ namespace sfem {
     ///         wlf: {C1: 8.86, C2: 101.6, T_ref: 0}
     ///         temperature: 10
     ///         history_storage: full      # full, float32, float16, float16_scaled,
-    ///                                    # int16_scaled, int8_scaled
+    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md
+    ///         history_elements_per_mean: 16  # *_md on one-point elements (QuadratureState)
+    ///         stress_storage: full       # the relaxed-stress slots: full or float32
     ///
     /// An entry overrides only the keys it names, so a block can change the
     /// temperature and keep the spectrum the top level gave it.  Any other key
@@ -93,6 +95,18 @@ namespace sfem {
 
         void set_temperature(const std::string &block, const std::string &group, const real_t temperature);
 
+        /// The remainder form's horizon (`PronyRelaxation::Options::remainder_horizon`) of every
+        /// group that has none set: the span of time the caller is about to simulate.
+        void set_default_remainder_horizon(const real_t horizon);
+
+        /// Term `i` of `group`'s committed history on `block`, decoded on the host into
+        /// `values` (laid out [c][q][e]) from the stress slots.
+        void decode_history(const std::string &block, const std::string &group, const int i, real_t *const values) const;
+
+        /// Per term of `group` on `block`, PronyRelaxation::squared_norms from the stress slots,
+        /// where they live: n_terms values into the host array `out`.
+        void squared_norms(const std::string &block, const std::string &group, const int n_diagonal, real_t *const out) const;
+
         /// The blocks registered, in name order.
         std::vector<std::string> block_names() const;
         PronyRelaxation       &relaxation(const std::string &block, const std::string &group);
@@ -106,9 +120,13 @@ namespace sfem {
         /// they read are written by kernels on it.
         void set_stream(void *const stream);
 
-        /// Stress slot `slot` of a group, laid out like the history: slot 0 is
-        /// the relaxed stress the open or next step starts from, slot 1 the one
-        /// `advance` commits.  Allocated, for every block and group, at first use.
+        /// Where the operator writes stress slot `slot` of a group, laid out like
+        /// the history: slot 0 is the relaxed stress the open or next step starts
+        /// from, slot 1 the one `advance` commits.  Allocated, for every block and
+        /// group, at first use.  A group whose slots are float32
+        /// (`PronyRelaxation::Options::stress_storage`) is written to a real_t
+        /// scratch that exists only while `evaluate` runs, and rounded into the
+        /// slot after it.
         real_t *stress_scratch(const std::string &block, const std::string &stress_name, const int slot);
 
         /// Open a step at the relaxed stresses in slot 0, evaluating them at the
@@ -131,6 +149,16 @@ namespace sfem {
         /// Persistent bytes: the history and the stress slots.
         std::size_t bytes() const;
 
+        /// The persistent bytes by what holds them, summed over blocks and groups.
+        struct Bytes {
+            std::size_t history{0};    ///< the stored terms H_i, scales included
+            std::size_t reference{0};  ///< the remainder form's reference stress R
+            std::size_t frozen{0};     ///< the frozen history the kernels read
+            std::size_t stress{0};     ///< the two relaxed-stress slots
+            std::size_t total() const { return history + reference + frozen + stress; }
+        };
+        Bytes bytes_breakdown() const;
+
 #ifdef SFEM_ENABLE_RYAML
         /// Read the `relaxation` entry of `node` into `block` ("" for every block).
         void configure_from_yaml(const std::string &block, const ryml::ConstNodeRef &node);
@@ -141,8 +169,15 @@ namespace sfem {
             ptrdiff_t                                     n_elements{0};
             int                                           n_qp{0};
             std::vector<std::shared_ptr<PronyRelaxation>> groups;
+            //! A stress slot: real_t, or float32 when the group's stress_storage is.
+            struct Slot {
+                std::shared_ptr<Buffer<real_t>> full;
+                std::shared_ptr<Buffer<float>>  narrow;
+            };
             //! [slot][group]: slot 0 the step's start, slot 1 its end.
-            std::vector<std::vector<std::shared_ptr<Buffer<real_t>>>> stress;
+            std::vector<std::vector<Slot>> stress;
+            //! [group]: where a float32 group's stress is evaluated, during `evaluate` only.
+            std::vector<std::shared_ptr<Buffer<real_t>>> scratch;
         };
 
         int          group_index(const std::string &group) const;
@@ -150,7 +185,9 @@ namespace sfem {
         int          stress_index(const std::string &stress) const;
         Block       &block(const std::string &name);
         const Block &block(const std::string &name) const;
-        const real_t *slot(const Block &b, const int slot, const size_t group) const;
+        bool          narrow(const Block &b, const size_t group) const;
+        void          begin_group(Block &b, const size_t group, const real_t t, const real_t dt);
+        void          advance_group(Block &b, const size_t group);
         void          allocate_stress();
         void          evaluate(const real_t *const x, const int slot, const StressEvaluation &evaluate);
 

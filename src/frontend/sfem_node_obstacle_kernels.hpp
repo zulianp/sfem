@@ -84,35 +84,99 @@ SFEM_HOST_DEVICE SFEM_INLINE real_t node_obstacle_kkt(const real_t *const n,
     return mu;
 }
 
-// B += sign scale mu H, the constraint's curvature C (6 packed) at a node in contact (mu > 0, gap
-// within mu / k); with `capped` scaled so that its most negative part stays within k / 2. B in the
-// tangent's value type, each entry rounded once.
+// How much of the constraints' curvature a tangent takes (node_obstacle_curvature).
+enum NodeObstacleCurvature : int {
+    // The whole term.
+    NODE_OBSTACLE_CURVATURE_FULL = 0,
+    // Scaled so that each node's most negative part stays within k / 2.
+    NODE_OBSTACLE_CURVATURE_CAPPED = 1,
+    // Each node's block without its negative eigenvalues: positive semidefinite, as the material's
+    // tangent projected per quadrature point (Newton's tangent_projection).
+    NODE_OBSTACLE_CURVATURE_PSD = 2,
+};
+
+// The symmetric 3x3 A (row major) with its negative eigenvalues set to zero: cyclic Jacobi
+// rotations, A = V diag(lambda) V^T, then V diag(max(lambda, 0)) V^T.
+SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_psd3(real_t *const A) {
+    real_t V[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+    for (int sweep = 0; sweep < 12; ++sweep) {
+        const real_t off   = A[1] * A[1] + A[2] * A[2] + A[5] * A[5];
+        const real_t scale = A[0] * A[0] + A[4] * A[4] + A[8] * A[8];
+        if (off <= real_t(1e-30) * scale || off == 0) break;
+        for (int pq = 0; pq < 3; ++pq) {
+            const int p = pq == 2 ? 1 : 0, q = pq == 0 ? 1 : 2;
+            const real_t apq = A[p * 3 + q];
+            if (apq == 0) continue;
+            // The rotation J (c at pp and qq, s at pq, -s at qp) that zeroes A'_pq in J^T A J.
+            const real_t theta = (A[q * 3 + q] - A[p * 3 + p]) / (2 * apq);
+            const real_t t     = (theta >= 0 ? real_t(1) : real_t(-1)) / (fabs(theta) + sqrt(theta * theta + 1));
+            const real_t c     = 1 / sqrt(t * t + 1);
+            const real_t s     = t * c;
+            real_t       J[9]  = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+            J[p * 3 + p] = c;
+            J[q * 3 + q] = c;
+            J[p * 3 + q] = s;
+            J[q * 3 + p] = -s;
+            real_t AJ[9], VJ[9];
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    AJ[i * 3 + j] = A[i * 3] * J[j] + A[i * 3 + 1] * J[3 + j] + A[i * 3 + 2] * J[6 + j];
+                    VJ[i * 3 + j] = V[i * 3] * J[j] + V[i * 3 + 1] * J[3 + j] + V[i * 3 + 2] * J[6 + j];
+                }
+            }
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    A[i * 3 + j] = J[i] * AJ[j] + J[3 + i] * AJ[3 + j] + J[6 + i] * AJ[6 + j];
+                }
+            }
+            for (int c9 = 0; c9 < 9; ++c9) V[c9] = VJ[c9];
+            A[p * 3 + q] = A[q * 3 + p] = 0;
+        }
+    }
+    const real_t lambda[3] = {fmax(A[0], real_t(0)), fmax(A[4], real_t(0)), fmax(A[8], real_t(0))};
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            A[i * 3 + j] = V[i * 3] * lambda[0] * V[j * 3] + V[i * 3 + 1] * lambda[1] * V[j * 3 + 1] +
+                           V[i * 3 + 2] * lambda[2] * V[j * 3 + 2];
+        }
+    }
+}
+
+// B += sign mu H, the constraint's curvature C (6 packed) at a node in contact (mu > 0, gap within
+// mu / k), as much of it as `mode` takes (NodeObstacleCurvature). B in the tangent's value type, each
+// entry rounded once.
 template <typename B_t>
 SFEM_HOST_DEVICE SFEM_INLINE void node_obstacle_curvature(const real_t *const n,
                                                           const real_t *const C,
                                                           const real_t *const ri,
                                                           const real_t        gap,
                                                           const real_t        k,
-                                                          const bool          capped,
+                                                          const int           mode,
                                                           const real_t        sign,
                                                           B_t *const          B) {
     const real_t mu = fmax(real_t(0), -(n[0] * ri[0] + n[1] * ri[1] + n[2] * ri[2]));
     if (mu == 0 || gap > mu / k) return;
 
-    const real_t H[9] = {C[0], C[1], C[2], C[1], C[3], C[4], C[2], C[4], C[5]};
+    real_t H[9] = {C[0], C[1], C[2], C[1], C[3], C[4], C[2], C[4], C[5]};
+    for (int c = 0; c < 9; ++c) H[c] *= mu;
 
-    real_t lowest = 0;
-    for (int a = 0; a < 3; ++a) {
-        real_t off = 0;
-        for (int b = 0; b < 3; ++b) {
-            if (b != a) off += fabs(H[a * 3 + b]);
+    if (mode == NODE_OBSTACLE_CURVATURE_PSD) {
+        node_obstacle_psd3(H);
+    } else if (mode == NODE_OBSTACLE_CURVATURE_CAPPED) {
+        real_t lowest = 0;
+        for (int a = 0; a < 3; ++a) {
+            real_t off = 0;
+            for (int b = 0; b < 3; ++b) {
+                if (b != a) off += fabs(H[a * 3 + b]);
+            }
+            lowest = fmin(lowest, H[a * 3 + a] - off);
         }
-        lowest = fmin(lowest, mu * (H[a * 3 + a] - off));
+        const real_t scale = lowest < -k / 2 ? k / (2 * -lowest) : 1;
+        for (int c = 0; c < 9; ++c) H[c] *= scale;
     }
-    const real_t scale = capped && lowest < -k / 2 ? k / (2 * -lowest) : 1;
 
     for (int c = 0; c < 9; ++c) {
-        B[c] = B_t(B[c] + sign * scale * mu * H[c]);
+        B[c] = B_t(B[c] + sign * H[c]);
     }
 }
 

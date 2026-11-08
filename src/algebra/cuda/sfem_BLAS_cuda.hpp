@@ -17,6 +17,8 @@ void *d_buffer_alloc(const size_t n);
 void  d_buffer_destroy(void *a);
 
 void d_memset(void *ptr, int value, const size_t n);
+/// Bytes in use on the current device, by this process and any other: total minus free.
+size_t d_memory_in_use(void);
 void copy_device_to_host(const size_t n, const void *const d, void *h);
 void copy_host_to_device(const size_t n, const void *const h, void *d);
 void d_memcpy(const ptrdiff_t n, const void *const src, void *const dest);

@@ -692,7 +692,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_prony_tri3_hessian_a_msoa
   }
 }
 
-template <typename s_t, typename v_t, typename g_t, int FORMAT>
+template <typename s_t, typename v_t, typename g_t, int FORMAT, bool PROJECT = false>
 __global__ void mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
@@ -754,7 +754,14 @@ __global__ void mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl(
     badj3[0] = s_t(g_adj3[element]);
     bdet0[0] = s_t(g_det0[element]);
 
-    mooney_rivlin_prony_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + element, nelements, bu_data, element_matrix);
+    if constexpr (PROJECT) {
+      const s_t projected_grad_ref_x[NS] = {s_t(-1), s_t(1), s_t(0)};
+      const s_t projected_grad_ref_y[NS] = {s_t(-1), s_t(0), s_t(1)};
+      const s_t projected_q_weight[1] = {s_t(1) / s_t(2)};
+      mooney_rivlin_prony_d2_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, PROJECT>(badj0, badj1, badj2, badj3, bdet0, projected_grad_ref_x, projected_grad_ref_y, projected_q_weight, C01, C10, K, iso_relaxation_gamma, iso_history + element, nelements, bu_data, element_matrix);
+    } else {
+      mooney_rivlin_prony_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, C01, C10, K, iso_relaxation_gamma, iso_history + element, nelements, bu_data, element_matrix);
+    }
 
     if constexpr (FORMAT == 1) {
       mooney_rivlin_prony_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
@@ -830,6 +837,72 @@ extern "C" int cu_mooney_rivlin_prony_tri3_hessian_bsr_a_msoa(
       break;
   }
   return sfem::codegen::unsupported_values_dispatch("mooney_rivlin_prony_tri3_hessian_bsr_a_msoa", (int)scalar_bytes, (int)values_bytes);
+}
+
+extern "C" int cu_mooney_rivlin_prony_tri3_hessian_bsr_psd_a_msoa(
+        const int scalar_bytes,
+        const int values_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t C01,
+        const real_t C10,
+        const real_t K,
+        const real_t iso_relaxation_gamma,
+        const void *const RSTR iso_history,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values,
+        void *const stream
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+      switch (values_bytes) {
+        case (int)sizeof(double): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<double, double, geom_t, 1, true><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<double, float, geom_t, 1, true><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    case (int)sizeof(float): {
+      switch (values_bytes) {
+        case (int)sizeof(float): {
+            if (nelements <= 0) return SFEM_SUCCESS;
+            const int block_size = 256;
+            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            sfem::codegen::mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl<float, float, geom_t, 1, true><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::launch_status("mooney_rivlin_prony_tri3_hessian_a_msoa_assemble_impl");
+        }
+        default:
+          break;
+      }
+      break;
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_values_dispatch("mooney_rivlin_prony_tri3_hessian_bsr_psd_a_msoa", (int)scalar_bytes, (int)values_bytes);
 }
 
 

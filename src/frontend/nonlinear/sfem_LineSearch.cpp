@@ -14,6 +14,8 @@ namespace sfem {
                 return "accepted";
             case LineSearchResult::Status::BEST_DECREASE:
                 return "best_decrease";
+            case LineSearchResult::Status::NONMONOTONE:
+                return "nonmonotone";
             case LineSearchResult::Status::AT_RESOLUTION:
                 return "at_resolution";
             case LineSearchResult::Status::NO_DECREASE:
@@ -30,7 +32,8 @@ namespace sfem {
                                         const real_t *const x,
                                         const real_t *const h,
                                         const real_t        m0,
-                                        const real_t        slope) {
+                                        const real_t        slope,
+                                        const real_t        reference) {
         SFEM_TRACE_SCOPE("LineSearch::search");
 
         LineSearchResult result;
@@ -65,8 +68,8 @@ namespace sfem {
         }
 
         // Armijo needs a descent direction; along an ascent one only a measured decrease counts.
-        auto armijo = [&](const int i) {
-            return slope < 0 && values_[i] <= m0 + options_.c1 * steps[i] * slope;
+        auto armijo = [&](const int i, const real_t ref) {
+            return slope < 0 && values_[i] <= ref + options_.c1 * steps[i] * slope;
         };
 
         int accepted = -1;
@@ -74,7 +77,7 @@ namespace sfem {
             merit.evaluate(x, h, n, steps.data(), values_.data());
             result.evaluations = n;
             for (int i = 0; i < n; ++i) {
-                if (armijo(i)) {
+                if (armijo(i, m0)) {
                     accepted = i;
                     break;
                 }
@@ -83,7 +86,7 @@ namespace sfem {
             for (int i = 0; i < n; ++i) {
                 merit.evaluate(x, h, 1, &steps[i], &values_[i]);
                 result.evaluations++;
-                if (armijo(i)) {
+                if (armijo(i, m0)) {
                     accepted = i;
                     break;
                 }
@@ -107,6 +110,20 @@ namespace sfem {
             result.alpha  = steps[best];
             result.merit  = values_[best];
             return result;
+        }
+
+        // No step decreases the merit. Measured against the largest merit of the step's last
+        // iterates instead, the first step that satisfies Armijo there is taken: the rise of a
+        // residual merit where a few contacts switch near the tolerance. Every step was evaluated.
+        if (best >= 0 && reference > m0) {
+            for (int i = 0; i < n; ++i) {
+                if (armijo(i, reference)) {
+                    result.status = LineSearchResult::Status::NONMONOTONE;
+                    result.alpha  = steps[i];
+                    result.merit  = values_[i];
+                    return result;
+                }
+            }
         }
 
         result.alpha = 0;
