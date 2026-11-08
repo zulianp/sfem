@@ -1058,6 +1058,7 @@ def _inexact_definitions(
     holds_scheme,
     previous_state,
     team=False,
+    projects=False,
 ):
     """The stored-tangent methods, delegating to the library's stores.
 
@@ -1070,6 +1071,10 @@ def _inexact_definitions(
     `affine_condition` and `affine_cache` say when this operator's exact apply
     reads the cached affine geometry and where it keeps it, so the stored
     tangent is evaluated on the geometry the exact one is.
+
+    `projects`: the material publishes the projected tangent
+    (`set_tangent_projection`); the stores take it too, projected per point at
+    their set-up, so their applies are unchanged.
     """
     from codegen.framework.plans.point_tangent import (
         flux_form_for_collection,
@@ -1092,6 +1097,8 @@ def _inexact_definitions(
     symmetric = {unit_symmetric for _label, _struct, unit_symmetric in units}
     if len(symmetric) != 1:
         raise ValueError("%s: the elements disagree on the tangent's symmetry" % material.name)
+    if projects and not next(iter(symmetric)):
+        raise ValueError("%s: a projected tangent is symmetric, the stored one is not" % material.name)
     op = _op_class_name(material)
 
     device = _runs_on_device()
@@ -1239,7 +1246,7 @@ def _inexact_definitions(
       input.parameters = %(parameter_pointer)s;
       input.u_stride = 3;
       input.u = x;
-%(previous)s      store->update(input);
+%(previous)s%(projection)s      store->update(input);
       return SFEM_SUCCESS;
     });
   }
@@ -1254,6 +1261,7 @@ def _inexact_definitions(
         "affine_condition": affine_condition,
         "affine_cache": affine_cache,
         "previous": previous,
+        "projection": "      input.project = impl_->project_tangent;\n" if projects else "",
         "inertia": inertia,
         "inertia_diagonal": inertia_diagonal,
         "stream_parameter": _INEXACT_STREAM_PARAMETER[device],
@@ -2545,6 +2553,7 @@ namespace sfem {
             holds_scheme=True,
             previous_state=None,
             team=team,
+            projects=bool(projected_elements),
         ),
     )
     source = _append_inexact_definitions(

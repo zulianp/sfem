@@ -1060,7 +1060,7 @@ namespace sfem {
             if (!step) return SFEM_FAILURE;
             if (newton_options.tangent_projection != TangentProjection::NONE && !step->tangent_projection_supported()) {
                 fprintf(stderr,
-                        "Playground: solver.newton.tangent_projection needs solver.linear.format BSR, no obstacle and a "
+                        "Playground: solver.newton.tangent_projection needs solver.linear.format BSR or INEXACT and a "
                         "material that projects its tangent on every element of the mesh; the %s step has not\n",
                         step->name());
                 return SFEM_FAILURE;

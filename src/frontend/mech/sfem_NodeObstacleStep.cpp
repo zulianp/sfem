@@ -380,7 +380,9 @@ namespace sfem {
     int NodeObstacleStep::iterations() const { return impl_->iterations; }
 
     bool NodeObstacleStep::tangent_projection_supported() const {
-        return impl_->options.tangent.format == op_type::BSR && impl_->f->tangent_projection_supported();
+        const auto &format = impl_->options.tangent.format;
+        const bool  stored = format == op_type::INEXACT && impl_->f->inexact_stores_every_tangent();
+        return (format == op_type::BSR || stored) && impl_->f->tangent_projection_supported();
     }
 
     void NodeObstacleStep::set_tangent_projection(const bool on) {
