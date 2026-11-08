@@ -14,11 +14,24 @@
 #include "sfem_Function_incore_cuda.hpp"
 #endif
 #include "sfem_NodeObstacleView.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_aliases.hpp"
 
 namespace sfem {
 
     // normals and curvature are flat: rows of n entries.
+    void NodeObstacleContact::account(MemoryLedger &ledger) const {
+        for (auto *buffer : {&complementarity_, &penetration_, &normals_, &curvature_, &gap_, &mu_, &frames_, &ahead_,
+                             &ahead_gap_, &ahead_normals_, &p0_}) {
+            ledger.add(MemoryLedger::CONTACT, *buffer);
+        }
+        ledger.add(MemoryLedger::CONTACT, nodes_);
+        ledger.add(MemoryLedger::CONTACT, idx_);
+        ledger.add(MemoryLedger::CONTACT, frame_of_);
+        for (auto &row : point_rows_) ledger.add(MemoryLedger::CONTACT, row);
+        if (obstacle_) obstacle_->account(ledger);
+    }
+
     NodeObstacleView NodeObstacleContact::view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const {
         NodeObstacleView c;
         c.es       = context_.space();

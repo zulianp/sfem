@@ -8,6 +8,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_NodeObstacleContact.hpp"
 #include "sfem_TeamBLAS.hpp"
 #include "sfem_blas_factory.hpp"
@@ -60,6 +61,8 @@ namespace sfem {
             std::shared_ptr<Operator<real_t>>             op() const override { return product; }
             std::shared_ptr<TeamOperator<real_t>> team() const override { return team_product; }
             bool team_capable() const override { return tangent->execution_space() == EXECUTION_SPACE_HOST; }
+
+            void account(MemoryLedger &ledger) const override { tangent->account(ledger); }
 
         private:
             void add(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature_term, const real_t sign) {
@@ -136,6 +139,14 @@ namespace sfem {
             std::shared_ptr<Operator<real_t>> op() const override { return product; }
             std::shared_ptr<TeamOperator<real_t>> team() const override { return team_product; }
             bool team_capable() const override { return team_product != nullptr; }
+
+            void account(MemoryLedger &ledger) const override {
+                // The stored tangent's codes, where its operators run (zero matrix-free).
+                ledger.add(MemoryLedger::TANGENT_VALUES,
+                           f->inexact_bytes(),
+                           es == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
+                for (auto *buffer : {&state, &reference, &tmp, &blocks}) ledger.add(MemoryLedger::TANGENT_WORK, *buffer);
+            }
 
             void build() {
                 // The material's product accumulates (Function::inexact_apply, Function::apply), its

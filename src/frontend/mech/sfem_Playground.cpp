@@ -29,6 +29,7 @@
 #include "sfem_SSMGCStep.hpp"
 #include "sfem_NodeObstacleStep.hpp"
 #include "sfem_ObstacleShape.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_Observers.hpp"
 #include "sfem_RelaxationGroups.hpp"
 #include "sfem_Rotation.hpp"
@@ -1234,6 +1235,18 @@ namespace sfem {
                 if (read<bool>(output, "quantities", false)) {
                     stepper->add_observer(std::make_shared<Quantities>(f, material, host_dirichlet, path));
                 }
+                if (has(output, "history_snapshots")) {
+                    auto snapshots   = child(output, "history_snapshots");
+                    auto dependent   = std::dynamic_pointer_cast<HistoryDependent>(material);
+                    auto relaxations = dependent ? dependent->relaxation_state() : nullptr;
+                    if (!relaxations || mesh->comm()->size() > 1) {
+                        fprintf(stderr, "Playground: output.history_snapshots needs a material with a Prony series, on one rank\n");
+                        return SFEM_FAILURE;
+                    }
+                    const smesh::Path dir = has(snapshots, "path") ? smesh::Path(config.resolve(read_string(snapshots, "path", "")))
+                                                                   : path / "history";
+                    stepper->add_observer(create_history_snapshots(*relaxations, read_list<real_t>(snapshots, "times", {}), dir, es));
+                }
             } else if (has(output, "fields") || has(output, "quantities")) {
                 fprintf(stderr, "Playground: output.fields and output.quantities need output.path\n");
                 return SFEM_FAILURE;
@@ -1267,7 +1280,14 @@ namespace sfem {
                         }
                         probe = create_prony_probe(*relaxations, mesh->comm());
                     } else if (type == "memory") {
-                        probe = create_memory_probe(mesh->comm());
+                        // What the solve keeps between steps: the step's tangent and vectors first
+                        // (buffers they share with the space are theirs), then the scheme's state,
+                        // then the mesh, the graphs and the cached geometry.
+                        probe = create_memory_probe(mesh->comm(), [this](MemoryLedger &ledger) {
+                            if (newton) newton->account(ledger);
+                            if (scheme) scheme->account(ledger);
+                            f->account(ledger);
+                        });
                     } else if (type == "contact" && obstacle) {
                         std::function<real_t()> min_gap = [c = contact] { return c->min_gap(); };
                         if (ssmgc_step) min_gap = [s = ssmgc_step] { return s->min_gap(); };

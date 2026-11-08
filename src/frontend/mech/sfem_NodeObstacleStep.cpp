@@ -18,6 +18,7 @@
 #include "sfem_Merit.hpp"
 #include "sfem_TimeScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_ParallelOperator.hpp"
@@ -389,6 +390,24 @@ namespace sfem {
         impl_->projection_managed = true;
         impl_->tangent_projected  = on;
         impl_->f->set_tangent_projection(on);
+    }
+
+    void NodeObstacleStep::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        // The tangent first: buffers it shares with the step are its.
+        if (impl.tangent) impl.tangent->account(ledger);
+        ledger.add(MemoryLedger::TANGENT_WORK, impl.eigen_vector);
+        ledger.add(MemoryLedger::TANGENT_WORK, impl.eigen_work);
+        for (auto *buffer : {&impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag,
+                             &impl.trial_r, &impl.scale, &impl.inverse_scale, &impl.scaled_bound, &impl.qp_tmp}) {
+            ledger.add(MemoryLedger::STEP, *buffer);
+        }
+        if (impl.qp) {
+            ledger.add(MemoryLedger::STEP,
+                       impl.qp->workspace_bytes(),
+                       impl.f->execution_space() == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
+        }
+        if (impl.contact) impl.contact->account(ledger);
     }
 
     bool NodeObstacleStep::met_negative_curvature() const { return impl_->negative_curvature; }

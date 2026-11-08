@@ -78,6 +78,7 @@ output:
   probes:
     - {type: contact}
     - {type: prony}
+    - {type: memory}
     - {type: control_point, name: pv_centre, at: [-0.011, -0.0008, 0]}
     - {type: control_point, name: pv_end0, at: [-0.0159, -0.0008, 0]}
     - {type: control_point, name: pv_end1, at: [-0.0061, -0.0008, 0]}

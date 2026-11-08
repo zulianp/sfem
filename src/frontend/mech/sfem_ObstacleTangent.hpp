@@ -11,6 +11,7 @@
 #include "sfem_defs.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     class Function;
     class NodeObstacleContact;
@@ -59,6 +60,10 @@ namespace sfem {
         virtual std::shared_ptr<TeamOperator<real_t>> team() const { return nullptr; }
         /// Whether team() is there once assembled: the product runs on a region's threads.
         virtual bool team_capable() const { return false; }
+
+        /// What it keeps between steps: its numbers (TANGENT_VALUES), their index arrays
+        /// (TANGENT_STRUCTURE) and the vectors only this format needs (TANGENT_WORK).
+        virtual void account(MemoryLedger &ledger) const = 0;
     };
 
 }  // namespace sfem
