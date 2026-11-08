@@ -128,6 +128,8 @@ namespace sfem {
                 "output.path",
                 "output.export_freq",
                 "output.history_csv",
+                "output.history_snapshots.times",
+                "output.history_snapshots.path",
                 "output.fields",
                 "output.quantities",
                 "output.probes[].type",

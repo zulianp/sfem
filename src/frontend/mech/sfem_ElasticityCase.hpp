@@ -108,6 +108,8 @@ namespace sfem {
     ///   path: output
     ///   export_freq: 1
     ///   history_csv: history.csv
+    ///   history_snapshots: {times: [0.01, 0.02], path: history}   # the Prony history at those
+    ///                                        # times, per element (one rank; path/history by default)
     ///   fields: [material_reaction]          # exported beside disp (and velocity, acceleration);
     ///                                        # gap and contact_force with an obstacle
     ///   quantities: true                     # path/quantities.yaml: objective and reactions

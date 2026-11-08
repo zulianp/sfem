@@ -670,6 +670,45 @@ int test_prony_probe() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The history snapshots of the twisted bar: at t = 1 and t = 2 a stress history and the one term's
+// history per element; under the held twist the term decays by exp(-1) between them.
+int test_history_snapshots() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_history_snapshots_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    auto pg = assemble(PRONY_TORSION,
+                       {"output.path=" + dir,
+                        "output.history_snapshots={times: [1, 2]}",
+                        "constraints=[{type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.4, "
+                        "profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}}]"});
+    SFEM_TEST_ASSERT(pg != nullptr);
+    SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+    auto read = [&](const int k, const std::string &suffix) {
+        std::vector<double> v;
+        for (auto &entry : std::filesystem::directory_iterator(dir + "/history/" + std::to_string(k))) {
+            const std::string name = entry.path().filename().string();
+            if (name.size() < suffix.size() || name.compare(name.size() - suffix.size(), suffix.size(), suffix) != 0) continue;
+            std::ifstream f(entry.path(), std::ios::binary);
+            v.resize(std::filesystem::file_size(entry.path()) / sizeof(double));
+            f.read(reinterpret_cast<char *>(v.data()), v.size() * sizeof(double));
+        }
+        return v;
+    };
+    auto norm = [](const std::vector<double> &v) {
+        double s = 0;
+        for (const double x : v) s += x * x;
+        return std::sqrt(s);
+    };
+    const auto H1 = read(0, ".H0.float64"), H2 = read(1, ".H0.float64"), S1 = read(0, ".Shist.float64");
+    // 6 x 2 x 2 hexahedra, 6 components (or 9) per element.
+    printf("  %zu values, |H0(1)| %g, |H0(2)| / |H0(1)| %g (exp(-1) %g)\n", H1.size(), norm(H1), norm(H2) / norm(H1), std::exp(-1.0));
+    SFEM_TEST_ASSERT(!H1.empty() && H1.size() == H2.size() && S1.size() == H1.size() && H1.size() % 24 == 0);
+    SFEM_TEST_ASSERT(norm(H1) > 0 && norm(S1) > 0);
+    SFEM_TEST_ASSERT(std::abs(norm(H2) / norm(H1) - std::exp(-1.0)) < 1e-3);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 // The rotation driven by its torque: every step ends with the probe's torque on the ramped
 // target, and under the held torque the Prony solid keeps turning.
 int test_torque_control() {
@@ -837,6 +876,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_torque_control);
     SFEM_RUN_TEST(test_prony_starts_relaxed);
     SFEM_RUN_TEST(test_prony_probe);
+    SFEM_RUN_TEST(test_history_snapshots);
     SFEM_RUN_TEST(test_boundary_increment_is_carried);
     SFEM_RUN_TEST(test_large_increment_in_fractions);
     SFEM_UNIT_TEST_FINALIZE();

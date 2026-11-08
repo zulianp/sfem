@@ -18,7 +18,8 @@
 #   history  full, float32, float16, float16_scaled, int16_scaled, int8_scaled, float16_md,
 #            int8_md; _p<P> elements per mean (TET4), _plain no remainder form, _s32 float32
 #            stress slots
-# SNAP_RUNS also write the history at the times SNAP (output.history_snapshots).
+# SNAP_RUNS also write the history at the times SNAP (output.history_snapshots). EXTRA: further
+# options for every run (a smoke run: EXTRA="--set time.t_end=3e-4").
 set -u
 SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PLAYGROUND=$SRC/build-cuda/playground
@@ -77,7 +78,7 @@ go() {  # <run>
   start=$(date +%s.%N)
   # shellcheck disable=SC2086
   SMESH_TRACE_FILE=$W/smesh.trace.csv srun --exact -n 1 -c 72 --gpus-per-task=1 "$PLAYGROUND" sim2.yaml \
-      --set execution_space=device $MESH $targs $hargs ${snap[@]+"${snap[@]}"} \
+      --set execution_space=device $MESH $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
       --set output.path=sim2 --set output.history_csv=sim2/history.csv > run.log 2>&1
   local rc=$?
   echo "$ELEMENT $run rc=$rc wall=$(echo "$(date +%s.%N) - $start" | bc)s steps=$(grep -cE '^step .*converged' run.log)" \
