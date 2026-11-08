@@ -64,6 +64,9 @@ namespace sfem {
         void          begin_step(real_t t, real_t dt) override;
         void          advance(const real_t *const x) override;
         void          account(MemoryLedger &ledger) const override;
+        /// u_n, u_{n-1}, v_n, v_{n-1}, the last step's length and whether the first step is taken.
+        int           write_state(const std::string &dir) const override;
+        int           read_state(const std::string &dir) override;
 
         std::shared_ptr<Op> inertia_op() const override;
 

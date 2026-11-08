@@ -1,5 +1,9 @@
 #include "sfem_Playground.hpp"
 
+#include <map>
+
+#include "sfem_StateFiles.hpp"
+
 #ifdef SFEM_ENABLE_RYAML
 
 #include <cmath>
@@ -176,6 +180,9 @@ namespace sfem {
         std::shared_ptr<NonlinearSolver>                   nonlinear;
         std::unique_ptr<Stepper>                           stepper;
         SharedBuffer<real_t>                               x;
+        /// restart: the folder of a saved state (Playground::write_state), read after the initial
+        /// conditions.
+        std::string                                        restart_dir;
         SidesetLookup                                      lookup;
         bool                                               verbose{true};
         bool                                               packed{true};
@@ -582,6 +589,31 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
             }
+            return SFEM_SUCCESS;
+        }
+
+        /// The state Playground::write_state saved: the solution, the scheme's state, the history.
+        /// The initial conditions have run; this replaces what they set.
+        int read_state(const std::string &dir) {
+            std::map<std::string, double> numbers;
+            double                        n_dofs = 0;
+            if (read_state_numbers(smesh::Path(dir) / "playground.txt", numbers) || state_number(numbers, "n_dofs", &n_dofs)) {
+                return SFEM_FAILURE;
+            }
+            if ((ptrdiff_t)n_dofs != fs->n_dofs() || mesh->comm()->size() > 1) {
+                fprintf(stderr, "Playground: the restart state in %s has %g dofs (this case %td) or the run has several ranks\n",
+                        dir.c_str(), n_dofs, fs->n_dofs());
+                return SFEM_FAILURE;
+            }
+            if (read_state_buffer(smesh::Path(dir) / "x.raw", x)) return SFEM_FAILURE;
+            if (scheme && scheme->read_state(dir) != SFEM_SUCCESS) {
+                fprintf(stderr, "Playground: the time scheme cannot read its state from %s\n", dir.c_str());
+                return SFEM_FAILURE;
+            }
+            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) {
+                if (history->read_history(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
+            }
+            if (mesh->comm()->rank() == 0) printf("Playground: restarted from %s\n", dir.c_str());
             return SFEM_SUCCESS;
         }
 
@@ -1123,13 +1155,34 @@ namespace sfem {
                 if (std::dynamic_pointer_cast<BDF2Scheme>(scheme)) options.max_growth = 2;
             }
 
+            // A restart (restart: <dir>, Playground::write_state) starts at the saved time and runs
+            // on to the case's end; the Prony remainder horizon stays the whole run's.
+            const real_t run_length = options.steps * options.dt;
+            if (has(config.root(), "restart") && regime != "steady") {
+                const auto                    dir = config.resolve(read_string(config.root(), "restart", ""));
+                std::map<std::string, double> numbers;
+                double                        t = 0, step = 0;
+                if (read_state_numbers(smesh::Path(dir) / "playground.txt", numbers) || state_number(numbers, "t", &t) ||
+                    state_number(numbers, "step", &step)) {
+                    fprintf(stderr, "Playground: cannot read the restart state in %s\n", dir.c_str());
+                    return SFEM_FAILURE;
+                }
+                options.t0    = (real_t)t;
+                options.steps = (int)std::llround((run_length - options.t0) / options.dt);
+                if (options.steps <= 0) {
+                    fprintf(stderr, "Playground: the restart state is at t = %g, past the end %g\n", t, (double)run_length);
+                    return SFEM_FAILURE;
+                }
+                restart_dir = dir;
+            }
+
             stepper = std::make_unique<Stepper>(f, nonlinear, options);
             stepper->set_time_scheme(scheme);
             if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) {
                 stepper->add_history(history);
                 // A Prony term slower than the run is stored as a remainder (PronyRelaxation).
                 if (auto *relaxations = history->relaxation_state()) {
-                    relaxations->set_default_remainder_horizon(options.steps * options.dt);
+                    relaxations->set_default_remainder_horizon(run_length);
                 }
             }
             for (auto &set : time_dependent) stepper->add_time_dependent(set);
@@ -1368,6 +1421,7 @@ namespace sfem {
 
         impl.x = create_buffer<real_t>(impl.fs->n_dofs(), impl.es);
         if (impl.initial_conditions(config) != SFEM_SUCCESS) return nullptr;
+        if (!impl.restart_dir.empty() && impl.read_state(impl.restart_dir) != SFEM_SUCCESS) return nullptr;
         if (impl.release_from_start) impl.contact->capture_penetration(impl.x->data());
         // The problem size, whatever the Newton verbosity: a timing is read against it. Over the
         // ranks, the owned elements and dofs.
@@ -1390,6 +1444,22 @@ namespace sfem {
     }
 
     int Playground::run() { return impl_->stepper->run(impl_->x->data()); }
+
+    int Playground::write_state(const std::string &dir, const real_t t, const int step) const {
+        auto &impl = *impl_;
+        if (impl.mesh->comm()->size() > 1) {
+            fprintf(stderr, "Playground::write_state: one rank only\n");
+            return SFEM_FAILURE;
+        }
+        if (smesh::create_directory(smesh::Path(dir)) != SFEM_SUCCESS) return SFEM_FAILURE;
+        if (write_state_buffer(smesh::Path(dir) / "x.raw", impl.x)) return SFEM_FAILURE;
+        if (impl.scheme && impl.scheme->write_state(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
+        if (auto history = std::dynamic_pointer_cast<HistoryDependent>(impl.material)) {
+            if (history->write_history(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
+        }
+        return write_state_numbers(smesh::Path(dir) / "playground.txt",
+                                   {{"t", (double)t}, {"step", (double)step}, {"n_dofs", (double)impl.fs->n_dofs()}});
+    }
 
     std::shared_ptr<Function>   Playground::function() const { return impl_->f; }
     std::shared_ptr<Op>         Playground::material() const { return impl_->material; }

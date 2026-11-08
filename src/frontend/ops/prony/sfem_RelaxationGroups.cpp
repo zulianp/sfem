@@ -1,4 +1,6 @@
 #include "sfem_RelaxationGroups.hpp"
+#include "sfem_HistoryDependent.hpp"
+#include "sfem_StateFiles.hpp"
 
 #include <cassert>
 #include <utility>
@@ -469,5 +471,83 @@ namespace sfem {
         }
     }
 #endif  // SFEM_ENABLE_RYAML
+
+    int RelaxationGroups::write_state(const std::string &dir) {
+        const smesh::Path d(dir);
+        if (write_state_numbers(d / "relaxation.txt",
+                                {{"start_stress_current", start_stress_current_ ? 1.0 : 0.0},
+                                 {"start_unknown", start_unknown_ ? 1.0 : 0.0},
+                                 {"n_blocks", (double)blocks_.size()},
+                                 {"n_groups", (double)declarations_.size()}})) {
+            return SFEM_FAILURE;
+        }
+        for (auto &entry : blocks_) {
+            const std::string name = entry.first;
+            Block            &b    = entry.second;
+            for (size_t g = 0; g < b.groups.size(); g++) {
+                if (b.groups[g] && b.groups[g]->write_state(dir + "/prony_" + name + "_" + std::to_string(g))) return SFEM_FAILURE;
+            }
+            for (size_t s = 0; s < b.stress.size(); s++) {
+                for (size_t g = 0; g < b.stress[s].size(); g++) {
+                    const std::string file = dir + "/stress_" + name + "_" + std::to_string(s) + "_" + std::to_string(g);
+                    const auto       &slot = b.stress[s][g];
+                    if (slot.full && write_state_buffer(smesh::Path(file + ".raw"), slot.full)) return SFEM_FAILURE;
+                    if (slot.narrow && write_state_buffer(smesh::Path(file + ".float32"), slot.narrow)) return SFEM_FAILURE;
+                }
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
+    int RelaxationGroups::read_state(const std::string &dir) {
+        std::map<std::string, double> numbers;
+        double                        current = 0, unknown = 0, n_blocks = 0, n_groups = 0;
+        if (read_state_numbers(smesh::Path(dir) / "relaxation.txt", numbers) ||
+            state_number(numbers, "start_stress_current", &current) || state_number(numbers, "start_unknown", &unknown) ||
+            state_number(numbers, "n_blocks", &n_blocks) || state_number(numbers, "n_groups", &n_groups)) {
+            return SFEM_FAILURE;
+        }
+        if ((size_t)n_blocks != blocks_.size() || (size_t)n_groups != declarations_.size()) {
+            fprintf(stderr, "RelaxationGroups::read_state: %s was saved with other blocks or groups\n", dir.c_str());
+            return SFEM_FAILURE;
+        }
+        if (relaxes()) allocate_stress();
+        for (auto &entry : blocks_) {
+            const std::string name = entry.first;
+            Block            &b    = entry.second;
+            for (size_t g = 0; g < b.groups.size(); g++) {
+                if (b.groups[g] && b.groups[g]->read_state(dir + "/prony_" + name + "_" + std::to_string(g))) return SFEM_FAILURE;
+            }
+            for (size_t s = 0; s < b.stress.size(); s++) {
+                for (size_t g = 0; g < b.stress[s].size(); g++) {
+                    const std::string file = dir + "/stress_" + name + "_" + std::to_string(s) + "_" + std::to_string(g);
+                    const auto       &slot = b.stress[s][g];
+                    if (slot.full && read_state_buffer(smesh::Path(file + ".raw"), slot.full)) return SFEM_FAILURE;
+                    if (slot.narrow && read_state_buffer(smesh::Path(file + ".float32"), slot.narrow)) return SFEM_FAILURE;
+                }
+            }
+        }
+        start_stress_current_ = current != 0;
+        start_unknown_        = unknown != 0;
+        return SFEM_SUCCESS;
+    }
+
+    int HistoryDependent::write_history(const std::string &dir) {
+        auto *groups = relaxation_state();
+        if (!groups) {
+            fprintf(stderr, "HistoryDependent::write_history: this history has no saved form\n");
+            return SFEM_FAILURE;
+        }
+        return groups->write_state(dir);
+    }
+
+    int HistoryDependent::read_history(const std::string &dir) {
+        auto *groups = relaxation_state();
+        if (!groups) {
+            fprintf(stderr, "HistoryDependent::read_history: this history has no saved form\n");
+            return SFEM_FAILURE;
+        }
+        return groups->read_state(dir);
+    }
 
 }  // namespace sfem
