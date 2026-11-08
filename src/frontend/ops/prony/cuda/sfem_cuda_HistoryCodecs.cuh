@@ -31,22 +31,25 @@ namespace sfem {
 
         template <typename T>
         struct DeviceCast {
-            using storage_t              = T;
-            static constexpr bool scaled = false;
+            using storage_t                      = T;
+            static constexpr bool scaled         = false;
+            static constexpr bool mean_deviation = false;
             __device__ static real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
             __device__ static T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
         };
 
         struct DeviceHalf {
-            using storage_t              = __half;
-            static constexpr bool scaled = false;
+            using storage_t                      = __half;
+            static constexpr bool scaled         = false;
+            static constexpr bool mean_deviation = false;
             __device__ static real_t    decode(const __half s, const real_t) { return __half2float(s); }
             __device__ static __half    encode(const real_t v, const real_t) { return to_half(v); }
         };
 
         struct DeviceScaledHalf {
-            using storage_t              = __half;
-            static constexpr bool scaled = true;
+            using storage_t                      = __half;
+            static constexpr bool scaled         = true;
+            static constexpr bool mean_deviation = false;
             __device__ static real_t decode(const __half s, const real_t scale) { return __half2float(s) * scale; }
             __device__ static __half encode(const real_t v, const real_t inv_scale) { return to_half(v * inv_scale); }
             __device__ static scaling_t scale_for(const real_t max_abs) {
@@ -57,8 +60,9 @@ namespace sfem {
 
         template <typename T, int LARGEST_CODE>
         struct DeviceScaledInteger {
-            using storage_t              = T;
-            static constexpr bool scaled = true;
+            using storage_t                      = T;
+            static constexpr bool scaled         = true;
+            static constexpr bool mean_deviation = false;
             __device__ static real_t decode(const T s, const real_t scale) { return static_cast<real_t>(s) * scale; }
             __device__ static T      encode(const real_t v, const real_t inv_scale) {
                 real_t code = nearbyint(v * inv_scale);
@@ -69,6 +73,13 @@ namespace sfem {
                 if (!(max_abs > 0)) return 1;
                 return static_cast<scaling_t>(max_abs / LARGEST_CODE);
             }
+        };
+
+        /// The deviations from the means a mean-deviation store keeps (sfem_HistoryStorage.hpp's
+        /// MeanDeviationCodec), coded by the base codec.
+        template <class Base>
+        struct DeviceMeanDeviation : Base {
+            static constexpr bool mean_deviation = true;
         };
 
     }  // namespace device_codecs

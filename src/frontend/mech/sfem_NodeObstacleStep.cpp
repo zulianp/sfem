@@ -18,6 +18,8 @@
 #include "sfem_Merit.hpp"
 #include "sfem_TimeScheme.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_MemoryLedger.hpp"
+#include "sfem_node_obstacle_kernels.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_mprgp.hpp"
@@ -31,17 +33,6 @@ namespace sfem {
             if (buffer->mem_space() == MEMORY_SPACE_DEVICE) return smesh::to_host(buffer);
 #endif
             return buffer;
-        }
-
-        /// `host`'s values into `target`, wherever it lives (no allocation).
-        void fill(const SharedBuffer<real_t> &target, const SharedBuffer<real_t> &host) {
-#ifdef SFEM_ENABLE_CUDA
-            if (target->mem_space() == MEMORY_SPACE_DEVICE) {
-                copy_host_to_device(host->size() * sizeof(real_t), host->data(), target->data());
-                return;
-            }
-#endif
-            std::copy(host->data(), host->data() + host->size(), target->data());
         }
     }  // namespace
 
@@ -64,7 +55,7 @@ namespace sfem {
         std::shared_ptr<Operator<real_t>>    qp_op;
         std::shared_ptr<PowerMethod<real_t>> power;
         SharedBuffer<real_t>                 eigen_vector, eigen_work;
-        SharedBuffer<real_t>                 k, k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
+        SharedBuffer<real_t>                 k_ref, projected, upper_bound, qp_rhs, framed, lift, diag, trial_r;
         // The QP's variables are y / scale, its bounds upper_bound / scale (scaled_bound), its
         // operator scale Q^T K Q scale; qp_tmp holds the unscaled product.
         SharedBuffer<real_t>                 scale, inverse_scale, scaled_bound, qp_tmp;
@@ -77,34 +68,23 @@ namespace sfem {
         real_t                               merit{0};
         bool                                 first_measure{true};
         int                                  iterations{0};
+        // Newton manages the tangent's projection (set_tangent_projection was called), and
+        // whether it is projected now; whether the last QP met negative curvature.
+        bool                                 projection_managed{false};
+        bool                                 tangent_projected{false};
+        bool                                 negative_curvature{false};
 
         real_t kkt(const real_t *const r, real_t &penetration) {
-            return contact->kkt_residual(r, k->data(), projected->data(), &penetration);
+            return contact->kkt_residual(r, k_ref->data(), projected->data(), &penetration);
         }
 
         // scale = D^{-1/2} from the tangent as it stands, D its diagonal with each contact node's
         // three entries replaced by their mean (the trace, which the frames keep); the QP's bounds.
         int update_scaling() {
-            if (tangent->diagonal(diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
-            auto           d     = on_host(diag);
-            auto           u     = on_host(upper_bound);
-            real_t *const  dd    = d->data();
-            const idx_t   *nodes = contact->nodes()->data();
-            for (ptrdiff_t i = 0; i < contact->size(); ++i) {
-                const ptrdiff_t node = nodes[i];
-                const real_t    mean = (dd[node * 3] + dd[node * 3 + 1] + dd[node * 3 + 2]) / 3;
-                for (int c = 0; c < 3; ++c) dd[node * 3 + c] = mean;
-            }
-            auto   s = create_host_buffer<real_t>(ndofs), inv = create_host_buffer<real_t>(ndofs), b = create_host_buffer<real_t>(ndofs);
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                const real_t root = dd[i] > 0 ? std::sqrt(dd[i]) : real_t(1);
-                s->data()[i]      = 1 / root;
-                inv->data()[i]    = root;
-                b->data()[i]      = u->data()[i] * root;
-            }
-            fill(scale, s);
-            fill(inverse_scale, inv);
-            fill(scaled_bound, b);
+            SFEM_TRACE_SCOPE("NodeObstacleStep::update_scaling");
+            // In the execution space; `diag` stays the shift's reference (solve).
+            if (tangent->diagonal(inverse_scale->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            contact->scaling(upper_bound->data(), inverse_scale->data(), scale->data(), scaled_bound->data());
             qp->set_upper_bound(scaled_bound);
             // Converged as the unscaled QP is, on the gradient of y = S z: S^{-1} times z's.
             qp->set_norm_weight(inverse_scale);
@@ -136,6 +116,7 @@ namespace sfem {
         }
 
         int solve_qp(const real_t *const r) {
+            SFEM_TRACE_SCOPE("NodeObstacleStep::solve_qp");
             if (update_scaling() != SFEM_SUCCESS) return SFEM_FAILURE;
             // Gershgorin's bound for S K S where the tangent has its rows: the scale is one per
             // contact node, so it commutes with the node's frame, and S Q^T K Q S = Q^T (S K S) Q has
@@ -202,7 +183,7 @@ namespace sfem {
         // assembled host tangent, and the composed one over a team material (sfem_TeamOperator.hpp).
         const bool in_region = impl.tangent->team_capable();
 
-        for (auto *buffer : {&impl.k, &impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
+        for (auto *buffer : {&impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag, &impl.trial_r, &impl.qp_tmp,
                              &impl.scale, &impl.inverse_scale, &impl.scaled_bound}) {
             *buffer = create_buffer<real_t>(impl.ndofs, es);
         }
@@ -283,18 +264,17 @@ namespace sfem {
             if (impl.tangent->diagonal(impl.k_ref->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             impl.k_ref_dt    = context.dt;
             impl.k_ref_shift = shift;
-        }
-        impl.blas->copy(impl.ndofs, impl.k_ref->data(), impl.k->data());
-        // Read on the host: once per step.
-        auto                host  = on_host(impl.k);
-        const real_t *const k     = host->data();
-        const idx_t *const  nodes = impl.contact->nodes()->data();
-        real_t              k_max = 0;
+            // Read on the host: once per assembly.
+            auto                host  = on_host(impl.k_ref);
+            const real_t *const k     = host->data();
+            const idx_t *const  nodes = impl.contact->nodes()->data();
+            real_t              k_max = 0;
 #pragma omp parallel for reduction(max : k_max)
-        for (ptrdiff_t i = 0; i < impl.contact->size(); ++i) {
-            k_max = std::max(k_max, k[(ptrdiff_t)nodes[i] * 3]);
+            for (ptrdiff_t i = 0; i < impl.contact->size(); ++i) {
+                k_max = std::max(k_max, k[(ptrdiff_t)nodes[i] * 3]);
+            }
+            impl.k_max = impl.reductions->max(k_max);
         }
-        impl.k_max         = impl.reductions->max(k_max);
         impl.first_measure = true;
         return SFEM_SUCCESS;
     }
@@ -331,7 +311,10 @@ namespace sfem {
         // y = K x: the QP's product writes tmp whole.
         impl.tangent_op   = impl.tangent->op();
         impl.tangent_team = impl.tangent->team();
-        if (impl.options.curvature && impl.tangent->set_curvature(x, r, impl.k->data(), false) != SFEM_SUCCESS) return SFEM_FAILURE;
+        // On the projected tangent the obstacle's curvature is projected too, node by node: the QP
+        // is then convex, as the material's share alone would leave it.
+        const int curvature = impl.tangent_projected ? NODE_OBSTACLE_CURVATURE_PSD : NODE_OBSTACLE_CURVATURE_FULL;
+        if (impl.options.curvature && impl.tangent->set_curvature(x, r, impl.k_ref->data(), curvature) != SFEM_SUCCESS) return SFEM_FAILURE;
         impl.contact->upper_bound(impl.qp->infty, impl.upper_bound->data());
         return SFEM_SUCCESS;
     }
@@ -346,11 +329,20 @@ namespace sfem {
 
         int        status = impl.solve_qp(r);
         const bool capped = status != SFEM_SUCCESS && impl.qp->iterations() >= impl.options.qp_max_it;
+        impl.negative_curvature = impl.qp->met_negative_curvature();
+        if (status != SFEM_SUCCESS && impl.negative_curvature && impl.projection_managed && !impl.tangent_projected) {
+            // The material's tangent is indefinite here: Newton repeats the iteration on the
+            // projected one (tangent_projection: on_failure) rather than on a shifted one.
+            impl.contact->from_frame(impl.scale->data(), impl.framed->data(), dx);
+            impl.f->copy_constrained_dofs(impl.lift->data(), dx);
+            return status;
+        }
         if (status != SFEM_SUCCESS && !(capped && impl.options.qp_accept_capped)) {
             // MPRGP stops at negative curvature. Away from the solution the residual overstates the
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
-            if (impl.options.curvature && tangent.set_curvature(x, r, impl.k->data(), true) != SFEM_SUCCESS) return SFEM_FAILURE;
+            const int capped = impl.tangent_projected ? NODE_OBSTACLE_CURVATURE_PSD : NODE_OBSTACLE_CURVATURE_CAPPED;
+            if (impl.options.curvature && tangent.set_curvature(x, r, impl.k_ref->data(), capped) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             // The material's tangent can be indefinite too (a hyperelastic block under
             // compression, on a mesh fine enough that c0 M no longer outweighs it): shift its
@@ -387,6 +379,38 @@ namespace sfem {
     }
 
     int NodeObstacleStep::iterations() const { return impl_->iterations; }
+
+    bool NodeObstacleStep::tangent_projection_supported() const {
+        const auto &format = impl_->options.tangent.format;
+        const bool  stored = format == op_type::INEXACT && impl_->f->inexact_stores_every_tangent();
+        return (format == op_type::BSR || stored) && impl_->f->tangent_projection_supported();
+    }
+
+    void NodeObstacleStep::set_tangent_projection(const bool on) {
+        impl_->projection_managed = true;
+        impl_->tangent_projected  = on;
+        impl_->f->set_tangent_projection(on);
+    }
+
+    void NodeObstacleStep::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        // The tangent first: buffers it shares with the step are its.
+        if (impl.tangent) impl.tangent->account(ledger);
+        ledger.add(MemoryLedger::TANGENT_WORK, impl.eigen_vector);
+        ledger.add(MemoryLedger::TANGENT_WORK, impl.eigen_work);
+        for (auto *buffer : {&impl.k_ref, &impl.projected, &impl.upper_bound, &impl.qp_rhs, &impl.framed, &impl.lift, &impl.diag,
+                             &impl.trial_r, &impl.scale, &impl.inverse_scale, &impl.scaled_bound, &impl.qp_tmp}) {
+            ledger.add(MemoryLedger::STEP, *buffer);
+        }
+        if (impl.qp) {
+            ledger.add(MemoryLedger::STEP,
+                       impl.qp->workspace_bytes(),
+                       impl.f->execution_space() == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
+        }
+        if (impl.contact) impl.contact->account(ledger);
+    }
+
+    bool NodeObstacleStep::met_negative_curvature() const { return impl_->negative_curvature; }
 
     void NodeObstacleStep::reaction(real_t *const out) const { impl_->contact->reaction(out); }
 

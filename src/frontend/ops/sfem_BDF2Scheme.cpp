@@ -4,6 +4,7 @@
 
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
@@ -129,6 +130,13 @@ namespace sfem {
         // separable half the inertia already assembles.
         blas->zaxpby(ndofs, impl_->shift, x, 1, impl_->z->data(), velocity);
         if (acceleration) blas->zaxpby(ndofs, impl_->alpha_a, x, -impl_->alpha_a, impl_->u_hat->data(), acceleration);
+    }
+
+    void BDF2Scheme::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        for (auto *buffer : {&impl.u_n, &impl.u_nm1, &impl.v_n, &impl.v_nm1, &impl.z, &impl.u_hat}) {
+            ledger.add(MemoryLedger::SCHEME, *buffer);
+        }
     }
 
     void BDF2Scheme::advance(const real_t *const x) {

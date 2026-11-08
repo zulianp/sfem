@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -85,6 +86,51 @@ static __host__ __device__ __forceinline__ void linear_elasticity_d2_simplex_dir
     point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
   mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void linear_elasticity_d2_simplex_direct_hessian_reference_point_tangent(
+    const int q,
+    const s_t *const RSTR adj,
+    const s_t det,
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR q_weight,
+    const s_t lmbda,
+    const s_t mu,
+    s_t *const RSTR T
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static constexpr int NC = 2;
+  static constexpr int ND = 2;
+  const s_t qw = q_weight[q];
+  const s_t adj_value0 = adj[0];
+  const s_t adj_value1 = adj[1];
+  const s_t adj_value2 = adj[2];
+  const s_t adj_value3 = adj[3];
+  const s_t det_value0 = det;
+  const s_t idet = s_t(1) / det_value0;
+  s_t D[16];
+  const s_t weak_hess_tmp0 = lmbda + s_t(2)*mu;
+  D[0] = weak_hess_tmp0;
+  D[1] = 0;
+  D[2] = 0;
+  D[3] = lmbda;
+  D[5] = mu;
+  D[6] = mu;
+  D[7] = 0;
+  D[10] = mu;
+  D[11] = 0;
+  D[15] = weak_hess_tmp0;
+  D[4] = D[1];
+  D[8] = D[2];
+  D[12] = D[3];
+  D[9] = D[6];
+  D[13] = D[7];
+  D[14] = D[11];
+  const s_t adj_q[ND * ND] = {adj_value0, adj_value1, adj_value2, adj_value3};
+  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);
 }
 
 template <typename s_t, int NS>

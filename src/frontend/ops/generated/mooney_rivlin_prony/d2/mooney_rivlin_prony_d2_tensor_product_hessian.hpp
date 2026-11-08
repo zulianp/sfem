@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.hpp"
 #include "tensor_product_kernels.hpp"
+#include "sfem_TangentProjection.hpp"
 #ifndef SFEM_INLINE
 #define SFEM_INLINE inline
 #endif
@@ -30,7 +31,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS>
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
 static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -162,12 +163,25 @@ static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_ten
     weight = qw * idet;
   };
   if constexpr (NS1 == 2) {
-    for (int q = 0; q < NQ; ++q) {
-      s_t D[16], adj_q[ND * ND], weight;
-      point_tangent(q, D, adj_q, weight);
-      s_t g_ref[ND * NS];
-      tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(shape_1d, grad_1d, q, g_ref);
-      point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);
+    if constexpr (PROJECT) {
+      s_t Dq[NQ * 16], adjq[NQ * ND * ND], weights[NQ];
+      for (int q = 0; q < NQ; ++q) {
+        point_tangent(q, &Dq[q * 16], &adjq[q * ND * ND], weights[q]);
+      }
+      project_abs_symmetric_lanes<s_t, 4, NQ>(Dq);
+      for (int q = 0; q < NQ; ++q) {
+        s_t g_ref[ND * NS];
+        tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(shape_1d, grad_1d, q, g_ref);
+        point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, &adjq[q * ND * ND], weights[q], &Dq[q * 16], element_matrix);
+      }
+    } else {
+      for (int q = 0; q < NQ; ++q) {
+        s_t D[16], adj_q[ND * ND], weight;
+        point_tangent(q, D, adj_q, weight);
+        s_t g_ref[ND * NS];
+        tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(shape_1d, grad_1d, q, g_ref);
+        point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);
+      }
     }
     mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
   } else {
@@ -175,42 +189,88 @@ static SFEM_INLINE void mooney_rivlin_prony_d2_tensor_product_direct_hessian_ten
     s_t slab_tangent[NP * 16];
     s_t flux[NC * ND * NP];
     for (int q_last = 0; q_last < NQ1; ++q_last) {
-      for (int p = 0; p < NP; ++p) {
-        s_t D[16], adj_q[ND * ND], weight;
-        point_tangent(p + NP * q_last, D, adj_q, weight);
-        const s_t pullback_weight = weight;
-        const s_t pullback_0_0_0_0 = adj_q[0] * D[0] + adj_q[1] * D[4];
-        const s_t pullback_0_0_0_1 = adj_q[0] * D[1] + adj_q[1] * D[5];
-        const s_t pullback_0_0_1_0 = adj_q[2] * D[0] + adj_q[3] * D[4];
-        const s_t pullback_0_0_1_1 = adj_q[2] * D[1] + adj_q[3] * D[5];
-        slab_tangent[p * 16 + 0] = pullback_weight * (pullback_0_0_0_0 * adj_q[0] + pullback_0_0_0_1 * adj_q[1]);
-        slab_tangent[p * 16 + 1] = pullback_weight * (pullback_0_0_0_0 * adj_q[2] + pullback_0_0_0_1 * adj_q[3]);
-        slab_tangent[p * 16 + 4] = pullback_weight * (pullback_0_0_1_0 * adj_q[0] + pullback_0_0_1_1 * adj_q[1]);
-        slab_tangent[p * 16 + 5] = pullback_weight * (pullback_0_0_1_0 * adj_q[2] + pullback_0_0_1_1 * adj_q[3]);
-        const s_t pullback_0_1_0_0 = adj_q[0] * D[2] + adj_q[1] * D[6];
-        const s_t pullback_0_1_0_1 = adj_q[0] * D[3] + adj_q[1] * D[7];
-        const s_t pullback_0_1_1_0 = adj_q[2] * D[2] + adj_q[3] * D[6];
-        const s_t pullback_0_1_1_1 = adj_q[2] * D[3] + adj_q[3] * D[7];
-        slab_tangent[p * 16 + 2] = pullback_weight * (pullback_0_1_0_0 * adj_q[0] + pullback_0_1_0_1 * adj_q[1]);
-        slab_tangent[p * 16 + 3] = pullback_weight * (pullback_0_1_0_0 * adj_q[2] + pullback_0_1_0_1 * adj_q[3]);
-        slab_tangent[p * 16 + 6] = pullback_weight * (pullback_0_1_1_0 * adj_q[0] + pullback_0_1_1_1 * adj_q[1]);
-        slab_tangent[p * 16 + 7] = pullback_weight * (pullback_0_1_1_0 * adj_q[2] + pullback_0_1_1_1 * adj_q[3]);
-        const s_t pullback_1_0_0_0 = adj_q[0] * D[8] + adj_q[1] * D[12];
-        const s_t pullback_1_0_0_1 = adj_q[0] * D[9] + adj_q[1] * D[13];
-        const s_t pullback_1_0_1_0 = adj_q[2] * D[8] + adj_q[3] * D[12];
-        const s_t pullback_1_0_1_1 = adj_q[2] * D[9] + adj_q[3] * D[13];
-        slab_tangent[p * 16 + 8] = pullback_weight * (pullback_1_0_0_0 * adj_q[0] + pullback_1_0_0_1 * adj_q[1]);
-        slab_tangent[p * 16 + 9] = pullback_weight * (pullback_1_0_0_0 * adj_q[2] + pullback_1_0_0_1 * adj_q[3]);
-        slab_tangent[p * 16 + 12] = pullback_weight * (pullback_1_0_1_0 * adj_q[0] + pullback_1_0_1_1 * adj_q[1]);
-        slab_tangent[p * 16 + 13] = pullback_weight * (pullback_1_0_1_0 * adj_q[2] + pullback_1_0_1_1 * adj_q[3]);
-        const s_t pullback_1_1_0_0 = adj_q[0] * D[10] + adj_q[1] * D[14];
-        const s_t pullback_1_1_0_1 = adj_q[0] * D[11] + adj_q[1] * D[15];
-        const s_t pullback_1_1_1_0 = adj_q[2] * D[10] + adj_q[3] * D[14];
-        const s_t pullback_1_1_1_1 = adj_q[2] * D[11] + adj_q[3] * D[15];
-        slab_tangent[p * 16 + 10] = pullback_weight * (pullback_1_1_0_0 * adj_q[0] + pullback_1_1_0_1 * adj_q[1]);
-        slab_tangent[p * 16 + 11] = pullback_weight * (pullback_1_1_0_0 * adj_q[2] + pullback_1_1_0_1 * adj_q[3]);
-        slab_tangent[p * 16 + 14] = pullback_weight * (pullback_1_1_1_0 * adj_q[0] + pullback_1_1_1_1 * adj_q[1]);
-        slab_tangent[p * 16 + 15] = pullback_weight * (pullback_1_1_1_0 * adj_q[2] + pullback_1_1_1_1 * adj_q[3]);
+      if constexpr (PROJECT) {
+        s_t Dp[NP * 16], adjp[NP * ND * ND], wp[NP];
+        for (int p = 0; p < NP; ++p) {
+          point_tangent(p + NP * q_last, &Dp[p * 16], &adjp[p * ND * ND], wp[p]);
+        }
+        project_abs_symmetric_lanes<s_t, 4, NP>(Dp);
+        for (int p = 0; p < NP; ++p) {
+          const s_t *const RSTR D = &Dp[p * 16];
+          const s_t *const RSTR adj_q = &adjp[p * ND * ND];
+          const s_t weight = wp[p];
+          const s_t pullback_weight = weight;
+          const s_t pullback_0_0_0_0 = adj_q[0] * D[0] + adj_q[1] * D[4];
+          const s_t pullback_0_0_0_1 = adj_q[0] * D[1] + adj_q[1] * D[5];
+          const s_t pullback_0_0_1_0 = adj_q[2] * D[0] + adj_q[3] * D[4];
+          const s_t pullback_0_0_1_1 = adj_q[2] * D[1] + adj_q[3] * D[5];
+          slab_tangent[p * 16 + 0] = pullback_weight * (pullback_0_0_0_0 * adj_q[0] + pullback_0_0_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 1] = pullback_weight * (pullback_0_0_0_0 * adj_q[2] + pullback_0_0_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 4] = pullback_weight * (pullback_0_0_1_0 * adj_q[0] + pullback_0_0_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 5] = pullback_weight * (pullback_0_0_1_0 * adj_q[2] + pullback_0_0_1_1 * adj_q[3]);
+          const s_t pullback_0_1_0_0 = adj_q[0] * D[2] + adj_q[1] * D[6];
+          const s_t pullback_0_1_0_1 = adj_q[0] * D[3] + adj_q[1] * D[7];
+          const s_t pullback_0_1_1_0 = adj_q[2] * D[2] + adj_q[3] * D[6];
+          const s_t pullback_0_1_1_1 = adj_q[2] * D[3] + adj_q[3] * D[7];
+          slab_tangent[p * 16 + 2] = pullback_weight * (pullback_0_1_0_0 * adj_q[0] + pullback_0_1_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 3] = pullback_weight * (pullback_0_1_0_0 * adj_q[2] + pullback_0_1_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 6] = pullback_weight * (pullback_0_1_1_0 * adj_q[0] + pullback_0_1_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 7] = pullback_weight * (pullback_0_1_1_0 * adj_q[2] + pullback_0_1_1_1 * adj_q[3]);
+          const s_t pullback_1_0_0_0 = adj_q[0] * D[8] + adj_q[1] * D[12];
+          const s_t pullback_1_0_0_1 = adj_q[0] * D[9] + adj_q[1] * D[13];
+          const s_t pullback_1_0_1_0 = adj_q[2] * D[8] + adj_q[3] * D[12];
+          const s_t pullback_1_0_1_1 = adj_q[2] * D[9] + adj_q[3] * D[13];
+          slab_tangent[p * 16 + 8] = pullback_weight * (pullback_1_0_0_0 * adj_q[0] + pullback_1_0_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 9] = pullback_weight * (pullback_1_0_0_0 * adj_q[2] + pullback_1_0_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 12] = pullback_weight * (pullback_1_0_1_0 * adj_q[0] + pullback_1_0_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 13] = pullback_weight * (pullback_1_0_1_0 * adj_q[2] + pullback_1_0_1_1 * adj_q[3]);
+          const s_t pullback_1_1_0_0 = adj_q[0] * D[10] + adj_q[1] * D[14];
+          const s_t pullback_1_1_0_1 = adj_q[0] * D[11] + adj_q[1] * D[15];
+          const s_t pullback_1_1_1_0 = adj_q[2] * D[10] + adj_q[3] * D[14];
+          const s_t pullback_1_1_1_1 = adj_q[2] * D[11] + adj_q[3] * D[15];
+          slab_tangent[p * 16 + 10] = pullback_weight * (pullback_1_1_0_0 * adj_q[0] + pullback_1_1_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 11] = pullback_weight * (pullback_1_1_0_0 * adj_q[2] + pullback_1_1_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 14] = pullback_weight * (pullback_1_1_1_0 * adj_q[0] + pullback_1_1_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 15] = pullback_weight * (pullback_1_1_1_0 * adj_q[2] + pullback_1_1_1_1 * adj_q[3]);
+        }
+      } else {
+        for (int p = 0; p < NP; ++p) {
+          s_t D[16], adj_q[ND * ND], weight;
+          point_tangent(p + NP * q_last, D, adj_q, weight);
+          const s_t pullback_weight = weight;
+          const s_t pullback_0_0_0_0 = adj_q[0] * D[0] + adj_q[1] * D[4];
+          const s_t pullback_0_0_0_1 = adj_q[0] * D[1] + adj_q[1] * D[5];
+          const s_t pullback_0_0_1_0 = adj_q[2] * D[0] + adj_q[3] * D[4];
+          const s_t pullback_0_0_1_1 = adj_q[2] * D[1] + adj_q[3] * D[5];
+          slab_tangent[p * 16 + 0] = pullback_weight * (pullback_0_0_0_0 * adj_q[0] + pullback_0_0_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 1] = pullback_weight * (pullback_0_0_0_0 * adj_q[2] + pullback_0_0_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 4] = pullback_weight * (pullback_0_0_1_0 * adj_q[0] + pullback_0_0_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 5] = pullback_weight * (pullback_0_0_1_0 * adj_q[2] + pullback_0_0_1_1 * adj_q[3]);
+          const s_t pullback_0_1_0_0 = adj_q[0] * D[2] + adj_q[1] * D[6];
+          const s_t pullback_0_1_0_1 = adj_q[0] * D[3] + adj_q[1] * D[7];
+          const s_t pullback_0_1_1_0 = adj_q[2] * D[2] + adj_q[3] * D[6];
+          const s_t pullback_0_1_1_1 = adj_q[2] * D[3] + adj_q[3] * D[7];
+          slab_tangent[p * 16 + 2] = pullback_weight * (pullback_0_1_0_0 * adj_q[0] + pullback_0_1_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 3] = pullback_weight * (pullback_0_1_0_0 * adj_q[2] + pullback_0_1_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 6] = pullback_weight * (pullback_0_1_1_0 * adj_q[0] + pullback_0_1_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 7] = pullback_weight * (pullback_0_1_1_0 * adj_q[2] + pullback_0_1_1_1 * adj_q[3]);
+          const s_t pullback_1_0_0_0 = adj_q[0] * D[8] + adj_q[1] * D[12];
+          const s_t pullback_1_0_0_1 = adj_q[0] * D[9] + adj_q[1] * D[13];
+          const s_t pullback_1_0_1_0 = adj_q[2] * D[8] + adj_q[3] * D[12];
+          const s_t pullback_1_0_1_1 = adj_q[2] * D[9] + adj_q[3] * D[13];
+          slab_tangent[p * 16 + 8] = pullback_weight * (pullback_1_0_0_0 * adj_q[0] + pullback_1_0_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 9] = pullback_weight * (pullback_1_0_0_0 * adj_q[2] + pullback_1_0_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 12] = pullback_weight * (pullback_1_0_1_0 * adj_q[0] + pullback_1_0_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 13] = pullback_weight * (pullback_1_0_1_0 * adj_q[2] + pullback_1_0_1_1 * adj_q[3]);
+          const s_t pullback_1_1_0_0 = adj_q[0] * D[10] + adj_q[1] * D[14];
+          const s_t pullback_1_1_0_1 = adj_q[0] * D[11] + adj_q[1] * D[15];
+          const s_t pullback_1_1_1_0 = adj_q[2] * D[10] + adj_q[3] * D[14];
+          const s_t pullback_1_1_1_1 = adj_q[2] * D[11] + adj_q[3] * D[15];
+          slab_tangent[p * 16 + 10] = pullback_weight * (pullback_1_1_0_0 * adj_q[0] + pullback_1_1_0_1 * adj_q[1]);
+          slab_tangent[p * 16 + 11] = pullback_weight * (pullback_1_1_0_0 * adj_q[2] + pullback_1_1_0_1 * adj_q[3]);
+          slab_tangent[p * 16 + 14] = pullback_weight * (pullback_1_1_1_0 * adj_q[0] + pullback_1_1_1_1 * adj_q[1]);
+          slab_tangent[p * 16 + 15] = pullback_weight * (pullback_1_1_1_0 * adj_q[2] + pullback_1_1_1_1 * adj_q[3]);
+        }
       }
       for (int trial_component = 0; trial_component < NC; ++trial_component) {
         for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {

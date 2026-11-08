@@ -354,7 +354,17 @@ class CUDAEnergySoAEmitter:
                 if variant.matrix_format in (MatrixFormat.BSR, MatrixFormat.BLOCK_DIAG_SYM)
                 and variant.mesh_layout is MatrixMeshLayout.STANDARD
             )
-            formats = MatrixFormatPlan(device) if device else None
+            # The projected tangent goes with the BSR assembly: the projection is a
+            # per-point function the device kernel calls as the host's does.
+            formats = (
+                MatrixFormatPlan(
+                    device,
+                    tangent_projection=formats.tangent_projection
+                    and any(variant.matrix_format is MatrixFormat.BSR for variant in device),
+                )
+                if device
+                else None
+            )
         return generate_sfem_soa_cpp_files_for_element(
             dataclasses.replace(plan, matrix_format_plan=formats),
             source_builder=self._source_builder(),

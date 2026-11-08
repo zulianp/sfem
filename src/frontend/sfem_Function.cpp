@@ -7,6 +7,7 @@
 #include "utils.h"
 
 #include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_device.hpp"
@@ -551,6 +552,20 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    std::size_t Function::inexact_bytes() const {
+        std::size_t bytes = 0;
+        for (auto &op : impl_->ops) bytes += op->inexact_bytes();
+        return bytes;
+    }
+
+    void Function::account(MemoryLedger &ledger) const {
+        const ExecutionSpace es = execution_space();
+        impl_->space->account(ledger, es);
+        std::size_t geometry = 0;
+        for (auto &op : impl_->ops) geometry += op->geometry_bytes();
+        ledger.add(MemoryLedger::GEOMETRY, geometry, es == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
+    }
+
     bool Function::inexact_supported() const {
         for (auto &op : impl_->ops) {
             if (op->inexact_supported()) return true;
@@ -582,6 +597,24 @@ namespace sfem {
                    execution_space() == EXECUTION_SPACE_DEVICE ? "device" : "host");
         }
         for (auto &op : impl_->ops) op->set_inexact_options(resolved);
+    }
+
+    bool Function::tangent_projection_supported() const {
+        for (auto &op : impl_->ops) {
+            if (!op->tangent_projection_supported()) return false;
+        }
+        return true;
+    }
+
+    void Function::set_tangent_projection(const bool on) {
+        for (auto &op : impl_->ops) op->set_tangent_projection(on);
+    }
+
+    bool Function::inexact_stores_every_tangent() const {
+        for (auto &op : impl_->ops) {
+            if (!op->is_linear() && !op->inexact_supported()) return false;
+        }
+        return true;
     }
 
     int Function::inexact_diag(const real_t *const x, real_t *const values) {

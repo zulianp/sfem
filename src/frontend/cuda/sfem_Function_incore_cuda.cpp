@@ -288,9 +288,13 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>     space;
         std::shared_ptr<NeumannConditions> h_neumann;
         std::vector<SharedBuffer<real_t>>  loads;
+        // Condition i's unit load is loads[load_of[i]]: conditions whose unit loads are the same
+        // (one sideset and component, a pressure and its offset) share one.
+        std::vector<size_t>                load_of;
 
         GPUNeumannConditions(const std::shared_ptr<NeumannConditions> &nc) : space(nc->space()), h_neumann(nc) {
-            const ptrdiff_t ndofs = space->n_dofs();
+            const ptrdiff_t                   ndofs = space->n_dofs();
+            std::vector<SharedBuffer<real_t>> host_loads;
             for (auto c : nc->conditions()) {
                 c.value   = 1;
                 auto unit = NeumannConditions::create(space, {c});
@@ -298,7 +302,13 @@ namespace sfem {
                 if (unit->gradient(nullptr, load->data()) != SFEM_SUCCESS) {
                     SFEM_ERROR("GPUNeumannConditions: assembling a condition's load failed\n");
                 }
-                loads.push_back(smesh::to_device(load));
+                size_t j = 0;
+                while (j < host_loads.size() && !std::equal(load->data(), load->data() + ndofs, host_loads[j]->data())) j++;
+                if (j == host_loads.size()) {
+                    host_loads.push_back(load);
+                    loads.push_back(smesh::to_device(load));
+                }
+                load_of.push_back(j);
             }
         }
 
@@ -324,8 +334,8 @@ namespace sfem {
         int gradient(const real_t *const /*x*/, real_t *const out) override {
             SFEM_TRACE_SCOPE("GPUNeumannConditions::gradient");
             const auto &conditions = h_neumann->conditions();
-            for (size_t i = 0; i < loads.size(); ++i) {
-                sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->axpy(space->n_dofs(), conditions[i].value, loads[i]->data(), out);
+            for (size_t i = 0; i < load_of.size(); ++i) {
+                sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->axpy(space->n_dofs(), conditions[i].value, loads[load_of[i]]->data(), out);
             }
             return SFEM_SUCCESS;
         }
@@ -335,8 +345,8 @@ namespace sfem {
         /// The work of the tractions, linear in the state as on the host.
         int value(const real_t *x, real_t *const out) override {
             const auto &conditions = h_neumann->conditions();
-            for (size_t i = 0; i < loads.size(); ++i) {
-                *out += conditions[i].value * sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->dot(space->n_dofs(), loads[i]->data(), x);
+            for (size_t i = 0; i < load_of.size(); ++i) {
+                *out += conditions[i].value * sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->dot(space->n_dofs(), loads[load_of[i]]->data(), x);
             }
             return SFEM_SUCCESS;
         }
@@ -345,9 +355,9 @@ namespace sfem {
         int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) override {
             const auto &conditions = h_neumann->conditions();
             auto        blas       = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
-            for (size_t i = 0; i < loads.size(); ++i) {
-                const real_t at_x  = conditions[i].value * blas->dot(space->n_dofs(), loads[i]->data(), x);
-                const real_t along = conditions[i].value * blas->dot(space->n_dofs(), loads[i]->data(), h);
+            for (size_t i = 0; i < load_of.size(); ++i) {
+                const real_t at_x  = conditions[i].value * blas->dot(space->n_dofs(), loads[load_of[i]]->data(), x);
+                const real_t along = conditions[i].value * blas->dot(space->n_dofs(), loads[load_of[i]]->data(), h);
                 for (int k = 0; k < nsteps; ++k) out[k] += at_x + steps[k] * along;
             }
             return SFEM_SUCCESS;

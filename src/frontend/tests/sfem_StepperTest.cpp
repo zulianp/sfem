@@ -148,8 +148,8 @@ int test_sequence() {
     return SFEM_TEST_SUCCESS;
 }
 
-// A failed attempt is retried with half the step, which opens the step again; the next step is
-// again of full length, and the last one ends at t_end.
+// A failed attempt is retried with half the step, which opens the step again; the rest of the
+// interval follows, so the run is back at t = 1, and the next step is again of full length.
 int test_cutback() {
     auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 1, 0);
     Log  log;
@@ -174,14 +174,14 @@ int test_cutback() {
                            "commit",
                            "history.advance",
                            "committed(0.5,1)",
-                           "history.begin(1.5,1)",
-                           "solve(0.5,1)",
-                           "converged(1.5,2)",
+                           "history.begin(1,0.5)",
+                           "solve(0.5,0.5)",
+                           "converged(1,2)",
                            "commit",
                            "history.advance",
-                           "committed(1.5,2)",
-                           "history.begin(2,0.5)",
-                           "solve(1.5,0.5)",
+                           "committed(1,2)",
+                           "history.begin(2,1)",
+                           "solve(1,1)",
                            "converged(2,3)",
                            "commit",
                            "history.advance",
@@ -193,6 +193,29 @@ int test_cutback() {
     strict.max_cutbacks         = 0;
     sfem::Stepper failing(p.f, std::make_shared<RecordingSolver>(log2, std::vector<int>{1}), strict);
     SFEM_TEST_ASSERT(failing.run(p.x->data()) == SFEM_FAILURE);
+    return SFEM_TEST_SUCCESS;
+}
+
+// Two cuts under a growth bound (BDF2's 2): the steps grow back by at most 2 and end on the grid,
+// t = 0.25, 0.75, 1, then 1.5, 2.
+int test_cutback_returns_to_the_grid() {
+    auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 1, 0);
+    Log  log;
+
+    sfem::StepperOptions options;
+    options.dt           = 1;
+    options.steps        = 2;
+    options.max_cutbacks = 2;
+    options.max_growth   = 2;
+    sfem::Stepper stepper(p.f, std::make_shared<RecordingSolver>(log, std::vector<int>{1, 2}), options);
+    stepper.add_observer(std::make_shared<RecordingObserver>(log));
+
+    SFEM_TEST_ASSERT(stepper.run(p.x->data()) == SFEM_SUCCESS);
+    Log converged;
+    for (auto &entry : log) {
+        if (entry.rfind("converged", 0) == 0) converged.push_back(entry);
+    }
+    SFEM_TEST_ASSERT(same(converged, {"converged(0.25,1)", "converged(0.75,2)", "converged(1,3)", "converged(1.5,4)", "converged(2,5)"}));
     return SFEM_TEST_SUCCESS;
 }
 
@@ -276,6 +299,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_sequence);
     SFEM_RUN_TEST(test_cutback);
+    SFEM_RUN_TEST(test_cutback_returns_to_the_grid);
     SFEM_RUN_TEST(test_release);
     SFEM_RUN_TEST(test_newmark_carried_state);
     SFEM_RUN_TEST(test_bdf2_carried_state);
