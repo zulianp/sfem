@@ -200,6 +200,19 @@ namespace sfem {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
       std::shared_ptr<smesh::FFF> metric_soa;
+
+      //! The bytes of the layouts it built.
+      std::size_t bytes() const {
+        std::size_t total = 0;
+        if (jacobian_soa) {
+          total += jacobian_soa->jacobian_adjugate_SoA()->nbytes() + jacobian_soa->jacobian_determinant()->nbytes();
+        }
+        if (jacobian_aos) {
+          total += jacobian_aos->jacobian_adjugate_AoS()->nbytes() + jacobian_aos->jacobian_determinant()->nbytes();
+        }
+        if (metric_soa) total += metric_soa->fff_SoA()->nbytes();
+        return total;
+      }
         };
 
     //! Whether this element leaves the operator no choice of geometry.
@@ -1260,4 +1273,12 @@ namespace sfem {
     return ret;
   }
 #endif  // SFEM_ENABLE_RYAML
+  std::size_t GeneratedLaplace::geometry_bytes() const {
+    std::size_t bytes = 0;
+    for (const auto &entry : impl_->domains->domains()) {
+      if (auto cache = std::static_pointer_cast<AffineGeometryCache>(entry.second.user_data)) bytes += cache->bytes();
+    }
+    return bytes;
+  }
+
 }  // namespace sfem

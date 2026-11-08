@@ -45,6 +45,12 @@ namespace sfem {
         Impl(const std::shared_ptr<FunctionSpace> &sp, const ExecutionSpace space_of)
             : space(sp), es(space_of), blas(sfem::blas<real_t>(space_of)) {}
 
+        void ensure_value_scratch() {
+            const ptrdiff_t ndofs = space->n_dofs();
+            if (!offset) offset = create_buffer<real_t>(ndofs, es);
+            if (!weighted) weighted = create_buffer<real_t>(ndofs, es);
+        }
+
         int ensure_state() const {
             if (!mass || !u_hat) {
                 SFEM_ERROR("InertiaPotential: mass and u_hat must be initialized");
@@ -146,9 +152,9 @@ namespace sfem {
             impl_->sync_consistent();
         }
 
-        impl_->offset   = create_buffer<real_t>(ndofs, impl_->es);
-        impl_->scaled   = create_buffer<real_t>(ndofs, impl_->es);
-        impl_->weighted = create_buffer<real_t>(ndofs, impl_->es);
+        impl_->scaled = create_buffer<real_t>(ndofs, impl_->es);
+        // The gradient takes `offset` with the consistent mass only; the value's two at its first call.
+        if (impl_->consistent) impl_->offset = create_buffer<real_t>(ndofs, impl_->es);
 
         return SFEM_SUCCESS;
     }
@@ -345,6 +351,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        impl_->ensure_value_scratch();
 
         // 0.5 * alpha * (x - u_hat)^T M (x - u_hat), as a weighted dot.
         const ptrdiff_t ndofs = impl_->space->n_dofs();
@@ -373,6 +380,7 @@ namespace sfem {
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+        impl_->ensure_value_scratch();
 
         if (nsteps <= 0) {
             return SFEM_SUCCESS;

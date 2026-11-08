@@ -51,6 +51,7 @@ namespace sfem {
             const real_t *const steps,
             real_t *const out) override;
     bool energy_or_potential_based() const override { return true; }
+    std::size_t geometry_bytes() const override;
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,

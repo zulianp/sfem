@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -118,6 +119,84 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
     point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
   mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simplex_direct_hessian_reference_point_tangent(
+    const int q,
+    const s_t *const RSTR adj,
+    const s_t det,
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR q_weight,
+    const s_t lmbda,
+    const s_t mu,
+    const s_t bu_data[NS * 2],
+    s_t *const RSTR T
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static constexpr int NC = 2;
+  static constexpr int ND = 2;
+  const s_t qw = q_weight[q];
+  const s_t adj_value0 = adj[0];
+  const s_t adj_value1 = adj[1];
+  const s_t adj_value2 = adj[2];
+  const s_t adj_value3 = adj[3];
+  const s_t det_value0 = det;
+  const s_t idet = s_t(1) / det_value0;
+  s_t gu_ref0 = s_t(0);
+  s_t gu_ref1 = s_t(0);
+  s_t gu_ref2 = s_t(0);
+  s_t gu_ref3 = s_t(0);
+  for (int shape = 0; shape < NS; ++shape) {
+    const s_t state_grad_ref0 = grad_ref_x[q * NS + shape];
+    const s_t state_grad_ref1 = grad_ref_y[q * NS + shape];
+    const s_t state_u0 = bu_data[shape * NC];
+    gu_ref0 += state_u0 * state_grad_ref0;
+    gu_ref1 += state_u0 * state_grad_ref1;
+    const s_t state_u1 = bu_data[shape * NC + 1];
+    gu_ref2 += state_u1 * state_grad_ref0;
+    gu_ref3 += state_u1 * state_grad_ref1;
+  }
+  const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+  const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+  const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+  const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+  s_t D[16];
+  const s_t weak_hess_tmp0 = gu0 + s_t(1);
+  const s_t weak_hess_tmp1 = pow_2(weak_hess_tmp0);
+  const s_t weak_hess_tmp2 = pow_2(gu1);
+  const s_t weak_hess_tmp3 = pow_2(gu2);
+  const s_t weak_hess_tmp4 = weak_hess_tmp2 + weak_hess_tmp3 + s_t(-1);
+  const s_t weak_hess_tmp5 = lmbda*(((s_t(1) / s_t(2)))*pow_2(gu0) + gu0 + ((s_t(1) / s_t(2)))*pow_2(gu3) + gu3 + ((s_t(1) / s_t(2)))*weak_hess_tmp2 + ((s_t(1) / s_t(2)))*weak_hess_tmp3);
+  const s_t weak_hess_tmp6 = gu1*weak_hess_tmp0;
+  const s_t weak_hess_tmp7 = gu3 + s_t(1);
+  const s_t weak_hess_tmp8 = gu2*weak_hess_tmp7;
+  const s_t weak_hess_tmp9 = gu2*weak_hess_tmp0;
+  const s_t weak_hess_tmp10 = gu1*weak_hess_tmp7;
+  const s_t weak_hess_tmp11 = gu1*gu2;
+  const s_t weak_hess_tmp12 = weak_hess_tmp0*weak_hess_tmp7;
+  const s_t weak_hess_tmp13 = pow_2(weak_hess_tmp7);
+  const s_t weak_hess_tmp14 = weak_hess_tmp1 + weak_hess_tmp13 + s_t(-1);
+  D[0] = lmbda*weak_hess_tmp1 + mu*(s_t(3)*weak_hess_tmp1 + weak_hess_tmp4) + weak_hess_tmp5;
+  D[1] = lmbda*weak_hess_tmp6 + mu*(s_t(2)*weak_hess_tmp6 + weak_hess_tmp8);
+  D[2] = lmbda*weak_hess_tmp9 + mu*(weak_hess_tmp10 + s_t(2)*weak_hess_tmp9);
+  D[3] = lmbda*weak_hess_tmp12 + mu*weak_hess_tmp11;
+  D[5] = lmbda*weak_hess_tmp2 + mu*(weak_hess_tmp14 + s_t(3)*weak_hess_tmp2) + weak_hess_tmp5;
+  D[6] = lmbda*weak_hess_tmp11 + mu*weak_hess_tmp12;
+  D[7] = lmbda*weak_hess_tmp10 + mu*(s_t(2)*weak_hess_tmp10 + weak_hess_tmp9);
+  D[10] = lmbda*weak_hess_tmp3 + mu*(weak_hess_tmp14 + s_t(3)*weak_hess_tmp3) + weak_hess_tmp5;
+  D[11] = lmbda*weak_hess_tmp8 + mu*(weak_hess_tmp6 + s_t(2)*weak_hess_tmp8);
+  D[15] = lmbda*weak_hess_tmp13 + mu*(s_t(3)*weak_hess_tmp13 + weak_hess_tmp4) + weak_hess_tmp5;
+  D[4] = D[1];
+  D[8] = D[2];
+  D[12] = D[3];
+  D[9] = D[6];
+  D[13] = D[7];
+  D[14] = D[11];
+  const s_t adj_q[ND * ND] = {adj_value0, adj_value1, adj_value2, adj_value3};
+  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);
 }
 
 template <typename s_t, int NS>

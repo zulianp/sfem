@@ -10,6 +10,8 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
+#include "sfem_TangentProjection.hpp"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -27,7 +29,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS>
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
 static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_simplex_direct_hessian_reference_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -449,6 +451,9 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_simplex_d
     D[69] = D[61];
     D[78] = D[62];
     D[79] = D[71];
+    if constexpr (PROJECT) {
+      project_abs_symmetric<s_t, 9>(D);
+    }
     s_t g_ref[ND * NS];
     for (int shape = 0; shape < NS; ++shape) {
       g_ref[0 * NS + shape] = grad_ref_x[q * NS + shape];
@@ -459,6 +464,422 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_simplex_d
     point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
   mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
+}
+
+template <typename s_t, int NQ, int NS, bool PROJECT = false>
+static __host__ __device__ __forceinline__ void mooney_rivlin_prony_d3_simplex_direct_hessian_reference_point_tangent(
+    const int q,
+    const s_t *const RSTR adj,
+    const s_t det,
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR grad_ref_z,
+    const s_t *const RSTR q_weight,
+    const s_t C01,
+    const s_t C10,
+    const s_t K,
+    const s_t iso_relaxation_gamma,
+    const s_t *const RSTR iso_history,
+    const ptrdiff_t qp_stride,
+    const s_t bu_data[NS * 3],
+    s_t *const RSTR T
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  const s_t qw = q_weight[q];
+  const s_t adj_value0 = adj[0];
+  const s_t adj_value1 = adj[1];
+  const s_t adj_value2 = adj[2];
+  const s_t adj_value3 = adj[3];
+  const s_t adj_value4 = adj[4];
+  const s_t adj_value5 = adj[5];
+  const s_t adj_value6 = adj[6];
+  const s_t adj_value7 = adj[7];
+  const s_t adj_value8 = adj[8];
+  const s_t det_value0 = det;
+  const s_t idet = s_t(1) / det_value0;
+  const s_t *const RSTR iso_history_q = iso_history + q * qp_stride;
+  const s_t iso_history_qp[6] = {iso_history_q[0], iso_history_q[1 * NQ * qp_stride], iso_history_q[2 * NQ * qp_stride], iso_history_q[3 * NQ * qp_stride], iso_history_q[4 * NQ * qp_stride], iso_history_q[5 * NQ * qp_stride]};
+  s_t gu_ref0 = s_t(0);
+  s_t gu_ref1 = s_t(0);
+  s_t gu_ref2 = s_t(0);
+  s_t gu_ref3 = s_t(0);
+  s_t gu_ref4 = s_t(0);
+  s_t gu_ref5 = s_t(0);
+  s_t gu_ref6 = s_t(0);
+  s_t gu_ref7 = s_t(0);
+  s_t gu_ref8 = s_t(0);
+  for (int shape = 0; shape < NS; ++shape) {
+    const s_t state_grad_ref0 = grad_ref_x[q * NS + shape];
+    const s_t state_grad_ref1 = grad_ref_y[q * NS + shape];
+    const s_t state_grad_ref2 = grad_ref_z[q * NS + shape];
+    const s_t state_u0 = bu_data[shape * NC];
+    gu_ref0 += state_u0 * state_grad_ref0;
+    gu_ref1 += state_u0 * state_grad_ref1;
+    gu_ref2 += state_u0 * state_grad_ref2;
+    const s_t state_u1 = bu_data[shape * NC + 1];
+    gu_ref3 += state_u1 * state_grad_ref0;
+    gu_ref4 += state_u1 * state_grad_ref1;
+    gu_ref5 += state_u1 * state_grad_ref2;
+    const s_t state_u2 = bu_data[shape * NC + 2];
+    gu_ref6 += state_u2 * state_grad_ref0;
+    gu_ref7 += state_u2 * state_grad_ref1;
+    gu_ref8 += state_u2 * state_grad_ref2;
+  }
+  const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value3 + gu_ref2 * adj_value6) * idet;
+  const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value4 + gu_ref2 * adj_value7) * idet;
+  const s_t gu2 = (gu_ref0 * adj_value2 + gu_ref1 * adj_value5 + gu_ref2 * adj_value8) * idet;
+  const s_t gu3 = (gu_ref3 * adj_value0 + gu_ref4 * adj_value3 + gu_ref5 * adj_value6) * idet;
+  const s_t gu4 = (gu_ref3 * adj_value1 + gu_ref4 * adj_value4 + gu_ref5 * adj_value7) * idet;
+  const s_t gu5 = (gu_ref3 * adj_value2 + gu_ref4 * adj_value5 + gu_ref5 * adj_value8) * idet;
+  const s_t gu6 = (gu_ref6 * adj_value0 + gu_ref7 * adj_value3 + gu_ref8 * adj_value6) * idet;
+  const s_t gu7 = (gu_ref6 * adj_value1 + gu_ref7 * adj_value4 + gu_ref8 * adj_value7) * idet;
+  const s_t gu8 = (gu_ref6 * adj_value2 + gu_ref7 * adj_value5 + gu_ref8 * adj_value8) * idet;
+  s_t D[81];
+  const s_t weak_hess_tmp0 = gu5*gu7;
+  const s_t weak_hess_tmp1 = gu4 + s_t(1);
+  const s_t weak_hess_tmp2 = gu8 + s_t(1);
+  const s_t weak_hess_tmp3 = s_t(2)*weak_hess_tmp0;
+  const s_t weak_hess_tmp4 = weak_hess_tmp1*weak_hess_tmp2;
+  const s_t weak_hess_tmp5 = -s_t(2)*weak_hess_tmp4;
+  const s_t weak_hess_tmp6 = ((s_t(1) / s_t(2)))*K;
+  const s_t weak_hess_tmp7 = weak_hess_tmp6*(-weak_hess_tmp3 - weak_hess_tmp5);
+  const s_t weak_hess_tmp8 = gu3*weak_hess_tmp2;
+  const s_t weak_hess_tmp9 = gu6*weak_hess_tmp1;
+  const s_t weak_hess_tmp10 = gu0 + s_t(1);
+  const s_t weak_hess_tmp11 = gu1*gu5*gu6 - gu1*weak_hess_tmp8 + gu2*gu3*gu7 - gu2*weak_hess_tmp9 - weak_hess_tmp0*weak_hess_tmp10 + weak_hess_tmp1*weak_hess_tmp10*weak_hess_tmp2;
+  const s_t weak_hess_tmp12 = s_t(2)/pow(weak_hess_tmp11, (s_t(2) / s_t(3)));
+  const s_t weak_hess_tmp13 = pow(weak_hess_tmp11, (s_t(-5) / s_t(3)));
+  const s_t weak_hess_tmp14 = ((s_t(2) / s_t(3)))*weak_hess_tmp0 - (s_t(2) / s_t(3))*weak_hess_tmp4;
+  const s_t weak_hess_tmp15 = weak_hess_tmp13*weak_hess_tmp14;
+  const s_t weak_hess_tmp16 = pow_2(gu3);
+  const s_t weak_hess_tmp17 = pow_2(gu6);
+  const s_t weak_hess_tmp18 = pow_2(weak_hess_tmp10);
+  const s_t weak_hess_tmp19 = weak_hess_tmp16 + weak_hess_tmp17 + weak_hess_tmp18;
+  const s_t weak_hess_tmp20 = pow_2(gu1);
+  const s_t weak_hess_tmp21 = pow_2(gu7);
+  const s_t weak_hess_tmp22 = pow_2(weak_hess_tmp1);
+  const s_t weak_hess_tmp23 = weak_hess_tmp20 + weak_hess_tmp21 + weak_hess_tmp22;
+  const s_t weak_hess_tmp24 = pow_2(gu2);
+  const s_t weak_hess_tmp25 = pow_2(gu5);
+  const s_t weak_hess_tmp26 = pow_2(weak_hess_tmp2);
+  const s_t weak_hess_tmp27 = weak_hess_tmp24 + weak_hess_tmp25 + weak_hess_tmp26;
+  const s_t weak_hess_tmp28 = weak_hess_tmp19 + weak_hess_tmp23 + weak_hess_tmp27;
+  const s_t weak_hess_tmp29 = weak_hess_tmp28/pow(weak_hess_tmp11, (s_t(8) / s_t(3)));
+  const s_t weak_hess_tmp30 = weak_hess_tmp14*weak_hess_tmp29;
+  const s_t weak_hess_tmp31 = s_t(2)*weak_hess_tmp25;
+  const s_t weak_hess_tmp32 = s_t(2)*weak_hess_tmp26;
+  const s_t weak_hess_tmp33 = weak_hess_tmp31 + weak_hess_tmp32;
+  const s_t weak_hess_tmp34 = s_t(2)*weak_hess_tmp21;
+  const s_t weak_hess_tmp35 = s_t(2)*weak_hess_tmp22;
+  const s_t weak_hess_tmp36 = weak_hess_tmp34 + weak_hess_tmp35;
+  const s_t weak_hess_tmp37 = pow(weak_hess_tmp11, (s_t(-4) / s_t(3)));
+  const s_t weak_hess_tmp38 = ((s_t(4) / s_t(3)))*weak_hess_tmp0 - (s_t(4) / s_t(3))*weak_hess_tmp4;
+  const s_t weak_hess_tmp39 = pow(weak_hess_tmp11, (s_t(-7) / s_t(3)));
+  const s_t weak_hess_tmp40 = gu6*gu7;
+  const s_t weak_hess_tmp41 = gu1*weak_hess_tmp10;
+  const s_t weak_hess_tmp42 = gu3*weak_hess_tmp1;
+  const s_t weak_hess_tmp43 = weak_hess_tmp40 + weak_hess_tmp41 + weak_hess_tmp42;
+  const s_t weak_hess_tmp44 = s_t(2)*gu1;
+  const s_t weak_hess_tmp45 = gu3*gu5;
+  const s_t weak_hess_tmp46 = gu2*weak_hess_tmp10;
+  const s_t weak_hess_tmp47 = gu6*weak_hess_tmp2;
+  const s_t weak_hess_tmp48 = weak_hess_tmp45 + weak_hess_tmp46 + weak_hess_tmp47;
+  const s_t weak_hess_tmp49 = s_t(2)*gu2;
+  const s_t weak_hess_tmp50 = s_t(2)*weak_hess_tmp10;
+  const s_t weak_hess_tmp51 = weak_hess_tmp39*(s_t(2)*weak_hess_tmp10*weak_hess_tmp28 - weak_hess_tmp19*weak_hess_tmp50 - weak_hess_tmp43*weak_hess_tmp44 - weak_hess_tmp48*weak_hess_tmp49);
+  const s_t weak_hess_tmp52 = gu1*gu2;
+  const s_t weak_hess_tmp53 = gu5*weak_hess_tmp1;
+  const s_t weak_hess_tmp54 = gu7*weak_hess_tmp2;
+  const s_t weak_hess_tmp55 = weak_hess_tmp52 + weak_hess_tmp53 + weak_hess_tmp54;
+  const s_t weak_hess_tmp56 = -(s_t(1) / s_t(2))*pow_2(weak_hess_tmp19) - (s_t(1) / s_t(2))*pow_2(weak_hess_tmp23) - (s_t(1) / s_t(2))*pow_2(weak_hess_tmp27) + ((s_t(1) / s_t(2)))*pow_2(weak_hess_tmp28) - pow_2(weak_hess_tmp43) - pow_2(weak_hess_tmp48) - pow_2(weak_hess_tmp55);
+  const s_t weak_hess_tmp57 = weak_hess_tmp56/pow(weak_hess_tmp11, (s_t(10) / s_t(3)));
+  const s_t weak_hess_tmp58 = weak_hess_tmp38*weak_hess_tmp57;
+  const s_t weak_hess_tmp59 = gu5*gu6 - weak_hess_tmp8;
+  const s_t weak_hess_tmp60 = gu5*gu6;
+  const s_t weak_hess_tmp61 = -(s_t(2) / s_t(3))*weak_hess_tmp60 + ((s_t(2) / s_t(3)))*weak_hess_tmp8;
+  const s_t weak_hess_tmp62 = weak_hess_tmp13*weak_hess_tmp50;
+  const s_t weak_hess_tmp63 = -(s_t(5) / s_t(3))*weak_hess_tmp60 + ((s_t(5) / s_t(3)))*weak_hess_tmp8;
+  const s_t weak_hess_tmp64 = s_t(2)*weak_hess_tmp40;
+  const s_t weak_hess_tmp65 = s_t(2)*weak_hess_tmp42;
+  const s_t weak_hess_tmp66 = -(s_t(4) / s_t(3))*weak_hess_tmp60 + ((s_t(4) / s_t(3)))*weak_hess_tmp8;
+  const s_t weak_hess_tmp67 = s_t(2)*gu1*weak_hess_tmp28 - weak_hess_tmp23*weak_hess_tmp44 - weak_hess_tmp43*weak_hess_tmp50 - weak_hess_tmp49*weak_hess_tmp55;
+  const s_t weak_hess_tmp68 = weak_hess_tmp38*weak_hess_tmp39;
+  const s_t weak_hess_tmp69 = -(s_t(7) / s_t(3))*weak_hess_tmp60 + ((s_t(7) / s_t(3)))*weak_hess_tmp8;
+  const s_t weak_hess_tmp70 = gu3*gu7;
+  const s_t weak_hess_tmp71 = weak_hess_tmp70 - weak_hess_tmp9;
+  const s_t weak_hess_tmp72 = ((s_t(2) / s_t(3)))*gu6*weak_hess_tmp1 - (s_t(2) / s_t(3))*weak_hess_tmp70;
+  const s_t weak_hess_tmp73 = ((s_t(5) / s_t(3)))*gu6*weak_hess_tmp1 - (s_t(5) / s_t(3))*weak_hess_tmp70;
+  const s_t weak_hess_tmp74 = s_t(2)*weak_hess_tmp45;
+  const s_t weak_hess_tmp75 = s_t(2)*weak_hess_tmp47;
+  const s_t weak_hess_tmp76 = ((s_t(4) / s_t(3)))*gu6*weak_hess_tmp1 - (s_t(4) / s_t(3))*weak_hess_tmp70;
+  const s_t weak_hess_tmp77 = s_t(2)*gu2*weak_hess_tmp28 - weak_hess_tmp27*weak_hess_tmp49 - weak_hess_tmp44*weak_hess_tmp55 - weak_hess_tmp48*weak_hess_tmp50;
+  const s_t weak_hess_tmp78 = ((s_t(7) / s_t(3)))*gu6*weak_hess_tmp1 - (s_t(7) / s_t(3))*weak_hess_tmp70;
+  const s_t weak_hess_tmp79 = gu1*weak_hess_tmp2;
+  const s_t weak_hess_tmp80 = gu2*gu7 - weak_hess_tmp79;
+  const s_t weak_hess_tmp81 = s_t(2)*gu3;
+  const s_t weak_hess_tmp82 = gu2*gu7;
+  const s_t weak_hess_tmp83 = ((s_t(2) / s_t(3)))*weak_hess_tmp79 - (s_t(2) / s_t(3))*weak_hess_tmp82;
+  const s_t weak_hess_tmp84 = ((s_t(5) / s_t(3)))*weak_hess_tmp79 - (s_t(5) / s_t(3))*weak_hess_tmp82;
+  const s_t weak_hess_tmp85 = gu5*weak_hess_tmp49;
+  const s_t weak_hess_tmp86 = weak_hess_tmp1*weak_hess_tmp44;
+  const s_t weak_hess_tmp87 = ((s_t(4) / s_t(3)))*weak_hess_tmp79 - (s_t(4) / s_t(3))*weak_hess_tmp82;
+  const s_t weak_hess_tmp88 = s_t(2)*gu5;
+  const s_t weak_hess_tmp89 = s_t(2)*weak_hess_tmp1;
+  const s_t weak_hess_tmp90 = s_t(2)*gu3*weak_hess_tmp28 - weak_hess_tmp19*weak_hess_tmp81 - weak_hess_tmp43*weak_hess_tmp89 - weak_hess_tmp48*weak_hess_tmp88;
+  const s_t weak_hess_tmp91 = ((s_t(7) / s_t(3)))*weak_hess_tmp79 - (s_t(7) / s_t(3))*weak_hess_tmp82;
+  const s_t weak_hess_tmp92 = gu2*gu6;
+  const s_t weak_hess_tmp93 = weak_hess_tmp10*weak_hess_tmp2 - weak_hess_tmp92;
+  const s_t weak_hess_tmp94 = gu0*gu4;
+  const s_t weak_hess_tmp95 = gu1*gu3;
+  const s_t weak_hess_tmp96 = K*(gu0*gu8 - gu0*weak_hess_tmp0 + gu0 + gu1*weak_hess_tmp60 + gu2*weak_hess_tmp70 + gu4*gu8 - gu4*weak_hess_tmp92 + gu4 + gu8*weak_hess_tmp94 - gu8*weak_hess_tmp95 + gu8 - weak_hess_tmp0 - weak_hess_tmp92 + weak_hess_tmp94 - weak_hess_tmp95);
+  const s_t weak_hess_tmp97 = weak_hess_tmp2*weak_hess_tmp96;
+  const s_t weak_hess_tmp98 = weak_hess_tmp10*weak_hess_tmp2;
+  const s_t weak_hess_tmp99 = ((s_t(2) / s_t(3)))*weak_hess_tmp92 - (s_t(2) / s_t(3))*weak_hess_tmp98;
+  const s_t weak_hess_tmp100 = weak_hess_tmp13*weak_hess_tmp2;
+  const s_t weak_hess_tmp101 = ((s_t(2) / s_t(3)))*weak_hess_tmp28;
+  const s_t weak_hess_tmp102 = weak_hess_tmp100*weak_hess_tmp101;
+  const s_t weak_hess_tmp103 = ((s_t(5) / s_t(3)))*weak_hess_tmp92 - (s_t(5) / s_t(3))*weak_hess_tmp98;
+  const s_t weak_hess_tmp104 = s_t(2)*weak_hess_tmp95;
+  const s_t weak_hess_tmp105 = ((s_t(4) / s_t(3)))*weak_hess_tmp92 - (s_t(4) / s_t(3))*weak_hess_tmp98;
+  const s_t weak_hess_tmp106 = s_t(2)*weak_hess_tmp1*weak_hess_tmp28 - weak_hess_tmp23*weak_hess_tmp89 - weak_hess_tmp43*weak_hess_tmp81 - weak_hess_tmp55*weak_hess_tmp88;
+  const s_t weak_hess_tmp107 = ((s_t(4) / s_t(3)))*weak_hess_tmp39*weak_hess_tmp56;
+  const s_t weak_hess_tmp108 = weak_hess_tmp107*weak_hess_tmp2;
+  const s_t weak_hess_tmp109 = ((s_t(7) / s_t(3)))*weak_hess_tmp92 - (s_t(7) / s_t(3))*weak_hess_tmp98;
+  const s_t weak_hess_tmp110 = gu1*gu6;
+  const s_t weak_hess_tmp111 = gu7*weak_hess_tmp10;
+  const s_t weak_hess_tmp112 = weak_hess_tmp110 - weak_hess_tmp111;
+  const s_t weak_hess_tmp113 = gu7*weak_hess_tmp96;
+  const s_t weak_hess_tmp114 = ((s_t(2) / s_t(3)))*gu7*weak_hess_tmp10 - (s_t(2) / s_t(3))*weak_hess_tmp110;
+  const s_t weak_hess_tmp115 = weak_hess_tmp101*weak_hess_tmp13;
+  const s_t weak_hess_tmp116 = gu7*weak_hess_tmp115;
+  const s_t weak_hess_tmp117 = ((s_t(5) / s_t(3)))*gu7*weak_hess_tmp10 - (s_t(5) / s_t(3))*weak_hess_tmp110;
+  const s_t weak_hess_tmp118 = gu2*gu3;
+  const s_t weak_hess_tmp119 = s_t(2)*weak_hess_tmp118;
+  const s_t weak_hess_tmp120 = ((s_t(4) / s_t(3)))*gu7*weak_hess_tmp10 - (s_t(4) / s_t(3))*weak_hess_tmp110;
+  const s_t weak_hess_tmp121 = s_t(2)*gu5*weak_hess_tmp28 - weak_hess_tmp27*weak_hess_tmp88 - weak_hess_tmp48*weak_hess_tmp81 - weak_hess_tmp55*weak_hess_tmp89;
+  const s_t weak_hess_tmp122 = gu7*weak_hess_tmp107;
+  const s_t weak_hess_tmp123 = ((s_t(7) / s_t(3)))*gu7*weak_hess_tmp10 - (s_t(7) / s_t(3))*weak_hess_tmp110;
+  const s_t weak_hess_tmp124 = gu1*gu5;
+  const s_t weak_hess_tmp125 = gu2*weak_hess_tmp1;
+  const s_t weak_hess_tmp126 = weak_hess_tmp124 - weak_hess_tmp125;
+  const s_t weak_hess_tmp127 = s_t(2)*gu6;
+  const s_t weak_hess_tmp128 = ((s_t(2) / s_t(3)))*gu2*weak_hess_tmp1 - (s_t(2) / s_t(3))*weak_hess_tmp124;
+  const s_t weak_hess_tmp129 = ((s_t(5) / s_t(3)))*gu2*weak_hess_tmp1 - (s_t(5) / s_t(3))*weak_hess_tmp124;
+  const s_t weak_hess_tmp130 = gu7*weak_hess_tmp44;
+  const s_t weak_hess_tmp131 = weak_hess_tmp2*weak_hess_tmp49;
+  const s_t weak_hess_tmp132 = ((s_t(4) / s_t(3)))*gu2*weak_hess_tmp1 - (s_t(4) / s_t(3))*weak_hess_tmp124;
+  const s_t weak_hess_tmp133 = s_t(2)*gu7;
+  const s_t weak_hess_tmp134 = s_t(2)*weak_hess_tmp2;
+  const s_t weak_hess_tmp135 = s_t(2)*gu6*weak_hess_tmp28 - weak_hess_tmp127*weak_hess_tmp19 - weak_hess_tmp133*weak_hess_tmp43 - weak_hess_tmp134*weak_hess_tmp48;
+  const s_t weak_hess_tmp136 = ((s_t(7) / s_t(3)))*gu2*weak_hess_tmp1 - (s_t(7) / s_t(3))*weak_hess_tmp124;
+  const s_t weak_hess_tmp137 = gu5*weak_hess_tmp10;
+  const s_t weak_hess_tmp138 = weak_hess_tmp118 - weak_hess_tmp137;
+  const s_t weak_hess_tmp139 = gu5*weak_hess_tmp96;
+  const s_t weak_hess_tmp140 = ((s_t(2) / s_t(3)))*gu5*weak_hess_tmp10 - (s_t(2) / s_t(3))*weak_hess_tmp118;
+  const s_t weak_hess_tmp141 = gu5*weak_hess_tmp115;
+  const s_t weak_hess_tmp142 = ((s_t(5) / s_t(3)))*gu5*weak_hess_tmp10 - (s_t(5) / s_t(3))*weak_hess_tmp118;
+  const s_t weak_hess_tmp143 = s_t(2)*weak_hess_tmp110;
+  const s_t weak_hess_tmp144 = ((s_t(4) / s_t(3)))*gu5*weak_hess_tmp10 - (s_t(4) / s_t(3))*weak_hess_tmp118;
+  const s_t weak_hess_tmp145 = s_t(2)*gu7*weak_hess_tmp28 - weak_hess_tmp127*weak_hess_tmp43 - weak_hess_tmp133*weak_hess_tmp23 - weak_hess_tmp134*weak_hess_tmp55;
+  const s_t weak_hess_tmp146 = gu5*weak_hess_tmp107;
+  const s_t weak_hess_tmp147 = ((s_t(7) / s_t(3)))*gu5*weak_hess_tmp10 - (s_t(7) / s_t(3))*weak_hess_tmp118;
+  const s_t weak_hess_tmp148 = weak_hess_tmp1*weak_hess_tmp10 - weak_hess_tmp95;
+  const s_t weak_hess_tmp149 = weak_hess_tmp1*weak_hess_tmp96;
+  const s_t weak_hess_tmp150 = weak_hess_tmp1*weak_hess_tmp10;
+  const s_t weak_hess_tmp151 = -(s_t(2) / s_t(3))*weak_hess_tmp150 + ((s_t(2) / s_t(3)))*weak_hess_tmp95;
+  const s_t weak_hess_tmp152 = weak_hess_tmp1*weak_hess_tmp115;
+  const s_t weak_hess_tmp153 = -(s_t(5) / s_t(3))*weak_hess_tmp150 + ((s_t(5) / s_t(3)))*weak_hess_tmp95;
+  const s_t weak_hess_tmp154 = s_t(2)*weak_hess_tmp92;
+  const s_t weak_hess_tmp155 = -(s_t(4) / s_t(3))*weak_hess_tmp150 + ((s_t(4) / s_t(3)))*weak_hess_tmp95;
+  const s_t weak_hess_tmp156 = -weak_hess_tmp127*weak_hess_tmp48 - weak_hess_tmp133*weak_hess_tmp55 - weak_hess_tmp134*weak_hess_tmp27 + s_t(2)*weak_hess_tmp2*weak_hess_tmp28;
+  const s_t weak_hess_tmp157 = weak_hess_tmp1*weak_hess_tmp107;
+  const s_t weak_hess_tmp158 = -(s_t(7) / s_t(3))*weak_hess_tmp150 + ((s_t(7) / s_t(3)))*weak_hess_tmp95;
+  const s_t weak_hess_tmp159 = -s_t(2)*weak_hess_tmp60;
+  const s_t weak_hess_tmp160 = s_t(2)*weak_hess_tmp8;
+  const s_t weak_hess_tmp161 = weak_hess_tmp6*(-weak_hess_tmp159 - weak_hess_tmp160);
+  const s_t weak_hess_tmp162 = weak_hess_tmp13*weak_hess_tmp61;
+  const s_t weak_hess_tmp163 = weak_hess_tmp29*weak_hess_tmp61;
+  const s_t weak_hess_tmp164 = s_t(2)*weak_hess_tmp16;
+  const s_t weak_hess_tmp165 = s_t(2)*weak_hess_tmp17;
+  const s_t weak_hess_tmp166 = weak_hess_tmp164 + weak_hess_tmp165;
+  const s_t weak_hess_tmp167 = weak_hess_tmp39*weak_hess_tmp67;
+  const s_t weak_hess_tmp168 = weak_hess_tmp57*weak_hess_tmp66;
+  const s_t weak_hess_tmp169 = weak_hess_tmp13*weak_hess_tmp44;
+  const s_t weak_hess_tmp170 = s_t(2)*weak_hess_tmp53;
+  const s_t weak_hess_tmp171 = s_t(2)*weak_hess_tmp54;
+  const s_t weak_hess_tmp172 = weak_hess_tmp39*weak_hess_tmp66;
+  const s_t weak_hess_tmp173 = -s_t(2)*weak_hess_tmp150;
+  const s_t weak_hess_tmp174 = gu3*weak_hess_tmp50;
+  const s_t weak_hess_tmp175 = gu6*weak_hess_tmp96;
+  const s_t weak_hess_tmp176 = gu6*weak_hess_tmp115;
+  const s_t weak_hess_tmp177 = -s_t(2)*weak_hess_tmp125;
+  const s_t weak_hess_tmp178 = gu6*weak_hess_tmp107;
+  const s_t weak_hess_tmp179 = -s_t(2)*weak_hess_tmp111;
+  const s_t weak_hess_tmp180 = gu6*weak_hess_tmp50;
+  const s_t weak_hess_tmp181 = gu3*weak_hess_tmp96;
+  const s_t weak_hess_tmp182 = gu3*weak_hess_tmp115;
+  const s_t weak_hess_tmp183 = -s_t(2)*weak_hess_tmp82;
+  const s_t weak_hess_tmp184 = gu3*weak_hess_tmp107;
+  const s_t weak_hess_tmp185 = s_t(2)*weak_hess_tmp70;
+  const s_t weak_hess_tmp186 = -s_t(2)*weak_hess_tmp9;
+  const s_t weak_hess_tmp187 = weak_hess_tmp6*(weak_hess_tmp185 + weak_hess_tmp186);
+  const s_t weak_hess_tmp188 = weak_hess_tmp13*weak_hess_tmp72;
+  const s_t weak_hess_tmp189 = weak_hess_tmp29*weak_hess_tmp72;
+  const s_t weak_hess_tmp190 = weak_hess_tmp39*weak_hess_tmp77;
+  const s_t weak_hess_tmp191 = weak_hess_tmp57*weak_hess_tmp76;
+  const s_t weak_hess_tmp192 = weak_hess_tmp13*weak_hess_tmp49;
+  const s_t weak_hess_tmp193 = -s_t(2)*weak_hess_tmp137;
+  const s_t weak_hess_tmp194 = weak_hess_tmp39*weak_hess_tmp76;
+  const s_t weak_hess_tmp195 = s_t(2)*weak_hess_tmp124;
+  const s_t weak_hess_tmp196 = -s_t(2)*weak_hess_tmp98;
+  const s_t weak_hess_tmp197 = s_t(2)*weak_hess_tmp79;
+  const s_t weak_hess_tmp198 = weak_hess_tmp6*(-weak_hess_tmp183 - weak_hess_tmp197);
+  const s_t weak_hess_tmp199 = weak_hess_tmp13*weak_hess_tmp83;
+  const s_t weak_hess_tmp200 = weak_hess_tmp29*weak_hess_tmp83;
+  const s_t weak_hess_tmp201 = s_t(2)*weak_hess_tmp24;
+  const s_t weak_hess_tmp202 = weak_hess_tmp201 + weak_hess_tmp32;
+  const s_t weak_hess_tmp203 = s_t(2)*weak_hess_tmp20;
+  const s_t weak_hess_tmp204 = weak_hess_tmp203 + weak_hess_tmp34;
+  const s_t weak_hess_tmp205 = weak_hess_tmp39*weak_hess_tmp87;
+  const s_t weak_hess_tmp206 = weak_hess_tmp57*weak_hess_tmp87;
+  const s_t weak_hess_tmp207 = weak_hess_tmp13*weak_hess_tmp81;
+  const s_t weak_hess_tmp208 = s_t(2)*weak_hess_tmp41;
+  const s_t weak_hess_tmp209 = weak_hess_tmp39*weak_hess_tmp90;
+  const s_t weak_hess_tmp210 = s_t(2)*weak_hess_tmp46;
+  const s_t weak_hess_tmp211 = weak_hess_tmp2*weak_hess_tmp88;
+  const s_t weak_hess_tmp212 = gu7*weak_hess_tmp89;
+  const s_t weak_hess_tmp213 = gu2*weak_hess_tmp96;
+  const s_t weak_hess_tmp214 = gu2*weak_hess_tmp115;
+  const s_t weak_hess_tmp215 = gu2*weak_hess_tmp107;
+  const s_t weak_hess_tmp216 = gu1*weak_hess_tmp96;
+  const s_t weak_hess_tmp217 = gu1*weak_hess_tmp115;
+  const s_t weak_hess_tmp218 = gu1*weak_hess_tmp107;
+  const s_t weak_hess_tmp219 = weak_hess_tmp6*(-weak_hess_tmp154 - weak_hess_tmp196);
+  const s_t weak_hess_tmp220 = weak_hess_tmp13*weak_hess_tmp99;
+  const s_t weak_hess_tmp221 = weak_hess_tmp29*weak_hess_tmp99;
+  const s_t weak_hess_tmp222 = s_t(2)*weak_hess_tmp18;
+  const s_t weak_hess_tmp223 = weak_hess_tmp165 + weak_hess_tmp222;
+  const s_t weak_hess_tmp224 = weak_hess_tmp106*weak_hess_tmp39;
+  const s_t weak_hess_tmp225 = weak_hess_tmp105*weak_hess_tmp57;
+  const s_t weak_hess_tmp226 = weak_hess_tmp13*weak_hess_tmp89;
+  const s_t weak_hess_tmp227 = s_t(2)*weak_hess_tmp52;
+  const s_t weak_hess_tmp228 = weak_hess_tmp105*weak_hess_tmp39;
+  const s_t weak_hess_tmp229 = gu6*weak_hess_tmp81;
+  const s_t weak_hess_tmp230 = weak_hess_tmp10*weak_hess_tmp96;
+  const s_t weak_hess_tmp231 = weak_hess_tmp10*weak_hess_tmp115;
+  const s_t weak_hess_tmp232 = weak_hess_tmp10*weak_hess_tmp107;
+  const s_t weak_hess_tmp233 = weak_hess_tmp6*(weak_hess_tmp143 + weak_hess_tmp179);
+  const s_t weak_hess_tmp234 = weak_hess_tmp114*weak_hess_tmp13;
+  const s_t weak_hess_tmp235 = weak_hess_tmp114*weak_hess_tmp29;
+  const s_t weak_hess_tmp236 = weak_hess_tmp121*weak_hess_tmp39;
+  const s_t weak_hess_tmp237 = weak_hess_tmp120*weak_hess_tmp57;
+  const s_t weak_hess_tmp238 = weak_hess_tmp13*weak_hess_tmp88;
+  const s_t weak_hess_tmp239 = weak_hess_tmp120*weak_hess_tmp39;
+  const s_t weak_hess_tmp240 = weak_hess_tmp6*(weak_hess_tmp177 + weak_hess_tmp195);
+  const s_t weak_hess_tmp241 = weak_hess_tmp128*weak_hess_tmp13;
+  const s_t weak_hess_tmp242 = weak_hess_tmp128*weak_hess_tmp29;
+  const s_t weak_hess_tmp243 = weak_hess_tmp201 + weak_hess_tmp31;
+  const s_t weak_hess_tmp244 = weak_hess_tmp203 + weak_hess_tmp35;
+  const s_t weak_hess_tmp245 = weak_hess_tmp132*weak_hess_tmp39;
+  const s_t weak_hess_tmp246 = weak_hess_tmp132*weak_hess_tmp57;
+  const s_t weak_hess_tmp247 = weak_hess_tmp127*weak_hess_tmp13;
+  const s_t weak_hess_tmp248 = weak_hess_tmp135*weak_hess_tmp39;
+  const s_t weak_hess_tmp249 = weak_hess_tmp6*(weak_hess_tmp119 + weak_hess_tmp193);
+  const s_t weak_hess_tmp250 = weak_hess_tmp13*weak_hess_tmp140;
+  const s_t weak_hess_tmp251 = weak_hess_tmp140*weak_hess_tmp29;
+  const s_t weak_hess_tmp252 = weak_hess_tmp164 + weak_hess_tmp222;
+  const s_t weak_hess_tmp253 = weak_hess_tmp144*weak_hess_tmp39;
+  const s_t weak_hess_tmp254 = weak_hess_tmp144*weak_hess_tmp57;
+  const s_t weak_hess_tmp255 = weak_hess_tmp155*weak_hess_tmp39;
+  D[0] = iso_history_qp[0] + iso_relaxation_gamma*(C01*(weak_hess_tmp37*(weak_hess_tmp33 + weak_hess_tmp36) + s_t(2)*weak_hess_tmp38*weak_hess_tmp51 + weak_hess_tmp58*(((s_t(7) / s_t(3)))*weak_hess_tmp0 - (s_t(7) / s_t(3))*weak_hess_tmp4)) + C10*(s_t(4)*weak_hess_tmp10*weak_hess_tmp15 + weak_hess_tmp12 + weak_hess_tmp30*(((s_t(5) / s_t(3)))*weak_hess_tmp0 - (s_t(5) / s_t(3))*weak_hess_tmp4))) + weak_hess_tmp7*(-weak_hess_tmp0 + weak_hess_tmp1*weak_hess_tmp2);
+  D[1] = iso_history_qp[3] + iso_relaxation_gamma*(C01*(weak_hess_tmp37*(-weak_hess_tmp64 - weak_hess_tmp65) + weak_hess_tmp51*weak_hess_tmp66 + weak_hess_tmp58*weak_hess_tmp69 + weak_hess_tmp67*weak_hess_tmp68) + C10*(weak_hess_tmp15*weak_hess_tmp44 + weak_hess_tmp30*weak_hess_tmp63 + weak_hess_tmp61*weak_hess_tmp62)) + weak_hess_tmp59*weak_hess_tmp7;
+  D[2] = iso_history_qp[4] + iso_relaxation_gamma*(C01*(weak_hess_tmp37*(-weak_hess_tmp74 - weak_hess_tmp75) + weak_hess_tmp51*weak_hess_tmp76 + weak_hess_tmp58*weak_hess_tmp78 + weak_hess_tmp68*weak_hess_tmp77) + C10*(weak_hess_tmp15*weak_hess_tmp49 + weak_hess_tmp30*weak_hess_tmp73 + weak_hess_tmp62*weak_hess_tmp72)) + weak_hess_tmp7*weak_hess_tmp71;
+  D[3] = iso_relaxation_gamma*(C01*(weak_hess_tmp37*(-weak_hess_tmp85 - weak_hess_tmp86) + weak_hess_tmp51*weak_hess_tmp87 + weak_hess_tmp58*weak_hess_tmp91 + weak_hess_tmp68*weak_hess_tmp90) + C10*(weak_hess_tmp15*weak_hess_tmp81 + weak_hess_tmp30*weak_hess_tmp84 + weak_hess_tmp62*weak_hess_tmp83)) + weak_hess_tmp7*weak_hess_tmp80;
+  D[4] = iso_relaxation_gamma*(C01*(weak_hess_tmp105*weak_hess_tmp51 + weak_hess_tmp106*weak_hess_tmp68 - weak_hess_tmp108 + weak_hess_tmp109*weak_hess_tmp58 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp1*weak_hess_tmp10 - weak_hess_tmp104)) + C10*(-weak_hess_tmp102 + weak_hess_tmp103*weak_hess_tmp30 + weak_hess_tmp15*weak_hess_tmp89 + weak_hess_tmp62*weak_hess_tmp99)) + weak_hess_tmp7*weak_hess_tmp93 + weak_hess_tmp97;
+  D[5] = iso_relaxation_gamma*(C01*(weak_hess_tmp120*weak_hess_tmp51 + weak_hess_tmp121*weak_hess_tmp68 + weak_hess_tmp122 + weak_hess_tmp123*weak_hess_tmp58 + weak_hess_tmp37*(s_t(4)*gu5*weak_hess_tmp10 - weak_hess_tmp119)) + C10*(weak_hess_tmp114*weak_hess_tmp62 + weak_hess_tmp116 + weak_hess_tmp117*weak_hess_tmp30 + weak_hess_tmp15*weak_hess_tmp88)) + weak_hess_tmp112*weak_hess_tmp7 - weak_hess_tmp113;
+  D[6] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp51 + weak_hess_tmp135*weak_hess_tmp68 + weak_hess_tmp136*weak_hess_tmp58 + weak_hess_tmp37*(-weak_hess_tmp130 - weak_hess_tmp131)) + C10*(weak_hess_tmp127*weak_hess_tmp15 + weak_hess_tmp128*weak_hess_tmp62 + weak_hess_tmp129*weak_hess_tmp30)) + weak_hess_tmp126*weak_hess_tmp7;
+  D[7] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp51 + weak_hess_tmp145*weak_hess_tmp68 + weak_hess_tmp146 + weak_hess_tmp147*weak_hess_tmp58 + weak_hess_tmp37*(s_t(4)*gu7*weak_hess_tmp10 - weak_hess_tmp143)) + C10*(weak_hess_tmp133*weak_hess_tmp15 + weak_hess_tmp140*weak_hess_tmp62 + weak_hess_tmp141 + weak_hess_tmp142*weak_hess_tmp30)) + weak_hess_tmp138*weak_hess_tmp7 - weak_hess_tmp139;
+  D[8] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp51 + weak_hess_tmp156*weak_hess_tmp68 - weak_hess_tmp157 + weak_hess_tmp158*weak_hess_tmp58 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp10*weak_hess_tmp2 - weak_hess_tmp154)) + C10*(weak_hess_tmp134*weak_hess_tmp15 + weak_hess_tmp151*weak_hess_tmp62 - weak_hess_tmp152 + weak_hess_tmp153*weak_hess_tmp30)) + weak_hess_tmp148*weak_hess_tmp7 + weak_hess_tmp149;
+  D[10] = iso_history_qp[1] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp167*weak_hess_tmp66 + weak_hess_tmp168*weak_hess_tmp69 + weak_hess_tmp37*(weak_hess_tmp166 + weak_hess_tmp33)) + C10*(s_t(4)*gu1*weak_hess_tmp162 + weak_hess_tmp12 + weak_hess_tmp163*weak_hess_tmp63)) + weak_hess_tmp161*weak_hess_tmp59;
+  D[11] = iso_history_qp[5] + iso_relaxation_gamma*(C01*(weak_hess_tmp167*weak_hess_tmp76 + weak_hess_tmp168*weak_hess_tmp78 + weak_hess_tmp172*weak_hess_tmp77 + weak_hess_tmp37*(-weak_hess_tmp170 - weak_hess_tmp171)) + C10*(weak_hess_tmp162*weak_hess_tmp49 + weak_hess_tmp163*weak_hess_tmp73 + weak_hess_tmp169*weak_hess_tmp72)) + weak_hess_tmp161*weak_hess_tmp71;
+  D[12] = iso_relaxation_gamma*(C01*(weak_hess_tmp108 + weak_hess_tmp167*weak_hess_tmp87 + weak_hess_tmp168*weak_hess_tmp91 + weak_hess_tmp172*weak_hess_tmp90 + weak_hess_tmp37*(weak_hess_tmp173 + s_t(4)*weak_hess_tmp95)) + C10*(weak_hess_tmp102 + weak_hess_tmp162*weak_hess_tmp81 + weak_hess_tmp163*weak_hess_tmp84 + weak_hess_tmp169*weak_hess_tmp83)) + weak_hess_tmp161*weak_hess_tmp80 - weak_hess_tmp97;
+  D[13] = iso_relaxation_gamma*(C01*(weak_hess_tmp105*weak_hess_tmp167 + weak_hess_tmp106*weak_hess_tmp172 + weak_hess_tmp109*weak_hess_tmp168 + weak_hess_tmp37*(-weak_hess_tmp174 - weak_hess_tmp85)) + C10*(weak_hess_tmp103*weak_hess_tmp163 + weak_hess_tmp162*weak_hess_tmp89 + weak_hess_tmp169*weak_hess_tmp99)) + weak_hess_tmp161*weak_hess_tmp93;
+  D[14] = iso_relaxation_gamma*(C01*(weak_hess_tmp120*weak_hess_tmp167 + weak_hess_tmp121*weak_hess_tmp172 + weak_hess_tmp123*weak_hess_tmp168 - weak_hess_tmp178 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp124 + weak_hess_tmp177)) + C10*(weak_hess_tmp114*weak_hess_tmp169 + weak_hess_tmp117*weak_hess_tmp163 + weak_hess_tmp162*weak_hess_tmp88 - weak_hess_tmp176)) + weak_hess_tmp112*weak_hess_tmp161 + weak_hess_tmp175;
+  D[15] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp167 + weak_hess_tmp135*weak_hess_tmp172 + weak_hess_tmp136*weak_hess_tmp168 - weak_hess_tmp146 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp110 + weak_hess_tmp179)) + C10*(weak_hess_tmp127*weak_hess_tmp162 + weak_hess_tmp128*weak_hess_tmp169 + weak_hess_tmp129*weak_hess_tmp163 - weak_hess_tmp141)) + weak_hess_tmp126*weak_hess_tmp161 + weak_hess_tmp139;
+  D[16] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp167 + weak_hess_tmp145*weak_hess_tmp172 + weak_hess_tmp147*weak_hess_tmp168 + weak_hess_tmp37*(-weak_hess_tmp131 - weak_hess_tmp180)) + C10*(weak_hess_tmp133*weak_hess_tmp162 + weak_hess_tmp140*weak_hess_tmp169 + weak_hess_tmp142*weak_hess_tmp163)) + weak_hess_tmp138*weak_hess_tmp161;
+  D[17] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp167 + weak_hess_tmp156*weak_hess_tmp172 + weak_hess_tmp158*weak_hess_tmp168 + weak_hess_tmp184 + weak_hess_tmp37*(weak_hess_tmp183 + s_t(4)*weak_hess_tmp79)) + C10*(weak_hess_tmp134*weak_hess_tmp162 + weak_hess_tmp151*weak_hess_tmp169 + weak_hess_tmp153*weak_hess_tmp163 + weak_hess_tmp182)) + weak_hess_tmp148*weak_hess_tmp161 - weak_hess_tmp181;
+  D[20] = iso_history_qp[2] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp190*weak_hess_tmp76 + weak_hess_tmp191*weak_hess_tmp78 + weak_hess_tmp37*(weak_hess_tmp166 + weak_hess_tmp36)) + C10*(s_t(4)*gu2*weak_hess_tmp188 + weak_hess_tmp12 + weak_hess_tmp189*weak_hess_tmp73)) + weak_hess_tmp187*weak_hess_tmp71;
+  D[21] = iso_relaxation_gamma*(C01*(-weak_hess_tmp122 + weak_hess_tmp190*weak_hess_tmp87 + weak_hess_tmp191*weak_hess_tmp91 + weak_hess_tmp194*weak_hess_tmp90 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp118 + weak_hess_tmp193)) + C10*(-weak_hess_tmp116 + weak_hess_tmp188*weak_hess_tmp81 + weak_hess_tmp189*weak_hess_tmp84 + weak_hess_tmp192*weak_hess_tmp83)) + weak_hess_tmp113 + weak_hess_tmp187*weak_hess_tmp80;
+  D[22] = iso_relaxation_gamma*(C01*(weak_hess_tmp105*weak_hess_tmp190 + weak_hess_tmp106*weak_hess_tmp194 + weak_hess_tmp109*weak_hess_tmp191 + weak_hess_tmp178 + weak_hess_tmp37*(s_t(4)*gu2*weak_hess_tmp1 - weak_hess_tmp195)) + C10*(weak_hess_tmp103*weak_hess_tmp189 + weak_hess_tmp176 + weak_hess_tmp188*weak_hess_tmp89 + weak_hess_tmp192*weak_hess_tmp99)) - weak_hess_tmp175 + weak_hess_tmp187*weak_hess_tmp93;
+  D[23] = iso_relaxation_gamma*(C01*(weak_hess_tmp120*weak_hess_tmp190 + weak_hess_tmp121*weak_hess_tmp194 + weak_hess_tmp123*weak_hess_tmp191 + weak_hess_tmp37*(-weak_hess_tmp174 - weak_hess_tmp86)) + C10*(weak_hess_tmp114*weak_hess_tmp192 + weak_hess_tmp117*weak_hess_tmp189 + weak_hess_tmp188*weak_hess_tmp88)) + weak_hess_tmp112*weak_hess_tmp187;
+  D[24] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp190 + weak_hess_tmp135*weak_hess_tmp194 + weak_hess_tmp136*weak_hess_tmp191 + weak_hess_tmp157 + weak_hess_tmp37*(weak_hess_tmp196 + s_t(4)*weak_hess_tmp92)) + C10*(weak_hess_tmp127*weak_hess_tmp188 + weak_hess_tmp128*weak_hess_tmp192 + weak_hess_tmp129*weak_hess_tmp189 + weak_hess_tmp152)) + weak_hess_tmp126*weak_hess_tmp187 - weak_hess_tmp149;
+  D[25] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp190 + weak_hess_tmp145*weak_hess_tmp194 + weak_hess_tmp147*weak_hess_tmp191 - weak_hess_tmp184 + weak_hess_tmp37*(s_t(4)*gu2*gu7 - weak_hess_tmp197)) + C10*(weak_hess_tmp133*weak_hess_tmp188 + weak_hess_tmp140*weak_hess_tmp192 + weak_hess_tmp142*weak_hess_tmp189 - weak_hess_tmp182)) + weak_hess_tmp138*weak_hess_tmp187 + weak_hess_tmp181;
+  D[26] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp190 + weak_hess_tmp156*weak_hess_tmp194 + weak_hess_tmp158*weak_hess_tmp191 + weak_hess_tmp37*(-weak_hess_tmp130 - weak_hess_tmp180)) + C10*(weak_hess_tmp134*weak_hess_tmp188 + weak_hess_tmp151*weak_hess_tmp192 + weak_hess_tmp153*weak_hess_tmp189)) + weak_hess_tmp148*weak_hess_tmp187;
+  D[30] = iso_history_qp[0] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp205*weak_hess_tmp90 + weak_hess_tmp206*weak_hess_tmp91 + weak_hess_tmp37*(weak_hess_tmp202 + weak_hess_tmp204)) + C10*(s_t(4)*gu3*weak_hess_tmp199 + weak_hess_tmp12 + weak_hess_tmp200*weak_hess_tmp84)) + weak_hess_tmp198*weak_hess_tmp80;
+  D[31] = iso_history_qp[3] + iso_relaxation_gamma*(C01*(weak_hess_tmp105*weak_hess_tmp209 + weak_hess_tmp106*weak_hess_tmp205 + weak_hess_tmp109*weak_hess_tmp206 + weak_hess_tmp37*(-weak_hess_tmp208 - weak_hess_tmp64)) + C10*(weak_hess_tmp103*weak_hess_tmp200 + weak_hess_tmp199*weak_hess_tmp89 + weak_hess_tmp207*weak_hess_tmp99)) + weak_hess_tmp198*weak_hess_tmp93;
+  D[32] = iso_history_qp[4] + iso_relaxation_gamma*(C01*(weak_hess_tmp120*weak_hess_tmp209 + weak_hess_tmp121*weak_hess_tmp205 + weak_hess_tmp123*weak_hess_tmp206 + weak_hess_tmp37*(-weak_hess_tmp210 - weak_hess_tmp75)) + C10*(weak_hess_tmp114*weak_hess_tmp207 + weak_hess_tmp117*weak_hess_tmp200 + weak_hess_tmp199*weak_hess_tmp88)) + weak_hess_tmp112*weak_hess_tmp198;
+  D[33] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp209 + weak_hess_tmp135*weak_hess_tmp205 + weak_hess_tmp136*weak_hess_tmp206 + weak_hess_tmp37*(-weak_hess_tmp211 - weak_hess_tmp212)) + C10*(weak_hess_tmp127*weak_hess_tmp199 + weak_hess_tmp128*weak_hess_tmp207 + weak_hess_tmp129*weak_hess_tmp200)) + weak_hess_tmp126*weak_hess_tmp198;
+  D[34] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp209 + weak_hess_tmp145*weak_hess_tmp205 + weak_hess_tmp147*weak_hess_tmp206 - weak_hess_tmp215 + weak_hess_tmp37*(weak_hess_tmp186 + s_t(4)*weak_hess_tmp70)) + C10*(weak_hess_tmp133*weak_hess_tmp199 + weak_hess_tmp140*weak_hess_tmp207 + weak_hess_tmp142*weak_hess_tmp200 - weak_hess_tmp214)) + weak_hess_tmp138*weak_hess_tmp198 + weak_hess_tmp213;
+  D[35] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp209 + weak_hess_tmp156*weak_hess_tmp205 + weak_hess_tmp158*weak_hess_tmp206 + weak_hess_tmp218 + weak_hess_tmp37*(weak_hess_tmp159 + s_t(4)*weak_hess_tmp8)) + C10*(weak_hess_tmp134*weak_hess_tmp199 + weak_hess_tmp151*weak_hess_tmp207 + weak_hess_tmp153*weak_hess_tmp200 + weak_hess_tmp217)) + weak_hess_tmp148*weak_hess_tmp198 - weak_hess_tmp216;
+  D[40] = iso_history_qp[1] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp105*weak_hess_tmp224 + weak_hess_tmp109*weak_hess_tmp225 + weak_hess_tmp37*(weak_hess_tmp202 + weak_hess_tmp223)) + C10*(s_t(4)*weak_hess_tmp1*weak_hess_tmp220 + weak_hess_tmp103*weak_hess_tmp221 + weak_hess_tmp12)) + weak_hess_tmp219*weak_hess_tmp93;
+  D[41] = iso_history_qp[5] + iso_relaxation_gamma*(C01*(weak_hess_tmp120*weak_hess_tmp224 + weak_hess_tmp121*weak_hess_tmp228 + weak_hess_tmp123*weak_hess_tmp225 + weak_hess_tmp37*(-weak_hess_tmp171 - weak_hess_tmp227)) + C10*(weak_hess_tmp114*weak_hess_tmp226 + weak_hess_tmp117*weak_hess_tmp221 + weak_hess_tmp220*weak_hess_tmp88)) + weak_hess_tmp112*weak_hess_tmp219;
+  D[42] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp224 + weak_hess_tmp135*weak_hess_tmp228 + weak_hess_tmp136*weak_hess_tmp225 + weak_hess_tmp215 + weak_hess_tmp37*(s_t(4)*gu6*weak_hess_tmp1 - weak_hess_tmp185)) + C10*(weak_hess_tmp127*weak_hess_tmp220 + weak_hess_tmp128*weak_hess_tmp226 + weak_hess_tmp129*weak_hess_tmp221 + weak_hess_tmp214)) + weak_hess_tmp126*weak_hess_tmp219 - weak_hess_tmp213;
+  D[43] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp224 + weak_hess_tmp145*weak_hess_tmp228 + weak_hess_tmp147*weak_hess_tmp225 + weak_hess_tmp37*(-weak_hess_tmp211 - weak_hess_tmp229)) + C10*(weak_hess_tmp133*weak_hess_tmp220 + weak_hess_tmp140*weak_hess_tmp226 + weak_hess_tmp142*weak_hess_tmp221)) + weak_hess_tmp138*weak_hess_tmp219;
+  D[44] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp224 + weak_hess_tmp156*weak_hess_tmp228 + weak_hess_tmp158*weak_hess_tmp225 - weak_hess_tmp232 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp1*weak_hess_tmp2 - weak_hess_tmp3)) + C10*(weak_hess_tmp134*weak_hess_tmp220 + weak_hess_tmp151*weak_hess_tmp226 + weak_hess_tmp153*weak_hess_tmp221 - weak_hess_tmp231)) + weak_hess_tmp148*weak_hess_tmp219 + weak_hess_tmp230;
+  D[50] = iso_history_qp[2] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp120*weak_hess_tmp236 + weak_hess_tmp123*weak_hess_tmp237 + weak_hess_tmp37*(weak_hess_tmp204 + weak_hess_tmp223)) + C10*(s_t(4)*gu5*weak_hess_tmp234 + weak_hess_tmp117*weak_hess_tmp235 + weak_hess_tmp12)) + weak_hess_tmp112*weak_hess_tmp233;
+  D[51] = iso_relaxation_gamma*(C01*(weak_hess_tmp132*weak_hess_tmp236 + weak_hess_tmp135*weak_hess_tmp239 + weak_hess_tmp136*weak_hess_tmp237 - weak_hess_tmp218 + weak_hess_tmp37*(s_t(4)*gu5*gu6 - weak_hess_tmp160)) + C10*(weak_hess_tmp127*weak_hess_tmp234 + weak_hess_tmp128*weak_hess_tmp238 + weak_hess_tmp129*weak_hess_tmp235 - weak_hess_tmp217)) + weak_hess_tmp126*weak_hess_tmp233 + weak_hess_tmp216;
+  D[52] = iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp236 + weak_hess_tmp145*weak_hess_tmp239 + weak_hess_tmp147*weak_hess_tmp237 + weak_hess_tmp232 + weak_hess_tmp37*(s_t(4)*weak_hess_tmp0 + weak_hess_tmp5)) + C10*(weak_hess_tmp133*weak_hess_tmp234 + weak_hess_tmp140*weak_hess_tmp238 + weak_hess_tmp142*weak_hess_tmp235 + weak_hess_tmp231)) + weak_hess_tmp138*weak_hess_tmp233 - weak_hess_tmp230;
+  D[53] = iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp236 + weak_hess_tmp156*weak_hess_tmp239 + weak_hess_tmp158*weak_hess_tmp237 + weak_hess_tmp37*(-weak_hess_tmp212 - weak_hess_tmp229)) + C10*(weak_hess_tmp134*weak_hess_tmp234 + weak_hess_tmp151*weak_hess_tmp238 + weak_hess_tmp153*weak_hess_tmp235)) + weak_hess_tmp148*weak_hess_tmp233;
+  D[60] = iso_history_qp[0] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp135*weak_hess_tmp245 + weak_hess_tmp136*weak_hess_tmp246 + weak_hess_tmp37*(weak_hess_tmp243 + weak_hess_tmp244)) + C10*(s_t(4)*gu6*weak_hess_tmp241 + weak_hess_tmp12 + weak_hess_tmp129*weak_hess_tmp242)) + weak_hess_tmp126*weak_hess_tmp240;
+  D[61] = iso_history_qp[3] + iso_relaxation_gamma*(C01*(weak_hess_tmp144*weak_hess_tmp248 + weak_hess_tmp145*weak_hess_tmp245 + weak_hess_tmp147*weak_hess_tmp246 + weak_hess_tmp37*(-weak_hess_tmp208 - weak_hess_tmp65)) + C10*(weak_hess_tmp133*weak_hess_tmp241 + weak_hess_tmp140*weak_hess_tmp247 + weak_hess_tmp142*weak_hess_tmp242)) + weak_hess_tmp138*weak_hess_tmp240;
+  D[62] = iso_history_qp[4] + iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp248 + weak_hess_tmp156*weak_hess_tmp245 + weak_hess_tmp158*weak_hess_tmp246 + weak_hess_tmp37*(-weak_hess_tmp210 - weak_hess_tmp74)) + C10*(weak_hess_tmp134*weak_hess_tmp241 + weak_hess_tmp151*weak_hess_tmp247 + weak_hess_tmp153*weak_hess_tmp242)) + weak_hess_tmp148*weak_hess_tmp240;
+  D[70] = iso_history_qp[1] + iso_relaxation_gamma*(C01*(s_t(2)*weak_hess_tmp145*weak_hess_tmp253 + weak_hess_tmp147*weak_hess_tmp254 + weak_hess_tmp37*(weak_hess_tmp243 + weak_hess_tmp252)) + C10*(s_t(4)*gu7*weak_hess_tmp250 + weak_hess_tmp12 + weak_hess_tmp142*weak_hess_tmp251)) + weak_hess_tmp138*weak_hess_tmp249;
+  D[71] = iso_history_qp[5] + iso_relaxation_gamma*(C01*(weak_hess_tmp145*weak_hess_tmp255 + weak_hess_tmp156*weak_hess_tmp253 + weak_hess_tmp158*weak_hess_tmp254 + weak_hess_tmp37*(-weak_hess_tmp170 - weak_hess_tmp227)) + C10*(weak_hess_tmp13*weak_hess_tmp133*weak_hess_tmp151 + weak_hess_tmp134*weak_hess_tmp250 + weak_hess_tmp153*weak_hess_tmp251)) + weak_hess_tmp148*weak_hess_tmp249;
+  D[80] = iso_history_qp[2] + iso_relaxation_gamma*(C01*(weak_hess_tmp155*weak_hess_tmp158*weak_hess_tmp57 + s_t(2)*weak_hess_tmp156*weak_hess_tmp255 + weak_hess_tmp37*(weak_hess_tmp244 + weak_hess_tmp252)) + C10*(s_t(4)*weak_hess_tmp100*weak_hess_tmp151 + weak_hess_tmp12 + weak_hess_tmp151*weak_hess_tmp153*weak_hess_tmp29)) + weak_hess_tmp148*weak_hess_tmp6*(-weak_hess_tmp104 - weak_hess_tmp173);
+  D[9] = D[1];
+  D[18] = D[2];
+  D[27] = D[3];
+  D[36] = D[4];
+  D[45] = D[5];
+  D[54] = D[6];
+  D[63] = D[7];
+  D[72] = D[8];
+  D[19] = D[11];
+  D[28] = D[12];
+  D[37] = D[13];
+  D[46] = D[14];
+  D[55] = D[15];
+  D[64] = D[16];
+  D[73] = D[17];
+  D[29] = D[21];
+  D[38] = D[22];
+  D[47] = D[23];
+  D[56] = D[24];
+  D[65] = D[25];
+  D[74] = D[26];
+  D[39] = D[31];
+  D[48] = D[32];
+  D[57] = D[33];
+  D[66] = D[34];
+  D[75] = D[35];
+  D[49] = D[41];
+  D[58] = D[42];
+  D[67] = D[43];
+  D[76] = D[44];
+  D[59] = D[51];
+  D[68] = D[52];
+  D[77] = D[53];
+  D[69] = D[61];
+  D[78] = D[62];
+  D[79] = D[71];
+  if constexpr (PROJECT) {
+    sfem::cooperative::project_abs_symmetric_call<s_t, 9>(D);
+  }
+  const s_t adj_q[ND * ND] = {adj_value0, adj_value1, adj_value2, adj_value3, adj_value4, adj_value5, adj_value6, adj_value7, adj_value8};
+  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);
 }
 
 template <typename s_t, int NS>

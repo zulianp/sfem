@@ -38,6 +38,28 @@ namespace sfem {
             SFEM_NODE_LOOP(i, c.size) { ub[(ptrdiff_t)c.idx[i] * 3] = c.gap[i]; }
         }
 
+        __global__ void node_mean_kernel(const NodeObstacleView c, real_t *const d) {
+            SFEM_NODE_LOOP(i, c.size) {
+                const ptrdiff_t node = c.idx[i];
+                const real_t    mean = (d[node * 3] + d[node * 3 + 1] + d[node * 3 + 2]) / 3;
+                for (int k = 0; k < 3; ++k) d[node * 3 + k] = mean;
+            }
+        }
+
+        __global__ void scaling_kernel(const ptrdiff_t     ndofs,
+                                       const real_t *const ub,
+                                       real_t *const       inverse_scale,
+                                       real_t *const       scale,
+                                       real_t *const       scaled_bound) {
+            SFEM_NODE_LOOP(i, ndofs) {
+                const real_t d    = inverse_scale[i];
+                const real_t root = d > 0 ? sqrt(d) : real_t(1);
+                scale[i]          = 1 / root;
+                inverse_scale[i]  = root;
+                scaled_bound[i]   = ub[i] * root;
+            }
+        }
+
         __global__ void offset_gap_kernel(const ptrdiff_t     size,
                                           const real_t        shift,
                                           const real_t        cutoff,
@@ -71,7 +93,7 @@ namespace sfem {
         __global__ void curvature_kernel(const NodeObstacleView c,
                                          const real_t *const      r,
                                          const real_t *const      k,
-                                         const bool               capped,
+                                         const int                curvature,
                                          const real_t             sign,
                                          const count_t *const     rowptr,
                                          const idx_t *const       colidx,
@@ -85,21 +107,21 @@ namespace sfem {
                 for (count_t kk = rowptr[node]; kk < rowptr[node + 1]; ++kk) {
                     if (colidx[kk] == node) B = &values[kk * 9];
                 }
-                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], curvature, sign, B);
             }
         }
 
         __global__ void curvature_blocks_kernel(const NodeObstacleView c,
                                                 const real_t *const    r,
                                                 const real_t *const    k,
-                                                const bool             capped,
+                                                const int              curvature,
                                                 real_t *const          blocks) {
             SFEM_NODE_LOOP(i, c.size) {
                 const ptrdiff_t node = c.idx[i];
                 const real_t    n[3] = {c.normals[0][i], c.normals[1][i], c.normals[2][i]};
                 const real_t    C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
                 real_t          B[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-                ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, 1, B);
+                ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], curvature, 1, B);
                 ::node_obstacle_pack_sym(B, &blocks[6 * i]);
             }
         }
@@ -163,6 +185,17 @@ namespace sfem {
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
+    void d_node_obstacle_scaling(const NodeObstacleView &c,
+                                 const ptrdiff_t         ndofs,
+                                 const real_t *const     ub,
+                                 real_t *const           inverse_scale,
+                                 real_t *const           scale,
+                                 real_t *const           scaled_bound) {
+        if (c.size > 0) node_mean_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, inverse_scale);
+        scaling_kernel<<<blocks_for(ndofs), block_size, 0, (cudaStream_t)c.stream>>>(ndofs, ub, inverse_scale, scale, scaled_bound);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
+    }
+
     void d_node_obstacle_offset_gap(const ptrdiff_t      size,
                                     const real_t         shift,
                                     const real_t         cutoff,
@@ -188,7 +221,7 @@ namespace sfem {
     void d_node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                    const real_t *const       r,
                                    const real_t *const       k,
-                                   const bool                capped,
+                                   const int                 curvature,
                                    const real_t              sign,
                                    const count_t *const      rowptr,
                                    const idx_t *const        colidx,
@@ -196,7 +229,7 @@ namespace sfem {
                                    void *const               values) {
         with_tangent_values(values_type, values, [&](auto *const v) {
             curvature_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(
-                    c, r, k, capped, sign, rowptr, colidx, v);
+                    c, r, k, curvature, sign, rowptr, colidx, v);
             SFEM_DEBUG_SYNCHRONIZE(c.stream);
             return SFEM_SUCCESS;
         });
@@ -205,9 +238,9 @@ namespace sfem {
     void d_node_obstacle_curvature_blocks(const NodeObstacleView &c,
                                           const real_t *const     r,
                                           const real_t *const     k,
-                                          const bool              capped,
+                                          const int               curvature,
                                           real_t *const           blocks) {
-        curvature_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, r, k, capped, blocks);
+        curvature_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, r, k, curvature, blocks);
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 
