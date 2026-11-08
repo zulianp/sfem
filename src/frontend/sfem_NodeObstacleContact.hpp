@@ -42,6 +42,17 @@ namespace sfem {
                             const int                                   dir,
                             const ExecutionContext                     &context = EXECUTION_SPACE_HOST);
 
+        // The union of several SDF grids (UnionObstacle: each node against the nearest), e.g. a fine
+        // grid around small features and a coarse one around large ones; one grid is the above.
+        NodeObstacleContact(const std::vector<std::shared_ptr<smesh::Grid<geom_t>>> &sdfs,
+                            const std::shared_ptr<Communicator>                     &comm,
+                            const SharedBuffer<idx_t>                               &nodes,
+                            const SharedBuffer<geom_t *>                            &points,
+                            const ptrdiff_t                                          ndofs,
+                            const ptrdiff_t                                          owned_dofs,
+                            const int                                                dir,
+                            const ExecutionContext                                  &context = EXECUTION_SPACE_HOST);
+
         ptrdiff_t                   size() const { return nodes_->size(); }
         // On the host, whatever the execution space.
         const SharedBuffer<idx_t>  &nodes() const { return nodes_; }
