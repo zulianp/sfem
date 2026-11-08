@@ -108,7 +108,8 @@ namespace sfem {
          * @brief The assembled tangents that follow projected to positive semidefinite, per
          * quadrature point (`project_abs_symmetric`), or not
          *
-         * Only the assembled (BSR) tangent is projected; the applies are the function's own.
+         * The assembled (BSR) and stored (inexact) tangents are projected; the applies are the
+         * function's own.
          */
         virtual void set_tangent_projection(const bool /*on*/) {}
 
@@ -122,6 +123,9 @@ namespace sfem {
 
         /** @brief Bytes held by the stored tangent, 0 before `inexact_update`. */
         virtual std::size_t inexact_bytes() const { return 0; }
+
+        /** @brief Bytes of the element geometry it caches (adjugates, determinants), where it runs. */
+        virtual std::size_t geometry_bytes() const { return 0; }
 
         /**
          * @brief diag += the stored operator's diagonal, for a Jacobi preconditioner on it

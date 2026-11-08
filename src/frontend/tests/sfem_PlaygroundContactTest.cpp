@@ -211,6 +211,49 @@ int test_composed_tangent() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The memory probe's ledger: per tangent format the bytes of its numbers, in the order of their
+// widths, the BSR's index arrays only with BSR, and work vectors only with a composed tangent.
+int test_memory_probe() {
+    struct Run {
+        const char *name;
+        const char *format;
+        const char *inexact;
+        int         storage_bytes;
+    };
+    const Run runs[] = {{"BSR f64", "BSR", "", 8},
+                        {"BSR f32", "BSR", "", 4},
+                        {"points f16", "INEXACT", "{store: points, encoding: f16}", 8},
+                        {"element_matrix i8pair", "INEXACT", "{store: element_matrix, encoding: i8pair}", 8}};
+    double values[4] = {0}, structure[4] = {0}, work[4] = {0}, mesh[4] = {0}, step[4] = {0};
+    for (int k = 0; k < 4; ++k) {
+        const std::string        csv       = "test_memory_probe.csv";
+        std::vector<std::string> overrides = {"output.history_csv=" + csv,
+                                              "time.t_end=0.02",
+                                              "output.probes=[{type: contact}, {type: memory}]",
+                                              std::string("solver.linear.format=") + runs[k].format,
+                                              "solver.linear.storage_bytes=" + std::to_string(runs[k].storage_bytes)};
+        if (runs[k].inexact[0]) overrides.push_back(std::string("solver.linear.inexact=") + runs[k].inexact);
+        auto pg = assemble(DROP, overrides);
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto rows = sfem::test::read_history(csv);
+        SFEM_TEST_ASSERT(!rows.empty());
+        auto &last   = rows.back();
+        values[k]    = last["bytes_tangent_values"];
+        structure[k] = last["bytes_tangent_structure"];
+        work[k]      = last["bytes_tangent_work"];
+        mesh[k]      = last["bytes_mesh"];
+        step[k]      = last["bytes_step"];
+        std::remove(csv.c_str());
+        printf("  %-22s values %g, structure %g, work %g, mesh %g, step %g bytes\n", runs[k].name, values[k], structure[k], work[k], mesh[k], step[k]);
+    }
+    SFEM_TEST_ASSERT(values[0] > values[1] && values[1] > values[2] && values[1] > values[3]);
+    SFEM_TEST_ASSERT(structure[0] > 0 && structure[0] == structure[1] && structure[2] == 0 && structure[3] == 0);
+    SFEM_TEST_ASSERT(work[0] == 0 && work[1] == 0 && work[2] > 0 && work[3] > 0);
+    for (int k = 0; k < 4; ++k) SFEM_TEST_ASSERT(mesh[k] > 0 && mesh[k] == mesh[0] && step[k] > 0);
+    return SFEM_TEST_SUCCESS;
+}
+
 // The QP capped at 8 iterations: MPRGP stops short, and the step is solved again with the curvature
 // capped, then with the tangent's diagonal shifted. The composed tangent (in double) gets through
 // the same way. Its MPRGP steps by the power method's estimate where the assembled one's take
@@ -602,6 +645,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_utopia_scheme);
     SFEM_RUN_TEST(test_ssmgc_free_flight_matches_node_sdf);
     SFEM_RUN_TEST(test_ssmgc_refusals);
+    SFEM_RUN_TEST(test_memory_probe);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_matches_host);
     SFEM_RUN_TEST(test_ssmgc_device_matches_host);

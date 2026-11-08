@@ -323,6 +323,25 @@ namespace sfem {
         r.decode_history(i, values, S_n.data(), S_prev.data());
     }
 
+    void RelaxationGroups::squared_norms(const std::string &block_name,
+                                         const std::string &group,
+                                         const int          n_diagonal,
+                                         real_t *const      out) const {
+        const Block           &b = block(block_name);
+        const size_t           g = group_index(group);
+        const PronyRelaxation &r = *b.groups[g];
+        // Slot 0 is the state the next step starts from, slot 1 the one the last step started from.
+        if (b.stress.empty()) {
+            r.squared_norms(static_cast<const real_t *>(nullptr), static_cast<const real_t *>(nullptr), n_diagonal, out);
+        } else if (narrow(b, g)) {
+#if SFEM_REAL_T_IS_FLOAT64
+            r.squared_norms(b.stress[0][g].narrow->data(), b.stress[1][g].narrow->data(), n_diagonal, out);
+#endif
+        } else {
+            r.squared_norms(b.stress[0][g].full->data(), b.stress[1][g].full->data(), n_diagonal, out);
+        }
+    }
+
     std::vector<std::string> RelaxationGroups::block_names() const {
         std::vector<std::string> names;
         for (const auto &entry : blocks_) names.push_back(entry.first);

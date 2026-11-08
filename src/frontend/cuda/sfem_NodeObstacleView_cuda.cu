@@ -38,6 +38,28 @@ namespace sfem {
             SFEM_NODE_LOOP(i, c.size) { ub[(ptrdiff_t)c.idx[i] * 3] = c.gap[i]; }
         }
 
+        __global__ void node_mean_kernel(const NodeObstacleView c, real_t *const d) {
+            SFEM_NODE_LOOP(i, c.size) {
+                const ptrdiff_t node = c.idx[i];
+                const real_t    mean = (d[node * 3] + d[node * 3 + 1] + d[node * 3 + 2]) / 3;
+                for (int k = 0; k < 3; ++k) d[node * 3 + k] = mean;
+            }
+        }
+
+        __global__ void scaling_kernel(const ptrdiff_t     ndofs,
+                                       const real_t *const ub,
+                                       real_t *const       inverse_scale,
+                                       real_t *const       scale,
+                                       real_t *const       scaled_bound) {
+            SFEM_NODE_LOOP(i, ndofs) {
+                const real_t d    = inverse_scale[i];
+                const real_t root = d > 0 ? sqrt(d) : real_t(1);
+                scale[i]          = 1 / root;
+                inverse_scale[i]  = root;
+                scaled_bound[i]   = ub[i] * root;
+            }
+        }
+
         __global__ void offset_gap_kernel(const ptrdiff_t     size,
                                           const real_t        shift,
                                           const real_t        cutoff,
@@ -160,6 +182,17 @@ namespace sfem {
     void d_node_obstacle_upper_bound(const NodeObstacleView &c, const ptrdiff_t ndofs, const real_t unbounded, real_t *const ub) {
         fill_kernel<<<blocks_for(ndofs), block_size, 0, (cudaStream_t)c.stream>>>(ndofs, unbounded, ub);
         upper_bound_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, ub);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
+    }
+
+    void d_node_obstacle_scaling(const NodeObstacleView &c,
+                                 const ptrdiff_t         ndofs,
+                                 const real_t *const     ub,
+                                 real_t *const           inverse_scale,
+                                 real_t *const           scale,
+                                 real_t *const           scaled_bound) {
+        if (c.size > 0) node_mean_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, inverse_scale);
+        scaling_kernel<<<blocks_for(ndofs), block_size, 0, (cudaStream_t)c.stream>>>(ndofs, ub, inverse_scale, scale, scaled_bound);
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 

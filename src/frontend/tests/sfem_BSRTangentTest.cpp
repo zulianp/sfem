@@ -9,6 +9,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_BSRTangent.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_elasticity_test_problem.hpp"
 #include "sfem_test.hpp"
 
@@ -176,6 +177,28 @@ int test_single_precision_storage() {
 // the same matrix on the micro-element graph. High-order: the generated element spans the macro
 // element and needs every macro node coupled -- on the micro-element graph it lost those couplings
 // and the product was 9% off the action.
+// The ledger counts the values in their width and the graph once: nnz 3x3 blocks of 8 or 4 bytes,
+// the rowptr and the colidx.
+int test_accounted_bytes() {
+    auto p = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 3, real_t(0.1));
+    for (const int bytes : {(int)sizeof(real_t), 4}) {
+        auto tangent = sfem::BSRTangent::create(p.f, sfem::EXECUTION_SPACE_HOST, bytes);
+        SFEM_TEST_ASSERT(tangent->assemble(p.x->data()) == SFEM_SUCCESS);
+        sfem::MemoryLedger ledger;
+        tangent->account(ledger);
+        const ptrdiff_t nrows = tangent->block_rows();
+        const ptrdiff_t nnz   = tangent->rowptr()[nrows];
+        SFEM_TEST_ASSERT(ledger.host(sfem::MemoryLedger::TANGENT_VALUES) == std::size_t(nnz * 9 * bytes));
+        SFEM_TEST_ASSERT(ledger.host(sfem::MemoryLedger::TANGENT_STRUCTURE) ==
+                         std::size_t((nrows + 1) * sizeof(count_t) + nnz * sizeof(idx_t)));
+        SFEM_TEST_ASSERT(ledger.device(sfem::MemoryLedger::TANGENT_VALUES) == 0);
+        // Counted once however often it is named.
+        tangent->account(ledger);
+        SFEM_TEST_ASSERT(ledger.host(sfem::MemoryLedger::TANGENT_VALUES) == std::size_t(nnz * 9 * bytes));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_semi_structured_mesh() {
     auto box  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 1, 0, 0, 0, 1, real_t(0.7), real_t(0.5));
     auto mesh = smesh::to_semistructured(2, box, true, false);
@@ -320,6 +343,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_diagonal_and_row_sums);
     SFEM_RUN_TEST(test_operator);
     SFEM_RUN_TEST(test_single_precision_storage);
+    SFEM_RUN_TEST(test_accounted_bytes);
     SFEM_RUN_TEST(test_semi_structured_mesh);
     SFEM_RUN_TEST(test_semi_structured_mesh_non_affine);
     SFEM_UNIT_TEST_FINALIZE();

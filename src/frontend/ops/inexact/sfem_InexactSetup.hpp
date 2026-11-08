@@ -6,6 +6,7 @@
 #include "packed_thread_scratch.hpp"
 #include "sfem_InexactElement.hpp"
 #include "sfem_InexactInterface.hpp"
+#include "sfem_TangentProjection.hpp"
 #include "sfem_base.hpp"
 
 namespace sfem {
@@ -26,6 +27,68 @@ namespace sfem {
                 adj[8] = J[0] * J[4] - J[1] * J[3];
                 det    = J[0] * adj[0] + J[1] * adj[3] + J[2] * adj[6];
             }
+
+            /// Row i, column j of a packed symmetric 9 x 9: the upper triangle by rows.
+            static SFEM_INLINE SFEM_HOST_DEVICE int packed_slot(const int i, const int j) {
+                const int r = i < j ? i : j, c = i < j ? j : i;
+                return r * 9 - r * (r - 1) / 2 + c - r;
+            }
+
+            /// The symmetric point tangent T (packed_slot, r = component * 3 + reference direction)
+            /// projected to positive semidefinite where the assembled tangent is: on dP/dF.
+            /// T = (1/det) P^T D P with P = I (x) adj, so D_(c,a)(d,b) = (1/det) sum_mn J_am T_(c,m)(d,n) J_bn,
+            /// J = adjugate(adj) / det; D is projected (project_abs_symmetric) and pulled back.
+            ///
+            /// On the device it is a call: inlined into the set-up kernel after the generated point
+            /// tangent, nvcc 12.6 at -O3 returned a wrong projection of a correct tangent (with and
+            /// without fast math, at every ptxas level; right at -G and as a call; 2026-11-08).
+#if defined(__CUDACC__)
+            template <typename s_t>
+            static __host__ __device__ __noinline__ void project_point_tangent(s_t *const T, const s_t adj[9], const s_t det) {
+#else
+            template <typename s_t>
+            static SFEM_INLINE void project_point_tangent(s_t *const T, const s_t adj[9], const s_t det) {
+#endif
+                s_t J[9], det2;
+                adjugate_and_determinant(adj, J, det2);
+                const s_t inv_det = s_t(1) / det;
+                for (int k = 0; k < 9; ++k) J[k] *= inv_det;
+
+                // W_(c,a)(d,n) = sum_m J_am T_(c,m)(d,n), then D_(c,a)(d,b) = (1/det) sum_n W_(c,a)(d,n) J_bn.
+                s_t W[81], D[81];
+                for (int c = 0; c < 3; ++c)
+                    for (int a = 0; a < 3; ++a)
+                        for (int col = 0; col < 9; ++col) {
+                            s_t acc = 0;
+                            for (int m = 0; m < 3; ++m) acc += J[a * 3 + m] * T[packed_slot(c * 3 + m, col)];
+                            W[(c * 3 + a) * 9 + col] = acc;
+                        }
+                for (int row = 0; row < 9; ++row)
+                    for (int d = 0; d < 3; ++d)
+                        for (int b = 0; b < 3; ++b) {
+                            s_t acc = 0;
+                            for (int n = 0; n < 3; ++n) acc += W[row * 9 + d * 3 + n] * J[b * 3 + n];
+                            D[row * 9 + d * 3 + b] = acc * inv_det;
+                        }
+                sfem::project_abs_symmetric<s_t, 9>(D);
+
+                // T_(c,m)(d,n) = (1/det) sum_ab adj_ma D_(c,a)(d,b) adj_nb, the upper triangle.
+                for (int c = 0; c < 3; ++c)
+                    for (int m = 0; m < 3; ++m)
+                        for (int col = 0; col < 9; ++col) {
+                            s_t acc = 0;
+                            for (int a = 0; a < 3; ++a) acc += adj[m * 3 + a] * D[(c * 3 + a) * 9 + col];
+                            W[(c * 3 + m) * 9 + col] = acc;
+                        }
+                for (int row = 0; row < 9; ++row)
+                    for (int d = 0; d < 3; ++d)
+                        for (int n = 0; n < 3; ++n) {
+                            if (d * 3 + n < row) continue;
+                            s_t acc = 0;
+                            for (int b = 0; b < 3; ++b) acc += W[row * 9 + d * 3 + b] * adj[n * 3 + b];
+                            T[packed_slot(row, d * 3 + n)] = acc * inv_det;
+                        }
+            }
         }  // namespace detail
 
         /// The set-up: every point's weighted tangent, block by block, handed to the store.
@@ -35,8 +98,9 @@ namespace sfem {
         /// pull it through the geometry and evaluate the material there (`M::point`, generated),
         /// weight it, and accumulate it into the block's stored tensors; then the store encodes
         /// the block.  Scratch comes from the thread's arena: a HEX27 block of tensors is 0.4 MB.
-        template <class Store>
-        void setup(Store &store, const SetupInput &in) {
+        /// PROJECT: each point's tangent projected first (detail::project_point_tangent).
+        template <class Store, bool PROJECT>
+        void setup_points(Store &store, const SetupInput &in) {
             using M                = typename Store::Unit;
             using El               = typename M::element;
             static constexpr int VS = Store::VS;
@@ -139,12 +203,23 @@ namespace sfem {
                             }
                             real_t T[NC];
                             M::template point<real_t>(in.parameters, gu, gz, adj, det, qp, T);
+                            if constexpr (PROJECT) detail::project_point_tangent(T, adj, det);
                             for (int c = 0; c < NC; ++c) Store::accumulate(q, bT, c, lane, w * T[c]);
                         }
                     }
 
                     store.encode_block(evb, ne, bT);
                 }
+            }
+        }
+
+        template <class Store>
+        void setup(Store &store, const SetupInput &in) {
+            if (!in.project) return setup_points<Store, false>(store, in);
+            if constexpr (Store::Unit::symmetric && Store::Unit::NC == 45) {
+                setup_points<Store, true>(store, in);
+            } else {
+                SFEM_ERROR("inexact::setup: only a symmetric tangent is projected\n");
             }
         }
 

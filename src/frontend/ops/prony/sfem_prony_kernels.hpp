@@ -403,5 +403,78 @@ namespace sfem {
             }
         }
 
+        /// Per stored term i, the sum over the points of its squared components, those from
+        /// `n_diagonal` on counted twice (a symmetric tensor's off-diagonal components in its
+        /// Frobenius norm): what a probe reports of H_i without decoding it to the host. A term in
+        /// remainder form (`beta`, `ref`, see `advance`) is read as G_i + beta_i (S_n - R).
+        template <class HCodec, typename S_t = real_t>
+        void squared_norms(const int                                        n_terms,
+                           const ptrdiff_t                                  rows,
+                           const ptrdiff_t                                  n,
+                           const int                                        n_qp,
+                           const int                                        n_diagonal,
+                           const typename HCodec::storage_t *const SFEM_RESTRICT H,
+                           const scaling_t *const SFEM_RESTRICT             H_scales,
+                           const Means                                     &m,
+                           const real_t *const SFEM_RESTRICT                beta,
+                           const S_t *const SFEM_RESTRICT                   S_n,
+                           const S_t *const SFEM_RESTRICT                   ref,
+                           real_t *const SFEM_RESTRICT                      out) {
+            for (int i = 0; i < n_terms; i++) {
+                const real_t be = beta ? beta[i] : real_t(0);
+                real_t       s  = 0;
+#pragma omp parallel for reduction(+ : s)
+                for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                    const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                    ptrdiff_t       groups[BLOCK];
+                    if constexpr (HCodec::mean_deviation) detail::lane_groups(e0, nb, m, groups);
+                    for (ptrdiff_t r = 0; r < rows; r++) {
+                        const typename HCodec::storage_t *const h      = &H[(i * rows + r) * n + e0];
+                        const scaling_t *const                  hs     = &H_scales[i * n + e0];
+                        const real_t                            weight = r / n_qp < n_diagonal ? 1 : 2;
+                        real_t                                  row    = 0;
+                        for (ptrdiff_t l = 0; l < nb; l++) {
+                            real_t v = HCodec::decode(h[l], hs[l]);
+                            if constexpr (HCodec::mean_deviation) {
+                                v += static_cast<real_t>(m.tensor(i, rows)[(r / m.n_qp) * m.n_groups + groups[l]]);
+                            }
+                            if (be != 0) {
+                                const ptrdiff_t k = r * n + e0 + l;
+                                v += be * (static_cast<real_t>(S_n[k]) - static_cast<real_t>(ref[k]));
+                            }
+                            row += v * v;
+                        }
+                        s += weight * row;
+                    }
+                }
+                out[i] = s;
+            }
+        }
+
+        /// The same sum for S_new - S_old: the history of a term held as a coefficient on the last
+        /// increment, up to the coefficient's square.
+        template <typename S_t>
+        real_t squared_increment(const ptrdiff_t                rows,
+                                 const ptrdiff_t                n,
+                                 const int                      n_qp,
+                                 const int                      n_diagonal,
+                                 const S_t *const SFEM_RESTRICT S_new,
+                                 const S_t *const SFEM_RESTRICT S_old) {
+            real_t s = 0;
+            for (ptrdiff_t r = 0; r < rows; r++) {
+                const real_t     weight = r / n_qp < n_diagonal ? 1 : 2;
+                const S_t *const a      = &S_new[r * n];
+                const S_t *const b      = &S_old[r * n];
+                real_t           row    = 0;
+#pragma omp parallel for reduction(+ : row)
+                for (ptrdiff_t e = 0; e < n; e++) {
+                    const real_t d = static_cast<real_t>(a[e]) - static_cast<real_t>(b[e]);
+                    row += d * d;
+                }
+                s += weight * row;
+            }
+            return s;
+        }
+
     }  // namespace prony
 }  // namespace sfem

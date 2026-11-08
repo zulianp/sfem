@@ -33,6 +33,7 @@
 #include "sfem_Constraint.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     // using Output = smesh::Output;
     class Output {
@@ -127,6 +128,13 @@ namespace sfem {
         /// Whether every stored tangent has the major symmetry.
         bool tangent_is_symmetric() const;
 
+        /// The bytes of every operator's stored tangent (Op::inexact_bytes), where they run.
+        std::size_t inexact_bytes() const;
+
+        /// What it keeps between steps beside its operators' states: the mesh, the space's graphs,
+        /// the operators' cached geometry.
+        void account(MemoryLedger &ledger) const;
+
         /// The stored tangent's format, for every operator that stores one.
         void set_inexact_options(const InexactOptions &options);
 
@@ -135,6 +143,10 @@ namespace sfem {
 
         /// The assembled tangents that follow projected (Op::set_tangent_projection), or not.
         void set_tangent_projection(const bool on);
+
+        /// Whether every operator whose tangent reads the state stores it (format INEXACT): the
+        /// stored tangents are then projected where the assembled ones are.
+        bool inexact_stores_every_tangent() const;
 
         /// The diagonal of the operator `inexact_apply` applies: the stored ones, and the exact
         /// diagonal of the operators that store nothing; the constrained rows are 1.

@@ -12,6 +12,7 @@
 #include "smesh_grid.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     // Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
     // (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
@@ -49,6 +50,9 @@ namespace sfem {
         const SharedBuffer<real_t> &gap() const { return gap_; }
         ExecutionSpace              execution_space() const { return context_.space(); }
 
+        /// Its nodes' state (CONTACT) and its obstacle's (Obstacle::account).
+        void account(MemoryLedger &ledger) const;
+
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
 
@@ -79,6 +83,8 @@ namespace sfem {
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.
         void upper_bound(const real_t unbounded, real_t *const ub) const;
+        /// node_obstacle_scaling at the contact nodes: the diagonal in `inverse_scale` on entry.
+        void scaling(const real_t *const ub, real_t *const inverse_scale, real_t *const scale, real_t *const scaled_bound) const;
 
         // First-order optimality of the step. At the solution the residual r is the obstacle's
         // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),

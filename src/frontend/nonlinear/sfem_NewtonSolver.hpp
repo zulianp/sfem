@@ -10,6 +10,7 @@
 #include "sfem_NonlinearSolver.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     class Function;
 
@@ -83,6 +84,9 @@ namespace sfem {
 
         const NewtonOptions &options() const;
         NewtonOptions       &options();
+
+        /// Its step's (LinearizedStep::account) and its own vectors (NEWTON).
+        void account(MemoryLedger &ledger) const;
 
     private:
         class Impl;
