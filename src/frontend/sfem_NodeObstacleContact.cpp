@@ -2,6 +2,7 @@
 
 #ifdef SFEM_ENABLE_SRESAMPLE
 #include "sfem_SDFObstacle.hpp"
+#include "sfem_UnionObstacle.hpp"
 #endif
 
 #include <algorithm>
@@ -43,6 +44,16 @@ namespace sfem {
                                              const ptrdiff_t                             owned_dofs,
                                              const int                                   dir,
                                              const ExecutionContext                     &context)
+        : NodeObstacleContact(std::vector<std::shared_ptr<smesh::Grid<geom_t>>>{sdf}, comm, nodes, points, ndofs, owned_dofs, dir, context) {}
+
+    NodeObstacleContact::NodeObstacleContact(const std::vector<std::shared_ptr<smesh::Grid<geom_t>>> &sdfs,
+                                             const std::shared_ptr<Communicator>                     &comm,
+                                             const SharedBuffer<idx_t>                               &nodes,
+                                             const SharedBuffer<geom_t *>                            &points,
+                                             const ptrdiff_t                                          ndofs,
+                                             const ptrdiff_t                                          owned_dofs,
+                                             const int                                                dir,
+                                             const ExecutionContext                                  &context)
         : nodes_(nodes),
           idx_(nodes),
           points_(points),
@@ -53,9 +64,15 @@ namespace sfem {
           dir_(dir) {
         const ExecutionSpace es = context.space();
 #ifdef SFEM_ENABLE_SRESAMPLE
-        obstacle_               = SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], context);
+        std::vector<std::shared_ptr<Obstacle>> parts;
+        for (const auto &sdf : sdfs) parts.push_back(SDFObstacle::create(sdf, comm, points->extent(1), points->data()[2], context));
+        if (parts.size() == 1) {
+            obstacle_ = parts[0];
+        } else {
+            obstacle_ = std::make_shared<UnionObstacle>(parts, context);
+        }
 #else
-        SFEM_UNUSED(sdf);
+        SFEM_UNUSED(sdfs);
         SFEM_ERROR("NodeObstacleContact: SDF obstacles need sfem built with SFEM_ENABLE_SRESAMPLE\n");
 #endif
 
