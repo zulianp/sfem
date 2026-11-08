@@ -7,6 +7,7 @@
 #include "utils.h"
 
 #include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_device.hpp"
@@ -549,6 +550,20 @@ namespace sfem {
         }
 
         return SFEM_SUCCESS;
+    }
+
+    std::size_t Function::inexact_bytes() const {
+        std::size_t bytes = 0;
+        for (auto &op : impl_->ops) bytes += op->inexact_bytes();
+        return bytes;
+    }
+
+    void Function::account(MemoryLedger &ledger) const {
+        const ExecutionSpace es = execution_space();
+        impl_->space->account(ledger, es);
+        std::size_t geometry = 0;
+        for (auto &op : impl_->ops) geometry += op->geometry_bytes();
+        ledger.add(MemoryLedger::GEOMETRY, geometry, es == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
     }
 
     bool Function::inexact_supported() const {

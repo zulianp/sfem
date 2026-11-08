@@ -15,6 +15,8 @@
 #include <sched.h>
 #endif
 
+#include "sfem_MemoryLedger.hpp"
+#include "smesh_write.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_prony_diagnostics.hpp"
@@ -656,9 +658,19 @@ namespace sfem {
 
         class MemoryProbe final : public Probe {
         public:
-            explicit MemoryProbe(const std::shared_ptr<Communicator> &comm) : comm_(comm) {}
+            MemoryProbe(const std::shared_ptr<Communicator> &comm, const std::function<void(MemoryLedger &)> &account)
+                : comm_(comm), account_(account) {}
 
-            std::vector<std::string> columns() const override { return {"host_peak_rss", "device_used_peak"}; }
+            std::vector<std::string> columns() const override {
+                std::vector<std::string> names{"host_peak_rss", "device_used_peak", "device_used_now"};
+                if (!account_) return names;
+                for (int c = 0; c < MemoryLedger::N_CATEGORIES; ++c) {
+                    const std::string category = MemoryLedger::name(MemoryLedger::Category(c));
+                    names.push_back("bytes_" + category);
+                    names.push_back("bytes_" + category + "_device");
+                }
+                return names;
+            }
 
             int sample(const StepRecord &, real_t *const values) override {
                 struct rusage usage;
@@ -668,19 +680,30 @@ namespace sfem {
 #else
                 const real_t rss = real_t(usage.ru_maxrss) * 1024;  // kilobytes
 #endif
+                real_t device_now = 0;
 #ifdef SFEM_ENABLE_CUDA
-                device_peak_ = std::max(device_peak_, real_t(d_memory_in_use()));
+                device_now   = real_t(d_memory_in_use());
+                device_peak_ = std::max(device_peak_, device_now);
 #endif
-                real_t sums[2] = {rss, device_peak_};
-                if (comm_->size() > 1) comm_->sum(sums, 2, smesh::TypeToEnum<real_t>::value());
-                values[0] = sums[0];
-                values[1] = sums[1];
+                sums_.assign({rss, device_peak_, device_now});
+                if (account_) {
+                    MemoryLedger ledger;
+                    account_(ledger);
+                    for (int c = 0; c < MemoryLedger::N_CATEGORIES; ++c) {
+                        sums_.push_back(real_t(ledger.host(MemoryLedger::Category(c))));
+                        sums_.push_back(real_t(ledger.device(MemoryLedger::Category(c))));
+                    }
+                }
+                if (comm_->size() > 1) comm_->sum(sums_.data(), (int)sums_.size(), smesh::TypeToEnum<real_t>::value());
+                std::copy(sums_.begin(), sums_.end(), values);
                 return SFEM_SUCCESS;
             }
 
         private:
-            std::shared_ptr<Communicator> comm_;
-            real_t                        device_peak_{0};
+            std::shared_ptr<Communicator>       comm_;
+            std::function<void(MemoryLedger &)> account_;
+            real_t                              device_peak_{0};
+            std::vector<real_t>                 sums_;
         };
 
         class NamedProbe final : public Probe {
@@ -705,8 +728,72 @@ namespace sfem {
         return std::make_shared<PronyProbe>(relaxations, comm);
     }
 
-    std::shared_ptr<Probe> create_memory_probe(const std::shared_ptr<Communicator> &comm) {
-        return std::make_shared<MemoryProbe>(comm);
+    namespace {
+        class HistorySnapshots final : public StepObserver {
+        public:
+            HistorySnapshots(RelaxationGroups &relaxations, const std::vector<real_t> &times, const smesh::Path &dir, const ExecutionSpace es)
+                : relaxations_(relaxations), times_(times), dir_(dir), es_(es) {}
+
+            int committed(const StepRecord &record) override {
+                for (size_t k = 0; k < times_.size(); ++k) {
+                    // The grid's times are reached exactly (a cut-back finishes its interval).
+                    if (std::abs(record.t - times_[k]) > real_t(1e-6) * record.dt) continue;
+                    if (write(k) != SFEM_SUCCESS) return SFEM_FAILURE;
+                }
+                return SFEM_SUCCESS;
+            }
+
+        private:
+            RelaxationGroups   &relaxations_;
+            std::vector<real_t> times_;
+            smesh::Path         dir_;
+            ExecutionSpace      es_;
+            std::vector<real_t> values_, mean_;  // [c][q][e], [c][e]
+
+            // values_ averaged over each element's points into mean_, then written.
+            int write_mean(const smesh::Path &path, const int nc, const int nq, const ptrdiff_t ne) {
+                mean_.assign((size_t)nc * ne, real_t(0));
+                for (int c = 0; c < nc; ++c)
+                    for (int q = 0; q < nq; ++q)
+                        for (ptrdiff_t e = 0; e < ne; ++e) mean_[(size_t)c * ne + e] += values_[((size_t)c * nq + q) * ne + e] / nq;
+                return smesh::array_write(path, mean_.data(), (ptrdiff_t)mean_.size());
+            }
+
+            int write(const size_t k) {
+                SFEM_TRACE_SCOPE("HistorySnapshots::write");
+                const smesh::Path dir = dir_ / std::to_string(k);
+                if (smesh::create_directory(dir_) != SFEM_SUCCESS || smesh::create_directory(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
+                for (const auto &block : relaxations_.block_names()) {
+                    for (const auto &group : relaxations_.declarations()) {
+                        const auto     &r  = relaxations_.relaxation(block, group.group);
+                        const int       nc = r.n_components(), nq = r.n_qp();
+                        const ptrdiff_t ne = r.n_elements(), n = (ptrdiff_t)nc * nq * ne;
+                        const std::string stem = block + "." + group.group + ".";
+                        values_.resize(n);
+                        copy_to_host(es_, relaxations_.history(block, group.history), n, values_.data());
+                        if (write_mean(dir / (stem + "Shist.float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
+                        for (int i = 0; i < r.series().n_terms(); ++i) {
+                            if (!r.stored(i)) continue;
+                            relaxations_.decode_history(block, group.group, i, values_.data());
+                            if (write_mean(dir / (stem + "H" + std::to_string(i) + ".float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
+                        }
+                    }
+                }
+                return SFEM_SUCCESS;
+            }
+        };
+    }  // namespace
+
+    std::shared_ptr<StepObserver> create_history_snapshots(RelaxationGroups          &relaxations,
+                                                           const std::vector<real_t> &times,
+                                                           const smesh::Path         &dir,
+                                                           const ExecutionSpace       es) {
+        return std::make_shared<HistorySnapshots>(relaxations, times, dir, es);
+    }
+
+    std::shared_ptr<Probe> create_memory_probe(const std::shared_ptr<Communicator>      &comm,
+                                               const std::function<void(MemoryLedger &)> &account) {
+        return std::make_shared<MemoryProbe>(comm, account);
     }
 
     std::shared_ptr<Probe> create_named_probe(const std::string &name, const std::shared_ptr<Probe> &probe) {

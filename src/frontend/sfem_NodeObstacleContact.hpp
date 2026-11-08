@@ -12,6 +12,7 @@
 #include "smesh_grid.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     // Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
     // (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
@@ -48,6 +49,9 @@ namespace sfem {
         // In the execution space.
         const SharedBuffer<real_t> &gap() const { return gap_; }
         ExecutionSpace              execution_space() const { return context_.space(); }
+
+        /// Its nodes' state (CONTACT) and its obstacle's (Obstacle::account).
+        void account(MemoryLedger &ledger) const;
 
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);

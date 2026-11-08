@@ -124,6 +124,9 @@ namespace sfem {
         /** @brief Bytes held by the stored tangent, 0 before `inexact_update`. */
         virtual std::size_t inexact_bytes() const { return 0; }
 
+        /** @brief Bytes of the element geometry it caches (adjugates, determinants), where it runs. */
+        virtual std::size_t geometry_bytes() const { return 0; }
+
         /**
          * @brief diag += the stored operator's diagonal, for a Jacobi preconditioner on it
          *

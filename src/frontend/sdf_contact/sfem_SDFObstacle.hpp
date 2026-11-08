@@ -78,6 +78,8 @@ namespace sfem {
                                     idx_t **const SFEM_RESTRICT  elements,
                                     geom_t **const SFEM_RESTRICT points,
                                     real_t *const SFEM_RESTRICT  gap) override;
+        void account(MemoryLedger &ledger) const override;
+
         int sample_weights_accumulate(smesh::ElemType              element_type,
                                       const ptrdiff_t              nelements,
                                       const ptrdiff_t              nnodes,

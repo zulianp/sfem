@@ -54,6 +54,13 @@ namespace sfem {
         bool negative_curvature_{false};
         bool met_negative_curvature() const { return negative_curvature_; }
 
+        /// Bytes of the workspace kept between solves (4 vectors, the passes' work, the control
+        /// block), in the BLAS's memory space; 0 before the first solve.
+        std::size_t workspace_bytes() const {
+            if (workspace_n_ < 0) return 0;
+            return std::size_t(4 * workspace_n_ + std::max<ptrdiff_t>(workspace_work_, 0) + mprgp_control_size<T>()) * sizeof(T);
+        }
+
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
         // Convergence on the projected gradient weighted entry by entry, |w g_P| (and rtol relative

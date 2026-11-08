@@ -190,6 +190,9 @@ namespace sfem {
         /// How many terms hold a stored tensor.
         int n_stored_terms() const { return n_live_; }
 
+        /// Whether term `i` holds a stored tensor (the open or last step's choice).
+        bool stored(const int i) const { return slot_[i] >= 0; }
+
         /// Bytes of state held, frozen history included: the sum of the three below.
         std::size_t bytes() const;
 

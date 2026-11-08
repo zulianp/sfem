@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "sfem_Function.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_operator_factory.hpp"
@@ -99,6 +100,12 @@ namespace sfem {
     int NewtonSolver::commit(const real_t *const x) { return impl_->step->end_step(x); }
 
     const NewtonOptions &NewtonSolver::options() const { return impl_->options; }
+
+    void NewtonSolver::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        if (impl.step) impl.step->account(ledger);
+        for (auto *buffer : {&impl.r, &impl.dx, &impl.moved, &impl.increment}) ledger.add(MemoryLedger::NEWTON, *buffer);
+    }
     NewtonOptions       &NewtonSolver::options() { return impl_->options; }
 
     NonlinearReport NewtonSolver::solve(const StepContext &context, real_t *const x) {

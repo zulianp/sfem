@@ -730,6 +730,28 @@ _HEADER_TANGENT_PROJECTION_METHODS = {
 }
 
 
+#: The cached geometry's bytes (`Op::geometry_bytes`), where the Op keeps an
+#: `AffineGeometryCache`.
+_HEADER_GEOMETRY_BYTES_METHODS = {
+    False: "",
+    True: """
+    std::size_t geometry_bytes() const override;""",
+}
+
+
+def _geometry_bytes_definition(op_name):
+    """The cached geometry's bytes over the Op's domains."""
+    return """
+  std::size_t %(op)s::geometry_bytes() const {
+    std::size_t bytes = 0;
+    for (const auto &entry : impl_->domains->domains()) {
+      if (auto cache = std::static_pointer_cast<AffineGeometryCache>(entry.second.user_data)) bytes += cache->bytes();
+    }
+    return bytes;
+  }
+""" % {"op": op_name}
+
+
 def _projected_tangent_elements(material, kernel_sources):
     """The mesh elements whose BSR assembly is also published on the tangent
     projected to positive semidefinite (`MatrixFormatPlan.tangent_projection`):
@@ -800,7 +822,7 @@ def _tangent_is_constant(form_collections):
 
 def _header(material, residual, publishes_value_steps=None, node_wise=False,
             holds_time_scheme=None, relaxes=False, state_independent=False, linear=False,
-            publishes_inexact=False, team=False, projects_tangent=False):
+            publishes_inexact=False, team=False, projects_tangent=False, caches_geometry=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -959,7 +981,8 @@ namespace sfem {
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material, publishes_inexact, team),
-        "tangent_projection_methods": _HEADER_TANGENT_PROJECTION_METHODS[bool(projects_tangent)],
+        "tangent_projection_methods": _HEADER_TANGENT_PROJECTION_METHODS[bool(projects_tangent)]
+        + _HEADER_GEOMETRY_BYTES_METHODS[bool(caches_geometry)],
         "team_methods": _HEADER_TEAM_METHODS[bool(team)],
         "relaxation_include": _HEADER_RELAXATION_INCLUDE[bool(relaxes)],
         "relaxation_base": _HEADER_RELAXATION_BASE[bool(relaxes)],
@@ -1816,7 +1839,19 @@ namespace sfem {
     struct AffineGeometryCache {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
-%(metric_cache_field)s        };
+%(metric_cache_field)s
+      //! The bytes of the layouts it built.
+      std::size_t bytes() const {
+        std::size_t total = 0;
+        if (jacobian_soa) {
+          total += jacobian_soa->jacobian_adjugate_SoA()->nbytes() + jacobian_soa->jacobian_determinant()->nbytes();
+        }
+        if (jacobian_aos) {
+          total += jacobian_aos->jacobian_adjugate_AoS()->nbytes() + jacobian_aos->jacobian_determinant()->nbytes();
+        }
+%(metric_cache_bytes)s        return total;
+      }
+        };
 
     //! Whether this element leaves the operator no choice of geometry.
     //!
@@ -2373,6 +2408,7 @@ namespace sfem {
         "gradient_affine_uses_jacobian_aos": _cpp_bool(any(gradient_affine_aos_flags)),
         "apply_affine_uses_jacobian_aos": _cpp_bool(any(apply_affine_aos_flags)),
         "metric_cache_field": _metric_cache_field(any(affine_metric_flags)),
+        "metric_cache_bytes": _metric_cache_bytes(any(affine_metric_flags)),
         "metric_cache_setup": _metric_cache_setup(any(affine_metric_flags)),
         # The Op's block size is the field's component count, which is `dim`
         # only for a displacement.  Laplace-as-an-energy has one component in
@@ -2559,6 +2595,7 @@ namespace sfem {
     source = _append_inexact_definitions(
         source, _tangent_projection_definitions(_op_class_name(material), projected_elements)
     )
+    source = _append_inexact_definitions(source, _geometry_bytes_definition(_op_class_name(material)))
     return (
         _header(
             material,
@@ -2569,6 +2606,7 @@ namespace sfem {
             publishes_inexact=bool(_inexact_units(kernel_sources)),
             team=team,
             projects_tangent=bool(projected_elements),
+            caches_geometry=True,
         ),
         _bind_team_views(source, _op_class_name(material)),
     )
@@ -12134,6 +12172,13 @@ def _metric_cache_field(uses_metric):
     if not uses_metric:
         return ""
     return "      std::shared_ptr<smesh::FFF> metric_soa;\n"
+
+
+def _metric_cache_bytes(uses_metric):
+    """The metric's share of the cache's bytes (`AffineGeometryCache::bytes`)."""
+    if not uses_metric:
+        return ""
+    return "        if (metric_soa) total += metric_soa->fff_SoA()->nbytes();\n"
 
 
 def _metric_cache_setup(uses_metric):

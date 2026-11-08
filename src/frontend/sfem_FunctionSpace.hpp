@@ -18,6 +18,7 @@ namespace smesh {
 }
 
 namespace sfem {
+    class MemoryLedger;
 
     class FunctionSpace final {
     public:
@@ -109,6 +110,10 @@ namespace sfem {
         /// fits. node_to_node_graph, except on a HIGH_ORDER semi-structured space, where the element
         /// is the macro element and node_to_node_graph couples only the nodes of a micro element.
         std::shared_ptr<CRSGraph> element_node_graph();
+
+        /// The mesh's coordinates and connectivity (MESH; their device copies too in a device run,
+        /// es) and the graphs built so far (GRAPH).
+        void account(MemoryLedger &ledger, const ExecutionSpace es) const;
 
         friend class Op;
 
