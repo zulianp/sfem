@@ -225,7 +225,14 @@ namespace {
         printf("%-14s the projection changes the BSR apply by %.3e\n", label, (double)change);
         SFEM_TEST_ASSERT(change > 1e-3);
 
-        // The device's projected BSR assembly is the host's.
+        // The device's BSR assembly is the host's, exact and projected.
+        device->set_tangent_projection(false);
+        const auto device_plain = device_bsr_apply(device, fs, u, h);
+        SFEM_TEST_ASSERT(!device_plain.empty());
+        const real_t exact = relative_difference(device_plain, plain);
+        printf("%-14s device BSR against the host's %.3e\n", label, (double)exact);
+        SFEM_TEST_ASSERT(exact < 1e-10);
+        device->set_tangent_projection(true);
         const auto device_projected = device_bsr_apply(device, fs, u, h);
         SFEM_TEST_ASSERT(!device_projected.empty());
         const real_t assembled = relative_difference(device_projected, projected);

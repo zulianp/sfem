@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -276,6 +277,236 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_dire
     point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
   mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_direct_hessian_reference_point_tangent(
+    const int q,
+    const s_t *const RSTR adj,
+    const s_t det,
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR grad_ref_z,
+    const s_t *const RSTR q_weight,
+    const s_t lmbda,
+    const s_t mu,
+    const s_t bu_data[NS * 3],
+    s_t *const RSTR T
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  const s_t qw = q_weight[q];
+  const s_t adj_value0 = adj[0];
+  const s_t adj_value1 = adj[1];
+  const s_t adj_value2 = adj[2];
+  const s_t adj_value3 = adj[3];
+  const s_t adj_value4 = adj[4];
+  const s_t adj_value5 = adj[5];
+  const s_t adj_value6 = adj[6];
+  const s_t adj_value7 = adj[7];
+  const s_t adj_value8 = adj[8];
+  const s_t det_value0 = det;
+  const s_t idet = s_t(1) / det_value0;
+  s_t gu_ref0 = s_t(0);
+  s_t gu_ref1 = s_t(0);
+  s_t gu_ref2 = s_t(0);
+  s_t gu_ref3 = s_t(0);
+  s_t gu_ref4 = s_t(0);
+  s_t gu_ref5 = s_t(0);
+  s_t gu_ref6 = s_t(0);
+  s_t gu_ref7 = s_t(0);
+  s_t gu_ref8 = s_t(0);
+  for (int shape = 0; shape < NS; ++shape) {
+    const s_t state_grad_ref0 = grad_ref_x[q * NS + shape];
+    const s_t state_grad_ref1 = grad_ref_y[q * NS + shape];
+    const s_t state_grad_ref2 = grad_ref_z[q * NS + shape];
+    const s_t state_u0 = bu_data[shape * NC];
+    gu_ref0 += state_u0 * state_grad_ref0;
+    gu_ref1 += state_u0 * state_grad_ref1;
+    gu_ref2 += state_u0 * state_grad_ref2;
+    const s_t state_u1 = bu_data[shape * NC + 1];
+    gu_ref3 += state_u1 * state_grad_ref0;
+    gu_ref4 += state_u1 * state_grad_ref1;
+    gu_ref5 += state_u1 * state_grad_ref2;
+    const s_t state_u2 = bu_data[shape * NC + 2];
+    gu_ref6 += state_u2 * state_grad_ref0;
+    gu_ref7 += state_u2 * state_grad_ref1;
+    gu_ref8 += state_u2 * state_grad_ref2;
+  }
+  const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value3 + gu_ref2 * adj_value6) * idet;
+  const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value4 + gu_ref2 * adj_value7) * idet;
+  const s_t gu2 = (gu_ref0 * adj_value2 + gu_ref1 * adj_value5 + gu_ref2 * adj_value8) * idet;
+  const s_t gu3 = (gu_ref3 * adj_value0 + gu_ref4 * adj_value3 + gu_ref5 * adj_value6) * idet;
+  const s_t gu4 = (gu_ref3 * adj_value1 + gu_ref4 * adj_value4 + gu_ref5 * adj_value7) * idet;
+  const s_t gu5 = (gu_ref3 * adj_value2 + gu_ref4 * adj_value5 + gu_ref5 * adj_value8) * idet;
+  const s_t gu6 = (gu_ref6 * adj_value0 + gu_ref7 * adj_value3 + gu_ref8 * adj_value6) * idet;
+  const s_t gu7 = (gu_ref6 * adj_value1 + gu_ref7 * adj_value4 + gu_ref8 * adj_value7) * idet;
+  const s_t gu8 = (gu_ref6 * adj_value2 + gu_ref7 * adj_value5 + gu_ref8 * adj_value8) * idet;
+  s_t D[81];
+  const s_t weak_hess_tmp0 = gu5*gu7;
+  const s_t weak_hess_tmp1 = gu4 + s_t(1);
+  const s_t weak_hess_tmp2 = gu8 + s_t(1);
+  const s_t weak_hess_tmp3 = weak_hess_tmp0 - weak_hess_tmp1*weak_hess_tmp2;
+  const s_t weak_hess_tmp4 = -weak_hess_tmp3;
+  const s_t weak_hess_tmp5 = gu1*gu3;
+  const s_t weak_hess_tmp6 = gu2*gu6;
+  const s_t weak_hess_tmp7 = gu0 + s_t(1);
+  const s_t weak_hess_tmp8 = gu1*gu5*gu6 + gu2*gu3*gu7 - weak_hess_tmp0*weak_hess_tmp7 + weak_hess_tmp1*weak_hess_tmp2*weak_hess_tmp7 - weak_hess_tmp1*weak_hess_tmp6 - weak_hess_tmp2*weak_hess_tmp5;
+  const s_t weak_hess_tmp9 = pow_m2(weak_hess_tmp8);
+  const s_t weak_hess_tmp10 = lmbda*weak_hess_tmp9;
+  const s_t weak_hess_tmp11 = mu*weak_hess_tmp9;
+  const s_t weak_hess_tmp12 = weak_hess_tmp3*weak_hess_tmp4;
+  const s_t weak_hess_tmp13 = gu0*gu4;
+  const s_t weak_hess_tmp14 = gu3*gu7;
+  const s_t weak_hess_tmp15 = sfem_log1p(gu0*gu8 - gu0*weak_hess_tmp0 + gu0 + gu1*gu5*gu6 + gu2*weak_hess_tmp14 + gu4*gu8 - gu4*weak_hess_tmp6 + gu4 + gu8*weak_hess_tmp13 - gu8*weak_hess_tmp5 + gu8 - weak_hess_tmp0 + weak_hess_tmp13 - weak_hess_tmp5 - weak_hess_tmp6);
+  const s_t weak_hess_tmp16 = weak_hess_tmp10*weak_hess_tmp15;
+  const s_t weak_hess_tmp17 = gu3*weak_hess_tmp2 - gu5*gu6;
+  const s_t weak_hess_tmp18 = -weak_hess_tmp17;
+  const s_t weak_hess_tmp19 = weak_hess_tmp10*weak_hess_tmp4;
+  const s_t weak_hess_tmp20 = weak_hess_tmp11*weak_hess_tmp4;
+  const s_t weak_hess_tmp21 = weak_hess_tmp15*weak_hess_tmp19;
+  const s_t weak_hess_tmp22 = -gu6*weak_hess_tmp1 + weak_hess_tmp14;
+  const s_t weak_hess_tmp23 = -weak_hess_tmp22;
+  const s_t weak_hess_tmp24 = gu1*weak_hess_tmp2 - gu2*gu7;
+  const s_t weak_hess_tmp25 = -weak_hess_tmp24;
+  const s_t weak_hess_tmp26 = pow_m1(weak_hess_tmp8);
+  const s_t weak_hess_tmp27 = mu*weak_hess_tmp26;
+  const s_t weak_hess_tmp28 = weak_hess_tmp2*weak_hess_tmp27;
+  const s_t weak_hess_tmp29 = -weak_hess_tmp2*weak_hess_tmp7 + weak_hess_tmp6;
+  const s_t weak_hess_tmp30 = -weak_hess_tmp29;
+  const s_t weak_hess_tmp31 = lmbda*weak_hess_tmp15*weak_hess_tmp26;
+  const s_t weak_hess_tmp32 = weak_hess_tmp2*weak_hess_tmp31;
+  const s_t weak_hess_tmp33 = gu7*weak_hess_tmp27;
+  const s_t weak_hess_tmp34 = gu1*gu6 - gu7*weak_hess_tmp7;
+  const s_t weak_hess_tmp35 = -weak_hess_tmp34;
+  const s_t weak_hess_tmp36 = gu7*weak_hess_tmp31;
+  const s_t weak_hess_tmp37 = gu1*gu5 - gu2*weak_hess_tmp1;
+  const s_t weak_hess_tmp38 = -weak_hess_tmp37;
+  const s_t weak_hess_tmp39 = gu5*weak_hess_tmp27;
+  const s_t weak_hess_tmp40 = gu2*gu3 - gu5*weak_hess_tmp7;
+  const s_t weak_hess_tmp41 = -weak_hess_tmp40;
+  const s_t weak_hess_tmp42 = gu5*weak_hess_tmp31;
+  const s_t weak_hess_tmp43 = weak_hess_tmp1*weak_hess_tmp27;
+  const s_t weak_hess_tmp44 = -weak_hess_tmp1*weak_hess_tmp7 + weak_hess_tmp5;
+  const s_t weak_hess_tmp45 = -weak_hess_tmp44;
+  const s_t weak_hess_tmp46 = weak_hess_tmp1*weak_hess_tmp31;
+  const s_t weak_hess_tmp47 = weak_hess_tmp11*weak_hess_tmp18;
+  const s_t weak_hess_tmp48 = weak_hess_tmp10*weak_hess_tmp18;
+  const s_t weak_hess_tmp49 = weak_hess_tmp15*weak_hess_tmp48;
+  const s_t weak_hess_tmp50 = gu6*weak_hess_tmp27;
+  const s_t weak_hess_tmp51 = gu6*weak_hess_tmp31;
+  const s_t weak_hess_tmp52 = gu3*weak_hess_tmp27;
+  const s_t weak_hess_tmp53 = gu3*weak_hess_tmp31;
+  const s_t weak_hess_tmp54 = weak_hess_tmp11*weak_hess_tmp22;
+  const s_t weak_hess_tmp55 = weak_hess_tmp10*weak_hess_tmp22;
+  const s_t weak_hess_tmp56 = weak_hess_tmp15*weak_hess_tmp55;
+  const s_t weak_hess_tmp57 = weak_hess_tmp11*weak_hess_tmp25;
+  const s_t weak_hess_tmp58 = weak_hess_tmp10*weak_hess_tmp25;
+  const s_t weak_hess_tmp59 = weak_hess_tmp15*weak_hess_tmp58;
+  const s_t weak_hess_tmp60 = gu2*weak_hess_tmp27;
+  const s_t weak_hess_tmp61 = gu2*weak_hess_tmp31;
+  const s_t weak_hess_tmp62 = gu1*weak_hess_tmp27;
+  const s_t weak_hess_tmp63 = gu1*weak_hess_tmp31;
+  const s_t weak_hess_tmp64 = weak_hess_tmp11*weak_hess_tmp30;
+  const s_t weak_hess_tmp65 = weak_hess_tmp10*weak_hess_tmp30;
+  const s_t weak_hess_tmp66 = weak_hess_tmp15*weak_hess_tmp65;
+  const s_t weak_hess_tmp67 = weak_hess_tmp27*weak_hess_tmp7;
+  const s_t weak_hess_tmp68 = weak_hess_tmp31*weak_hess_tmp7;
+  const s_t weak_hess_tmp69 = weak_hess_tmp11*weak_hess_tmp34;
+  const s_t weak_hess_tmp70 = weak_hess_tmp10*weak_hess_tmp34;
+  const s_t weak_hess_tmp71 = weak_hess_tmp15*weak_hess_tmp70;
+  const s_t weak_hess_tmp72 = weak_hess_tmp11*weak_hess_tmp37;
+  const s_t weak_hess_tmp73 = weak_hess_tmp10*weak_hess_tmp37;
+  const s_t weak_hess_tmp74 = weak_hess_tmp15*weak_hess_tmp73;
+  const s_t weak_hess_tmp75 = weak_hess_tmp11*weak_hess_tmp40;
+  const s_t weak_hess_tmp76 = weak_hess_tmp10*weak_hess_tmp40;
+  const s_t weak_hess_tmp77 = weak_hess_tmp15*weak_hess_tmp76;
+  const s_t weak_hess_tmp78 = weak_hess_tmp44*weak_hess_tmp45;
+  D[0] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp4) - weak_hess_tmp11*weak_hess_tmp12 + weak_hess_tmp12*weak_hess_tmp16;
+  D[1] = -weak_hess_tmp17*weak_hess_tmp20 + weak_hess_tmp17*weak_hess_tmp21 + weak_hess_tmp18*weak_hess_tmp19;
+  D[2] = weak_hess_tmp19*weak_hess_tmp22 - weak_hess_tmp20*weak_hess_tmp23 + weak_hess_tmp21*weak_hess_tmp23;
+  D[3] = weak_hess_tmp19*weak_hess_tmp25 - weak_hess_tmp20*weak_hess_tmp24 + weak_hess_tmp21*weak_hess_tmp24;
+  D[4] = weak_hess_tmp19*weak_hess_tmp30 - weak_hess_tmp20*weak_hess_tmp29 + weak_hess_tmp21*weak_hess_tmp29 - weak_hess_tmp28 + weak_hess_tmp32;
+  D[5] = weak_hess_tmp19*weak_hess_tmp34 - weak_hess_tmp20*weak_hess_tmp35 + weak_hess_tmp21*weak_hess_tmp35 + weak_hess_tmp33 - weak_hess_tmp36;
+  D[6] = weak_hess_tmp19*weak_hess_tmp37 - weak_hess_tmp20*weak_hess_tmp38 + weak_hess_tmp21*weak_hess_tmp38;
+  D[7] = weak_hess_tmp19*weak_hess_tmp40 - weak_hess_tmp20*weak_hess_tmp41 + weak_hess_tmp21*weak_hess_tmp41 + weak_hess_tmp39 - weak_hess_tmp42;
+  D[8] = weak_hess_tmp19*weak_hess_tmp45 - weak_hess_tmp20*weak_hess_tmp44 + weak_hess_tmp21*weak_hess_tmp44 - weak_hess_tmp43 + weak_hess_tmp46;
+  D[10] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp18) - weak_hess_tmp17*weak_hess_tmp47 + weak_hess_tmp17*weak_hess_tmp49;
+  D[11] = weak_hess_tmp22*weak_hess_tmp48 - weak_hess_tmp23*weak_hess_tmp47 + weak_hess_tmp23*weak_hess_tmp49;
+  D[12] = -weak_hess_tmp24*weak_hess_tmp47 + weak_hess_tmp24*weak_hess_tmp49 + weak_hess_tmp25*weak_hess_tmp48 + weak_hess_tmp28 - weak_hess_tmp32;
+  D[13] = -weak_hess_tmp29*weak_hess_tmp47 + weak_hess_tmp29*weak_hess_tmp49 + weak_hess_tmp30*weak_hess_tmp48;
+  D[14] = weak_hess_tmp34*weak_hess_tmp48 - weak_hess_tmp35*weak_hess_tmp47 + weak_hess_tmp35*weak_hess_tmp49 - weak_hess_tmp50 + weak_hess_tmp51;
+  D[15] = weak_hess_tmp37*weak_hess_tmp48 - weak_hess_tmp38*weak_hess_tmp47 + weak_hess_tmp38*weak_hess_tmp49 - weak_hess_tmp39 + weak_hess_tmp42;
+  D[16] = weak_hess_tmp40*weak_hess_tmp48 - weak_hess_tmp41*weak_hess_tmp47 + weak_hess_tmp41*weak_hess_tmp49;
+  D[17] = -weak_hess_tmp44*weak_hess_tmp47 + weak_hess_tmp44*weak_hess_tmp49 + weak_hess_tmp45*weak_hess_tmp48 + weak_hess_tmp52 - weak_hess_tmp53;
+  D[20] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp22) - weak_hess_tmp23*weak_hess_tmp54 + weak_hess_tmp23*weak_hess_tmp56;
+  D[21] = -weak_hess_tmp24*weak_hess_tmp54 + weak_hess_tmp24*weak_hess_tmp56 + weak_hess_tmp25*weak_hess_tmp55 - weak_hess_tmp33 + weak_hess_tmp36;
+  D[22] = -weak_hess_tmp29*weak_hess_tmp54 + weak_hess_tmp29*weak_hess_tmp56 + weak_hess_tmp30*weak_hess_tmp55 + weak_hess_tmp50 - weak_hess_tmp51;
+  D[23] = weak_hess_tmp34*weak_hess_tmp55 - weak_hess_tmp35*weak_hess_tmp54 + weak_hess_tmp35*weak_hess_tmp56;
+  D[24] = weak_hess_tmp37*weak_hess_tmp55 - weak_hess_tmp38*weak_hess_tmp54 + weak_hess_tmp38*weak_hess_tmp56 + weak_hess_tmp43 - weak_hess_tmp46;
+  D[25] = weak_hess_tmp40*weak_hess_tmp55 - weak_hess_tmp41*weak_hess_tmp54 + weak_hess_tmp41*weak_hess_tmp56 - weak_hess_tmp52 + weak_hess_tmp53;
+  D[26] = -weak_hess_tmp44*weak_hess_tmp54 + weak_hess_tmp44*weak_hess_tmp56 + weak_hess_tmp45*weak_hess_tmp55;
+  D[30] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp25) - weak_hess_tmp24*weak_hess_tmp57 + weak_hess_tmp24*weak_hess_tmp59;
+  D[31] = -weak_hess_tmp29*weak_hess_tmp57 + weak_hess_tmp29*weak_hess_tmp59 + weak_hess_tmp30*weak_hess_tmp58;
+  D[32] = weak_hess_tmp34*weak_hess_tmp58 - weak_hess_tmp35*weak_hess_tmp57 + weak_hess_tmp35*weak_hess_tmp59;
+  D[33] = weak_hess_tmp37*weak_hess_tmp58 - weak_hess_tmp38*weak_hess_tmp57 + weak_hess_tmp38*weak_hess_tmp59;
+  D[34] = weak_hess_tmp40*weak_hess_tmp58 - weak_hess_tmp41*weak_hess_tmp57 + weak_hess_tmp41*weak_hess_tmp59 - weak_hess_tmp60 + weak_hess_tmp61;
+  D[35] = -weak_hess_tmp44*weak_hess_tmp57 + weak_hess_tmp44*weak_hess_tmp59 + weak_hess_tmp45*weak_hess_tmp58 + weak_hess_tmp62 - weak_hess_tmp63;
+  D[40] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp30) - weak_hess_tmp29*weak_hess_tmp64 + weak_hess_tmp29*weak_hess_tmp66;
+  D[41] = weak_hess_tmp34*weak_hess_tmp65 - weak_hess_tmp35*weak_hess_tmp64 + weak_hess_tmp35*weak_hess_tmp66;
+  D[42] = weak_hess_tmp37*weak_hess_tmp65 - weak_hess_tmp38*weak_hess_tmp64 + weak_hess_tmp38*weak_hess_tmp66 + weak_hess_tmp60 - weak_hess_tmp61;
+  D[43] = weak_hess_tmp40*weak_hess_tmp65 - weak_hess_tmp41*weak_hess_tmp64 + weak_hess_tmp41*weak_hess_tmp66;
+  D[44] = -weak_hess_tmp44*weak_hess_tmp64 + weak_hess_tmp44*weak_hess_tmp66 + weak_hess_tmp45*weak_hess_tmp65 - weak_hess_tmp67 + weak_hess_tmp68;
+  D[50] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp34) - weak_hess_tmp35*weak_hess_tmp69 + weak_hess_tmp35*weak_hess_tmp71;
+  D[51] = weak_hess_tmp37*weak_hess_tmp70 - weak_hess_tmp38*weak_hess_tmp69 + weak_hess_tmp38*weak_hess_tmp71 - weak_hess_tmp62 + weak_hess_tmp63;
+  D[52] = weak_hess_tmp40*weak_hess_tmp70 - weak_hess_tmp41*weak_hess_tmp69 + weak_hess_tmp41*weak_hess_tmp71 + weak_hess_tmp67 - weak_hess_tmp68;
+  D[53] = -weak_hess_tmp44*weak_hess_tmp69 + weak_hess_tmp44*weak_hess_tmp71 + weak_hess_tmp45*weak_hess_tmp70;
+  D[60] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp37) - weak_hess_tmp38*weak_hess_tmp72 + weak_hess_tmp38*weak_hess_tmp74;
+  D[61] = weak_hess_tmp40*weak_hess_tmp73 - weak_hess_tmp41*weak_hess_tmp72 + weak_hess_tmp41*weak_hess_tmp74;
+  D[62] = -weak_hess_tmp44*weak_hess_tmp72 + weak_hess_tmp44*weak_hess_tmp74 + weak_hess_tmp45*weak_hess_tmp73;
+  D[70] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp40) - weak_hess_tmp41*weak_hess_tmp75 + weak_hess_tmp41*weak_hess_tmp77;
+  D[71] = -weak_hess_tmp44*weak_hess_tmp75 + weak_hess_tmp44*weak_hess_tmp77 + weak_hess_tmp45*weak_hess_tmp76;
+  D[80] = mu + weak_hess_tmp10*pow_2(weak_hess_tmp45) - weak_hess_tmp11*weak_hess_tmp78 + weak_hess_tmp16*weak_hess_tmp78;
+  D[9] = D[1];
+  D[18] = D[2];
+  D[27] = D[3];
+  D[36] = D[4];
+  D[45] = D[5];
+  D[54] = D[6];
+  D[63] = D[7];
+  D[72] = D[8];
+  D[19] = D[11];
+  D[28] = D[12];
+  D[37] = D[13];
+  D[46] = D[14];
+  D[55] = D[15];
+  D[64] = D[16];
+  D[73] = D[17];
+  D[29] = D[21];
+  D[38] = D[22];
+  D[47] = D[23];
+  D[56] = D[24];
+  D[65] = D[25];
+  D[74] = D[26];
+  D[39] = D[31];
+  D[48] = D[32];
+  D[57] = D[33];
+  D[66] = D[34];
+  D[75] = D[35];
+  D[49] = D[41];
+  D[58] = D[42];
+  D[67] = D[43];
+  D[76] = D[44];
+  D[59] = D[51];
+  D[68] = D[52];
+  D[77] = D[53];
+  D[69] = D[61];
+  D[78] = D[62];
+  D[79] = D[71];
+  const s_t adj_q[ND * ND] = {adj_value0, adj_value1, adj_value2, adj_value3, adj_value4, adj_value5, adj_value6, adj_value7, adj_value8};
+  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);
 }
 
 template <typename s_t, int NS>
