@@ -130,10 +130,14 @@ namespace sfem {
                 queue.pop_front();
                 lock.unlock();
                 int rc = SFEM_SUCCESS;
-                for (size_t k = 0; k < e.values.size() && rc == SFEM_SUCCESS; ++k) {
-                    rc = output->write_step(name(k), e.index, e.values[k]->data());
+                {
+                    // Off the solver's thread: not traced unless every event takes a mutex.
+                    SFEM_TRACE_SCOPE_MUTEX("FieldExport::write_files");
+                    for (size_t k = 0; k < e.values.size() && rc == SFEM_SUCCESS; ++k) {
+                        rc = output->write_step(name(k), e.index, e.values[k]->data());
+                    }
+                    if (rc == SFEM_SUCCESS) output->log_time(e.t);
                 }
-                if (rc == SFEM_SUCCESS) output->log_time(e.t);
                 lock.lock();
                 if (rc != SFEM_SUCCESS && error == SFEM_SUCCESS) error = rc;
                 idle.push_back(std::move(e.values));
