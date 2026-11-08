@@ -98,6 +98,22 @@ namespace sfem {
         virtual bool tangent_is_symmetric() const { return true; }
 
         /**
+         * @brief Whether `set_tangent_projection` makes the assembled tangent positive semidefinite
+         *
+         * A linear operator has nothing to project; its tangent is taken as it is.
+         */
+        virtual bool tangent_projection_supported() const { return is_linear(); }
+
+        /**
+         * @brief The assembled tangents that follow projected to positive semidefinite, per
+         * quadrature point (`project_abs_symmetric`), or not
+         *
+         * The assembled (BSR) and stored (inexact) tangents are projected; the applies are the
+         * function's own.
+         */
+        virtual void set_tangent_projection(const bool /*on*/) {}
+
+        /**
          * @brief What the stored tangent stores and how it is applied
          *
          * Takes effect at the next `inexact_update`; an operator without the
@@ -107,6 +123,9 @@ namespace sfem {
 
         /** @brief Bytes held by the stored tangent, 0 before `inexact_update`. */
         virtual std::size_t inexact_bytes() const { return 0; }
+
+        /** @brief Bytes of the element geometry it caches (adjugates, determinants), where it runs. */
+        virtual std::size_t geometry_bytes() const { return 0; }
 
         /**
          * @brief diag += the stored operator's diagonal, for a Jacobi preconditioner on it

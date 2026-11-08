@@ -3,7 +3,8 @@
 // The tangent is stored at the points of the rule the exact apply integrates with, so with f64
 // codes the stored apply is the exact one to rounding; every other encoding is the exact one up to
 // its own rounding, which bounds the difference here.  The packed and the atomic traversals, and
-// the folded and the unfolded point store, compute the same operator.
+// the folded and the unfolded point store, compute the same operator.  With the tangent projection
+// on, every store holds the projected tangent: the f64 ones apply the projected BSR assembly.
 
 #include <cmath>
 #include <cstdio>
@@ -128,6 +129,79 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    // The stores of the projected tangent against the projected BSR assembly: f64 to the rounding
+    // of the set-up's pull-back, the others to their encoding's.
+    const Case PROJECTED_CASES[] = {
+            {"points", "f64", 1e-10},
+            {"element_matrix", "f64", 1e-10},
+            {"points", "f32", 1e-5},
+            {"bsr", "f16", 5e-3},
+    };
+
+    /// u = (F - I) X, a sheared compression (det F = 0.6) under which the Prony material's tangent
+    /// is indefinite, plus a little noise.
+    std::vector<real_t> compressed(const std::shared_ptr<sfem::FunctionSpace> &fs) {
+        const real_t         F[3][3] = {{0.5, 0.3, 0}, {0, 1.1, 0}, {0, 0, 1.1}};
+        auto                 mesh    = fs->mesh();
+        const geom_t *const *x       = mesh->points()->data();
+        std::vector<real_t>  u       = pseudo_random(fs->n_dofs(), 0.002, 5);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i)
+            for (int a = 0; a < 3; ++a)
+                for (int b = 0; b < 3; ++b) u[i * 3 + a] += (F[a][b] - (a == b)) * x[b][i];
+        return u;
+    }
+
+    /// The assembled tangent at u applied to h.
+    std::vector<real_t> bsr_apply(const std::shared_ptr<sfem::Op>           &op,
+                                  const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                  const std::vector<real_t>                  &u,
+                                  const std::vector<real_t>                  &h) {
+        auto                graph  = fs->element_node_graph();
+        const count_t      *rowptr = graph->rowptr()->data();
+        const idx_t        *colidx = graph->colidx()->data();
+        std::vector<real_t> values((size_t)graph->nnz() * 9, 0), out(h.size(), 0);
+        if (op->hessian_bsr(u.data(), rowptr, colidx, values.data()) != SFEM_SUCCESS) return {};
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i)
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k)
+                for (int d = 0; d < 3; ++d)
+                    for (int e = 0; e < 3; ++e) out[i * 3 + d] += values[(size_t)k * 9 + d * 3 + e] * h[colidx[k] * 3 + e];
+        return out;
+    }
+
+    int check_projected(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+        auto op = sfem::create_op(fs, "GeneratedMooneyRivlinProny", sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(op->tangent_projection_supported());
+
+        const std::vector<real_t> u     = compressed(fs);
+        const std::vector<real_t> h     = pseudo_random(fs->n_dofs(), 1, 11);
+        const auto                plain = bsr_apply(op, fs, u, h);
+        op->set_tangent_projection(true);
+        const auto projected = bsr_apply(op, fs, u, h);
+        SFEM_TEST_ASSERT(!plain.empty() && !projected.empty());
+        const real_t change = relative_difference(projected, plain);
+        printf("%-14s the projection changes the BSR apply by %.3e\n", label, (double)change);
+        SFEM_TEST_ASSERT(change > 1e-3);
+
+        for (const Case &c : PROJECTED_CASES) {
+            for (const char *fold : {"auto", "off"}) {
+                const auto stored = stored_apply(op, sfem::InexactOptions::from_strings(c.store, c.encoding, fold), u, h);
+                SFEM_TEST_ASSERT(!stored.empty());
+                const real_t error = relative_difference(stored, projected);
+                printf("%-14s %-15s %-7s fold %-4s projected rel diff %.3e (bound %.0e)\n",
+                       label, c.store, c.encoding, fold, (double)error, c.tolerance);
+                SFEM_TEST_ASSERT(error < c.tolerance);
+            }
+        }
+
+        // Off again, the stores follow.
+        op->set_tangent_projection(false);
+        const auto back = stored_apply(op, sfem::InexactOptions::from_strings("points", "f64"), u, h);
+        SFEM_TEST_ASSERT(!back.empty() && relative_difference(back, plain) < 1e-12);
+        return SFEM_TEST_SUCCESS;
+    }
+
     std::shared_ptr<sfem::FunctionSpace> space(const std::shared_ptr<sfem::Mesh> &mesh) {
         auto fs = sfem::FunctionSpace::create(mesh, 3);
         if (fs->initialize_packed_mesh() != SFEM_SUCCESS) return nullptr;
@@ -194,6 +268,17 @@ int test_tet10_prony() {
     return check(space(smesh::promote_to(smesh::TET10, mesh)), "GeneratedMooneyRivlinProny", "TET10 Prony");
 }
 
+// The projected tangent (tangent_projection) in every store, on the affine, isoparametric and folded
+// point stores.
+int test_projected_prony() {
+    auto tet4 = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1);
+    SFEM_TEST_ASSERT(check_projected(space(tet4), "TET4 projected") == SFEM_TEST_SUCCESS);
+    auto tet10 = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 2, 2, 2, 0, 0, 0, 1, 1, 1));
+    SFEM_TEST_ASSERT(check_projected(space(tet10), "TET10 projected") == SFEM_TEST_SUCCESS);
+    auto hex8 = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    return check_projected(space(hex8), "HEX8 projected");
+}
+
 // `auto` takes the format tabled for the element and the execution space; anything else is kept.
 int test_auto() {
     using O        = sfem::InexactOptions;
@@ -245,6 +330,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_curved_tet10);
     SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_tet10_prony);
+    SFEM_RUN_TEST(test_projected_prony);
     SFEM_RUN_TEST(test_auto);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

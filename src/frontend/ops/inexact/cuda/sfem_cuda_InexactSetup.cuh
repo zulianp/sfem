@@ -325,6 +325,7 @@ namespace sfem {
                 const real_t         *quadrature[MAX_FIELDS]{};
                 int                   quadrature_components[MAX_FIELDS]{};
                 ptrdiff_t             quadrature_stride{0};
+                bool                  project{false};  // the point tangents projected (SetupInput::project)
             };
 
             template <class M>
@@ -359,6 +360,8 @@ namespace sfem {
                     }
                 }
                 a.quadrature_stride = in.quadrature_stride;
+                a.project           = in.project;
+                if (a.project && !(M::symmetric && M::NC == 45)) SFEM_ERROR("inexact (device): only a symmetric tangent is projected\n");
                 return a;
             }
 
@@ -403,7 +406,7 @@ namespace sfem {
                 for (int c = 0; c < 9; ++c) G[c] = acc[c];
             }
 
-            template <class M, class Sink>
+            template <class M, class Sink, bool PROJECT>
             __global__ void setup_kernel(const SetupArgs a, const TablesView t, const Sink sink) {
                 using El               = typename M::element;
                 using L                = SetupShared<M, Sink>;
@@ -455,6 +458,7 @@ namespace sfem {
                     }
                     real_t T[NC];
                     M::template point<real_t>(a.parameters, gu, gz, adj, det, qp, T);
+                    if constexpr (PROJECT) detail::project_point_tangent(T, adj, det);
                     const real_t w = t.qw[q];
                     for (int c = 0; c < NC; ++c) Ts[q][c] = w * T[c];
                 }
@@ -495,8 +499,8 @@ namespace sfem {
             }
 
             /// Launches the set-up with as many elements per block as fit, up to `THREADS` threads.
-            template <class M, class Sink>
-            void launch_setup(const SetupArgs &a, const TablesView &t, const Sink &sink, cudaStream_t stream) {
+            template <class M, class Sink, bool PROJECT>
+            void launch_setup_kernel(const SetupArgs &a, const TablesView &t, const Sink &sink, cudaStream_t stream) {
                 using L                     = SetupShared<M, Sink>;
                 static constexpr int  NQ    = M::element::NQ;
                 static constexpr std::size_t per = (std::size_t)L::per_element * sizeof(double);
@@ -506,14 +510,22 @@ namespace sfem {
                 while (epb > 1 && epb * per > cap) --epb;
                 const std::size_t shared = epb * per;
                 if (shared > 48 * 1024) {
-                    check(cudaFuncSetAttribute(setup_kernel<M, Sink>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shared),
+                    check(cudaFuncSetAttribute(setup_kernel<M, Sink, PROJECT>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shared),
                           "set-up shared memory");
                 }
                 if (a.nelements == 0) return;
                 const unsigned blocks = (unsigned)((a.nelements + epb - 1) / epb);
-                setup_kernel<M, Sink><<<blocks, epb * NQ, shared, stream>>>(a, t, sink);
+                setup_kernel<M, Sink, PROJECT><<<blocks, epb * NQ, shared, stream>>>(a, t, sink);
                 check(cudaGetLastError(), "set-up launch");
                 SFEM_DEBUG_SYNCHRONIZE(stream);
+            }
+
+            template <class M, class Sink>
+            void launch_setup(const SetupArgs &a, const TablesView &t, const Sink &sink, cudaStream_t stream) {
+                if constexpr (M::symmetric && M::NC == 45) {
+                    if (a.project) return launch_setup_kernel<M, Sink, true>(a, t, sink, stream);
+                }
+                launch_setup_kernel<M, Sink, false>(a, t, sink, stream);
             }
 
         }  // namespace cuda

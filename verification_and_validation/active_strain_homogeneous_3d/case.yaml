@@ -94,8 +94,6 @@ variants:
         - "solver.linear.format=MF"
         - --set
         - "mesh.packed=true"
-        - --set
-        - "mesh.renumber=false"
         - undeformed
         - compatible
       environment:
@@ -148,8 +146,6 @@ variants:
         - "solver.linear.format=BSR"
         - --set
         - "mesh.packed=true"
-        - --set
-        - "mesh.renumber=false"
         - undeformed
         - compatible
       environment:

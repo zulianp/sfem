@@ -9,7 +9,87 @@ static_assert((int)smesh::SMESH_FLOAT64 == (int)sizeof(double),
 static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
               "the generated kernels select their scalar by width");
 
+extern "C" int mooney_rivlin_prony_hex27_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_apply_packed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -169,7 +249,87 @@ extern "C" int mooney_rivlin_prony_tet4_apply_packed_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_apply_packed_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_apply_packed_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_apply_packed_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -329,7 +489,99 @@ extern "C" int mooney_rivlin_prony_tet4_apply_packed_a_msoa_team(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_apply_packed_two_pass_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -513,7 +765,99 @@ extern "C" int mooney_rivlin_prony_tet4_apply_packed_two_pass_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_apply_packed_two_pass_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_apply_packed_two_pass_a_msoa_team(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_apply_packed_two_pass_a_msoa_team(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -697,7 +1041,79 @@ extern "C" int mooney_rivlin_prony_tet4_apply_packed_two_pass_a_msoa_team(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_gradient_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_gradient_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_gradient_packed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -841,7 +1257,91 @@ extern "C" int mooney_rivlin_prony_tet4_gradient_packed_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
 extern "C" int mooney_rivlin_prony_hex8_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_gradient_packed_two_pass_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1009,7 +1509,85 @@ extern "C" int mooney_rivlin_prony_tet4_gradient_packed_two_pass_a_msoa(
     void *const RSTR outy,
     void *const RSTR outz
 );
+extern "C" int mooney_rivlin_prony_hex27_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
+);
 extern "C" int mooney_rivlin_prony_hex8_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C01,
+    const real_t C10,
+    const real_t K,
+    const real_t iso_relaxation_gamma,
+    const void *const RSTR iso_history,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
+);
+extern "C" int mooney_rivlin_prony_proteus_hex27_objective_steps_packed_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_packs,
     const ptrdiff_t n_elements_per_pack,
@@ -1212,8 +1790,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_apply_packed_3d_a_m
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_apply_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_apply_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_apply_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_apply_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1273,8 +1855,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_apply_packed_3d_a_m
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_apply_packed_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_apply_packed_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_apply_packed_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_apply_packed_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1340,8 +1926,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_apply_packed_two_pa
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_apply_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_apply_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_apply_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_apply_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1407,8 +1997,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_apply_packed_two_pa
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_apply_packed_two_pass_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_apply_packed_two_pass_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_apply_packed_two_pass_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_apply_packed_two_pass_a_msoa_team((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1464,8 +2058,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_gradient_packed_3d_
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_gradient_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_gradient_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_gradient_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_gradient_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1527,8 +2125,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_gradient_packed_two
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_gradient_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_gradient_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_gradient_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_gradient_packed_two_pass_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
     case smesh::TET10:
@@ -1587,8 +2189,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_prony_objective_steps_pac
           ? smesh::TypeToEnum<real_t>::value()
           : real_type;
   switch (element_type) {
+    case smesh::HEX27:
+      return mooney_rivlin_prony_hex27_objective_steps_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
     case smesh::HEX8:
       return mooney_rivlin_prony_hex8_objective_steps_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::PROTEUS_HEX27:
+      return mooney_rivlin_prony_proteus_hex27_objective_steps_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
     case smesh::PROTEUS_HEX8:
       return mooney_rivlin_prony_proteus_hex8_objective_steps_packed_a_msoa((int)resolved_real_type, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
     case smesh::TET10:

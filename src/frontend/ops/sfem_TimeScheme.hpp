@@ -8,6 +8,7 @@
 #include "sfem_logger.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     class Op;
 
@@ -73,6 +74,9 @@ namespace sfem {
         /// Close a step at the solution `x`: reconstruct whatever derived
         /// states the method carries, then rotate them.
         virtual void advance(const real_t *const x) = 0;
+
+        /// The state it carries between steps (SCHEME).
+        virtual void account(MemoryLedger & /*ledger*/) const {}
 
         /// The derived states this method implies at an arbitrary `x`, without
         /// advancing the step.

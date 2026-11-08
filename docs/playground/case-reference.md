@@ -97,6 +97,11 @@ material:
       prony: [{g: 0.3, tau: 0.1}, {g: 0.2, tau: 1.0}]
       integrator: linear            # or midpoint
       history_storage: full         # full | float32 | float16 | float16_scaled | int16_scaled | int8_scaled
+                                    # | float16_md | int8_md (a float mean per group, the deviations coded)
+      history_elements_per_mean: 16 # *_md on one-point elements: the elements a mean is taken over (power of two, <= 64)
+      stress_storage: full          # the two relaxed-stress slots kept between steps: full | float32
+      remainder_horizon: 0.18       # reduced history_storage: the terms with tau a_T above it (s) are stored
+                                    # as remainders G = H - g (S_n - R); default the run's span, 0 for none
       wlf: {C1: 17.4, C2: 51.6, T_ref: 20}   # optional time-temperature shift
       temperature: 20
 ```
@@ -197,7 +202,7 @@ node numbering.
 | `dt` | real > 0 | **required** (not for `steady`) | Step length. |
 | `steps` | int | | Number of steps; takes precedence over `t_end`. |
 | `t_end` | real | | Final time; `steps = round(t_end / dt)`. One of `steps` or `t_end` is **required**. |
-| `max_cutbacks` | int | `4` | A failed step is retried with half its length, this many times. |
+| `max_cutbacks` | int | `4` | A failed step is retried with half its length, this many times; the rest of its interval follows in steps of at most that length, so the run reaches the same times `t0 + k dt`. |
 
 ## dynamics
 
@@ -262,10 +267,12 @@ obstacle:
 | `newton.divergence_factor` | `1e4` | |
 | `newton.merit` | `auto` | `auto`, `energy`, `residual`. |
 | `newton.fixed_iterations` | `false` | `true` accepts the state after `max_it` iterations. |
+| `newton.tangent_projection` | `none` | `on_failure`: where CG meets negative curvature or the line search finds no decrease along Newton's direction, the iteration is repeated from the same state on the tangent projected to positive semidefinite at every quadrature point (its eigenvalues replaced by their absolute values), kept until the line search takes a full step; the tangent itself is taken back once per time step, and failing again the projection stays. `always`: the projected tangent at every iteration. With a `node_sdf` obstacle the trigger is the contact QP meeting negative curvature, and the obstacle's curvature is projected too, node by node (its negative eigenvalues dropped). Needs `linear.format: BSR` or `INEXACT` (every store; projected per point at its set-up, its apply unchanged) and GeneratedMooneyRivlinProny; host or device. |
 | `newton.verbose` | `true` | One line per Newton iteration. |
 | `newton.line_search.enabled` | on for nonlinear materials | |
 | `newton.line_search.steps` | `[1, 1/2, ..., 1/128]` | |
 | `newton.line_search.c1` | `1e-4` | |
+| `newton.line_search.nonmonotone` | `5` | Where no step of the schedule decreases the merit, Armijo against the largest merit of the step's last this-many iterates (Grippo-Lampariello-Lucidi); every other step is the monotone rule's. `1` is the monotone rule. |
 | `newton.line_search.batched` | `true` | |
 | `newton.line_search.rule` | `armijo` | Or `damped`: `damping` (in (0, 1]) times the step, shortened only past an inverted element. |
 | `linear.type` | `cg` | Or `bcgs`. |
@@ -318,6 +325,7 @@ solver:
 | `history_csv` | none | A CSV row per step: status, iterations and probe values. Independent of `path`. |
 | `fields` | `[]` | Written beside the displacement: `velocity`, `acceleration` (dynamic), `material_reaction`, `gap`, `contact_force` (with an obstacle). |
 | `quantities` | `false` | `path/quantities.yaml`: objective and reaction resultants per step; one rank only. |
+| `history_snapshots` | none | `{times: [...], path}`: the Prony history at those step times, per block and group the history the kernels read and each stored term, averaged per element (`<path>/<k>/<block>.<group>.{Shist,H<i>}.float64`, [component][element]; `path` defaults to `path/history`). One rank, a Prony material. |
 | `probes` | `[]` | Columns of the history; see below. |
 
 Probes, each with a `type` and an optional `name` that prefixes its columns:
@@ -327,7 +335,8 @@ Probes, each with a `type` and an optional `name` that prefixes its columns:
 | `control_point` | `at: [x, y, z]` (the nearest node), `rates` (default `true` in `dynamic`) | `ux, uy, uz`, and `vx..vz, ax..az` with rates |
 | `torque` | `constraint` (index into `constraints`, default 0) | `angle, released, torque` |
 | `contact` | | `reaction_x, reaction_y, reaction_z, touched` (with an obstacle) |
-| `prony` | | `<group>_gamma`, `<group>_H<k>` (with a Prony material) |
+| `prony` | | `<group>_gamma`, `<group>_H<k>`, `<group>_stored` (terms holding a tensor), `bytes_history, bytes_increment, bytes_frozen, bytes_stress` (persistent bytes over all ranks; with a Prony material); `updates, updates_lost` when built with `SFEM_ENABLE_PRONY_DIAGNOSTICS` (history values `advance` meant to change, and those the storage format rounded away; cumulative, host only) |
+| `memory` | | `host_peak_rss, device_used_peak, device_used_now` (bytes over all ranks; the device's total minus free), and what the solve keeps between steps by category, `bytes_<category>` on the host and `bytes_<category>_device`: `mesh, geometry, graph, tangent_values, tangent_structure, tangent_work, step, contact, obstacle_grid, scheme, newton` (the Prony state is the `prony` probe's) |
 
 See [outputs](outputs.md) for the files.
 

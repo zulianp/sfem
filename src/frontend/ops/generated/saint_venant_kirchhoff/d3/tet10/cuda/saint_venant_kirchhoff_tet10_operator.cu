@@ -1404,7 +1404,7 @@ __host__ __device__ __forceinline__ void saint_venant_kirchhoff_tet10_hessian_i_
 }
 
 template <typename s_t, typename v_t, typename g_t, int FORMAT>
-__global__ void saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
+__global__ void __launch_bounds__(sfem::cooperative::threads<11>(), sfem::cooperative::MIN_BLOCKS) saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -1429,7 +1429,6 @@ __global__ void saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 11;
   static constexpr int NS = 10;
-  static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy, uz};
   const g_t *const RSTR x = points[0];
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
@@ -1439,92 +1438,39 @@ __global__ void saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
 
   static_assert(FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");
-  for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
-    idx_t ev[NS];
-    s_t element_matrix[NDOFS * NDOFS];
-    s_t bcoordinate_data[NS * ND];
-    s_t bu_data[NS * NC];
-    s_t badj0[NQ];
-    s_t badj1[NQ];
-    s_t badj2[NQ];
-    s_t badj3[NQ];
-    s_t badj4[NQ];
-    s_t badj5[NQ];
-    s_t badj6[NQ];
-    s_t badj7[NQ];
-    s_t badj8[NQ];
-    s_t bdet0[NQ];
-
-    for (int shape = 0; shape < NS; ++shape) {
+  static constexpr int NE = sfem::cooperative::ELEMENTS;
+  __shared__ s_t T[NE][NQ][sfem::cooperative::n_packed<NC * ND>()];
+  __shared__ s_t bcoordinate_data[NE][ND][NS];
+  __shared__ s_t bu_data[NE][NS * NC];
+  __shared__ idx_t ev[NE][NS];
+  __shared__ count_t pos[NE][NS][NS];
+  const s_t *const grad_ref[ND] = {isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z};
+  const int le = threadIdx.x / NQ;
+  const int q = threadIdx.x % NQ;
+  const ptrdiff_t first = (ptrdiff_t)blockIdx.x * NE;
+  const ptrdiff_t element = first + le;
+  const bool active = element < nelements;
+  if (active) {
+    for (int shape = q; shape < NS; shape += NQ) {
       const idx_t node = elements[shape][element];
-      ev[shape] = node;
-      for (int d = 0; d < ND; ++d) {
-        bcoordinate_data[shape * ND + d] = s_t(points[d][node]);
-        bu_data[shape * NC + d] = u_components[d][node * u_stride];
-      }
-    }
-
-
-    for (int q = 0; q < NQ; ++q) {
-      s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values;
-      s_t J01_values;
-      s_t J02_values;
-      s_t J10_values;
-      s_t J11_values;
-      s_t J12_values;
-      s_t J20_values;
-      s_t J21_values;
-      s_t J22_values;
-      {
-        J00_values = s_t(0);
-        J01_values = s_t(0);
-        J02_values = s_t(0);
-        J10_values = s_t(0);
-        J11_values = s_t(0);
-        J12_values = s_t(0);
-        J20_values = s_t(0);
-        J21_values = s_t(0);
-        J22_values = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-        const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
-        {
-          J00_values += bcoordinate_data[3 * shape] * g0;
-          J01_values += bcoordinate_data[3 * shape] * g1;
-          J02_values += bcoordinate_data[3 * shape] * g2;
-          J10_values += bcoordinate_data[3 * shape + 1] * g0;
-          J11_values += bcoordinate_data[3 * shape + 1] * g1;
-          J12_values += bcoordinate_data[3 * shape + 1] * g2;
-          J20_values += bcoordinate_data[3 * shape + 2] * g0;
-          J21_values += bcoordinate_data[3 * shape + 2] * g1;
-          J22_values += bcoordinate_data[3 * shape + 2] * g2;
-        }
-      }
-      {
-        const s_t J00 = J00_values;
-        const s_t J01 = J01_values;
-        const s_t J02 = J02_values;
-        const s_t J10 = J10_values;
-        const s_t J11 = J11_values;
-        const s_t J12 = J12_values;
-        const s_t J20 = J20_values;
-        const s_t J21 = J21_values;
-        const s_t J22 = J22_values;
-        geometry_jacobian_adjugate_and_determinant_3<s_t>(
-            J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q);
-      }
-    }
-
-    saint_venant_kirchhoff_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_data, element_matrix);
-
-    if constexpr (FORMAT == 1) {
-      saint_venant_kirchhoff_tet10_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      ev[le][shape] = node;
+      for (int d = 0; d < ND; ++d) bcoordinate_data[le][d][shape] = s_t(points[d][node]);
+      for (int c = 0; c < NC; ++c) bu_data[le][shape * NC + c] = u_components[c][node * u_stride];
     }
   }
+  __syncthreads();
+  if (active) {
+    for (int shape = q; shape < NS; shape += NQ) {
+      sfem::cooperative::row_map<NS>(ev[le], shape, rowptr, colidx, pos[le]);
+    }
+    s_t adj[ND * ND];
+    s_t det;
+    sfem::cooperative::point_geometry<s_t, NS, ND>(bcoordinate_data[le], grad_ref, q, adj, det);
+    saint_venant_kirchhoff_d3_simplex_direct_hessian_reference_point_tangent<s_t, NQ, NS>(q, adj, det, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_data[le], T[le][q]);
+  }
+  __syncthreads();
+  const int count = (int)(nelements - first < NE ? nelements - first : NE);
+  sfem::cooperative::pair_blocks_bsr<s_t, v_t, NS, NQ, NC, ND>(count, T, grad_ref, pos, values);
 
 }
 
@@ -1554,15 +1500,15 @@ extern "C" int cu_saint_venant_kirchhoff_tet10_hessian_bsr_i_msoa(
       switch (values_bytes) {
         case (int)sizeof(double): {
             if (nelements <= 0) return SFEM_SUCCESS;
-            const int block_size = 256;
-            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            const int block_size = sfem::cooperative::threads<11>();
+            const int grid_size = (int)((nelements + sfem::cooperative::ELEMENTS - 1) / sfem::cooperative::ELEMENTS);
             sfem::codegen::saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
             return sfem::codegen::launch_status("saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl");
         }
         case (int)sizeof(float): {
             if (nelements <= 0) return SFEM_SUCCESS;
-            const int block_size = 256;
-            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            const int block_size = sfem::cooperative::threads<11>();
+            const int grid_size = (int)((nelements + sfem::cooperative::ELEMENTS - 1) / sfem::cooperative::ELEMENTS);
             sfem::codegen::saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
             return sfem::codegen::launch_status("saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl");
         }
@@ -1575,8 +1521,8 @@ extern "C" int cu_saint_venant_kirchhoff_tet10_hessian_bsr_i_msoa(
       switch (values_bytes) {
         case (int)sizeof(float): {
             if (nelements <= 0) return SFEM_SUCCESS;
-            const int block_size = 256;
-            const int grid_size = (int)((nelements + block_size - 1) / block_size);
+            const int block_size = sfem::cooperative::threads<11>();
+            const int grid_size = (int)((nelements + sfem::cooperative::ELEMENTS - 1) / sfem::cooperative::ELEMENTS);
             sfem::codegen::saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl<float, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
             return sfem::codegen::launch_status("saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl");
         }

@@ -8,6 +8,7 @@
 #endif
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_TangentValues.hpp"
 
@@ -347,5 +348,16 @@ namespace sfem {
         });
     }
     ExecutionSpace BSRTangent::execution_space() const { return impl_->context.space(); }
+
+    void BSRTangent::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        ledger.add(MemoryLedger::TANGENT_VALUES, impl.values);
+        ledger.add(MemoryLedger::TANGENT_VALUES, impl.values32);
+        if (impl.graph) {
+            ledger.add(MemoryLedger::TANGENT_STRUCTURE, impl.graph->rowptr());
+            ledger.add(MemoryLedger::TANGENT_STRUCTURE, impl.graph->colidx());
+        }
+        ledger.add(MemoryLedger::TANGENT_STRUCTURE, impl.split);
+    }
 
 }  // namespace sfem

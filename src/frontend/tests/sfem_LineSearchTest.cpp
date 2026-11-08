@@ -126,6 +126,39 @@ int test_damped_ignores_the_merit() {
     return SFEM_TEST_SUCCESS;
 }
 
+// A merit that rises along a direction its slope says descends, as a residual merit does where a
+// few contacts switch near the tolerance: m(s) = 1 + s/10, m'(0) = -1.
+class Rising final : public sfem::Merit {
+public:
+    const char *name() const override { return "rising"; }
+    int         evaluate(const real_t *const, const real_t *const, const int nsteps, const real_t *const steps, real_t *const out) override {
+        for (int i = 0; i < nsteps; ++i) out[i] = 1 + steps[i] / 10;
+        return SFEM_SUCCESS;
+    }
+    real_t at(const real_t *const, const real_t *const) override { return 1; }
+    real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t) override { return -1; }
+    bool   batched() const override { return true; }
+};
+
+// Nonmonotone (Grippo-Lampariello-Lucidi) only where nothing decreases the merit: a larger earlier
+// merit lets the rising full step through; it does not change a step Armijo's rule finds (a = 0.3:
+// s = 1/2 with or without it).
+int test_nonmonotone_reference() {
+    Rising           rising;
+    sfem::LineSearch ls;
+    auto             r = ls.search(rising, nullptr, nullptr, 1, -1, real_t(1.5));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::NONMONOTONE);
+    SFEM_TEST_ASSERT(r.alpha == real_t(1));
+    SFEM_TEST_ASSERT(ls.search(rising, nullptr, nullptr, 1, -1).status == sfem::LineSearchResult::Status::NO_DECREASE);
+
+    Parabola     m(0.3, true);
+    const real_t m0    = m.at(nullptr, nullptr);
+    const real_t slope = m.slope(nullptr, nullptr, nullptr, 0);
+    auto         p     = ls.search(m, nullptr, nullptr, m0, slope, real_t(0.5));
+    SFEM_TEST_ASSERT(p.status == sfem::LineSearchResult::Status::ACCEPTED && p.alpha == real_t(0.5));
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_disabled_takes_the_full_step() {
     Parabola                m(0.3, true);
     sfem::LineSearchOptions options;
@@ -146,6 +179,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_at_resolution);
     SFEM_RUN_TEST(test_best_decrease);
     SFEM_RUN_TEST(test_disabled_takes_the_full_step);
+    SFEM_RUN_TEST(test_nonmonotone_reference);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

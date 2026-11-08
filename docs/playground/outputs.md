@@ -36,7 +36,7 @@ initial state:
 
 then the probes' columns ([case reference](case-reference.md#output)): `ux, uy, uz` for a
 control point, `angle, released, torque` for a rotation, `reaction_x, reaction_y, reaction_z,
-touched` for contact, Prony history measures; each prefixed with the probe's `name` when it has
+touched` for contact, Prony history measures and bytes, `host_peak_rss, device_used_peak` for memory; each prefixed with the probe's `name` when it has
 one. Failed attempts are reported on the console only.
 
 ## Console

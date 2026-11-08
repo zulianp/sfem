@@ -11,6 +11,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_node_obstacle_kernels.hpp"
 #include "sfem_test.hpp"
 #include "smesh_grid.hpp"
 
@@ -239,6 +240,45 @@ int test_reaction() {
 
 // Nodes whose next position x + dt v would be below the plane land on it; the others, and every
 // tangential velocity, are left alone.
+int test_psd3_removes_the_negative_eigenvalues() {
+    // Q diag(2, -1, 0.5) Q^T, Q a rotation: the projection keeps the eigenvectors and the positive
+    // eigenvalues and sets the negative one to zero.
+    const real_t a = real_t(0.3), b = real_t(-0.7), c = real_t(1.1);
+    const real_t Rx[9] = {1, 0, 0, 0, std::cos(a), -std::sin(a), 0, std::sin(a), std::cos(a)};
+    const real_t Ry[9] = {std::cos(b), 0, std::sin(b), 0, 1, 0, -std::sin(b), 0, std::cos(b)};
+    const real_t Rz[9] = {std::cos(c), -std::sin(c), 0, std::sin(c), std::cos(c), 0, 0, 0, 1};
+    const auto   mul   = [](const real_t *A, const real_t *B, real_t *C) {
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j) C[i * 3 + j] = A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j];
+    };
+    real_t T[9], Q[9];
+    mul(Rx, Ry, T);
+    mul(T, Rz, Q);
+    const auto build = [&](const real_t *lambda, real_t *A) {
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j) {
+                A[i * 3 + j] = 0;
+                for (int k = 0; k < 3; ++k) A[i * 3 + j] += Q[i * 3 + k] * lambda[k] * Q[j * 3 + k];
+            }
+    };
+    const real_t full[3] = {2, -1, real_t(0.5)}, kept[3] = {2, 0, real_t(0.5)};
+    real_t       A[9], expected[9];
+    build(full, A);
+    build(kept, expected);
+    node_obstacle_psd3(A);
+    real_t err = 0;
+    for (int i = 0; i < 9; ++i) err = std::max(err, std::abs(A[i] - expected[i]));
+    printf("  psd3 %.3g\n", (double)err);
+    SFEM_TEST_ASSERT(err < 1e-12);
+    // A positive semidefinite block is left as it is.
+    build(kept, A);
+    node_obstacle_psd3(A);
+    err = 0;
+    for (int i = 0; i < 9; ++i) err = std::max(err, std::abs(A[i] - expected[i]));
+    SFEM_TEST_ASSERT(err < 1e-12);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_project_velocity() {
     auto                f  = make_fixture();
     const real_t        dt = real_t(0.1);
@@ -353,11 +393,12 @@ int test_device_matches_host() {
     device.upper_bound(real_t(1e30), dub->data());
     SFEM_TEST_ASSERT(worst(ub, host_copy(dub->data(), ndofs)) < 1e-12);
 
-    // The curvature into the diagonal blocks of the node graph's BSR values, capped and not.
+    // The curvature into the diagonal blocks of the node graph's BSR values, whole, capped and
+    // without its negative eigenvalues.
     auto graph = fs->node_to_node_graph();
     auto dgraph_rowptr = smesh::to_device(graph->rowptr());
     auto dgraph_colidx = smesh::to_device(graph->colidx());
-    for (const bool capped : {false, true}) {
+    for (const int capped : {NODE_OBSTACLE_CURVATURE_FULL, NODE_OBSTACLE_CURVATURE_CAPPED, NODE_OBSTACLE_CURVATURE_PSD}) {
         std::vector<real_t> values(graph->nnz() * 9, 0);
         auto                dvalues = to_device(values);
         host.add_curvature(
@@ -365,8 +406,10 @@ int test_device_matches_host() {
         device.add_curvature(
                 dx->data(), dr->data(), dk->data(), capped, 1, dgraph_rowptr->data(), dgraph_colidx->data(), smesh::SMESH_DEFAULT, dvalues->data());
         const real_t c = worst(values, host_copy(dvalues->data(), values.size()));
-        printf("  curvature (capped %d) %.3g\n", (int)capped, (double)c);
-        SFEM_TEST_ASSERT(c < 1e-12);
+        printf("  curvature (mode %d) %.3g\n", capped, (double)c);
+        // Projected, each block's zero eigenvalue (along the normal) lands on either side of zero
+        // with the last bits of the eigensolve, and is clamped or kept.
+        SFEM_TEST_ASSERT(c < (capped == NODE_OBSTACLE_CURVATURE_PSD ? 1e-10 : 1e-12));
 #if !SFEM_REAL_T_IS_FLOAT32
         // Into a tangent stored in single precision: the host's double values, rounded.
         auto hsingle = sfem::create_host_buffer<float>(values.size());
@@ -447,6 +490,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_scaled_frames);
     SFEM_RUN_TEST(test_shift_cutoff_release);
     SFEM_RUN_TEST(test_reaction);
+    SFEM_RUN_TEST(test_psd3_removes_the_negative_eigenvalues);
     SFEM_RUN_TEST(test_project_velocity);
     SFEM_RUN_TEST(test_union_of_grids);
 #ifdef SFEM_ENABLE_CUDA

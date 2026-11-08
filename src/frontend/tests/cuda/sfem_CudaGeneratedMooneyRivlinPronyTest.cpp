@@ -25,6 +25,7 @@
 #include "sfem_GeneratedMooneyRivlinProny.hpp"
 #include "sfem_GeneratedMooneyRivlinProny_cuda.hpp"
 #include "sfem_HistoryDependent.hpp"
+#include "sfem_PronyRelaxation.hpp"
 #include "sfem_BLAS_cuda.hpp"
 
 using namespace sfem;
@@ -74,7 +75,11 @@ namespace {
     }
 
     template <class OpType>
-    void configure(OpType &op, const std::shared_ptr<Mesh> &mesh, const HistoryStorage storage) {
+    void configure(OpType                      &op,
+                   const std::shared_ptr<Mesh> &mesh,
+                   const HistoryStorage         storage,
+                   const HistoryStorage         stress  = HistoryStorage::FULL,
+                   const real_t                 horizon = 0) {
         for (const auto &block : mesh->blocks()) {
             op.set_value_in_block(block->name(), "C10", test_C10);
             op.set_value_in_block(block->name(), "C01", test_C01);
@@ -82,10 +87,16 @@ namespace {
         }
         PronyRelaxation::Options options;
         options.history_storage = storage;
+        options.stress_storage    = stress;
+        options.remainder_horizon = horizon;
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
-    int host_vs_device(const HistoryStorage storage, const real_t tolerance, const smesh::ElemType element = smesh::HEX8) {
+    int host_vs_device(const HistoryStorage  storage,
+                       const real_t          tolerance,
+                       const smesh::ElemType element = smesh::HEX8,
+                       const HistoryStorage  stress  = HistoryStorage::FULL,
+                       const real_t          horizon = 0) {
         const int n = 6;
         std::shared_ptr<Mesh> mesh;
         if (element == smesh::HEX8) {
@@ -104,8 +115,8 @@ namespace {
                 create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_DEVICE));
         SFEM_TEST_ASSERT(host_op != nullptr);
         SFEM_TEST_ASSERT(device_op != nullptr);
-        configure(*host_op, mesh, storage);
-        configure(*device_op, mesh, storage);
+        configure(*host_op, mesh, storage, stress, horizon);
+        configure(*device_op, mesh, storage, stress, horizon);
 
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
@@ -150,9 +161,10 @@ namespace {
             const real_t value_error    = std::abs(v_h - v_d) / std::max(std::abs(v_h), real_t(1e-30));
             const real_t gradient_error = relative_difference(g_h, g_d);
             const real_t apply_error    = relative_difference(a_h, a_d);
-            printf("  %-6s %-15s step %d ndof=%td: value %.3e (host %.6g) gradient %.3e apply %.3e\n",
+            printf("  %-6s %-15s%s step %d ndof=%td: value %.3e (host %.6g) gradient %.3e apply %.3e\n",
                    smesh::type_to_string(element),
                    to_string(storage),
+                   horizon > 0 ? " remainder" : "",
                    step,
                    ndofs,
                    (double)value_error,
@@ -187,6 +199,43 @@ int test_device_matches_host_float16_storage() {
     return host_vs_device(HistoryStorage::FLOAT16_SCALED, real_t(1e-5));
 }
 
+// Mean-deviation storage: the means are summed in the host's order, so the codes differ only
+// where a rounding tie falls differently; one int8 code is 1/127 of an element's largest
+// deviation, one float16 code 2^-11 of it. TET4 takes its mean over runs of elements.
+int test_device_matches_host_int8_md_storage() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT8_MD, real_t(5e-3), element) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// float32 stress slots on both sides: the same rounding of the same stress.
+int test_device_matches_host_float32_stress_slots() {
+    return host_vs_device(HistoryStorage::FULL, real_t(1e-10), smesh::HEX8, HistoryStorage::FLOAT32);
+}
+
+int test_device_matches_host_float16_md_storage() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::FLOAT16_MD, real_t(1e-4), element) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// The remainder form (tau = 10 beyond the horizon 5, tau = 1 within it), with real_t and float32
+// stress slots and so R in each: the same arithmetic on both sides, within the codecs' ties.
+int test_device_matches_host_remainder_form() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT16_SCALED, real_t(1e-6), element, HistoryStorage::FULL, 5) != SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::FLOAT16_MD, real_t(1e-4), element, HistoryStorage::FLOAT32, 5) != SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // Any generated energy material on HEX8 goes through the same HEX8 -> PROTEUS_HEX8 forwarding
 // as this one, so the existing modified Mooney-Rivlin is checked on the device too: its gradient
 // against the host's.  If this fails as well, a failure above is the forwarding's, not Prony's.
@@ -214,14 +263,98 @@ int test_existing_hex8_material_runs_on_the_device() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The Prony probe's per-term sums of |H_i|^2, reduced on the device, against the host's sums of
+// the decoded tensors: every format, plain and remainder, a term held as a coefficient, real_t
+// and float32 stress slots, one point per element (the means over packs) and four, over several
+// thread blocks.
+template <typename S_t>
+int device_squared_norms_match(const int n_qp) {
+    const PronySeries    fast({real_t(0.3), real_t(0.25), real_t(0.15)}, {real_t(1e-3), real_t(1), real_t(10)});
+    const HistoryStorage formats[] = {HistoryStorage::FULL,
+                                      HistoryStorage::FLOAT32,
+                                      HistoryStorage::FLOAT16_SCALED,
+                                      HistoryStorage::INT16_SCALED,
+                                      HistoryStorage::INT8_SCALED,
+                                      HistoryStorage::FLOAT16_MD,
+                                      HistoryStorage::INT8_MD};
+    const int            n_components = 6, n_diagonal = 3;
+    const ptrdiff_t      n_elements = 3001;
+    const ptrdiff_t      n          = n_components * n_qp * n_elements;
+    const real_t         prestress  = 2, t_ramp = 20;
+    std::vector<real_t>  a(n);
+    fill_pseudo_random(n, real_t(2), a.data(), 0x2545f4914f6cdd1dull);
+    auto stress = [&](const real_t t) {
+        auto S = create_host_buffer<S_t>(n);
+        for (ptrdiff_t k = 0; k < n; k++) S->data()[k] = static_cast<S_t>(a[k] * (prestress + std::min(t / t_ramp, real_t(1))));
+        return S;
+    };
+
+    for (const auto format : formats) {
+        for (int r = 0; r < 2; r++) {
+            PronyRelaxation::Options options;
+            options.history_storage   = format;
+            options.stress_storage    = sizeof(S_t) == sizeof(float) ? HistoryStorage::FLOAT32 : HistoryStorage::FULL;
+            options.remainder_horizon = r ? real_t(5) : real_t(0);
+            options.execution_space   = EXECUTION_SPACE_DEVICE;
+            PronyRelaxation relaxation(fast, n_components, n_qp, n_elements, options);
+            std::shared_ptr<Buffer<S_t>> S_prev, S_n;
+            for (int step = 1; step <= 5; step++) {
+                S_n      = smesh::to_device(stress(step - 1));
+                auto S_d = smesh::to_device(stress(step));
+                relaxation.begin_step(step, 1, S_n->data(), S_prev ? S_prev->data() : nullptr);
+                relaxation.advance(S_n->data(), S_d->data());
+                S_prev = S_n;
+                S_n    = S_d;
+            }
+            SFEM_TEST_ASSERT(relaxation.n_stored_terms() == 2 && relaxation.remainder(2) == (r == 1 && format != HistoryStorage::FULL));
+
+            real_t sums[3];
+            relaxation.squared_norms(S_n->data(), S_prev->data(), n_diagonal, sums);
+            const auto          Sn_h = smesh::to_host(S_n), Sp_h = smesh::to_host(S_prev);
+            std::vector<real_t> Sn(Sn_h->data(), Sn_h->data() + n), Sp(Sp_h->data(), Sp_h->data() + n), H(n);
+            for (int i = 0; i < fast.n_terms(); i++) {
+                relaxation.decode_history(i, H.data(), Sn.data(), Sp.data());
+                real_t expected = 0;
+                for (ptrdiff_t k = 0; k < n; k++) expected += (k / (n_qp * n_elements) < n_diagonal ? 1 : 2) * H[k] * H[k];
+                if (!(expected > 0 && std::abs(sums[i] - expected) <= real_t(1e-12) * expected)) {
+                    printf("  %s%s n_qp %d term %d: device %.17g, decoded %.17g\n",
+                           to_string(format),
+                           r ? " remainder" : "",
+                           n_qp,
+                           i,
+                           (double)sums[i],
+                           (double)expected);
+                    return SFEM_TEST_FAILURE;
+                }
+            }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_device_squared_norms_match_the_decoded_history() {
+    for (const int n_qp : {1, 4}) {
+        if (device_squared_norms_match<real_t>(n_qp) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+#if SFEM_REAL_T_IS_FLOAT64
+        if (device_squared_norms_match<float>(n_qp) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+#endif
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_existing_hex8_material_runs_on_the_device);
     SFEM_RUN_TEST(test_device_matches_host_full_storage);
     SFEM_RUN_TEST(test_device_matches_host_int16_storage);
     SFEM_RUN_TEST(test_device_matches_host_float16_storage);
+    SFEM_RUN_TEST(test_device_matches_host_int8_md_storage);
+    SFEM_RUN_TEST(test_device_matches_host_float16_md_storage);
+    SFEM_RUN_TEST(test_device_matches_host_float32_stress_slots);
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
+    SFEM_RUN_TEST(test_device_matches_host_remainder_form);
+    SFEM_RUN_TEST(test_device_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

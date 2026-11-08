@@ -8,6 +8,7 @@
 #include "sfem_base.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     /// What a step says about an iterate: the stationarity `value` the tolerance applies to, its
     /// scale `reference`, and whether the iterate is `admissible` (a constraint met to its own
@@ -52,8 +53,22 @@ namespace sfem {
         /// Once per step, after its solution is accepted.
         virtual int end_step(const real_t *const) { return SFEM_SUCCESS; }
 
+        /// Whether `set_tangent_projection` can make the linearisation positive semidefinite.
+        virtual bool tangent_projection_supported() const { return false; }
+
+        /// The linearisations that follow on the tangent projected to positive semidefinite per
+        /// quadrature point (Function::set_tangent_projection), or on the tangent itself.
+        virtual void set_tangent_projection(const bool /*on*/) {}
+
+        /// What it keeps between steps: its tangent and its solver's vectors (MemoryLedger).
+        virtual void account(MemoryLedger & /*ledger*/) const {}
+
         /// Inner iterations of the last `solve`.
         virtual int iterations() const = 0;
+
+        /// Whether the last `solve` stopped on a direction of non-positive curvature: the
+        /// linearisation is indefinite at the iterate.
+        virtual bool met_negative_curvature() const { return false; }
 
         /// Whether a converged solve of a linear function lands on its solution: true when the
         /// linearisation is the function's own, false for a constraint the step linearises (an

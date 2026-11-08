@@ -582,6 +582,9 @@ ABI_VERBS = (
     "merit",
     "jacobian_action",
     "matrix_assembly",
+    # The BSR assembly on the tangent projected to positive semidefinite: a
+    # kernel of its own beside the exact one (`MatrixFormatPlan.tangent_projection`).
+    "hessian_bsr_psd",
     "hessian_bsr",
     "hessian_crs",
     "objective",

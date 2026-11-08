@@ -59,11 +59,12 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "mooney_rivlin_prony",
     systems,
-    elements=gen.sfem_default_element_types(),
+    elements=gen.sfem_default_element_types() + ("HEX27",),
     # The history lives at one rule's points, and TET10's affine and
     # isoparametric routes integrate with different rules: pinned to the
-    # isoparametric one, the more accurate.
-    quadrature_settings=(("TET10", 4),),
+    # isoparametric one, the more accurate.  HEX27 and its semi-structured
+    # form likewise (64 points, not 27).
+    quadrature_settings=(("TET10", 4), ("HEX27", 4), ("PROTEUS_HEX27", 4)),
     op_name="GeneratedMooneyRivlinProny",
     parameter_defaults=(
         ("C01", 0.0),
@@ -74,6 +75,10 @@ material = gen.CodeGenerator(
     # The stored tangent reads the relaxation's step weight and its history at the same points
     # the history lives at, which are the rule's.
     inexact_apply=True,
+    # Newton can retry an iteration on the tangent projected to positive semidefinite per
+    # quadrature point (solver.newton.tangent_projection): the rubber's tangent is indefinite
+    # where elements are strongly compressed, as after the torsion bar's release.
+    tangent_projection=True,
 )
 
 

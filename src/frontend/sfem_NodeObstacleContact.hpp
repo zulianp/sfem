@@ -12,6 +12,7 @@
 #include "smesh_grid.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     // Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
     // (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
@@ -60,6 +61,9 @@ namespace sfem {
         const SharedBuffer<real_t> &gap() const { return gap_; }
         ExecutionSpace              execution_space() const { return context_.space(); }
 
+        /// Its nodes' state (CONTACT) and its obstacle's (Obstacle::account).
+        void account(MemoryLedger &ledger) const;
+
         // Samples the gap, the normals and the frames with the nodes displaced by x.
         void update(const real_t *const x);
 
@@ -90,6 +94,8 @@ namespace sfem {
         // The step's upper bound in the frames: the gap on each contact node's normal component,
         // `unbounded` everywhere else.
         void upper_bound(const real_t unbounded, real_t *const ub) const;
+        /// node_obstacle_scaling at the contact nodes: the diagonal in `inverse_scale` on entry.
+        void scaling(const real_t *const ub, real_t *const inverse_scale, real_t *const scale, real_t *const scaled_bound) const;
 
         // First-order optimality of the step. At the solution the residual r is the obstacle's
         // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),
@@ -114,13 +120,15 @@ namespace sfem {
         // in kkt_residual. Adds each node's 3x3 block to the diagonal block of the BSR tangent.
         //
         // Away from the solution that estimate can be large, and on a convex obstacle the term is
-        // negative across it, enough to make the tangent indefinite. With `capped`, each node's
-        // share is scaled so that its most negative part (bounded by row sums) stays within half
-        // of the node's inertia stiffness k_i = c0 m_i. `sign` -1 takes back an earlier call.
+        // negative across it, enough to make the tangent indefinite. `curvature`
+        // (NodeObstacleCurvature) takes the whole term; or each node's share scaled so that its
+        // most negative part (bounded by row sums) stays within half of the node's inertia
+        // stiffness k_i = c0 m_i; or each node's share without its negative eigenvalues. `sign` -1
+        // takes back an earlier call.
         void add_curvature(const real_t *const  x,
                            const real_t *const  r,
                            const real_t *const  k,
-                           const bool           capped,
+                           const int            curvature,
                            const real_t         sign,
                            const count_t *const       rowptr,
                            const idx_t *const         colidx,
@@ -131,7 +139,7 @@ namespace sfem {
         // (node_obstacle_curvature_blocks, 6 * size() entries, overwritten), for a tangent that
         // applies it on its own; apply_blocks adds B_i in_i to out_i at each contact node,
         // blocks_diagonal their diagonals to d.
-        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped, real_t *const blocks);
+        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature, real_t *const blocks);
         void apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const;
         // The same at the contact nodes of the calling thread's rows (a region's Team, the host).
         void apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const;

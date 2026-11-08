@@ -63,6 +63,7 @@ namespace sfem {
         real_t        weight(const char *name) const override;
         void          begin_step(real_t t, real_t dt) override;
         void          advance(const real_t *const x) override;
+        void          account(MemoryLedger &ledger) const override;
 
         std::shared_ptr<Op> inertia_op() const override;
 
