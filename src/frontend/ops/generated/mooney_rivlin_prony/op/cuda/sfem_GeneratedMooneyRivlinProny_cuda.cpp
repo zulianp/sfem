@@ -251,6 +251,18 @@ namespace sfem {
     struct AffineGeometryCache {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
+
+      //! The bytes of the layouts it built.
+      std::size_t bytes() const {
+        std::size_t total = 0;
+        if (jacobian_soa) {
+          total += jacobian_soa->jacobian_adjugate_SoA()->nbytes() + jacobian_soa->jacobian_determinant()->nbytes();
+        }
+        if (jacobian_aos) {
+          total += jacobian_aos->jacobian_adjugate_AoS()->nbytes() + jacobian_aos->jacobian_determinant()->nbytes();
+        }
+        return total;
+      }
         };
 
     //! Whether this element leaves the operator no choice of geometry.
@@ -1342,6 +1354,7 @@ namespace sfem {
       const real_t *const quadrature[1] = {impl_->relaxation->history(domain.block->name(), "iso_history")};
       input.quadrature = quadrature;
       input.quadrature_stride = domain.block->n_elements();
+      input.project = impl_->project_tangent;
       store->update(input);
       return SFEM_SUCCESS;
     });
@@ -1375,5 +1388,13 @@ namespace sfem {
   }
 
   void GPUGeneratedMooneyRivlinProny::set_tangent_projection(const bool on) { impl_->project_tangent = on; }
+
+  std::size_t GPUGeneratedMooneyRivlinProny::geometry_bytes() const {
+    std::size_t bytes = 0;
+    for (const auto &entry : impl_->domains->domains()) {
+      if (auto cache = std::static_pointer_cast<AffineGeometryCache>(entry.second.user_data)) bytes += cache->bytes();
+    }
+    return bytes;
+  }
 
 }  // namespace sfem

@@ -632,6 +632,51 @@ int test_remainder_follows_the_shift_across_the_horizon() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_squared_norms_match_the_decoded_history() {
+    // squared_norms sums |H_i|^2 where the store lives, off-diagonals twice:
+    // the same as summing decode_history's tensors, for a term held as a
+    // coefficient, plain stored terms and a remainder, in every format.
+    const sfem::PronySeries    fast({real_t(0.3), real_t(0.25), real_t(0.15)}, {real_t(1e-3), real_t(1), real_t(10)});
+    const sfem::HistoryStorage formats[] = {sfem::HistoryStorage::FULL,
+                                            sfem::HistoryStorage::FLOAT32,
+                                            sfem::HistoryStorage::FLOAT16_SCALED,
+                                            sfem::HistoryStorage::INT16_SCALED,
+                                            sfem::HistoryStorage::INT8_SCALED,
+                                            sfem::HistoryStorage::FLOAT16_MD,
+                                            sfem::HistoryStorage::INT8_MD};
+    const int                  n_diagonal = 3;
+    const real_t               prestress  = 2;
+    std::vector<real_t>        grid{0};
+    while (grid.back() < 5) grid.push_back(grid.back() + 1);
+    const auto S_n = stress_at(grid.back(), 20, prestress), S_prev = stress_at(grid[grid.size() - 2], 20, prestress);
+
+    for (const auto format : formats) {
+        for (int r = 0; r < 2; r++) {
+            sfem::PronyRelaxation::Options options;
+            options.history_storage   = format;
+            options.remainder_horizon = r ? real_t(5) : real_t(0);
+            sfem::PronyRelaxation relaxation(fast, N_COMPONENTS, N_QP, N_ELEMENTS, options);
+            drive(relaxation, grid, 20, prestress);
+            SFEM_TEST_ASSERT(relaxation.n_stored_terms() == 2 && relaxation.remainder(2) == (r == 1 && format != sfem::HistoryStorage::FULL));
+
+            real_t sums[3];
+            relaxation.squared_norms(S_n.data(), S_prev.data(), n_diagonal, sums);
+            std::vector<real_t> H(N_ENTRIES);
+            for (int i = 0; i < fast.n_terms(); i++) {
+                relaxation.decode_history(i, H.data(), S_n.data(), S_prev.data());
+                real_t expected = 0;
+                for (ptrdiff_t k = 0; k < N_ENTRIES; k++) {
+                    const int comp = static_cast<int>(k / (N_QP * N_ELEMENTS));
+                    expected += (comp < n_diagonal ? 1 : 2) * H[k] * H[k];
+                }
+                SFEM_TEST_ASSERT(expected > 0);
+                SFEM_TEST_ASSERT(std::abs(sums[i] - expected) <= real_t(1e-12) * expected);
+            }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_instantaneous_response_before_any_step);
@@ -653,6 +698,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_remainder_resolves_slow_terms_finer);
     SFEM_RUN_TEST(test_remainder_decodes_to_the_history);
     SFEM_RUN_TEST(test_remainder_follows_the_shift_across_the_horizon);
+    SFEM_RUN_TEST(test_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

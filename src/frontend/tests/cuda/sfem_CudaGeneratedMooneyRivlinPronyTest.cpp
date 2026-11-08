@@ -25,6 +25,7 @@
 #include "sfem_GeneratedMooneyRivlinProny.hpp"
 #include "sfem_GeneratedMooneyRivlinProny_cuda.hpp"
 #include "sfem_HistoryDependent.hpp"
+#include "sfem_PronyRelaxation.hpp"
 #include "sfem_BLAS_cuda.hpp"
 
 using namespace sfem;
@@ -262,6 +263,85 @@ int test_existing_hex8_material_runs_on_the_device() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The Prony probe's per-term sums of |H_i|^2, reduced on the device, against the host's sums of
+// the decoded tensors: every format, plain and remainder, a term held as a coefficient, real_t
+// and float32 stress slots, one point per element (the means over packs) and four, over several
+// thread blocks.
+template <typename S_t>
+int device_squared_norms_match(const int n_qp) {
+    const PronySeries    fast({real_t(0.3), real_t(0.25), real_t(0.15)}, {real_t(1e-3), real_t(1), real_t(10)});
+    const HistoryStorage formats[] = {HistoryStorage::FULL,
+                                      HistoryStorage::FLOAT32,
+                                      HistoryStorage::FLOAT16_SCALED,
+                                      HistoryStorage::INT16_SCALED,
+                                      HistoryStorage::INT8_SCALED,
+                                      HistoryStorage::FLOAT16_MD,
+                                      HistoryStorage::INT8_MD};
+    const int            n_components = 6, n_diagonal = 3;
+    const ptrdiff_t      n_elements = 3001;
+    const ptrdiff_t      n          = n_components * n_qp * n_elements;
+    const real_t         prestress  = 2, t_ramp = 20;
+    std::vector<real_t>  a(n);
+    fill_pseudo_random(n, real_t(2), a.data(), 0x2545f4914f6cdd1dull);
+    auto stress = [&](const real_t t) {
+        auto S = create_host_buffer<S_t>(n);
+        for (ptrdiff_t k = 0; k < n; k++) S->data()[k] = static_cast<S_t>(a[k] * (prestress + std::min(t / t_ramp, real_t(1))));
+        return S;
+    };
+
+    for (const auto format : formats) {
+        for (int r = 0; r < 2; r++) {
+            PronyRelaxation::Options options;
+            options.history_storage   = format;
+            options.stress_storage    = sizeof(S_t) == sizeof(float) ? HistoryStorage::FLOAT32 : HistoryStorage::FULL;
+            options.remainder_horizon = r ? real_t(5) : real_t(0);
+            options.execution_space   = EXECUTION_SPACE_DEVICE;
+            PronyRelaxation relaxation(fast, n_components, n_qp, n_elements, options);
+            std::shared_ptr<Buffer<S_t>> S_prev, S_n;
+            for (int step = 1; step <= 5; step++) {
+                S_n      = smesh::to_device(stress(step - 1));
+                auto S_d = smesh::to_device(stress(step));
+                relaxation.begin_step(step, 1, S_n->data(), S_prev ? S_prev->data() : nullptr);
+                relaxation.advance(S_n->data(), S_d->data());
+                S_prev = S_n;
+                S_n    = S_d;
+            }
+            SFEM_TEST_ASSERT(relaxation.n_stored_terms() == 2 && relaxation.remainder(2) == (r == 1 && format != HistoryStorage::FULL));
+
+            real_t sums[3];
+            relaxation.squared_norms(S_n->data(), S_prev->data(), n_diagonal, sums);
+            const auto          Sn_h = smesh::to_host(S_n), Sp_h = smesh::to_host(S_prev);
+            std::vector<real_t> Sn(Sn_h->data(), Sn_h->data() + n), Sp(Sp_h->data(), Sp_h->data() + n), H(n);
+            for (int i = 0; i < fast.n_terms(); i++) {
+                relaxation.decode_history(i, H.data(), Sn.data(), Sp.data());
+                real_t expected = 0;
+                for (ptrdiff_t k = 0; k < n; k++) expected += (k / (n_qp * n_elements) < n_diagonal ? 1 : 2) * H[k] * H[k];
+                if (!(expected > 0 && std::abs(sums[i] - expected) <= real_t(1e-12) * expected)) {
+                    printf("  %s%s n_qp %d term %d: device %.17g, decoded %.17g\n",
+                           to_string(format),
+                           r ? " remainder" : "",
+                           n_qp,
+                           i,
+                           (double)sums[i],
+                           (double)expected);
+                    return SFEM_TEST_FAILURE;
+                }
+            }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_device_squared_norms_match_the_decoded_history() {
+    for (const int n_qp : {1, 4}) {
+        if (device_squared_norms_match<real_t>(n_qp) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+#if SFEM_REAL_T_IS_FLOAT64
+        if (device_squared_norms_match<float>(n_qp) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+#endif
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_existing_hex8_material_runs_on_the_device);
@@ -274,6 +354,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_RUN_TEST(test_device_matches_host_remainder_form);
+    SFEM_RUN_TEST(test_device_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

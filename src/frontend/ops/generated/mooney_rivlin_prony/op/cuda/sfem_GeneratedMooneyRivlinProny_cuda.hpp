@@ -62,6 +62,7 @@ namespace sfem {
     int inexact_diag(real_t *const diag) override;
     bool tangent_projection_supported() const override;
     void set_tangent_projection(const bool on) override;
+    std::size_t geometry_bytes() const override;
     void begin_step(const real_t t, const real_t dt) override;
     void advance(const real_t *const x) override;
     void reset_history(const real_t *const x) override;

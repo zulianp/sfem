@@ -54,6 +54,13 @@ namespace sfem {
         bool negative_curvature_{false};
         bool met_negative_curvature() const { return negative_curvature_; }
 
+        /// Bytes of the workspace kept between solves (4 vectors, the passes' work, the control
+        /// block), in the BLAS's memory space; 0 before the first solve.
+        std::size_t workspace_bytes() const {
+            if (workspace_n_ < 0) return 0;
+            return std::size_t(4 * workspace_n_ + std::max<ptrdiff_t>(workspace_work_, 0) + mprgp_control_size<T>()) * sizeof(T);
+        }
+
         SharedBuffer<T> upper_bound_;
         SharedBuffer<T> lower_bound_;
         // Convergence on the projected gradient weighted entry by entry, |w g_P| (and rtol relative
@@ -515,7 +522,11 @@ namespace sfem {
             r.product  = apply_op;
             r.reduce   = device_reduce_;
             r.stream                 = this->blas->context().stream();
-            const MPRGPRunResult run = impl.cg_run(r, iterations_, run_state_);
+            MPRGPRunResult run;
+            {
+                SFEM_TRACE_SCOPE("MPRGP::cg_run");  // the run's launch and its wait
+                run = impl.cg_run(r, iterations_, run_state_);
+            }
             if (!run.ran) return false;
             SFEM_TRACE_SCOPE("MPRGP::device_run");  // counts the runs taken on the device
 
@@ -539,6 +550,7 @@ namespace sfem {
         void set_max_eig(const T max_eig) { max_eig_ = max_eig; }
 
         int apply(const T* const b, T* const x) override {
+            SFEM_TRACE_SCOPE("MPRGP::apply");
             assert(good());
             if (!good()) {
                 fprintf(stderr, "[Error] MPRGP needs to be properly initialized!\n");
@@ -638,11 +650,13 @@ namespace sfem {
                         grads = gradients(c);
                         count_cg_steps++;
                     } else {
+                        SFEM_TRACE_SCOPE("MPRGP::expansion_step");
                         // apply_op inside!
                         grads = this->expansion_step(c, b, p, Ap_or_Ag, g, x, work);
                         count_expansion_steps++;
                     }
                 } else {
+                    SFEM_TRACE_SCOPE("MPRGP::proportioning_step");
                     // apply_op inside!
                     if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
                         fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");

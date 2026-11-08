@@ -103,6 +103,10 @@ namespace sfem {
         /// `values` (laid out [c][q][e]) from the stress slots.
         void decode_history(const std::string &block, const std::string &group, const int i, real_t *const values) const;
 
+        /// Per term of `group` on `block`, PronyRelaxation::squared_norms from the stress slots,
+        /// where they live: n_terms values into the host array `out`.
+        void squared_norms(const std::string &block, const std::string &group, const int n_diagonal, real_t *const out) const;
+
         /// The blocks registered, in name order.
         std::vector<std::string> block_names() const;
         PronyRelaxation       &relaxation(const std::string &block, const std::string &group);

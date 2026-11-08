@@ -682,6 +682,17 @@ class TargetPlatform:
             % (indent, implementation_name, template_args, ", ".join(arguments)),
         )
 
+    def cooperative_mesh_function_line(self, implementation_name, n_qp):
+        """How a kernel run a block of threads per `sfem::cooperative::ELEMENTS` elements, a thread
+        per element and point, is declared; only a device runs one."""
+        raise NotImplementedError("%s has no cooperative mesh kernels" % type(self).__name__)
+
+    def cooperative_mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements", n_qp=None
+    ):
+        """The launch of a `cooperative_mesh_function_line` kernel."""
+        raise NotImplementedError("%s has no cooperative mesh kernels" % type(self).__name__)
+
     def scatter_add_lines(self, lhs, rhs, indent, pragma_indent=None):
         """One accumulation into a node several elements may share.
 
@@ -1133,6 +1144,27 @@ class CUDATarget(TargetPlatform):
 
     def mesh_function_line(self, implementation_name):
         return "__global__ void %s(" % implementation_name
+
+    def cooperative_mesh_function_line(self, implementation_name, n_qp):
+        #: Its registers bounded for `MIN_BLOCKS` resident blocks: unbounded, the point's tangent
+        #: took 255 and two blocks fit (TET10, 10.9 ms); bounded for three, 9.2 ms; for six, 12.9.
+        return (
+            "__global__ void __launch_bounds__(sfem::cooperative::threads<%d>(), sfem::cooperative::MIN_BLOCKS) %s("
+            % (n_qp, implementation_name)
+        )
+
+    def cooperative_mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements", n_qp=None
+    ):
+        return (
+            "%sif (%s <= 0) return SFEM_SUCCESS;" % (indent, extent),
+            "%sconst int block_size = sfem::cooperative::threads<%d>();" % (indent, n_qp),
+            "%sconst int grid_size = (int)((%s + sfem::cooperative::ELEMENTS - 1) / sfem::cooperative::ELEMENTS);"
+            % (indent, extent),
+            "%ssfem::codegen::%s<%s><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(%s);"
+            % (indent, implementation_name, template_args, ", ".join(arguments)),
+            '%sreturn sfem::codegen::launch_status("%s");' % (indent, implementation_name),
+        )
 
     def success_return_lines(self, indent="  "):
         """Nothing: a `__global__` kernel returns void."""
