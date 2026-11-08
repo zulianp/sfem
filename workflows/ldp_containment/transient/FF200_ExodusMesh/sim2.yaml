@@ -65,7 +65,10 @@ dynamics: {scheme: bdf2, density: 1150, mass: lumped}
 time: {dt: 1e-4, t_end: 0.18, max_cutbacks: 8}
 # The step's forces to 1e-6 N, 8e-8 of the outlet's load on the pressure valve (12.4 N). The
 # tangent stored in float32: the QP 15-19% faster, the strokes the same to rounding (FF200, 16 ms).
-solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false}, linear: {storage_bytes: 4}}
+# An impact compresses TET10 elements until the material's tangent is indefinite: where the QP meets
+# negative curvature, Newton repeats the iteration on the tangent projected per quadrature point.
+solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false, tangent_projection: on_failure},
+         linear: {storage_bytes: 4}}
 output:
   # Every step, to follow the material's relaxation within a stroke: the displacement only (the
   # movie's), the contact and the rates in the history's probes.
@@ -75,6 +78,7 @@ output:
   probes:
     - {type: contact}
     - {type: prony}
+    - {type: memory}
     - {type: control_point, name: pv_centre, at: [-0.011, -0.0008, 0]}
     - {type: control_point, name: pv_end0, at: [-0.0159, -0.0008, 0]}
     - {type: control_point, name: pv_end1, at: [-0.0061, -0.0008, 0]}

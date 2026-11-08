@@ -21,7 +21,8 @@ namespace sfem {
         real_t dt{1};
         /// Steps of length dt from t0; step k ends at t0 + k dt.
         int steps{1};
-        /// How often a failed step is retried with half its length.
+        /// How often a failed step is retried with half its length. The rest of its interval follows
+        /// in steps of at most that length, so the run reaches t0 + k dt as it would have.
         int max_cutbacks{0};
         /// After a shortened step each step is at most this many times the last one's length, up
         /// to dt: a multistep scheme stays stable only for a bounded ratio (BDF2, 1 + sqrt(2)).
@@ -64,7 +65,8 @@ namespace sfem {
     ///   4. the solution is committed: the solver, the histories, the scheme;
     ///
     /// with the observers around it. A failed step is solved again from the last state, then with
-    /// half its length up to `max_cutbacks` times.
+    /// half its length up to `max_cutbacks` times; the rest of its interval follows in steps of at
+    /// most that length, ending at t0 + k dt.
     class Stepper {
     public:
         Stepper(const std::shared_ptr<Function>        &f,

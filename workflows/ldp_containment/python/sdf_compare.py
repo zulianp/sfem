@@ -48,20 +48,33 @@ class Grid:
         self.name = location
 
     def sample(self, p):
-        """Trilinear values at points p (3, n); NaN outside the grid."""
+        """Values at points p (3, n) of the interpolating cubic B-spline the solver samples
+        (sresample's bspline_coefficients and sdf_sample): each line extended by 12 samples of
+        point reflection through its end, so planes stay exact, then prefiltered with mirror
+        ends; NaN outside the grid."""
+        from scipy import ndimage
+
+        if not hasattr(self, "c"):
+            v = np.pad(self.v.astype(np.float64), self.PAD, mode="reflect", reflect_type="odd")
+            self.c = ndimage.spline_filter(v, order=3, mode="mirror")
         t = (p.T - self.o) / self.h
         inside = np.all((t >= 0) & (t <= self.n - 1), axis=1)
-        i = np.clip(np.floor(t).astype(np.int64), 0, self.n - 2)
-        f = t - i
-        out = np.zeros(p.shape[1])
-        for dz in (0, 1):
-            for dy in (0, 1):
-                for dx in (0, 1):
-                    w = ((f[:, 0] if dx else 1 - f[:, 0]) * (f[:, 1] if dy else 1 - f[:, 1]) *
-                         (f[:, 2] if dz else 1 - f[:, 2]))
-                    out += w * self.v[i[:, 2] + dz, i[:, 1] + dy, i[:, 0] + dx]
-        out[~inside] = np.nan
+        out = np.full(p.shape[1], np.nan)
+        zyx = t[inside][:, ::-1].T + self.PAD
+        out[inside] = ndimage.map_coordinates(self.c, zyx, order=3, mode="mirror", prefilter=False)
         return out
+
+    def gradient(self, p):
+        """The spline's gradient at points p (3, n), by central differences of 1e-3 of a cell
+        (3, n); NaN outside the grid."""
+        g = np.empty(p.shape)
+        for a in range(3):
+            e = np.zeros((3, 1))
+            e[a] = 1e-3 * self.h[a]
+            g[a] = (self.sample(p + e) - self.sample(p - e)) / (2 * e[a])
+        return g
+
+    PAD = 12
 
 
 def load_mesh(folder, blocks):

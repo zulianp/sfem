@@ -9,6 +9,7 @@
 #include "smesh_types.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     class Function;
 
@@ -59,6 +60,9 @@ namespace sfem {
         void                *values();
         smesh::PrimitiveType values_type() const;
         ExecutionSpace       execution_space() const;
+
+        /// Its values (TANGENT_VALUES), and the graph and row splits it reads (TANGENT_STRUCTURE).
+        void account(MemoryLedger &ledger) const;
 
     private:
         BSRTangent();

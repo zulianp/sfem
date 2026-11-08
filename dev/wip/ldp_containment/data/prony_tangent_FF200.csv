@@ -1,0 +1,2 @@
+elements,nodes,dofs,nnz_blocks,tangent_f32_bytes,tangent_f64_bytes,mesh_bytes,vector_bytes
+242336,50175,150525,672769,27111464,51331148,4479476,1204200

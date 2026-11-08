@@ -1,5 +1,6 @@
 #include "sfem_SDFObstacle.hpp"
 
+#include "sfem_MemoryLedger.hpp"
 #include "sresample_bspline.hpp"
 #include "sresample_node_sample.hpp"
 #include "sresample_surface_sample.hpp"
@@ -222,6 +223,14 @@ namespace sfem {
         obs->impl_->spline          = spline;
         obs->impl_->context         = context;
         return obs;
+    }
+
+    void SDFObstacle::account(MemoryLedger &ledger) const {
+        if (impl_->spline) {
+            ledger.add(MemoryLedger::OBSTACLE_GRID, impl_->spline->coefficients);
+            ledger.add(MemoryLedger::OBSTACLE_GRID, impl_->spline->stride);
+        }
+        ledger.add(MemoryLedger::OBSTACLE_GRID, impl_->workspace);
     }
 
     SDFObstacle::SDFObstacle() : impl_(std::make_unique<Impl>()) {}

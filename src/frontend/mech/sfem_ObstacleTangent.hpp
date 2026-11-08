@@ -11,6 +11,7 @@
 #include "sfem_defs.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     class Function;
     class NodeObstacleContact;
@@ -42,8 +43,9 @@ namespace sfem {
         /// The material's tangent at x, without curvature or shift.
         virtual int assemble(const real_t *const x) = 0;
         /// The obstacle's curvature at x for the reactions of r (NodeObstacleContact::add_curvature),
-        /// in place of any the tangent carries.
-        virtual int set_curvature(const real_t *const x, const real_t *const r, const real_t *const k, const bool capped) = 0;
+        /// as much of it as `curvature` takes (NodeObstacleCurvature), in place of any the tangent
+        /// carries.
+        virtual int set_curvature(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature) = 0;
         /// K_dd += factor |reference_d|, cumulative until the next assemble; `reference` is the
         /// same at every call between two assembles.
         virtual int shift_diagonal(const real_t factor, const real_t *const reference) = 0;
@@ -58,6 +60,10 @@ namespace sfem {
         virtual std::shared_ptr<TeamOperator<real_t>> team() const { return nullptr; }
         /// Whether team() is there once assembled: the product runs on a region's threads.
         virtual bool team_capable() const { return false; }
+
+        /// What it keeps between steps: its numbers (TANGENT_VALUES), their index arrays
+        /// (TANGENT_STRUCTURE) and the vectors only this format needs (TANGENT_WORK).
+        virtual void account(MemoryLedger &ledger) const = 0;
     };
 
 }  // namespace sfem

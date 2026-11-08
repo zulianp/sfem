@@ -9,8 +9,8 @@
 # nu 0.4): mu_inf = 2 g_inf (C10 + C01) = 3.276 MPa; K = E / (3 (1 - 2 nu)), not relaxed. Its
 # effective shear modulus is 4.74 MPa over a stroke (45 ms) and 6.34 MPa over a 1e-4 s step, so
 # the strokes relax it; the terms shorter than about 1e-6 s are relaxed within any step. The
-# repository's workflows/prony_torsion/cases/epdm_torsion_newmark.yaml uses the same series
-# unscaled.
+# repository's workflows/prony_torsion/cases/epdm_torsion_release.yaml uses the same material
+# on a bar in torsion.
 #
 # The SDF grid (db/sdf_stops: mesh_to_sdf with SSDF_MARGIN 1.6e-3, the rest as prepare.sh)
 # reaches y from -3.27 to +1.55 mm: the pressure valve's cage (ribs from y = 0.70 mm, cover at

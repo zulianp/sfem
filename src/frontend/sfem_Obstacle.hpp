@@ -7,6 +7,7 @@
 #include "smesh_elem_type.hpp"
 
 namespace sfem {
+    class MemoryLedger;
 
     // The gap an obstacle reports where it cannot be sampled (outside its grid): large, so the
     // contact constraint there stays inactive. sresample's sdf::unreachable.
@@ -17,6 +18,9 @@ namespace sfem {
     class Obstacle {
     public:
         virtual ~Obstacle() = default;
+
+        /// What it keeps: its distance field and its workspace (OBSTACLE_GRID).
+        virtual void account(MemoryLedger & /*ledger*/) const {}
 
         virtual int sample(smesh::ElemType              element_type,
                            const ptrdiff_t              nelements,

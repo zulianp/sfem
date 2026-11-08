@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 #include "sfem_Function.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_OwnedReductions.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_operator_factory.hpp"
@@ -98,6 +100,12 @@ namespace sfem {
     int NewtonSolver::commit(const real_t *const x) { return impl_->step->end_step(x); }
 
     const NewtonOptions &NewtonSolver::options() const { return impl_->options; }
+
+    void NewtonSolver::account(MemoryLedger &ledger) const {
+        auto &impl = *impl_;
+        if (impl.step) impl.step->account(ledger);
+        for (auto *buffer : {&impl.r, &impl.dx, &impl.moved, &impl.increment}) ledger.add(MemoryLedger::NEWTON, *buffer);
+    }
     NewtonOptions       &NewtonSolver::options() { return impl_->options; }
 
     NonlinearReport NewtonSolver::solve(const StepContext &context, real_t *const x) {
@@ -132,11 +140,31 @@ namespace sfem {
             }
         }
 
+        // Every step starts on the tangent the options name.
+        bool projected = opts.tangent_projection == TangentProjection::ALWAYS;
+        // The tangent itself is taken back once: indefinite again, it is so where the iterates
+        // converge and the projection stays.
+        bool taken_back = false;
+        if (opts.tangent_projection != TangentProjection::NONE) {
+            if (!impl.step->tangent_projection_supported()) {
+                fprintf(stderr,
+                        "NewtonSolver: the %s step cannot project its tangent (an assembled BSR tangent and operators "
+                        "that project theirs)\n",
+                        impl.step->name());
+                report.status = NonlinearReport::Status::STEP_FAILED;
+                return report;
+            }
+            impl.step->set_tangent_projection(projected);
+        }
+
         // A linear function is solved by one full step whose linear solve met its tolerance: its
         // accuracy is the linear solver's, and a second step would only repeat the solve.
         const bool linear = impl.f->is_linear() && impl.step->solves_linear_function_exactly();
 
         NewtonIteration log;
+        // The merits of this step's iterates, the last line_search.nonmonotone of them: the
+        // nonmonotone line search measures a step against their largest.
+        std::vector<real_t> recent;
         real_t          tol = 0;
         int             count = 0;
         log.x               = x;
@@ -163,6 +191,7 @@ namespace sfem {
                 if (log.measure.value > opts.divergence_factor * std::max(report.reference, tol)) return NonlinearReport::Status::DIVERGED;
                 if (it == opts.max_it) return opts.fixed_iterations ? NonlinearReport::Status::ITERATIONS_DONE : NonlinearReport::Status::MAX_IT;
 
+                log.projected = projected;
                 {
                     SFEM_TRACE_SCOPE("NewtonSolver::linearize");
                     if (!impl.reductions->all(impl.step->linearize(x, r) == SFEM_SUCCESS)) return NonlinearReport::Status::STEP_FAILED;
@@ -182,10 +211,22 @@ namespace sfem {
 
                 if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::Status::STEP_FAILED;
 
+                if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected && impl.step->met_negative_curvature()) {
+                    // The tangent is indefinite here (CG's curvature is a global sum, the same on
+                    // every rank): the iteration again from x on the projected tangent, rather than
+                    // along the truncated direction CG returned.
+                    projected = true;
+                    impl.step->set_tangent_projection(true);
+                    continue;
+                }
+
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
                     const real_t slope = merit->slope(x, r, dx, m0);
-                    log.line_search    = line_search.search(*merit, x, dx, m0, slope);
+                    recent.push_back(m0);
+                    if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    const real_t reference = *std::max_element(recent.begin(), recent.end());
+                    log.line_search        = line_search.search(*merit, x, dx, m0, slope, reference);
                 } else {
                     log.line_search        = LineSearchResult();
                     log.line_search.status = LineSearchResult::Status::ACCEPTED;
@@ -195,16 +236,33 @@ namespace sfem {
                 switch (log.line_search.status) {
                     case LineSearchResult::Status::ACCEPTED:
                     case LineSearchResult::Status::BEST_DECREASE:
+                    case LineSearchResult::Status::NONMONOTONE:
                         break;
                     case LineSearchResult::Status::AT_RESOLUTION:
                         return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;
                     case LineSearchResult::Status::NO_DECREASE:
                     case LineSearchResult::Status::NON_FINITE:
+                        if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected) {
+                            // The tangent is indefinite here: the iteration again from x, on the
+                            // projected tangent.
+                            projected = true;
+                            impl.step->set_tangent_projection(true);
+                            known = false;
+                            continue;
+                        }
                         return NonlinearReport::Status::LINE_SEARCH_FAILED;
                 }
 
                 report.min_alpha = std::min(report.min_alpha, log.line_search.alpha);
                 impl.blas->axpy(ndofs, log.line_search.alpha, dx, x);
+                if (projected && !taken_back && opts.tangent_projection == TangentProjection::ON_FAILURE &&
+                    log.line_search.alpha == 1) {
+                    // A full step: back to the tangent itself, whose Newton converges quadratically
+                    // where it is positive definite; a failure there is retried projected again.
+                    projected  = false;
+                    taken_back = true;
+                    impl.step->set_tangent_projection(false);
+                }
                 solved = linear && !log.linear_capped && log.line_search.alpha == 1;
                 known  = merit && merit->residual_at(log.line_search.alpha, r);
             }
