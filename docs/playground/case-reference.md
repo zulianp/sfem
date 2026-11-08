@@ -202,7 +202,7 @@ node numbering.
 | `dt` | real > 0 | **required** (not for `steady`) | Step length. |
 | `steps` | int | | Number of steps; takes precedence over `t_end`. |
 | `t_end` | real | | Final time; `steps = round(t_end / dt)`. One of `steps` or `t_end` is **required**. |
-| `max_cutbacks` | int | `4` | A failed step is retried with half its length, this many times. |
+| `max_cutbacks` | int | `4` | A failed step is retried with half its length, this many times; the rest of its interval follows in steps of at most that length, so the run reaches the same times `t0 + k dt`. |
 
 ## dynamics
 
