@@ -10,6 +10,7 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
@@ -162,6 +163,122 @@ static __host__ __device__ __forceinline__ void linear_elasticity_d3_simplex_dir
     point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);
   }
   mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void linear_elasticity_d3_simplex_direct_hessian_reference_point_tangent(
+    const int q,
+    const s_t *const RSTR adj,
+    const s_t det,
+    const s_t *const RSTR grad_ref_x,
+    const s_t *const RSTR grad_ref_y,
+    const s_t *const RSTR grad_ref_z,
+    const s_t *const RSTR q_weight,
+    const s_t lmbda,
+    const s_t mu,
+    s_t *const RSTR T
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+  static_assert(NS > 0, "NS must be positive");
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  const s_t qw = q_weight[q];
+  const s_t adj_value0 = adj[0];
+  const s_t adj_value1 = adj[1];
+  const s_t adj_value2 = adj[2];
+  const s_t adj_value3 = adj[3];
+  const s_t adj_value4 = adj[4];
+  const s_t adj_value5 = adj[5];
+  const s_t adj_value6 = adj[6];
+  const s_t adj_value7 = adj[7];
+  const s_t adj_value8 = adj[8];
+  const s_t det_value0 = det;
+  const s_t idet = s_t(1) / det_value0;
+  s_t D[81];
+  const s_t weak_hess_tmp0 = lmbda + s_t(2)*mu;
+  D[0] = weak_hess_tmp0;
+  D[1] = 0;
+  D[2] = 0;
+  D[3] = 0;
+  D[4] = lmbda;
+  D[5] = 0;
+  D[6] = 0;
+  D[7] = 0;
+  D[8] = lmbda;
+  D[10] = mu;
+  D[11] = 0;
+  D[12] = mu;
+  D[13] = 0;
+  D[14] = 0;
+  D[15] = 0;
+  D[16] = 0;
+  D[17] = 0;
+  D[20] = mu;
+  D[21] = 0;
+  D[22] = 0;
+  D[23] = 0;
+  D[24] = mu;
+  D[25] = 0;
+  D[26] = 0;
+  D[30] = mu;
+  D[31] = 0;
+  D[32] = 0;
+  D[33] = 0;
+  D[34] = 0;
+  D[35] = 0;
+  D[40] = weak_hess_tmp0;
+  D[41] = 0;
+  D[42] = 0;
+  D[43] = 0;
+  D[44] = lmbda;
+  D[50] = mu;
+  D[51] = 0;
+  D[52] = mu;
+  D[53] = 0;
+  D[60] = mu;
+  D[61] = 0;
+  D[62] = 0;
+  D[70] = mu;
+  D[71] = 0;
+  D[80] = weak_hess_tmp0;
+  D[9] = D[1];
+  D[18] = D[2];
+  D[27] = D[3];
+  D[36] = D[4];
+  D[45] = D[5];
+  D[54] = D[6];
+  D[63] = D[7];
+  D[72] = D[8];
+  D[19] = D[11];
+  D[28] = D[12];
+  D[37] = D[13];
+  D[46] = D[14];
+  D[55] = D[15];
+  D[64] = D[16];
+  D[73] = D[17];
+  D[29] = D[21];
+  D[38] = D[22];
+  D[47] = D[23];
+  D[56] = D[24];
+  D[65] = D[25];
+  D[74] = D[26];
+  D[39] = D[31];
+  D[48] = D[32];
+  D[57] = D[33];
+  D[66] = D[34];
+  D[75] = D[35];
+  D[49] = D[41];
+  D[58] = D[42];
+  D[67] = D[43];
+  D[76] = D[44];
+  D[59] = D[51];
+  D[68] = D[52];
+  D[77] = D[53];
+  D[69] = D[61];
+  D[78] = D[62];
+  D[79] = D[71];
+  const s_t adj_q[ND * ND] = {adj_value0, adj_value1, adj_value2, adj_value3, adj_value4, adj_value5, adj_value6, adj_value7, adj_value8};
+  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);
 }
 
 template <typename s_t, int NS>

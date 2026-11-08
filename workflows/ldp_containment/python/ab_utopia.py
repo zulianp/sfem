@@ -17,7 +17,8 @@ Measured on the nodes of those blocks (S = SFEM's last state, U = utopia's):
   displacement   max and L2 of |u_S - u_U| relative to U's, also after removing the best-fit rigid
                  motion of each block (a free valve may settle in a different rigid position)
   penetration    the largest sdf(X + u) over the skin nodes (>0 is inside the obstacle), and the
-                 largest violation of the shifted constraint, sdf + shift
+                 largest violation of the constraint the solver enforces, gap >= shift with the
+                 gap -sdf / |grad sdf| (sdf sampled as the solver does, sdf_compare.Grid)
   contact        skin nodes within 10 shifts of the obstacle, for each, and their overlap (Jaccard)
   energy         the NeoHookeanOgden elastic energy of each state (TET4, one point per element)
 One CSV row is appended to --csv.
@@ -165,10 +166,11 @@ def main(argv):
     skin = skin_nodes(np.hstack(list(blocks.values())))
     for tag, u in (("utopia", uU), ("sfem", uS)):
         s = grid.sample(x[:, skin] + u[:, skin])
+        gap = -s / np.linalg.norm(grid.gradient(x[:, skin] + u[:, skin]), axis=0)
         row[f"outside_grid_{tag}"] = int(np.sum(np.isnan(s)))
         s = np.nan_to_num(s, nan=-np.inf)
         row[f"max_sdf_{tag}"] = s.max()
-        row[f"max_violation_{tag}"] = max(0.0, (s + shift).max())
+        row[f"max_violation_{tag}"] = max(0.0, np.nanmax(shift - gap))
         row[f"contact_{tag}"] = set(skin[s > -10 * shift].tolist())
         e, inverted = energy(x, np.hstack(list(blocks.values())), u, mu, lmbda)
         row[f"energy_{tag}"] = e

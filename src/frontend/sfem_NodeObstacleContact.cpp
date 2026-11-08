@@ -14,11 +14,24 @@
 #include "sfem_Function_incore_cuda.hpp"
 #endif
 #include "sfem_NodeObstacleView.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "sfem_aliases.hpp"
 
 namespace sfem {
 
     // normals and curvature are flat: rows of n entries.
+    void NodeObstacleContact::account(MemoryLedger &ledger) const {
+        for (auto *buffer : {&complementarity_, &penetration_, &normals_, &curvature_, &gap_, &mu_, &frames_, &ahead_,
+                             &ahead_gap_, &ahead_normals_, &p0_}) {
+            ledger.add(MemoryLedger::CONTACT, *buffer);
+        }
+        ledger.add(MemoryLedger::CONTACT, nodes_);
+        ledger.add(MemoryLedger::CONTACT, idx_);
+        ledger.add(MemoryLedger::CONTACT, frame_of_);
+        for (auto &row : point_rows_) ledger.add(MemoryLedger::CONTACT, row);
+        if (obstacle_) obstacle_->account(ledger);
+    }
+
     NodeObstacleView NodeObstacleContact::view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const {
         NodeObstacleView c;
         c.es       = context_.space();
@@ -80,9 +93,6 @@ namespace sfem {
         gap_              = create_buffer<real_t>(n, es);
         mu_               = create_buffer<real_t>(n, es);
         frames_           = create_buffer<real_t>(9 * n, es);
-        ahead_            = create_buffer<real_t>(ndofs, es);
-        ahead_gap_        = create_buffer<real_t>(n, es);
-        ahead_normals_    = create_buffer<real_t>(3 * n, es);
         complementarity_  = create_buffer<real_t>(n, es);
         penetration_      = create_buffer<real_t>(n, es);
     }
@@ -147,6 +157,13 @@ namespace sfem {
         node_obstacle_upper_bound(view(normals_, gap_), ndofs_, unbounded, ub);
     }
 
+    void NodeObstacleContact::scaling(const real_t *const ub,
+                                      real_t *const       inverse_scale,
+                                      real_t *const       scale,
+                                      real_t *const       scaled_bound) const {
+        node_obstacle_scaling(view(normals_, gap_), ndofs_, ub, inverse_scale, scale, scaled_bound);
+    }
+
     real_t NodeObstacleContact::kkt_residual(const real_t *const r,
                                              const real_t *const k,  // per dof
                                              real_t *const       projected,
@@ -172,7 +189,7 @@ namespace sfem {
     void NodeObstacleContact::add_curvature(const real_t *const  x,
                                             const real_t *const  r,
                                             const real_t *const  k,
-                                            const bool           capped,
+                                            const int            curvature,
                                             const real_t         sign,
                                             const count_t *const       rowptr,
                                             const idx_t *const         colidx,
@@ -183,20 +200,20 @@ namespace sfem {
         real_t *Crows[6];
         rows(curvature_, 6, Crows);
         obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
-        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, capped, sign, rowptr, colidx, values_type, values);
+        node_obstacle_curvature_bsr(view(normals_, gap_), r, k, curvature, sign, rowptr, colidx, values_type, values);
     }
 
     void NodeObstacleContact::curvature_blocks(const real_t *const x,
                                                const real_t *const r,
                                                const real_t *const k,
-                                               const bool          capped,
+                                               const int           curvature,
                                                real_t *const       blocks) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::curvature_blocks");
 
         real_t *Crows[6];
         rows(curvature_, 6, Crows);
         obstacle_->sample_nodes_curvature(size(), idx_->data(), xyz_, x, Crows);
-        node_obstacle_curvature_blocks(view(normals_, gap_), r, k, capped, blocks);
+        node_obstacle_curvature_blocks(view(normals_, gap_), r, k, curvature, blocks);
     }
 
     void NodeObstacleContact::apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const {
@@ -220,6 +237,12 @@ namespace sfem {
     void NodeObstacleContact::project_velocity(const real_t *const x, real_t *const v, const real_t dt) {
         SFEM_TRACE_SCOPE("NodeObstacleContact::project_velocity");
 
+        // Only a scheme that projects its velocity (Newmark's) needs them.
+        if (!ahead_) {
+            ahead_         = create_buffer<real_t>(ndofs_, execution_space());
+            ahead_gap_     = create_buffer<real_t>(size(), execution_space());
+            ahead_normals_ = create_buffer<real_t>(3 * size(), execution_space());
+        }
         sfem::blas<real_t>(context_)->zaxpby(ndofs_, 1, x, dt, v, ahead_->data());
         real_t *an[3];
         rows(ahead_normals_, 3, an);

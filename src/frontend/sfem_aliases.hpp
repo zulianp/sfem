@@ -65,4 +65,6 @@ namespace sfem {
 
 #define SFEM_TRACE_SCOPE(name) SMESH_TRACE_SCOPE(name)
 #define SFEM_TRACE_SCOPE_VARIANT(format, num) SMESH_TRACE_SCOPE_VARIANT(format, num)
+// A scope on a thread of its own: traced only with SFEM_ENABLE_TRACE_MUTEX (smesh_tracer.hpp).
+#define SFEM_TRACE_SCOPE_MUTEX(name) SMESH_TRACE_SCOPE_MUTEX(name)
 #endif

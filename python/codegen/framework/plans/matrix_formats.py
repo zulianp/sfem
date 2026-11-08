@@ -244,6 +244,13 @@ class MatrixAssemblyVariantPlan:
 @dataclass(frozen=True)
 class MatrixFormatPlan:
     variants: tuple = ()
+    #: Also publish the BSR assembly on the tangent projected to positive
+    #: semidefinite per quadrature point (`project_abs_symmetric`), as a second
+    #: entry point beside the exact one, `<stem>_hessian_bsr_psd_<geometry>`.  The
+    #: exact assembly is unchanged: the projection is a compile-time branch of a
+    #: template flag that it instantiates off.  Host and device alike: the
+    #: projection is a per-point inline function (`sfem_TangentProjection.hpp`).
+    tangent_projection: bool = False
 
     def __post_init__(self):
         variants = tuple(self.variants)
@@ -255,6 +262,8 @@ class MatrixFormatPlan:
                 raise ValueError("duplicate matrix-format variant '%s'" % variant.name)
             seen.add(variant.name)
         object.__setattr__(self, "variants", variants)
+        if self.tangent_projection and MatrixFormat.BSR not in self.formats:
+            raise ValueError("tangent_projection projects the BSR assembly, and the plan has none")
 
     @property
     def is_empty(self):
@@ -265,11 +274,15 @@ class MatrixFormatPlan:
         return tuple(dict.fromkeys(variant.matrix_format for variant in self.variants))
 
     def to_dict(self):
-        return {
+        data = {
             "schema": "sfem.matrix_format_plan",
             "schema_version": MATRIX_FORMAT_PLAN_SCHEMA_VERSION,
             "variants": [variant.to_dict() for variant in self.variants],
         }
+        # Only when asked, so a plan without it is the dictionary it always was.
+        if self.tangent_projection:
+            data["tangent_projection"] = True
+        return data
 
 
 #: The formats whose scatter walks a sparsity pattern, and so must locate its
@@ -340,9 +353,12 @@ def matrix_format_plan_from_request(
     mesh_layouts=("standard",),
     packed_passes=("one_pass", "two_pass"),
     patch_node_index_filter=False,
+    tangent_projection=False,
 ):
     formats = _normalize_formats(formats)
     if not formats:
+        if tangent_projection:
+            raise ValueError("tangent_projection projects the BSR assembly; request the bsr format")
         return MatrixFormatPlan(())
     mesh_layouts = _normalize_mesh_layouts(mesh_layouts)
     packed_passes = _normalize_packed_passes(packed_passes)
@@ -374,7 +390,7 @@ def matrix_format_plan_from_request(
                         ),
                     )
                 )
-    return MatrixFormatPlan(tuple(variants))
+    return MatrixFormatPlan(tuple(variants), tangent_projection=bool(tangent_projection))
 
 
 def specialize_matrix_format_plan(plan, unit, context):
@@ -420,7 +436,8 @@ def specialize_matrix_format_plan(plan, unit, context):
                 ),
             )
             for variant in plan.variants
-        )
+        ),
+        tangent_projection=plan.tangent_projection,
     )
 
 

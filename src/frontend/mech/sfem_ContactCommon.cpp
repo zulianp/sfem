@@ -32,6 +32,7 @@ namespace sfem {
             std::vector<std::string> columns() const override { return {"reaction_x", "reaction_y", "reaction_z", "touched"}; }
 
             int converged(const StepRecord &) override {
+                SFEM_TRACE_SCOPE("ContactProbe::converged");
                 const ptrdiff_t n = force_->size();
                 reaction_(force_->data());
                 auto                force = on_host(force_);

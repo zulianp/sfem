@@ -1,6 +1,7 @@
 #include "sfem_NodeObstacleView.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -103,6 +104,31 @@ namespace sfem {
         }
     }
 
+    void node_obstacle_scaling(const NodeObstacleView &c,
+                               const ptrdiff_t         ndofs,
+                               const real_t *const     ub,
+                               real_t *const           inverse_scale,
+                               real_t *const           scale,
+                               real_t *const           scaled_bound) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_scaling(c, ndofs, ub, inverse_scale, scale, scaled_bound);
+#endif
+        real_t *const d = inverse_scale;
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < c.size; ++i) {
+            const ptrdiff_t node = c.idx[i];
+            const real_t    mean = (d[node * 3] + d[node * 3 + 1] + d[node * 3 + 2]) / 3;
+            for (int k = 0; k < 3; ++k) d[node * 3 + k] = mean;
+        }
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            const real_t root = d[i] > 0 ? std::sqrt(d[i]) : real_t(1);
+            scale[i]          = 1 / root;
+            inverse_scale[i]  = root;
+            scaled_bound[i]   = ub[i] * root;
+        }
+    }
+
     void node_obstacle_offset_gap(const ExecutionContext &context,
                                   const ptrdiff_t         size,
                                   const real_t            shift,
@@ -145,7 +171,7 @@ namespace sfem {
     void node_obstacle_curvature_bsr(const NodeObstacleView &c,
                                      const real_t *const     r,
                                      const real_t *const     k,
-                                     const bool              capped,
+                                     const int               curvature,
                                      const real_t            sign,
                                      const count_t *const    rowptr,
                                      const idx_t *const      colidx,
@@ -153,7 +179,7 @@ namespace sfem {
                                      void *const             values) {
 #ifdef SFEM_ENABLE_CUDA
         if (c.es == EXECUTION_SPACE_DEVICE) {
-            d_node_obstacle_curvature_bsr(c, r, k, capped, sign, rowptr, colidx, values_type, values);
+            d_node_obstacle_curvature_bsr(c, r, k, curvature, sign, rowptr, colidx, values_type, values);
             return;
         }
 #endif
@@ -165,7 +191,7 @@ namespace sfem {
                 normal_at(c, i, n);
                 const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
                 auto *const  B    = bsr_diagonal_block(node, rowptr, colidx, 3, v);
-                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, sign, B);
+                if (B) ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], curvature, sign, B);
             }
             return SFEM_SUCCESS;
         });
@@ -174,10 +200,10 @@ namespace sfem {
     void node_obstacle_curvature_blocks(const NodeObstacleView &c,
                                         const real_t *const     r,
                                         const real_t *const     k,
-                                        const bool              capped,
+                                        const int               curvature,
                                         real_t *const           blocks) {
 #ifdef SFEM_ENABLE_CUDA
-        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_curvature_blocks(c, r, k, capped, blocks);
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_curvature_blocks(c, r, k, curvature, blocks);
 #endif
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < c.size; ++i) {
@@ -186,7 +212,7 @@ namespace sfem {
             normal_at(c, i, n);
             const real_t C[6] = {c.curvature[0][i], c.curvature[1][i], c.curvature[2][i], c.curvature[3][i], c.curvature[4][i], c.curvature[5][i]};
             real_t       B[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-            ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], capped, 1, B);
+            ::node_obstacle_curvature(n, C, &r[node * 3], c.gap[i], k[node * 3], curvature, 1, B);
             ::node_obstacle_pack_sym(B, &blocks[6 * i]);
         }
     }

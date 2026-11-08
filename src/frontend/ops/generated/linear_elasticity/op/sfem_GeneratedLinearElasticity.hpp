@@ -69,6 +69,7 @@ namespace sfem {
                            const real_t *const h,
                            real_t *const out,
                            const ElementScope scope) override;
+    std::size_t geometry_bytes() const override;
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
