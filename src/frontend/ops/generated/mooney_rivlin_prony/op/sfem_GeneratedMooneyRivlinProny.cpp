@@ -1480,6 +1480,7 @@ namespace sfem {
       const real_t *const quadrature[1] = {impl_->relaxation->history(domain.block->name(), "iso_history")};
       input.quadrature = quadrature;
       input.quadrature_stride = domain.block->n_elements();
+      input.project = impl_->project_tangent;
       store->update(input);
       return SFEM_SUCCESS;
     });

@@ -108,7 +108,8 @@ namespace sfem {
          * @brief The assembled tangents that follow projected to positive semidefinite, per
          * quadrature point (`project_abs_symmetric`), or not
          *
-         * Only the assembled (BSR) tangent is projected; the applies are the function's own.
+         * The assembled (BSR) and stored (inexact) tangents are projected; the applies are the
+         * function's own.
          */
         virtual void set_tangent_projection(const bool /*on*/) {}
 

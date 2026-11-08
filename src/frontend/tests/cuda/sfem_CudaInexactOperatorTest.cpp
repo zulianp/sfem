@@ -5,7 +5,9 @@
 // operator is the host's: with f64 codes both are the exact apply to rounding; with the others the
 // codes agree up to the rare one that a different rounding of the same arithmetic puts on the other
 // side of a tie, so the two stored operators differ by far less than either differs from the exact
-// one.  The diagonal (Jacobi on the stored operator) is checked against the assembled one.
+// one.  The diagonal (Jacobi on the stored operator) is checked against the assembled one.  With
+// the tangent projection on, the device stores hold the projected tangent: the f64 ones apply the
+// host's projected BSR assembly.
 
 #include <cmath>
 #include <cstdio>
@@ -146,6 +148,110 @@ namespace {
         return sfem::FunctionSpace::create(mesh, 3);
     }
 
+    /// u = (F - I) X, a sheared compression (det F = 0.6) under which the Prony material's tangent
+    /// is indefinite, plus a little noise (sfem_InexactOperatorTest.cpp).
+    std::vector<real_t> compressed(const std::shared_ptr<sfem::FunctionSpace> &fs) {
+        const real_t         F[3][3] = {{0.5, 0.3, 0}, {0, 1.1, 0}, {0, 0, 1.1}};
+        auto                 mesh    = fs->mesh();
+        const geom_t *const *x       = mesh->points()->data();
+        std::vector<real_t>  u       = pseudo_random(fs->n_dofs(), 0.002, 5);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i)
+            for (int a = 0; a < 3; ++a)
+                for (int b = 0; b < 3; ++b) u[i * 3 + a] += (F[a][b] - (a == b)) * x[b][i];
+        return u;
+    }
+
+    /// The host's assembled tangent at u applied to h.
+    std::vector<real_t> bsr_apply(const std::shared_ptr<sfem::Op>           &op,
+                                  const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                  const std::vector<real_t>                  &u,
+                                  const std::vector<real_t>                  &h) {
+        auto                graph  = fs->element_node_graph();
+        const count_t      *rowptr = graph->rowptr()->data();
+        const idx_t        *colidx = graph->colidx()->data();
+        std::vector<real_t> values((size_t)graph->nnz() * 9, 0), out(h.size(), 0);
+        if (op->hessian_bsr(u.data(), rowptr, colidx, values.data()) != SFEM_SUCCESS) return {};
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i)
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k)
+                for (int d = 0; d < 3; ++d)
+                    for (int e = 0; e < 3; ++e) out[i * 3 + d] += values[(size_t)k * 9 + d * 3 + e] * h[colidx[k] * 3 + e];
+        return out;
+    }
+
+    /// The device's assembled tangent at u, applied to h on the host.
+    std::vector<real_t> device_bsr_apply(const std::shared_ptr<sfem::Op>           &op,
+                                         const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                         const std::vector<real_t>                  &u,
+                                         const std::vector<real_t>                  &h) {
+        auto            graph    = fs->element_node_graph();
+        const ptrdiff_t nvals    = graph->nnz() * 9;
+        auto            d_rowptr = smesh::to_device(graph->rowptr());
+        auto            d_colidx = smesh::to_device(graph->colidx());
+        auto            d_values = sfem::create_buffer<real_t>(nvals, sfem::EXECUTION_SPACE_DEVICE);
+        auto            du       = on_device(u);
+        if (op->hessian_bsr(du->data(), d_rowptr->data(), d_colidx->data(), d_values->data()) != SFEM_SUCCESS) return {};
+        const auto      values = from_device(d_values);
+        const count_t  *rowptr = graph->rowptr()->data();
+        const idx_t    *colidx = graph->colidx()->data();
+        std::vector<real_t> out(h.size(), 0);
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i)
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k)
+                for (int d = 0; d < 3; ++d)
+                    for (int e = 0; e < 3; ++e) out[i * 3 + d] += values[(size_t)k * 9 + d * 3 + e] * h[colidx[k] * 3 + e];
+        return out;
+    }
+
+    int check_projected(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+        auto host   = sfem::create_op(fs, "GeneratedMooneyRivlinProny", sfem::EXECUTION_SPACE_HOST);
+        auto device = sfem::create_op(fs, "GeneratedMooneyRivlinProny", sfem::EXECUTION_SPACE_DEVICE);
+        SFEM_TEST_ASSERT(host && device);
+        SFEM_TEST_ASSERT(host->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->tangent_projection_supported());
+
+        const std::vector<real_t> u     = compressed(fs);
+        const std::vector<real_t> h     = pseudo_random(fs->n_dofs(), 1, 11);
+        const auto                plain = bsr_apply(host, fs, u, h);
+        const auto                unprojected = stored(device, true, sfem::InexactOptions::from_strings("points", "f64"), u, h);
+        SFEM_TEST_ASSERT(!plain.empty() && !unprojected.empty());
+        const real_t base = relative_difference(unprojected, plain);
+        printf("%-14s points f64 unprojected against the BSR apply %.3e\n", label, (double)base);
+        SFEM_TEST_ASSERT(base < 1e-12);
+        host->set_tangent_projection(true);
+        device->set_tangent_projection(true);
+        const auto projected = bsr_apply(host, fs, u, h);
+        SFEM_TEST_ASSERT(!plain.empty() && !projected.empty());
+        const real_t change = relative_difference(projected, plain);
+        printf("%-14s the projection changes the BSR apply by %.3e\n", label, (double)change);
+        SFEM_TEST_ASSERT(change > 1e-3);
+
+        // The device's projected BSR assembly is the host's.
+        const auto device_projected = device_bsr_apply(device, fs, u, h);
+        SFEM_TEST_ASSERT(!device_projected.empty());
+        const real_t assembled = relative_difference(device_projected, projected);
+        printf("%-14s device projected BSR against the host's %.3e\n", label, (double)assembled);
+        SFEM_TEST_ASSERT(assembled < 1e-10);
+
+        const Case cases[] = {{"points", "f64", 1e-10, 0}, {"element_matrix", "f64", 1e-10, 0}, {"bsr", "f16", 5e-3, 0}};
+        for (const Case &c : cases) {
+            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding);
+            const auto d       = stored(device, true, options, u, h);
+            const auto r       = stored(host, false, options, u, h);
+            SFEM_TEST_ASSERT(!d.empty() && !r.empty());
+            const real_t error = relative_difference(d, projected), agreement = relative_difference(d, r);
+            printf("%-14s %-15s %-7s projected rel diff %.3e (bound %.0e), host's store %.3e, host's store vs BSR %.3e, vs plain %.3e\n",
+                   label, c.store, c.encoding, (double)error, c.tolerance, (double)agreement,
+                   (double)relative_difference(r, projected), (double)relative_difference(d, plain));
+            SFEM_TEST_ASSERT(error < c.tolerance);
+        }
+
+        // Off again, the stores follow.
+        device->set_tangent_projection(false);
+        const auto back = stored(device, true, sfem::InexactOptions::from_strings("points", "f64"), u, h);
+        SFEM_TEST_ASSERT(!back.empty() && relative_difference(back, plain) < 1e-12);
+        return SFEM_TEST_SUCCESS;
+    }
+
     // Curved cells: every node moved by a smooth field, so the Jacobian varies within each element.
     void warp(const std::shared_ptr<sfem::Mesh> &mesh) {
         geom_t **const  x = mesh->points()->data();
@@ -200,6 +306,18 @@ int test_linear_elasticity() {
     return check(space(mesh), "GeneratedLinearElasticity", "HEX8 linear");
 }
 
+// The projected tangent (tangent_projection) in the device stores: affine, isoparametric, folded.
+int test_projected_prony() {
+    auto       tet4  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    auto       tet10 = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1));
+    auto       hex8  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 5, 4, 4, 0, 0, 0, 1, 1, 1);
+    const bool ok4   = check_projected(space(tet4), "TET4 projected") == SFEM_TEST_SUCCESS;
+    const bool ok10  = check_projected(space(tet10), "TET10 projected") == SFEM_TEST_SUCCESS;
+    const bool ok8   = check_projected(space(hex8), "HEX8 projected") == SFEM_TEST_SUCCESS;
+    SFEM_TEST_ASSERT(ok4 && ok10 && ok8);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_hex8);
@@ -209,6 +327,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_curved_hex8);
     SFEM_RUN_TEST(test_curved_tet10);
     SFEM_RUN_TEST(test_linear_elasticity);
+    SFEM_RUN_TEST(test_projected_prony);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

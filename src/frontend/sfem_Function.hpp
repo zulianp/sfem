@@ -136,6 +136,10 @@ namespace sfem {
         /// The assembled tangents that follow projected (Op::set_tangent_projection), or not.
         void set_tangent_projection(const bool on);
 
+        /// Whether every operator whose tangent reads the state stores it (format INEXACT): the
+        /// stored tangents are then projected where the assembled ones are.
+        bool inexact_stores_every_tangent() const;
+
         /// The diagonal of the operator `inexact_apply` applies: the stored ones, and the exact
         /// diagonal of the operators that store nothing; the constrained rows are 1.
         int inexact_diag(const real_t *const x, real_t *const values);

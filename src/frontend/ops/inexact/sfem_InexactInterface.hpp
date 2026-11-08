@@ -40,6 +40,8 @@ namespace sfem {
             // pointer each, laid out [component][point][element] at `quadrature_stride` per point.
             const real_t *const     *quadrature{nullptr};
             ptrdiff_t                quadrature_stride{0};
+            // Every point's tangent projected to positive semidefinite (Op::set_tangent_projection).
+            bool                     project{false};
         };
 
         /// One block of the packed mesh, as the two-pass traversal reads it (`smesh::PackedMesh`).

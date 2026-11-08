@@ -130,7 +130,8 @@ namespace sfem {
     }
 
     bool UnconstrainedStep::tangent_projection_supported() const {
-        return impl_->tangent && impl_->f->tangent_projection_supported();
+        const bool stored = impl_->options.format == op_type::INEXACT && impl_->f->inexact_stores_every_tangent();
+        return (impl_->tangent || stored) && impl_->f->tangent_projection_supported();
     }
 
     void UnconstrainedStep::set_tangent_projection(const bool on) { impl_->f->set_tangent_projection(on); }

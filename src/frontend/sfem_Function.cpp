@@ -595,6 +595,13 @@ namespace sfem {
         for (auto &op : impl_->ops) op->set_tangent_projection(on);
     }
 
+    bool Function::inexact_stores_every_tangent() const {
+        for (auto &op : impl_->ops) {
+            if (!op->is_linear() && !op->inexact_supported()) return false;
+        }
+        return true;
+    }
+
     int Function::inexact_diag(const real_t *const x, real_t *const values) {
         SFEM_TRACE_SCOPE("Function::inexact_diag");
         for (auto &op : impl_->ops) {
