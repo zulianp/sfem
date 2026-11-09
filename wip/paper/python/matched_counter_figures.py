@@ -58,14 +58,14 @@ def read_study(directory):
 def tables(result):
     metrics = result['metrics']
     residual = [PREAMBLE, r'\begin{tabular}{@{}llrrrr@{}}',r'\toprule',
-                r'Scheme & Layout & ms & MB & GB/s & Gop \\',r'\midrule']
+                r'Scheme & Layout & ms & MB & GB/s & GFLOP \\',r'\midrule']
     for scheme,label in (('fo','First-order'),('darwish','Darwish')):
         for layout in ('atomic','packed'):
             value = metrics['residual-'+scheme+'-'+layout]
             residual.append('{} & {} & {:.2f} & {:.1f} & {:.1f} & {:.2f}'.format(
                 label,layout,value['normal_ms'],value['mb'],value['gbps'],value['gop'])+r' \\')
     actions = [PREAMBLE, r'\begin{tabular}{@{}llrrrr@{}}',r'\toprule',
-               r'Operator & Layout & ms/apply [range] & MB/apply & GB/s & Gop/s \\',r'\midrule']
+               r'Operator & Layout & ms/apply [range] & MB/apply & GB/s & GFLOP/s \\',r'\midrule']
     for operation,scheme,label in (('jacobian','fo',r'$\Jex$'),('jacobian','darwish',r'$\Jhoex$ (Darwish)'),
                                    ('lagged','fo',r'$\Jlag$'),('spmv','fo',r'$\Jlag$ (SpMV)')):
         for layout in (('packed',) if operation == 'spmv' else ('atomic','packed')):

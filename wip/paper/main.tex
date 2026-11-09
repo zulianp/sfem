@@ -699,7 +699,8 @@ hardware bottleneck or establish that an implementation is optimal.
 
 \begin{table}[t]
   \centering
-  \caption{The platform. One Grace die, not the dual-die Superchip.}
+  \caption{One Grace CPU die. Measured memory bandwidth is from the
+    triad benchmark; measured FP64 throughput is useful work in DGEMM.}
   \label{tab:platform}
   \small
   \begin{tabular}{@{}lrr@{}}
@@ -720,9 +721,11 @@ hardware bottleneck or establish that an implementation is optimal.
 
 The CPU measurements use a Grace die of an NVIDIA GH200 Grace Hopper
 Superchip (Table~\ref{tab:platform}). The matched counter campaign uses 72 bound
-OpenMP threads in one exclusive allocation. Copy and triad over $80\times10^6$
-doubles provide transported-bandwidth references; checked $N=8192$ FP64 DGEMM
-with OpenBLAS 0.3.30 provides a compute reference. These are achieved rates,
+OpenMP threads in one exclusive allocation. Two streaming benchmarks, copy and triad, use arrays of $80\times10^6$
+doubles to measure memory bandwidth. Copy transfers one array into another;
+triad combines two input arrays using a scalar multiply and an addition.
+Dense FP64 matrix multiplication (DGEMM, $N=8192$, OpenBLAS 0.3.30)
+provides the compute reference. These are achieved rates,
 not strict hardware ceilings or an official STREAM score. All samples are
 retained; the historical timing campaigns and their settings remain distinct.
 
@@ -948,9 +951,8 @@ packed residual has saturated.
 the layouts interleaved, and no figure combines runs from different nodes. This is not a
 formality: node-to-node variation here is 5--11\%, larger than several differences the paper
 discusses, and a change already shown performance-neutral by a controlled comparison once read
-5.7--6.5\% slower with its two sides on different nodes. Each recorded run also carries the
-configuration that \emph{dispatched}, not the one requested, so a measurement cannot claim a
-term the code path silently dropped.
+5.7--6.5\% slower with its two sides on different nodes. Each run records the operator terms actually executed, allowing us to check
+that the measured implementation matches the stated configuration.
 
 %================================================================================================
 \section{Results}
@@ -1232,7 +1234,7 @@ The cached action takes \jachoDmDoubleCacheMs{}\,ms versus
 not beat that reference in this campaign. These SpMV comparisons involve different operators;
 the equivalent consistent-matrix comparison is reported separately below.
 Each fresh process performs 30 warmups and 70 timed applications with seven
-rotating live vectors; vector churn is excluded. Limited FP32 checks permit
+rotating input vectors; time spent updating and rotating these vectors is excluded. Limited FP32 checks permit
 the documented precision-dependent subgradient-band exceptions.
 
 \paragraph{Why the precision gains differ.}
@@ -1250,12 +1252,12 @@ Cached Darwish likewise halves traffic but attains
 $\pdCachedSpeedup\times$ acceleration; these observations do not identify a
 unique hardware bottleneck. Compared with direct Darwish, caching moves about
 \pdDoubleTrafficExtra\% more bytes in FP64 while reducing retired instructions by
-\pdDoubleInstructionsSaved\%/\pdSingleInstructionsSaved\% (FP64/FP32),
+\pdDoubleInstructionsSaved\% in FP64 and \pdSingleInstructionsSaved\% in FP32,
 exchanging traffic for less repeated computation. With seven live vectors,
 FP32 cached Darwish and lagged SpMV are nearly tied in this diagnostic
 (\pdCachedLiveMs{} versus \pdSpmvLiveMs{}\,ms); their ordering is not universal.
-All samples and practical counter screens are retained in the reproducibility
-material. These diagnostic runs do not replace Figure~\ref{fig:jacho}'s matched data.
+The reproducibility material includes all samples and checks of counter
+coverage, repeatability and measurement overhead. These diagnostic runs do not replace Figure~\ref{fig:jacho}'s matched data.
 
 \paragraph{Reconstruction cost.}
 Higher-order reconstruction adds both field traffic and arithmetic.
@@ -1336,12 +1338,12 @@ full sample ranges are [\sgDarwishRebuildMin, \sgDarwishRebuildMax] and
 [\sgDarwishReuseMin, \sgDarwishReuseMax]\,ms, respectively.
 All \sgPositive{} of \sgPairs{} pairs favour reuse, with three pairs per scheme
 in each launch order. Each fresh process performs 30 warmups and 70 timed
-applications with seven rotating direction vectors; vector churn, setup and
-checks are excluded, while required direction reconstruction remains timed.
-Worker transparent huge pages are disabled. These are fixed-state application
+applications with seven rotating direction vectors. Updating and rotating
+these vectors, setup and validation are excluded from timing; direction-gradient
+reconstruction is included. Transparent huge pages are disabled for the benchmark processes. These are fixed-state application
 savings, not solver timings; no Darwish coefficient cache is used.
 Ranges describe sample variation, not confidence intervals. Full ranges for
-all schemes and the unchanged numerical gates are recorded in the
+all schemes and the numerical correctness checks are recorded in the
 reproducibility documentation.
 
 \subsection{Against the lagged matrix}
@@ -1354,41 +1356,63 @@ reproducibility documentation.
   \definecolor{rlGreen}{RGB}{45,135,85}
   \input{figures/empirical_roofline}
   \caption{Matched empirical roofline: FP64 affine interior, $n=128$, pack
-    1024, 72 Grace cores, Rhie--Chow enabled. Small points retain all 18
-    counted captures per arm; large points are means. Dashed/dotted lines:
-    measured copy/triad bandwidth; dash-dot: counted DGEMM rate. Shading spans
-    reference samples, not confidence intervals. Residual pairs compare layouts;
+    1024, 72 Grace cores, Rhie--Chow enabled. Small points show all 18
+    measurements per implementation; large points are means. The dashed line
+    follows measured copy bandwidth and the dotted line follows measured
+    triad bandwidth. Each slope ends at the shared dash-dot DGEMM plateau,
+    forming the empirical reference $P(I)=\min(BI,P_{\mathrm{DGEMM}})$.
+    Shading spans the envelope of reference sample ranges, not a confidence interval. The black solid roof uses
+    vendor references of \rlCompVendorBandwidth{} GB/s and
+    \rlCompVendorPeak{} TFLOP/s per CPU die~\cite{NvidiaGrace2023}.
+    FLOPs count speculative hardware operations across all precisions;
+    bytes are transported traffic. The FP64 vendor roof is contextual, not
+    a strict ceiling for this counter metric. Residual pairs compare layouts;
     the lagged pair compares equivalent matrix-free and assembled actions.
     Coefficient-cached Darwish is not measured here.}
   \label{fig:roofline}
 \end{figure}
 
 \paragraph{Matched measurements.}
-Job \matchedJob{} on \texttt{\matchedHost{}} brackets only repeated applications
-with acknowledged counter windows, using retained workers, 30 warmups and
-per-worker transparent huge pages disabled. Setup, assembly and checks are
-excluded; state gradients are reused and required direction gradients are timed.
-Empty controls, counter coverage, repeat-count stability and paired normal
-timing checks pass without sample deletion or background subtraction.
-The axes count speculative floating-point operations of all precisions and
-transported bytes, consistently for operators and references. The measured
-copy/triad references are \rlCompCopy/\rlCompTriad{} GB/s and counted DGEMM
-is \rlCompGemm{} Gop/s. Complete methods, ranges and action points are retained
-in the supporting material.
+We measure repeated operator applications after 30 warmup iterations,
+reusing the same processes and allocated arrays. Hardware counters are enabled
+only around the repeated applications. Setup, matrix assembly and validation
+are excluded; state gradients are reused and required direction gradients are timed.
+Transparent huge pages are disabled for both the operator and reference benchmarks.
+Checks of counter coverage, repeatability and timing overhead pass without
+discarding samples or subtracting background activity.
 
-Packing accelerates the normal first-order/Darwish residual applications by
-$\matchedFoSpeedup\times$/$\matchedDarwishSpeedup\times$ while traffic changes
-by only \matchedFoTrafficChange\%/\matchedDarwishTrafficChange\%.
-The accumulation experiment below supports the layout-cost explanation;
-roofline position alone cannot isolate atomic updates or synchronization.
-For equivalent lagged actions, packed takes \rlCompLaggedTime{} ms against
-\rlCompSpmvTime{} ms for BSR SpMV ($\rlCompSpeedup\times$), transporting
-\matchedTrafficSpmvLagged{} times less data. SpMV runs close to the streaming
-reference but still takes longer. Packed executes about
-\rlCompWorkRatio{} times as many counted operations: its
-$\rlCompRateRatio\times$ throughput ratio is therefore not its application
-speedup. None of these measurements establishes a solver speedup or an
-optimal implementation.
+The hardware counters include speculative floating-point operations across
+all precisions, rather than only the useful arithmetic specified by the algorithm.
+Fused multiply-add counts as two operations per active vector element; loads,
+stores and integer indexing are excluded from the FLOP count. Traffic counts
+bytes read from and written to memory. In the same allocation, the copy
+benchmark achieves a mean bandwidth of \rlCompCopy{} GB/s, and the separate
+triad benchmark achieves \rlCompTriad{} GB/s. Their sample ranges are shown
+by the shaded band. DGEMM achieves \rlCompGemm{} GFLOP/s using the same
+hardware operation counts as the plotted operators. Its useful-work rate,
+based on $2N^3$ operations per multiplication, is
+\matchedGemmUseful{} GFLOP/s (Table~\ref{tab:platform}); the two rates use
+different definitions of work. The theoretical FP64 reference is half the
+vendor's 7.1 TFLOP/s dual-die specification, not a measured rate.
+Detailed measurement procedures, sample ranges and run identifiers are
+provided in the reproducibility material.
+
+Packing speeds up the first-order residual by $\matchedFoSpeedup\times$
+while increasing transported bytes by \matchedFoTrafficChange\%.
+For the Darwish residual, the speedup is $\matchedDarwishSpeedup\times$
+and the change in transported bytes is \matchedDarwishTrafficChange\%.
+The accumulation experiment below supports accumulation as a major contributor
+to these layout differences; roofline position alone cannot isolate atomic
+updates or synchronization.
+For the equivalent lagged operator, the packed matrix-free action takes
+\rlCompLaggedTime{} ms, compared with \rlCompSpmvTime{} ms for BSR SpMV:
+a $\rlCompSpeedup\times$ application speedup. BSR SpMV transports
+\matchedTrafficSpmvLagged{} times as many bytes as the packed action.
+SpMV approaches the measured streaming bandwidth but still takes longer.
+The packed action executes about \rlCompWorkRatio{} times as many counted
+operations, so its $\rlCompRateRatio\times$ floating-point throughput ratio
+is larger than its runtime speedup. These are operator measurements; they
+do not establish a solver speedup or an optimal implementation.
 
 \begin{table}[t]
   \centering
@@ -1422,7 +1446,7 @@ alone do not establish why the layouts differ.
 
 \begin{table*}[t]
   \centering
-  \caption{Steady affine FP64 interior residual accumulation on \scatterHost{}, job \scatterJob{}, with Rhie--Chow,
+  \caption{Steady affine FP64 interior residual accumulation on Grace, with Rhie--Chow,
     $n=\scatterN$ and pack size \scatterPackSize{}. Times are milliseconds per sweep:
     normal execution $t_0$, full probe $t_+$, and bypass $t_-$.
     Each mean uses \scatterSamples{} samples of \scatterRepeat{} sweeps, with
@@ -1440,8 +1464,8 @@ The diagnostic in Table~\ref{tab:scatter} switches accumulation within the same 
 sweep. A compiler escape consumes every element result in both modes, preserving the
 element calculations when accumulation is bypassed. Input staging and existing buffer
 clearing remain; state gradients are reconstructed before timing. The atomic bypass omits
-nodal additions. The packed bypass omits pack-local additions, owned/ghost draining and
-the final ghost reduction. Before timing each case, all element contributions must be
+nodal additions. The packed bypass omits pack-local additions, writes to owned output rows
+and ghost buffers, and the final ghost reduction. Before timing each case, all element contributions must be
 finite, nonzero as a vector and bit-identical between modes; the full nodal result must
 match normal execution within $10^{-11}$ relative infinity norm per equation, and bypass
 must leave a zero output. These checks pass for every reported case.
@@ -1449,7 +1473,7 @@ must leave a zero output. These checks pass for every reported case.
 At 72 threads, the first-order accumulation costs are
 \SI{\scatterFoAtomicDelta}{\milli\second} for atomic and
 \SI{\scatterFoPackedDelta}{\milli\second} for packed.
-The limited scheme costs \SI{\scatterHoAtomicDelta}{\milli\second} and
+The Darwish scheme costs \SI{\scatterHoAtomicDelta}{\milli\second} and
 \SI{\scatterHoPackedDelta}{\milli\second}, respectively. The differences account for
 \scatterFoGapShare\% and \scatterHoGapShare\% of the respective full-probe layout gaps.
 Normal execution in this allocation gives packed speedups of
@@ -1510,7 +1534,7 @@ Darwish actions in a separate matched Grace run. The direct control builds and
 retains the same cache but recomputes the coefficients during application;
 its mean time matches the original to the precision shown.
 Caching reduces application time by \dcTimeReduction\% relative to the original
-direct action ($\dcSpeedup\times$ speedup), with every paired primary window
+direct action ($\dcSpeedup\times$ speedup), with all six paired 60-application measurements
 favouring the cache. The cached consistent action also takes \dcSpmvReduction\%
 less time than the assembled \emph{lagged} SpMV. This is a cost comparison of
 different operators; within that table, only the packed lagged action and SpMV
@@ -1529,10 +1553,11 @@ encode the same one.
 \par\smallskip\footnotesize Matrix columns count values, column indices and row offsets only; cache is the additional Darwish coefficient array. --- means that component is not required by the arm, not zero total memory. Mesh, geometry, state gradients, vectors and workspaces are excluded. $^{\dagger}$Lagged BSR storage is calculated from the fixture connectivity and array widths, not measured process memory.
 \end{table*}
 
-Each block retains one worker per arm. Directions are defined from node
-coordinates, with 30 warmups before each capture and transparent huge pages disabled. All six
-permutations of 30/60/90 applications are retained, including the additional
-windows outside the primary comparison. The cache adds \dcGiB{}\,GiB and takes
+Each measurement block reuses one process per implementation. Directions
+are defined from node coordinates. Each measurement follows 30 warmup
+applications, with transparent huge pages disabled. We test 30, 60 and 90
+applications in all six possible orders. The table uses the 60-application
+measurements; the other lengths are reported in the reproducibility material. The cache adds \dcGiB{}\,GiB and takes
 \dcSetup{}\,s to allocate, build and check. At the mean measured saving, this
 setup is repaid after approximately \dcPayoff{} applications at an unchanged
 state, relative to direct Darwish; solver amortisation was not measured.
@@ -1565,12 +1590,13 @@ the separate \dcTimeReduction\% result in Table~\ref{tab:darwishcache}.
   \caption{Equivalent consistent Darwish applications: FP64, 72 Grace cores,
     affine interior, $n=128$, pack size 1024, Rhie--Chow enabled, perturbation
     0.017. Means and full ranges of 24 windows per arm, each with 60 applications.
-    Three workers each retain both matrices and the cache through eight balanced
-    four-arm blocks. Coordinate-based directions, 30 warmups and THP disabled;
-    setup and checks excluded. Ranges are not confidence intervals.}
+    Three processes each keep both matrices and the cache allocated while
+    measuring all four implementations in eight blocks with balanced ordering.
+    Directions are coordinate-based; each measurement follows 30 warmups.
+    Transparent huge pages are disabled; setup and validation are excluded. Ranges are not confidence intervals.}
   \label{tab:consistentmatrix}
   \input{tables/consistent_matrix}
-\par\smallskip\footnotesize Matrix columns count values, column indices and row offsets only; cache is the additional Darwish coefficient array. --- means that component is not required by the arm, not zero total memory. Mesh, geometry, state gradients, vectors and workspaces are excluded. Columns describe the representation used by each arm; both matrices and the cache stayed allocated in every timing worker.
+\par\smallskip\footnotesize Matrix columns count values, column indices and row offsets only; cache is the additional Darwish coefficient array. --- means that component is not required by the arm, not zero total memory. Mesh, geometry, state gradients, vectors and workspaces are excluded. Columns describe the representation used by each arm; both matrices and the cache stayed allocated in every benchmark process.
 \end{table*}
 
 For the lagged operator, the BSR arrays occupy \dcLaggedGiB{}\,GiB on the same mesh; the packed lagged action requires neither those matrix arrays nor the Darwish coefficient cache. The consistent cache adds \cmCacheGiB{}\,GiB; CSR and BSR store \cmCsrGiB{} and

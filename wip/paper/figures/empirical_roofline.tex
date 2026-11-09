@@ -4,20 +4,24 @@
 \begin{axis}[
 width=\linewidth,height=7.0cm,scale only axis=false,
 xmode=log,ymode=log,log basis x=10,log basis y=10,
-xmin=0.16,xmax=10,ymin=60,ymax=3300,
+xmin=0.16,xmax=10,ymin=60,ymax=4500,
 xtick={0.2,0.5,1,2,5,10},xticklabels={0.2,0.5,1,2,5,10},
-ytick={100,200,500,1000,2000},yticklabels={100,200,500,1000,2000},
-xlabel={Speculative FP operations / transported byte},
-ylabel={Speculative FP Gop/s},
+ytick={100,200,500,1000,2000,4000},yticklabels={100,200,500,1000,2000,4000},
+xlabel={Arithmetic intensity [FLOP/byte]},
+ylabel={Floating-point throughput [GFLOP/s]},
 grid=major,major grid style={gray!18},tick label style={font=\footnotesize},
 label style={font=\footnotesize},legend columns=2,
 legend style={at={(0.5,-0.27)},anchor=north,draw=none,font=\scriptsize,
 cells={anchor=west},column sep=6pt},]
-\addplot[draw=none,fill=gray!15,forget plot] coordinates {(.16,63.06447108784885) (10,3941.5294429905534) (10,4175.386846696572) (.16,66.80618954714517)} \closedcycle;
-\addplot[draw=none,fill=gray!15,forget plot] coordinates {(.16,2363.490814540799) (10,2363.490814540799) (10,2462.050629226856) (.16,2462.050629226856)} \closedcycle;
-\addplot[gray,dashed,thick,no marks,forget plot] coordinates {(.16,64.1951897291501) (10,4012.199358071881)};
-\addplot[gray,dotted,thick,no marks,forget plot] coordinates {(.16,65.82876003382617) (10,4114.297502114136)};
-\addplot[gray,dashdotted,thick,no marks,forget plot] coordinates {(.16,2448.1093146161065) (10,2448.1093146161065)};
+\addplot[draw=none,fill=gray!15,forget plot] coordinates {(0.16,63.0644710878) (5.99637995536,2363.49081454) (10,2363.49081454) (10,2462.05062923) (5.89658089088,2462.05062923) (0.16,66.8061895471)} \closedcycle;
+\addplot[gray,dashed,thick,no marks,forget plot] coordinates {(0.16,64.1951897292) (6.10166418997,2448.10931462)};
+\addplot[gray,dotted,thick,no marks,forget plot] coordinates {(0.16,65.8287600338) (5.95024864721,2448.10931462)};
+\addplot[gray,dashdotted,thick,no marks,forget plot] coordinates {(5.95024864721,2448.10931462) (10,2448.10931462)};
+\addplot[black,solid,thick,no marks,forget plot] coordinates {(.16,80.0) (7.1,3550.0) (10,3550.0)};
+\draw[black,solid,thick] (rel axis cs:0.04,0.94) -- (rel axis cs:0.16,0.94);
+\node[anchor=west,font=\scriptsize] at (rel axis cs:0.18,0.94) {Vendor FP64};
+\draw[gray,dashdotted,thick] (rel axis cs:0.04,0.85) -- (rel axis cs:0.16,0.85);
+\node[anchor=west,font=\scriptsize] at (rel axis cs:0.18,0.85) {Measured};
 \addplot[only marks,color=rlBlue,mark=*,mark options={fill=white},mark size=1.25pt,opacity=0.45,forget plot] coordinates {(4.40018536339,283.343737204) (4.37676714375,281.922865423) (4.37033853198,282.040888282) (4.38620794682,282.093557482) (4.36808772194,281.458045046) (4.369080131,281.712590582) (4.3878325883,272.825823352) (4.40478861035,281.168380445) (4.38412958822,281.019936887) (4.38232509338,281.085635739) (4.37374018746,281.438551702) (4.39846757755,282.70871921) (4.36488821831,282.254140987) (4.38834158634,281.770056427) (4.37086674552,279.093331963) (4.36271392914,282.197810361) (4.36681184214,281.859024975) (4.38673092065,281.505203775)};
 \addplot[only marks,color=rlBlue,mark=*,mark options={fill=white},mark size=2.7pt,thick] coordinates {(4.38012798479,281.194349991)};
 \addlegendentry{First-order, atomic}

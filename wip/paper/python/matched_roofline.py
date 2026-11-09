@@ -1,4 +1,4 @@
-"""Companion plots of counted work and transported traffic, with measured references."""
+"""Plot counted floating-point work with measured and vendor references."""
 import copy
 import json
 import math
@@ -20,6 +20,9 @@ ARMS = [
     ('spmv-fo-packed', r'$J_{\rm lagged}$, BSR SpMV', 'black', 'diamond*', True),
 ]
 PREAMBLE = '% Generated from the verified job 5047137 archive; do not edit.\n'
+# The published 7.1 TFLOP/s specification covers two Grace CPU dies.
+VENDOR_REFERENCE = dict(bandwidth_gbps=500., fp64_gflops=7100./2,
+    source='https://developer.nvidia.com/blog/nvidia-grace-cpu-superchip-architecture-in-depth/')
 
 
 def project(row, floating=True):
@@ -50,7 +53,9 @@ def plot_data(meta, result):
     data = dict(schema=1, job=meta['job'], host=meta['host'], source_archive_sha256=meta['sha256'],
                 scope={key: meta[key] for key in ('n', 'pack_size', 'threads', 'precision', 'geometry',
                        'rhie_chow', 'state_gradients', 'direction', 'boundary', 'transient', 'thp')},
-                axes=dict(x='speculative FP operations / transported byte', y='speculative FP Gop/s'),
+                axes=dict(x='Arithmetic intensity [FLOP/byte]', y='Floating-point throughput [GFLOP/s]'),
+                counting='speculative hardware-counter floating-point operations across all precisions; transported bytes',
+                vendor_reference=dict(VENDOR_REFERENCE),
                 center='arithmetic mean of per-capture x and y; not an additional capture',
                 variation='all captures shown; ranges are not confidence intervals',
                 operators={}, references={})
@@ -78,15 +83,25 @@ def coordinates(rows):
     return ' '.join('({:.12g},{:.12g})'.format(row['ops_per_byte'], row['gops']) for row in rows)
 
 
+def roof_path(bandwidth, compute, xmin=0.16, xmax=10.):
+    knee = compute/bandwidth
+    xs = [xmin] + ([knee] if xmin < knee < xmax else []) + [xmax]
+    return [(x, min(bandwidth*x, compute)) for x in xs]
+
+
+def path_coordinates(points):
+    return ' '.join('({:.12g},{:.12g})'.format(x,y) for x,y in points)
+
+
 def panel(data, arms, title):
     text = [PREAMBLE, r'\begin{tikzpicture}', r'\begin{axis}[',
             r'width=\linewidth,height=7.9cm,scale only axis=false,',
             r'xmode=log,ymode=log,log basis x=10,log basis y=10,',
-            r'xmin=0.16,xmax=10,ymin=60,ymax=3300,',
+            r'xmin=0.16,xmax=10,ymin=60,ymax=4500,',
             r'xtick={0.2,0.5,1,2,5,10},xticklabels={0.2,0.5,1,2,5,10},',
-            r'ytick={100,200,500,1000,2000},yticklabels={100,200,500,1000,2000},',
-            r'xlabel={Speculative FP operations / transported byte},',
-            r'ylabel={Speculative FP Gop/s},title={'+title+'},',
+            r'ytick={100,200,500,1000,2000,4000},yticklabels={100,200,500,1000,2000,4000},',
+            r'xlabel={Arithmetic intensity [FLOP/byte]},',
+            r'ylabel={Floating-point throughput [GFLOP/s]},title={'+title+'},',
             r'grid=major,major grid style={gray!18},tick label style={font=\footnotesize},',
             r'label style={font=\footnotesize},legend columns=2,',
             r'legend style={at={(0.5,-0.27)},anchor=north,draw=none,font=\footnotesize,',
@@ -94,16 +109,31 @@ def panel(data, arms, title):
     refs = data['references']
     low = min(refs[name]['minimum'] for name in ('copy', 'triad'))
     high = max(refs[name]['maximum'] for name in ('copy', 'triad'))
-    text.append(r'\addplot[draw=none,fill=gray!15,forget plot] coordinates {'+
-                '(.16,{}) (10,{}) (10,{}) (.16,{})'.format(.16*low,10*low,10*high,.16*high)+r'} \closedcycle;')
     gemm = refs['dgemm']
+    # Follow the roof envelope; separate full-length bands obscure the knee.
+    band = roof_path(low, gemm['minimum']) + list(reversed(roof_path(high, gemm['maximum'])))
     text.append(r'\addplot[draw=none,fill=gray!15,forget plot] coordinates {'+
-                '(.16,{lo}) (10,{lo}) (10,{hi}) (.16,{hi})'.format(lo=gemm['minimum'],hi=gemm['maximum'])+r'} \closedcycle;')
+                path_coordinates(band)+r'} \closedcycle;')
     for name, style in (('copy', 'dashed'), ('triad', 'dotted')):
+        bandwidth = refs[name]['mean']
+        knee = gemm['mean']/bandwidth
         text.append(r'\addplot[gray,'+style+r',thick,no marks,forget plot] coordinates {'+
-                    '(.16,{}) (10,{})'.format(.16*refs[name]['mean'],10*refs[name]['mean'])+'};')
+                    path_coordinates([(0.16,0.16*bandwidth),(knee,gemm['mean'])])+'};')
+    # Both bandwidth references share the measured compute plateau.
+    knee = gemm['mean']/max(refs[name]['mean'] for name in ('copy', 'triad'))
     text.append(r'\addplot[gray,dashdotted,thick,no marks,forget plot] coordinates {'+
-                '(.16,{0}) (10,{0})'.format(gemm['mean'])+'};')
+                path_coordinates([(knee,gemm['mean']),(10,gemm['mean'])])+'};')
+
+    vendor = data['vendor_reference']
+    bandwidth, peak = vendor['bandwidth_gbps'], vendor['fp64_gflops']
+    text.append(r'\addplot[black,solid,thick,no marks,forget plot] coordinates {'+
+                '(.16,{}) ({},{}) (10,{})'.format(.16*bandwidth,peak/bandwidth,peak,peak)+'};')
+    for label, style, height in (('Vendor FP64','black,solid',0.94),
+                                 ('Measured','gray,dashdotted',0.85)):
+        text.append(r'\draw['+style+r',thick] (rel axis cs:0.04,'+str(height)+
+                    r') -- (rel axis cs:0.16,'+str(height)+');')
+        text.append(r'\node[anchor=west,font=\scriptsize] at (rel axis cs:0.18,'+
+                    str(height)+') {'+label+'};')
     for name, label, color, mark, filled in arms:
         fill = color if filled else 'white'
         style = 'only marks,color='+color+',mark='+mark+',mark options={fill='+fill+'}'
@@ -121,6 +151,8 @@ def values(data, result):
     lagged, spmv = (metrics[name] for name in ('lagged-fo-packed', 'spmv-fo-packed'))
     values = dict(Copy='{:.1f}'.format(refs['copy']['mean']), Triad='{:.1f}'.format(refs['triad']['mean']),
                   Gemm='{:.0f}'.format(refs['dgemm']['mean']),
+                  VendorBandwidth='{:.0f}'.format(data['vendor_reference']['bandwidth_gbps']),
+                  VendorPeak='{:.2f}'.format(data['vendor_reference']['fp64_gflops']/1000),
                   LaggedTime='{:.2f}'.format(lagged['normal_ms']), SpmvTime='{:.2f}'.format(spmv['normal_ms']),
                   Speedup='{:.2f}'.format(spmv['normal_ms']/lagged['normal_ms']),
                   WorkRatio='{:.2f}'.format(lagged['gop']/spmv['gop']),
@@ -140,6 +172,16 @@ def build_outputs(meta, result, directory):
 def selftest(meta, result):
     data = plot_data(meta, result)
     assert len(data['operators']) == 11 and len(data['references']) == 3
+    assert roof_path(400., 2400.) == [(0.16,64.), (6.,2400.), (10.,2400.)]
+    assert roof_path(400., 40.) == [(0.16,40.), (10.,40.)]
+    assert roof_path(400., 8000.) == [(0.16,64.), (10.,4000.)]
+    for name in ('copy', 'triad'):
+        bandwidth = data['references'][name]['mean']
+        compute = data['references']['dgemm']['mean']
+        path = roof_path(bandwidth,compute)
+        assert len(path) == 3 and math.isclose(path[1][0]*bandwidth,compute)
+        assert all(y <= compute and y <= bandwidth*x for x,y in path)
+
     for value in data['operators'].values():
         for row in value['samples']:
             assert math.isclose(row['gops']/row['ops_per_byte'], row['gbps'], rel_tol=1e-12)
