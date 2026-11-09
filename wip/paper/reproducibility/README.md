@@ -26,10 +26,36 @@ It does not rerun the hardware measurements. The archive retains the exact
 measurement sources, launch records, binaries' hashes, dependencies and controls;
 the capture code is not installed in the production benchmark by this paper PR.
 
+## Run identifiers and measurement protocol
+
+Scheduler job and node identifiers are provenance, not hardware descriptions.
+The roofline uses job 5047137 on nid006550. The separate accumulation table
+uses job 5026072 on nid006544; its samples are not combined with the roofline.
+The generated macros and archived launch records retain these identifiers.
+
+The counter controller waits for acknowledgement that counting has started
+before allowing the timed loop to run, then stops counting after the loop.
+Both counter monitors bracket the same loop; their switching is asynchronous.
+Empty-loop controls and the counter-runtime checks bound this overhead.
+The processes and their arrays are reused across measurements so that setup
+and allocation are outside the measured application windows.
+
+Copy and triad are distinct streaming benchmarks, not repeated estimates from
+one kernel. Their mean transported bandwidths are 401.2 and 411.4 GB/s,
+respectively, in this allocation. The figure includes their sample variation.
+DGEMM has two reported rates: 2448 GFLOP/s from speculative hardware counts
+for the roofline, and 2453 GFLOP/s from useful work (2*N^3 per call) in the
+platform table. Neither should be confused with the theoretical vendor peak.
+
 ## Definitions and limits
 
-- Both axes use speculative PMU floating-point operations of all precisions,
-  not a source-level useful-FLOP model. Transported bytes are counted reads
+- Axes use FLOP/byte and GFLOP/s. FLOPs are speculative PMU floating-point
+  operations across all precisions, not a source-level useful-work model.
+  `FP_SCALE_OPS_SPEC` plus `FP_FIXED_OPS_SPEC` counts SVE, scalar and NEON
+  arithmetic; fused multiply-add counts twice per active element. Integer
+  indexing, loads, stores and synchronization are not part of the FLOP count.
+  See the [Grace counter definitions](https://docs.nvidia.com/dccpu/grace-perf-tuning-guide/measuring-performance.html#computational-intensity).
+  Transported bytes are counted reads
   plus total writes, using the validated Grace event definitions.
 - Application rates use the timed loop bracketed by both counter windows.
   Setup, assembly, validation and warmups lie outside those windows.
@@ -39,17 +65,28 @@ the capture code is not installed in the production benchmark by this paper PR.
 - Copy/triad controls use 80 million doubles and repeat counts 10/40/70.
   OpenBLAS 0.3.30 DGEMM uses N=8192, three warmups and 1/2/3 calls. These
   achieved references are not strict hardware ceilings or official STREAM scores.
+- The separate black solid roof uses vendor references: up to 500 GB/s and
+  3.55 TFLOP/s per CPU die, the latter derived as half the advertised 7.1 TFLOP/s
+  dual-die rate. Source: [NVIDIA Grace architecture specifications](https://developer.nvidia.com/blog/nvidia-grace-cpu-superchip-architecture-in-depth/).
+  These values are not measurements of this allocation. The FP64 roof provides
+  context rather than a strict ceiling for all-precision speculative counts;
+  no percentage of vendor peak is claimed. It does not change any measured point.
 - All samples remain. Counter coverage, empty controls, runtime windows,
   repeat-count stability and paired normal timing pass the original practical
   screens. No background subtraction or post-hoc sample filtering is applied.
 - The main figure selects four residual arms and the equivalent lagged pair.
   Small points show every counted capture; large points are arithmetic means
   of per-capture coordinates. Reference bands show sample ranges, not confidence
-  intervals. Full residual/action figures, sample coordinates and timing/traffic
+  intervals. Each empirical roof follows min(B*I, P), using the copy or triad
+  mean bandwidth B and the common hardware-counted DGEMM rate P. Slopes stop
+  at their knees; the shared plateau starts at the first knee. The shaded
+  envelope uses the smallest/largest reference bandwidth and DGEMM rates;
+  it is a descriptive envelope, not a jointly measured bound.
+  Full residual/action figures, sample coordinates and timing/traffic
   tables are regenerated under ignored `generated-roofline/`.
 - The two lagged applications are equivalent operators. A residual and a
   Jacobian, or a consistent and lagged Jacobian, answer different questions.
-  Counted Gop/s ratios are not automatically runtime speedups.
+  Counted GFLOP/s ratios are not automatically runtime speedups.
 
 The matched results distinguish comparable traffic with cheaper accumulation
 from avoiding matrix traffic altogether. They do not isolate a hardware
