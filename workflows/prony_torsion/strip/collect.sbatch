@@ -17,7 +17,7 @@ COL=$D/dev/wip/ldp_containment/python/collect_prony.py
 P=${OUT:-$D/runs/paper_strip}
 [ -e $P ] && { echo "collect: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
-REDUCED="float32 int16_scaled int8_scaled float16_md"
+REDUCED="float32 int16_scaled float16_md"
 RUNS="full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
 RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
 for m in HEX8_60 HEX8_120 HEX27_30 HEX27_60 TET4_60 TET10_60; do
