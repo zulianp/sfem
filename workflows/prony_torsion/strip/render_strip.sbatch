@@ -10,11 +10,28 @@
 # The strip's renders (render_strip.py): the paper's sequence at the times TIMES, without text, and
 # the movie's frames, every STRIDE-th exported step with the time stamped, 20 per pvbatch process (the
 # EGL driver aborts one after about 25 images); one colour range for both, RANGE (m).
-#   RUN=<run folder> OUT=<folder> RANGE=0,<umax> [TIMES=t0,t1,...] [STRIDE=10] [SIZE=1600,700]
+#   RUN=<run folder> OUT=<folder> [RANGE=0,<umax>] [TIMES=t0,t1,...] [STRIDE=10] [SIZE=1600,700]
+# Without RANGE the colour range is 0 to the largest |u| over every STRIDE-th step (computed once).
 set -u
 T=/ritom/scratch/cscs/zulianp/sfem-prony-md/workflows/prony_torsion/strip/render_strip.py
 export VTK_DEFAULT_EGL_DEVICE_INDEX=0
 mkdir -p $OUT
+if [ -z "${RANGE:-}" ]; then
+  RANGE=$(python3 - "$RUN" "${STRIDE:-10}" <<'PYEOF'
+import os, sys
+import numpy as np
+run, stride = sys.argv[1], int(sys.argv[2])
+out = os.path.join(run, "results", "out")
+n = len(open(os.path.join(out, "time.txt")).read().split())
+top = 0.0
+for k in range(0, n, stride):
+    u = np.stack([np.fromfile(os.path.join(out, "disp.%d.%09d.float64" % (d, k))) for d in range(3)], axis=1)
+    top = max(top, float(np.linalg.norm(u, axis=1).max()))
+print("0,%.4g" % top)
+PYEOF
+)
+fi
+echo "colour range $RANGE"
 if [ -n "${TIMES:-}" ]; then
   pvbatch $T $RUN $OUT/sequence --times=$TIMES --range=$RANGE --size=${SIZE:-2400,1300} --prefix=seq --crop
 fi

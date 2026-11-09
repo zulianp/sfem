@@ -50,6 +50,7 @@ namespace sfem {
                 "constraints[].angle",
                 "constraints[].profile.*",
                 "constraints[].release",
+                "constraints[].hold_axial",
                 "constraints[].control.torque",
                 "constraints[].control.tol",
                 "constraints[].control.max_it",

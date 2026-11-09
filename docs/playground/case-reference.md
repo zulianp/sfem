@@ -166,6 +166,7 @@ Rigid rotations of a sideset (host only).
 | `control.tol`, `control.max_it` | real, int | `1e-6` (relative), `20` | |
 | `profile` | [profile](#profiles) | constant 1 | |
 | `release` | time | | The constraint is removed from the first step that ends at or after this time. |
+| `hold_axial` | bool | `false` | The face also keeps its position along the axis (otherwise free); a release frees it too. |
 
 ```yaml
 constraints:

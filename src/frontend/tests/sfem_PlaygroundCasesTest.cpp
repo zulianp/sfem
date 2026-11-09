@@ -560,6 +560,43 @@ solver: {newton: {verbose: false}}
     return SFEM_TEST_SUCCESS;
 }
 
+// hold_axial: the twisted face keeps its position along the axis; without it the twist moves it.
+int test_rotation_hold_axial() {
+    real_t largest[2] = {0, 0};
+    for (int hold = 0; hold < 2; ++hold) {
+        const std::string yaml = std::string(R"(
+mesh:
+  box: {n: [4, 2, 2], min: [0, 0, 0], max: [2, 1, 1]}
+  sidesets:
+    - {name: left, plane: {axis: x, at: min}}
+    - {name: right, plane: {axis: x, at: max}}
+material: {type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
+constraints:
+  - {type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 1.2, hold_axial: )") +
+                                 (hold ? "true" : "false") + R"(,
+     profile: {type: linear_ramp, start_time: 0, end_time: 4, start_value: 0, end_value: 1}}
+regime: quasi_static
+time: {dt: 1, steps: 4}
+solver: {newton: {verbose: false}}
+)";
+        auto pg = assemble(yaml.c_str());
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        auto       mesh = pg->function()->space()->mesh();
+        auto       xyz  = mesh->points()->data();
+        const auto u    = pg->solution()->data();
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+            if (std::abs(xyz[0][i] - 2) > 1e-6) continue;
+            largest[hold] = std::max(largest[hold], std::abs(u[i * 3 + 0]));
+        }
+    }
+    SFEM_TEST_ASSERT(largest[1] == 0);
+    SFEM_TEST_ASSERT(largest[0] > 1e-6);
+    return SFEM_TEST_SUCCESS;
+}
+
 // A sine profile: the twisted face follows angle * sin(2 pi t / period).
 int test_sine_rotation() {
     const char *const yaml = R"(
@@ -917,6 +954,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_dynamic_cantilever);
     SFEM_RUN_TEST(test_output_fields);
     SFEM_RUN_TEST(test_rotation_constraint);
+    SFEM_RUN_TEST(test_rotation_hold_axial);
     SFEM_RUN_TEST(test_sine_rotation);
     SFEM_RUN_TEST(test_prony_torsion_release);
     SFEM_RUN_TEST(test_torque_control);

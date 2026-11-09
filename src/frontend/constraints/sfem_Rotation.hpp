@@ -23,7 +23,8 @@ namespace sfem {
                                                 const int                                    axis,
                                                 const real_t                                 center[3],
                                                 const real_t                                 angle,
-                                                const LoadProfile                           &profile);
+                                                const LoadProfile                           &profile,
+                                                const bool                                   hold_axial = false);
         ~Rotation() override;
 
         /// Prescribes the rotation at time t.

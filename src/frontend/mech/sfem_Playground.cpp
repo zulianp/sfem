@@ -494,7 +494,8 @@ namespace sfem {
                 LoadProfile profile;
                 if (has(c, "profile") && LoadProfile::from_yaml(c["profile"], profile, config.base_dir()) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-                auto rotation = Rotation::create(fs, sidesets, axis, center.data(), read<real_t>(c, "angle", 0), profile);
+                auto rotation = Rotation::create(
+                        fs, sidesets, axis, center.data(), read<real_t>(c, "angle", 0), profile, read<bool>(c, "hold_axial", false));
                 if (!rotation) return SFEM_FAILURE;
                 if (es != EXECUTION_SPACE_HOST) {
                     // On the device the rotation prescribes through a device copy of its conditions,
