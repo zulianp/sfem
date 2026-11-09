@@ -14,40 +14,45 @@
 # reference (set dt_TET4), every run of a step against that step's reference (sets dt_own_<us>:
 # the repeat's floor and each storage's error at that step), and the valve events of every run.
 # Runs a step lacks are left out.
-#   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025"] [OUT=runs/paper_dt_<finest tag>]
+# MESH names the folders' mesh part, s0 (TET4) or p2 (TET10).
+#   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025"] [MESH=s0] [OUT=runs/paper_dt_<finest tag>]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=$D/dev/wip/ldp_containment/python/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025}
+MESH=${MESH:-s0}
+SET=dt_TET4; [ $MESH = p2 ] && SET=dt_TET10
 finest=${TAGS##* }
 P=${OUT:-$D/runs/paper_dt_$finest}
 [ -e $P ] && { echo "collect_dt: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 RUNS=${RUNS:-bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__full_s32_a bsr32__float32_plain_s32_a}
 all=""
-for tag in $TAGS; do for r in $RUNS; do [ -f $CASE/${tag}_s0_$r/sim2/history.csv ] && all="$all ${tag}_s0_$r"; done; done
-ref=${finest}_s0_bsr32__full_a
+for tag in $TAGS; do for r in $RUNS; do [ -f $CASE/${tag}_${MESH}_$r/sim2/history.csv ] && all="$all ${tag}_${MESH}_$r"; done; done
+ref=${finest}_${MESH}_bsr32__full_a
 others=$(for r in $all; do [ $r != $ref ] && echo $r; done)
 # shellcheck disable=SC2086
-$PY $COL runs $P/dt_runs.csv $P/dt_series.csv dt_TET4 $CASE $ref $others > $P/dt.log 2>&1; echo "runs rc=$?"
+$PY $COL runs $P/dt_runs.csv $P/dt_series.csv $SET $CASE $ref $others > $P/dt.log 2>&1; echo "runs rc=$?"
 for tag in $TAGS; do
-  own=$(for r in $all; do case $r in ${tag}_s0_*) [ $r != ${tag}_s0_bsr32__full_a ] && echo $r ;; esac; done)
+  own=$(for r in $all; do case $r in (${tag}_${MESH}_*) [ $r != ${tag}_${MESH}_bsr32__full_a ] && echo $r ;; esac; done)
   # shellcheck disable=SC2086
-  $PY $COL runs $P/dt_runs.csv $P/dt_own_series.csv dt_own_$tag $CASE ${tag}_s0_bsr32__full_a $own \
+  $PY $COL runs $P/dt_runs.csv $P/dt_own_series.csv dt_own_$tag $CASE ${tag}_${MESH}_bsr32__full_a $own \
       >> $P/dt.log 2>&1; echo "own $tag rc=$?"
 done
 # shellcheck disable=SC2086
-$PY $COL events $P/dt_events.csv dt_TET4 $CASE $all >> $P/dt.log 2>&1; echo "events rc=$?"
-# The collector reads the frames' times from out/time.txt: the campaign's repeat must match valve_runs.csv.
-$PY $COL runs $P/check_runs.csv $P/check_series.csv TET4 $CASE tp10_s0_bsr32__full_a tp10_s0_bsr32__full_b >> $P/dt.log 2>&1
-$PY - $P/check_runs.csv $D/runs/paper_data10/valve_runs.csv <<'PYEOF'
+$PY $COL events $P/dt_events.csv $SET $CASE $all >> $P/dt.log 2>&1; echo "events rc=$?"
+# The collector reads the frames' times from out/time.txt: the campaign's TET4 repeat must match valve_runs.csv.
+if [ $MESH = s0 ]; then
+  $PY $COL runs $P/check_runs.csv $P/check_series.csv TET4 $CASE tp10_s0_bsr32__full_a tp10_s0_bsr32__full_b >> $P/dt.log 2>&1
+  $PY - $P/check_runs.csv $D/runs/paper_data10/valve_runs.csv <<'PYEOF'
 import csv, sys
 new = {r["run"]: r for r in csv.DictReader(open(sys.argv[1]))}["tp10_s0_bsr32__full_b"]
 old = {(r["set"], r["run"]): r for r in csv.DictReader(open(sys.argv[2]))}[("TET4", "bsr32__full_b")]
 print("check e_u median", new["e_u_median"], "against", old["e_u_median"])
 PYEOF
+fi
 $PY - $P/dt_runs.csv <<'PYEOF'
 import csv, sys
 for r in csv.DictReader(open(sys.argv[1])):
