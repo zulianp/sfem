@@ -27,6 +27,10 @@
 // times -- for the means, the deviations' scale, and to store -- and a group
 // never straddles a block (`elements` divides BLOCK), so each pass stays within
 // the block that owns the group.
+//
+// Only a scaled codec's store has scales (`QuadratureState::scales`); for the
+// others the scales pointer is null, and the loops neither read it nor offset
+// it: an unscaled code is decoded under scale one, which its codec ignores.
 
 namespace sfem {
     namespace prony {
@@ -116,6 +120,30 @@ namespace sfem {
                 }
             }
 
+            /// The scale at `scales[k]`, or one for an unscaled codec, whose `scales` is null.
+            template <class Codec>
+            inline scaling_t scale_at(const scaling_t *const scales, const ptrdiff_t k) {
+                if constexpr (Codec::scaled) {
+                    return scales[k];
+                } else {
+                    (void)scales;
+                    (void)k;
+                    return 1;
+                }
+            }
+
+            /// `scales + offset` for a scaled codec; null for an unscaled one, which has no scales.
+            template <class Codec, class T>
+            inline T *scales_from(T *const scales, const ptrdiff_t offset) {
+                if constexpr (Codec::scaled) {
+                    return scales + offset;
+                } else {
+                    (void)scales;
+                    (void)offset;
+                    return nullptr;
+                }
+            }
+
             /// Value (r, e) of a mean-deviation tensor.
             template <class Codec>
             inline real_t mean_deviation_value(const typename Codec::storage_t code,
@@ -192,10 +220,7 @@ namespace sfem {
                         inv[l]         = 1 / static_cast<real_t>(scales[e0 + l]);
                     }
                 } else {
-                    for (ptrdiff_t l = 0; l < nb; l++) {
-                        scales[e0 + l] = 1;
-                        inv[l]         = 1;
-                    }
+                    for (ptrdiff_t l = 0; l < nb; l++) inv[l] = 1;
                 }
 
                 for (ptrdiff_t r = 0; r < rows; r++) {
@@ -225,7 +250,7 @@ namespace sfem {
                             v[l] = detail::mean_deviation_value<Codec>(s[l], scales[e0 + l], m.data, m, r, e0 + l);
                         }
                     } else {
-                        for (ptrdiff_t l = 0; l < nb; l++) v[l] = Codec::decode(s[l], scales[e0 + l]);
+                        for (ptrdiff_t l = 0; l < nb; l++) v[l] = Codec::decode(s[l], detail::scale_at<Codec>(scales, e0 + l));
                     }
                 }
             }
@@ -265,15 +290,15 @@ namespace sfem {
 
                     for (int i = 0; i < n_terms; i++) {
                         const typename HCodec::storage_t *const h  = &H[(i * rows + r) * n + e0];
-                        const scaling_t *const                  hs = &H_scales[i * n + e0];
+                        const scaling_t *const                  hs = detail::scales_from<HCodec>(H_scales, i * n + e0);
                         const real_t                            a  = alpha[i];
                         if constexpr (HCodec::mean_deviation) {
                             const history_mean_t *const row = m.tensor(i, rows) + (r / m.n_qp) * m.n_groups;
                             for (ptrdiff_t l = 0; l < nb; l++) {
-                                o[l] += a * (static_cast<real_t>(row[groups[l]]) + HCodec::decode(h[l], hs[l]));
+                                o[l] += a * (static_cast<real_t>(row[groups[l]]) + HCodec::decode(h[l], detail::scale_at<HCodec>(hs, l)));
                             }
                         } else {
-                            for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], hs[l]);
+                            for (ptrdiff_t l = 0; l < nb; l++) o[l] += a * HCodec::decode(h[l], detail::scale_at<HCodec>(hs, l));
                         }
                         const real_t ab = beta ? a * beta[i] : real_t(0);
                         if (ab != 0) {
@@ -362,12 +387,12 @@ namespace sfem {
 
                 for (int i = 0; i < n_terms; i++) {
                     typename HCodec::storage_t *const h_i  = &H[i * rows * n];
-                    scaling_t *const                  hs_i = &H_scales[i * n + e0];
+                    scaling_t *const                  hs_i = detail::scales_from<HCodec>(H_scales, i * n + e0);
                     const real_t                      a    = alpha[i];
 
                     real_t old_scale[BLOCK];
                     real_t inv[BLOCK];
-                    for (ptrdiff_t l = 0; l < nb; l++) old_scale[l] = hs_i[l];
+                    for (ptrdiff_t l = 0; l < nb; l++) old_scale[l] = detail::scale_at<HCodec>(hs_i, l);
 
                     if constexpr (HCodec::scaled) {
                         real_t max_abs[BLOCK];
@@ -395,7 +420,7 @@ namespace sfem {
                             SFEM_PRONY_DIAGNOSTIC(const real_t before = HCodec::decode(h[l], old_scale[l]));
                             const real_t v = a * HCodec::decode(h[l], old_scale[l]) + increment(i, r * n + e0 + l);
                             h[l]           = HCodec::encode(v, inv[l]);
-                            SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], hs_i[l]));
+                            SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], detail::scale_at<HCodec>(hs_i, l)));
                         }
                     }
                 }
@@ -430,11 +455,11 @@ namespace sfem {
                     if constexpr (HCodec::mean_deviation) detail::lane_groups(e0, nb, m, groups);
                     for (ptrdiff_t r = 0; r < rows; r++) {
                         const typename HCodec::storage_t *const h      = &H[(i * rows + r) * n + e0];
-                        const scaling_t *const                  hs     = &H_scales[i * n + e0];
+                        const scaling_t *const                  hs     = detail::scales_from<HCodec>(H_scales, i * n + e0);
                         const real_t                            weight = r / n_qp < n_diagonal ? 1 : 2;
                         real_t                                  row    = 0;
                         for (ptrdiff_t l = 0; l < nb; l++) {
-                            real_t v = HCodec::decode(h[l], hs[l]);
+                            real_t v = HCodec::decode(h[l], detail::scale_at<HCodec>(hs, l));
                             if constexpr (HCodec::mean_deviation) {
                                 v += static_cast<real_t>(m.tensor(i, rows)[(r / m.n_qp) * m.n_groups + groups[l]]);
                             }

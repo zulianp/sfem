@@ -36,8 +36,8 @@ namespace sfem {
         }
 
         const ptrdiff_t n_values = n_tensors * values_per_tensor() * n_elements;
-        data_   = create_buffer<uint8_t>(n_values * bytes_per_value(storage), es);
-        scales_ = create_buffer<scaling_t>(n_tensors * n_elements, es);
+        data_ = create_buffer<uint8_t>(n_values * bytes_per_value(storage), es);
+        if (is_scaled(storage)) scales_ = create_buffer<scaling_t>(n_tensors * n_elements, es);
 
         if (is_mean_deviation(storage)) {
             if (n_components > 9) {
@@ -56,7 +56,7 @@ namespace sfem {
     }
 
     std::size_t QuadratureState::bytes() const {
-        return data_->size() * sizeof(uint8_t) + scales_->size() * sizeof(scaling_t) +
+        return data_->size() * sizeof(uint8_t) + (scales_ ? scales_->size() * sizeof(scaling_t) : 0) +
                (means_ ? means_->size() * sizeof(history_mean_t) : 0);
     }
 
@@ -75,7 +75,7 @@ namespace sfem {
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_zero(data_->size(), data_->data(), scales_->size(), scales_->data(), stream) != SFEM_SUCCESS ||
+            if (cu_prony_zero(data_->size(), data_->data(), scales_ ? scales_->size() : 0, scales(), stream) != SFEM_SUCCESS ||
                 (means_ && cu_prony_zero(means_->size() * sizeof(history_mean_t), means_->data(), 0, nullptr, stream) != SFEM_SUCCESS)) {
                 SFEM_ERROR("QuadratureState::zero failed on the device\n");
             }
@@ -84,20 +84,19 @@ namespace sfem {
 #endif
         // Zero is the all-zero bit pattern in every storage format.
         std::memset(data_->data(), 0, data_->size());
-        scaling_t *const s = scales_->data();
-        std::fill(s, s + scales_->size(), scaling_t(1));
+        if (scales_) std::fill(scales_->data(), scales_->data() + scales_->size(), scaling_t(1));
         if (means_) std::memset(means_->data(), 0, means_->size() * sizeof(history_mean_t));
     }
 
     void QuadratureState::zero_tensor(const int t, void *const stream) {
         const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         uint8_t *const   data        = data_->data() + t * tensor_bytes;
-        scaling_t *const s           = scales_->data() + t * n_elements_;
+        scaling_t *const s           = scales_ ? scales_->data() + t * n_elements_ : nullptr;
 #ifndef SFEM_ENABLE_CUDA
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_zero(tensor_bytes, data, n_elements_, s, stream) != SFEM_SUCCESS ||
+            if (cu_prony_zero(tensor_bytes, data, s ? n_elements_ : 0, s, stream) != SFEM_SUCCESS ||
                 (means_ && cu_prony_zero(n_components_ * n_groups_ * sizeof(history_mean_t),
                                          means_view().tensor(t, values_per_tensor()),
                                          0,
@@ -109,7 +108,7 @@ namespace sfem {
         }
 #endif
         std::memset(data, 0, tensor_bytes);
-        std::fill(s, s + n_elements_, scaling_t(1));
+        if (s) std::fill(s, s + n_elements_, scaling_t(1));
         if (means_) std::memset(means_view().tensor(t, values_per_tensor()), 0, n_components_ * n_groups_ * sizeof(history_mean_t));
     }
 
@@ -121,13 +120,14 @@ namespace sfem {
         const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         const uint8_t  *src_data     = src.data_->data() + from * tensor_bytes;
         uint8_t        *dst_data     = data_->data() + to * tensor_bytes;
-        const scaling_t *src_scales  = src.scales_->data() + from * n_elements_;
-        scaling_t       *dst_scales  = scales_->data() + to * n_elements_;
+        const scaling_t *src_scales  = src.scales_ ? src.scales_->data() + from * n_elements_ : nullptr;
+        scaling_t       *dst_scales  = scales_ ? scales_->data() + to * n_elements_ : nullptr;
 #ifndef SFEM_ENABLE_CUDA
         (void)stream;
 #else
         if (es_ == EXECUTION_SPACE_DEVICE) {
-            if (cu_prony_copy(tensor_bytes, src_data, dst_data, n_elements_, src_scales, dst_scales, stream) != SFEM_SUCCESS ||
+            if (cu_prony_copy(tensor_bytes, src_data, dst_data, dst_scales ? n_elements_ : 0, src_scales, dst_scales, stream) !=
+                        SFEM_SUCCESS ||
                 (means_ && cu_prony_copy(n_components_ * n_groups_ * sizeof(history_mean_t),
                                          src.means_view().tensor(from, values_per_tensor()),
                                          means_view().tensor(to, values_per_tensor()),
@@ -141,7 +141,7 @@ namespace sfem {
         }
 #endif
         std::memcpy(dst_data, src_data, tensor_bytes);
-        std::memcpy(dst_scales, src_scales, n_elements_ * sizeof(scaling_t));
+        if (dst_scales) std::memcpy(dst_scales, src_scales, n_elements_ * sizeof(scaling_t));
         if (means_) {
             std::memmove(means_view().tensor(to, values_per_tensor()),
                          src.means_view().tensor(from, values_per_tensor()),
@@ -159,7 +159,7 @@ namespace sfem {
                                  n_elements_,
                                  values,
                                  &data<Codec>()[t * values_per_tensor() * n_elements_],
-                                 &scales()[t * n_elements_],
+                                 scales_ ? &scales()[t * n_elements_] : nullptr,
                                  m);
             return 0;
         });
@@ -168,7 +168,7 @@ namespace sfem {
     void QuadratureState::decode(const int t, real_t *const values) const {
         const ptrdiff_t  tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         const uint8_t   *data         = data_->data() + t * tensor_bytes;
-        const scaling_t *s            = scales_->data() + t * n_elements_;
+        const scaling_t *s            = scales_ ? scales_->data() + t * n_elements_ : nullptr;
         // On the device the encoded tensor and its scales come to the host, which decodes them
         // as it does its own.
         prony::Means m = means_view();
@@ -179,13 +179,13 @@ namespace sfem {
         if (es_ != EXECUTION_SPACE_HOST) {
 #ifdef SFEM_ENABLE_CUDA
             host_data.resize(tensor_bytes);
-            host_scales.resize(n_elements_);
+            if (s) host_scales.resize(n_elements_);
             if (cudaMemcpy(host_data.data(), data, tensor_bytes, cudaMemcpyDeviceToHost) != cudaSuccess ||
-                cudaMemcpy(host_scales.data(), s, n_elements_ * sizeof(scaling_t), cudaMemcpyDeviceToHost) != cudaSuccess) {
+                (s && cudaMemcpy(host_scales.data(), s, n_elements_ * sizeof(scaling_t), cudaMemcpyDeviceToHost) != cudaSuccess)) {
                 SFEM_ERROR("QuadratureState::decode: copying the tensor from the device failed\n");
             }
             data = host_data.data();
-            s    = host_scales.data();
+            if (s) s = host_scales.data();
             if (m.data) {
                 host_means.resize(n_components_ * n_groups_);
                 if (cudaMemcpy(host_means.data(), m.data, host_means.size() * sizeof(history_mean_t), cudaMemcpyDeviceToHost) !=

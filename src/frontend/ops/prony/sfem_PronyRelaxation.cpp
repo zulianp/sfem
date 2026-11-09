@@ -141,7 +141,7 @@ namespace sfem {
         const S_t *const R     = reference<S_t>();
         prony::Means     means = H_->means_view();
         if (means.data) means.data = means.tensor(first, rows);
-        scaling_t *const scales = H_->scales() + first * n_elements_;
+        scaling_t *const scales = H_->scales() ? H_->scales() + first * n_elements_ : nullptr;
         uint8_t *const   data   = static_cast<uint8_t *>(H_->raw()) + first * rows * n_elements_ * bytes_per_value(options_.history_storage);
 #ifdef SFEM_ENABLE_CUDA
         if (options_.execution_space == EXECUTION_SPACE_DEVICE) {

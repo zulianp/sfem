@@ -38,6 +38,19 @@ namespace sfem {
             return (w.alpha[i] * be - w.b[i]) * (sp - R) + (w.b[i] - be) * (sn - R);
         }
 
+        /// The scale at `scales[k]`, or one for an unscaled codec, whose store has no scales
+        /// (`scales` null), as on the host (sfem_prony_kernels.hpp, scale_at).
+        template <class Codec>
+        __device__ inline scaling_t scale_at(const scaling_t *const SFEM_RESTRICT scales, const ptrdiff_t k) {
+            if constexpr (Codec::scaled) {
+                return scales[k];
+            } else {
+                (void)scales;
+                (void)k;
+                return 1;
+            }
+        }
+
         template <class F>
         int dispatch(const HistoryStorage storage, F &&f) {
             switch (storage) {
@@ -81,7 +94,7 @@ namespace sfem {
                 const ptrdiff_t e   = k - r * n;
                 real_t          acc = -b_sum * static_cast<real_t>(S_n[k]);
                 for (int i = 0; i < n_terms; i++) {
-                    real_t h = Codec::decode(H[(i * rows + r) * n + e], H_scales[i * n + e]);
+                    real_t h = Codec::decode(H[(i * rows + r) * n + e], scale_at<Codec>(H_scales, i * n + e));
                     if constexpr (Codec::mean_deviation) {
                         h += static_cast<real_t>(m.data[(i * (rows / m.n_qp) + r / m.n_qp) * m.n_groups + e / m.elements]);
                     }
@@ -200,7 +213,7 @@ namespace sfem {
                 for (int i = 0; i < n_terms; i++) {
                     typename Codec::storage_t *const h         = &H[i * rows * n];
                     const real_t                     a         = w.alpha[i];
-                    const real_t                     old_scale = H_scales[i * n + e];
+                    const real_t                     old_scale = scale_at<Codec>(H_scales, i * n + e);
 
                     real_t inv = 1;
                     if constexpr (Codec::scaled) {
@@ -272,7 +285,7 @@ namespace sfem {
             for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
                 const ptrdiff_t r = k / n;
                 const ptrdiff_t e = k - r * n;
-                real_t          v = Codec::decode(H[(i * rows + r) * n + e], H_scales[i * n + e]);
+                real_t          v = Codec::decode(H[(i * rows + r) * n + e], scale_at<Codec>(H_scales, i * n + e));
                 if constexpr (Codec::mean_deviation) {
                     v += static_cast<real_t>(m.data[(i * (rows / m.n_qp) + r / m.n_qp) * m.n_groups + e / m.elements]);
                 }

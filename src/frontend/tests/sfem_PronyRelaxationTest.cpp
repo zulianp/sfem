@@ -331,8 +331,10 @@ int test_every_codec_round_trips_within_its_bound() {
         state.decode(0, back.data());
         for (ptrdiff_t k = 0; k < N_ENTRIES; k++) SFEM_TEST_ASSERT(back[k] == 0);
 
+        // Scales for the scaled formats only.
         SFEM_TEST_ASSERT(state.bytes() == size_t(2 * N_ENTRIES) * sfem::bytes_per_value(formats[f]) +
-                                                  size_t(2 * N_ELEMENTS) * sizeof(scaling_t));
+                                                  (sfem::is_scaled(formats[f]) ? size_t(2 * N_ELEMENTS) * sizeof(scaling_t) : 0));
+        SFEM_TEST_ASSERT((state.scales() != nullptr) == sfem::is_scaled(formats[f]));
     }
     return SFEM_TEST_SUCCESS;
 }
