@@ -90,8 +90,8 @@ namespace sfem {
             // 6 per contact node (node_obstacle_curvature_blocks), when `curved`.
             SharedBuffer<real_t>                 blocks;
             bool                                 curved{false};
-            // K_dd += shift reference_d (shift_diagonal), with tmp for its product.
-            SharedBuffer<real_t>                 reference, tmp;
+            // K_dd += shift reference_d (shift_diagonal).
+            SharedBuffer<real_t>                 reference;
             real_t                               shift{0};
             // Where the stored tangent takes the curvature and the shift in its own pass
             // (Function::set_inexact_extra, the device's assembled store): the extra the product
@@ -152,7 +152,7 @@ namespace sfem {
                 ledger.add(MemoryLedger::TANGENT_VALUES,
                            f->inexact_bytes(),
                            es == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
-                for (auto *buffer : {&state, &reference, &tmp, &blocks}) ledger.add(MemoryLedger::TANGENT_WORK, *buffer);
+                for (auto *buffer : {&state, &reference, &blocks}) ledger.add(MemoryLedger::TANGENT_WORK, *buffer);
             }
 
             void build() {
@@ -282,7 +282,6 @@ namespace sfem {
         ret->blas      = blas<real_t>(es);
         ret->state     = create_buffer<real_t>(ret->ndofs, es);
         ret->reference = create_buffer<real_t>(ret->ndofs, es);
-        ret->tmp       = create_buffer<real_t>(ret->ndofs, es);
         ret->blocks    = create_buffer<real_t>(6 * contact->size(), es);
         ret->build();
         return ret;
