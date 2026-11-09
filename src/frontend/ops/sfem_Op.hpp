@@ -28,6 +28,10 @@
 
 namespace sfem {
 
+    namespace inexact {
+        struct DiagonalExtra;
+    }
+
     /**
      * @brief Abstract base class for finite element operators
      *
@@ -172,6 +176,11 @@ namespace sfem {
          * signature says so.
          */
         virtual int inexact_apply(const real_t *const /*h*/, real_t *const /*out*/) { return SFEM_FAILURE; }
+
+        /// Extra diagonal blocks `inexact_apply` adds in its own pass, overwriting `out` when
+        /// `overwrite` (inexact::DiagonalExtra); null removes them. False where the stored
+        /// tangent cannot take them (only the assembled store can), and nothing is changed.
+        virtual bool set_inexact_extra(const inexact::DiagonalExtra * /*extra*/, const bool /*overwrite*/) { return false; }
 
         /**
          * @brief Whether the products (`team_apply`, `team_inexact_apply`) run on the threads

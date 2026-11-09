@@ -646,6 +646,23 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    bool Function::set_inexact_extra(const inexact::DiagonalExtra *const extra, const bool overwrite) {
+        // Only where one operator makes the whole product: an overwrite of `out` by one store
+        // would drop the others' terms.
+        std::shared_ptr<Op> only;
+        for (auto &op : impl_->ops) {
+            if (!op->residual_depends_on_state() && !op->inexact_supported()) continue;
+            if (only) {
+                if (extra) return false;
+                op->set_inexact_extra(nullptr, false);
+                continue;
+            }
+            only = op;
+        }
+        if (!only || !only->inexact_supported()) return false;
+        return only->set_inexact_extra(extra, overwrite);
+    }
+
     int Function::inexact_apply(const real_t *const h, real_t *const out) {
         SFEM_TRACE_SCOPE("Function::inexact_apply");
 

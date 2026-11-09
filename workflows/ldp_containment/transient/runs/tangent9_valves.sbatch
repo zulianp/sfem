@@ -19,16 +19,17 @@
 #            int8_md; _p<P> elements per mean (TET4), _plain no remainder form, _s32 float32
 #            stress slots
 # SNAP_RUNS also write the history at the times SNAP (output.history_snapshots). EXTRA: further
-# options for every run (a smoke run: EXTRA="--set time.t_end=3e-4").
+# options for every run (a smoke run: EXTRA="--set time.t_end=3e-4"). PREFIX names the folders
+# instead of tp9_{s0|p2}, PLAYGROUND another build's binary (an A/B gate, qp_window.sbatch).
 set -u
 SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PLAYGROUND=$SRC/build-cuda/playground
+PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 T=$SRC/workflows/ldp_containment/transient
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
 case ${ELEMENT:-TET4} in
-  TET4) SIM1=$CASE/prony3_sim1/sim1; PREFIX=tp9_s0; MESH="" ;;
-  TET10) SIM1=$CASE/p2_sim1/sim1; PREFIX=tp9_p2; MESH="--set mesh.path=../db/solid_p2" ;;
+  TET4) SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; MESH="" ;;
+  TET10) SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; MESH="--set mesh.path=../db/solid_p2" ;;
   *) echo "unknown ELEMENT ${ELEMENT}"; exit 1 ;;
 esac
 I="--set solver.linear.format=INEXACT --set solver.linear.inexact.store"
@@ -85,6 +86,8 @@ go() {  # <run>
        "failed=$(grep -c 'attempt failed' run.log) node=$(hostname) gpu=${CUDA_VISIBLE_DEVICES:-?}"
 }
 
+# Sourced (qp_window.sbatch), only the definitions.
+[ "${BASH_SOURCE[0]}" != "$0" ] && return 0
 for run in ${RUNS}; do
   while [ "$(jobs -rp | wc -l)" -ge 4 ]; do wait -n; done
   go "$run" &

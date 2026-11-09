@@ -46,6 +46,8 @@ namespace sfem {
         ptrdiff_t                   size() const { return nodes_->size(); }
         // On the host, whatever the execution space.
         const SharedBuffer<idx_t>  &nodes() const { return nodes_; }
+        /// Every node of the vectors to its contact node's index, -1 if it is none (execution space).
+        const idx_t                *frame_of() const { return frame_of_->data(); }
         // In the execution space.
         const SharedBuffer<real_t> &gap() const { return gap_; }
         ExecutionSpace              execution_space() const { return context_.space(); }
@@ -133,6 +135,8 @@ namespace sfem {
         // The same at the contact nodes of the calling thread's rows (a region's Team, the host).
         void apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const;
         void blocks_diagonal(const real_t *const blocks, real_t *const d) const;
+        // out = B_i in at the contact nodes (blocks null: none) + shift reference .* in, at every node.
+        void extra(const real_t *const blocks, const real_t shift, const real_t *const reference, const real_t *const in, real_t *const out) const;
 
         // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
         // residual's part that is the obstacle's reaction.

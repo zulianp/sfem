@@ -74,11 +74,32 @@ namespace sfem {
         /// keeps the rows whose blocks do not sum to zero as a correction, `y_i += R_i x_i` with
         /// `R_i = sum_j K_ij` in single precision: exact for any operator, and empty in a
         /// quasi-static solve, where the sums are the assembly's rounding.
+        /// What a contact step adds to the stored tangent's diagonal blocks, applied in the store's
+        /// own pass: the obstacle's curvature, a symmetric 3x3 block per contact node (packed
+        /// [xx, xy, xz, yy, yz, zz], node_obstacle_pack_sym), and a shift times |reference| per
+        /// dof. Pointers where the store's vectors live.
+        struct DiagonalExtra {
+            const idx_t   *contact_of{nullptr};  // per node: its contact's index, -1 for none; null: no curvature
+            const real_t  *blocks{nullptr};      // 6 per contact
+            real_t         shift{0};
+            const real_t  *reference{nullptr};   // per dof, read where shift != 0
+        };
+
+        /// out += B in, B packed as DiagonalExtra's blocks (node_obstacle_packed_sym_apply's arithmetic).
+        SFEM_HOST_DEVICE SFEM_INLINE void packed_sym_apply(const real_t *const B, const real_t *const in, real_t *const out) {
+            out[0] += B[0] * in[0] + B[1] * in[1] + B[2] * in[2];
+            out[1] += B[1] * in[0] + B[3] * in[1] + B[4] * in[2];
+            out[2] += B[2] * in[0] + B[4] * in[1] + B[5] * in[2];
+        }
+
         class BsrStore {
         public:
             virtual ~BsrStore() = default;
             virtual int         update(const AssembleBSR &assemble)                    = 0;
             virtual void        apply(const real_t *const x, real_t *const y) const    = 0;  // y += A x
+            /// y = A x + E x (`overwrite`) or y += A x + E x, E the extra diagonal blocks, in one pass
+            /// where the store can: the operations of apply, then the curvature, then the shift.
+            virtual void apply(const real_t *const x, real_t *const y, const DiagonalExtra &extra, const bool overwrite) const = 0;
             /// y += A x by the threads of a region (sfem_TeamOperator.hpp): on return the calling
             /// thread's rows, team's share of the 3 n entries, are complete. The host's.
             virtual void team_apply(const Team &team, const real_t *const x, real_t *const y) const {

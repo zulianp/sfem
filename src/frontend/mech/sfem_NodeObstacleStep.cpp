@@ -121,8 +121,16 @@ namespace sfem {
             // Gershgorin's bound for S K S where the tangent has its rows: the scale is one per
             // contact node, so it commutes with the node's frame, and S Q^T K Q S = Q^T (S K S) Q has
             // the same eigenvalues.
-            const real_t bound = tangent->max_eig(scale->data());
-            qp->set_max_eig(bound > 0 ? bound : estimate_max_eig());
+            real_t bound = 0;
+            {
+                SFEM_TRACE_SCOPE("NodeObstacleStep::max_eig");
+                bound = tangent->max_eig(scale->data());
+            }
+            if (bound <= 0) {
+                SFEM_TRACE_SCOPE("NodeObstacleStep::estimate_max_eig");
+                bound = estimate_max_eig();
+            }
+            qp->set_max_eig(bound);
             blas->zaxpby(ndofs, -1, r, 0, r, qp_rhs->data());
             // The constrained rows are the identity: their right-hand side and start are the
             // increment the step arrived with.

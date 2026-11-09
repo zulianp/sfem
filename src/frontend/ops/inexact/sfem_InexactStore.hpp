@@ -187,6 +187,10 @@ namespace sfem {
             std::map<int, SharedBuffer<real_t>>                        ghost;
             std::unique_ptr<BsrStore>                                  bsr;
             const real_t                                              *state{nullptr};
+            /// apply_bsr's extra diagonal blocks and whether it overwrites (Op::set_inexact_extra);
+            /// null: the plain y += A x.
+            const inexact::DiagonalExtra                              *extra{nullptr};
+            bool                                                       overwrite{false};
 
             std::size_t bytes() const {
                 std::size_t ret = bsr ? bsr->bytes() : 0;
@@ -232,8 +236,20 @@ namespace sfem {
                     SFEM_ERROR("inexact: the bsr store is applied before inexact_update\n");
                     return SFEM_FAILURE;
                 }
-                bsr->apply(h, out);
+                if (extra) {
+                    bsr->apply(h, out, *extra, overwrite);
+                } else {
+                    bsr->apply(h, out);
+                }
                 return SFEM_SUCCESS;
+            }
+
+            /// The extra diagonal blocks of apply_bsr, taken only by the assembled store.
+            bool set_extra(const inexact::DiagonalExtra *const e, const bool overwrite_output) {
+                if (!assembled()) return false;
+                extra     = e;
+                overwrite = overwrite_output;
+                return true;
             }
 
             /// apply_bsr by the threads of a region (BsrStore::team_apply); inexact_update first.

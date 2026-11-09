@@ -1,5 +1,6 @@
 #include "sfem_ObstacleTangent.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -7,6 +8,7 @@
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_MemoryLedger.hpp"
 #include "sfem_NodeObstacleContact.hpp"
@@ -91,6 +93,11 @@ namespace sfem {
             // K_dd += shift reference_d (shift_diagonal), with tmp for its product.
             SharedBuffer<real_t>                 reference, tmp;
             real_t                               shift{0};
+            // Where the stored tangent takes the curvature and the shift in its own pass
+            // (Function::set_inexact_extra, the device's assembled store): the extra the product
+            // hands it.
+            bool                                 fused{false};
+            inexact::DiagonalExtra               extra;
 
             int assemble(const real_t *const x) override {
                 blas->copy(ndofs, x, state->data());
@@ -180,10 +187,23 @@ namespace sfem {
                     product = team_product_operator();
                     return;
                 }
+                fused = es == EXECUTION_SPACE_DEVICE && format == op_type::INEXACT && f->set_inexact_extra(&extra, true);
+                f->set_inexact_extra(nullptr, false);
                 product           = make_op<real_t>(
                         ndofs,
                         ndofs,
                         [self](const real_t *const in, real_t *const out) {
+                            if (self->fused) {
+                                // One pass writes out: the stored product, the curvature, the shift.
+                                self->extra.contact_of = self->curved ? self->contact->frame_of() : nullptr;
+                                self->extra.blocks     = self->blocks->data();
+                                self->extra.shift      = self->shift;
+                                self->extra.reference  = self->reference->data();
+                                self->f->set_inexact_extra(&self->extra, true);
+                                self->material->apply(in, out);
+                                self->f->set_inexact_extra(nullptr, false);
+                                return;
+                            }
                             self->blas->zeros(self->ndofs, out);
                             self->material->apply(in, out);
                             if (self->curved) self->contact->apply_blocks(self->blocks->data(), in, out);

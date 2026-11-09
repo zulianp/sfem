@@ -133,6 +133,23 @@ namespace sfem {
             }
         }
 
+        __global__ void extra_kernel(const NodeObstacleView c,
+                                     const real_t *const    blocks,
+                                     const real_t           shift,
+                                     const real_t *const    reference,
+                                     const real_t *const    in,
+                                     real_t *const          out) {
+            SFEM_NODE_LOOP(node, c.n_nodes) {
+                real_t              o[3] = {0, 0, 0};
+                const real_t *const x    = &in[node * 3];
+                const ptrdiff_t     i    = c.frame_of[node];
+                if (blocks && i >= 0) ::node_obstacle_packed_sym_apply(&blocks[6 * i], x, o);
+                if (shift != 0)
+                    for (int d = 0; d < 3; ++d) o[d] += shift * (reference[node * 3 + d] * x[d]);
+                for (int d = 0; d < 3; ++d) out[node * 3 + d] = o[d];
+            }
+        }
+
         __global__ void blocks_diagonal_kernel(const NodeObstacleView c, const real_t *const blocks, real_t *const d) {
             SFEM_NODE_LOOP(i, c.size) {
                 const ptrdiff_t node = c.idx[i];
@@ -246,6 +263,16 @@ namespace sfem {
 
     void d_node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out) {
         apply_blocks_kernel<<<blocks_for(c.size), block_size, 0, (cudaStream_t)c.stream>>>(c, blocks, in, out);
+        SFEM_DEBUG_SYNCHRONIZE(c.stream);
+    }
+
+    void d_node_obstacle_extra(const NodeObstacleView &c,
+                               const real_t *const     blocks,
+                               const real_t            shift,
+                               const real_t *const     reference,
+                               const real_t *const     in,
+                               real_t *const           out) {
+        extra_kernel<<<blocks_for(c.n_nodes), block_size, 0, (cudaStream_t)c.stream>>>(c, blocks, shift, reference, in, out);
         SFEM_DEBUG_SYNCHRONIZE(c.stream);
     }
 

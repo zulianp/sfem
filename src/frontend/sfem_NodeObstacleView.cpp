@@ -228,6 +228,27 @@ namespace sfem {
         }
     }
 
+    void node_obstacle_extra(const NodeObstacleView &c,
+                             const real_t *const     blocks,
+                             const real_t            shift,
+                             const real_t *const     reference,
+                             const real_t *const     in,
+                             real_t *const           out) {
+#ifdef SFEM_ENABLE_CUDA
+        if (c.es == EXECUTION_SPACE_DEVICE) return d_node_obstacle_extra(c, blocks, shift, reference, in, out);
+#endif
+#pragma omp parallel for
+        for (ptrdiff_t node = 0; node < c.n_nodes; ++node) {
+            real_t *const       o = &out[node * 3];
+            const real_t *const x = &in[node * 3];
+            o[0] = o[1] = o[2] = 0;
+            const ptrdiff_t i = c.frame_of[node];
+            if (blocks && i >= 0) ::node_obstacle_packed_sym_apply(&blocks[6 * i], x, o);
+            if (shift != 0)
+                for (int d = 0; d < 3; ++d) o[d] += shift * (reference[node * 3 + d] * x[d]);
+        }
+    }
+
     void node_obstacle_apply_blocks(const NodeObstacleView &c,
                                     const real_t *const     blocks,
                                     const real_t *const     in,
