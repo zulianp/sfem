@@ -117,7 +117,7 @@ namespace sfem {
         auto            blas    = impl_->blas;
         const real_t    alpha_a = impl_->alpha_a;
 
-        blas->zaxpby(ndofs, alpha_a, x, -alpha_a, impl_->u_hat->data(), acceleration);
+        if (acceleration) blas->zaxpby(ndofs, alpha_a, x, -alpha_a, impl_->u_hat->data(), acceleration);
         blas->zaxpby(ndofs, impl_->shift, x, 1, impl_->z->data(), velocity);
     }
 

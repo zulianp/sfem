@@ -141,6 +141,12 @@ namespace sfem {
         /// is the caller's to evaluate at the next `begin_step`, as always.
         void reset();
 
+        /// The committed state (stored terms, which terms are stored and how, the coefficients of
+        /// the rest, the remainder form's R, the temperature) into files `prefix`.*, and back into
+        /// a relaxation of the same series and shape (a restart). Between steps only.
+        int write_state(const std::string &prefix) const;
+        int read_state(const std::string &prefix);
+
         /// What the kernels read.
         real_t        gamma() const { return gamma_; }
         const real_t *history() const { return history_->data(); }

@@ -142,6 +142,12 @@ namespace sfem {
         /// Restart every group at rest at the displacement `x`.
         void reset(const real_t *const x, const StressEvaluation &evaluate);
 
+        /// The committed state, every block's groups (PronyRelaxation::write_state) and the two
+        /// relaxed-stress slots, into the folder `dir` and back (a restart): the next begin_step
+        /// starts from the saved relaxed stress, nothing is evaluated again.
+        int write_state(const std::string &dir);
+        int read_state(const std::string &dir);
+
         /// Whether any group has a non-empty series; an operator with none
         /// need not evaluate stresses at all.
         bool relaxes() const;

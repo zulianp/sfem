@@ -265,7 +265,8 @@ int test_release() {
 }
 
 // What a scheme carries out of a step is what `reconstruct` gives at its solution, for the
-// schemes that carry it unmodified.
+// schemes that carry it unmodified; `reconstruct` without an acceleration (null, as the interface
+// allows) gives the same velocity.
 template <class Scheme>
 int carried_matches_reconstruct() {
     auto            p     = sfem::test::make_cube_problem("GeneratedLinearElasticity", 2, 0);
@@ -274,11 +275,13 @@ int carried_matches_reconstruct() {
     sch->set_density(2);
     SFEM_TEST_ASSERT(sch->initialize() == SFEM_SUCCESS);
 
-    std::vector<real_t> x(n), v(n), a(n), cv(n), ca(n);
+    std::vector<real_t> x(n), v(n), a(n), cv(n), ca(n), v_only(n);
     for (int step = 0; step < 3; ++step) {
         sch->begin_step(step * real_t(0.1), real_t(0.1));
         for (ptrdiff_t i = 0; i < n; ++i) x[i] = std::sin(real_t(0.3) * (i + 1) + step);
         sch->reconstruct(x.data(), v.data(), a.data());
+        sch->reconstruct(x.data(), v_only.data(), nullptr);
+        for (ptrdiff_t i = 0; i < n; ++i) SFEM_TEST_ASSERT(v_only[i] == v[i]);
         sch->advance(x.data());
         sch->carried_state(cv.data(), ca.data());
         for (ptrdiff_t i = 0; i < n; ++i) {

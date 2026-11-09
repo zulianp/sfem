@@ -81,6 +81,52 @@ int test_gap_and_frames() {
     return SFEM_TEST_SUCCESS;
 }
 
+// Two obstacles on grids of different resolution, their union (UnionObstacle): the half-space
+// z < 0 on the fixture's grid and x > 1.27 on a coarser one. Each node's gap is the nearer one's,
+// min(z, 1.27 - x), and its vector to the surface (gap_field) points to that obstacle.
+namespace {
+    std::vector<std::shared_ptr<smesh::Grid<geom_t>>> two_half_spaces(const std::shared_ptr<sfem::Communicator> &comm) {
+        auto below = smesh::create_sdf(comm, 41, 41, 41, -1, -1, -1, 2, 2, 2, [](const geom_t, const geom_t, const geom_t z) -> geom_t {
+            return -z;
+        });
+        auto beside = smesh::create_sdf(comm, 21, 21, 21, -1, -1, -1, 3, 3, 3, [](const geom_t x, const geom_t, const geom_t) -> geom_t {
+            return x - geom_t(1.27);
+        });
+        return {below, beside};
+    }
+}  // namespace
+
+int test_union_of_grids() {
+    auto            comm   = sfem::Communicator::world();
+    auto            mesh   = sfem::Mesh::create_hex8_cube(comm, 2, 2, 2, 0, 0, real_t(0.1), 1, 1, real_t(1.1));
+    const ptrdiff_t nnodes = mesh->n_nodes(), ndofs = 3 * nnodes;
+    auto            nodes  = sfem::create_host_buffer<idx_t>(nnodes);
+    for (ptrdiff_t i = 0; i < nnodes; ++i) nodes->data()[i] = (idx_t)i;
+    sfem::NodeObstacleContact contact(two_half_spaces(comm), comm, nodes, mesh->points(), ndofs, ndofs, 2);
+
+    std::vector<real_t> x(ndofs, 0), to_surface(ndofs);
+    contact.update(x.data());
+    contact.gap_field(to_surface.data());
+
+    const geom_t *const px = mesh->points()->data()[0];
+    const geom_t *const pz = mesh->points()->data()[2];
+    const real_t *const gap = contact.gap()->data();
+    int                 beside = 0;
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        const real_t gz = pz[i], gx = real_t(1.27) - px[i];
+        SFEM_TEST_ASSERT(std::abs(gap[i] - std::min(gz, gx)) < 1e-6);
+        if (gx < gz) {
+            beside++;
+            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - gx) < 1e-6 && std::abs(to_surface[i * 3 + 2]) < 1e-6);
+        } else {
+            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3]) < 1e-6 && std::abs(to_surface[i * 3 + 2] + gz) < 1e-6);
+        }
+    }
+    // Both obstacles constrain some nodes.
+    SFEM_TEST_ASSERT(beside > 0 && beside < nnodes);
+    return SFEM_TEST_SUCCESS;
+}
+
 // With a scale, each sweep rounds as the frames and the scaling one after the other: s .* (Q^T v)
 // and Q (s .* v), bitwise; nodes without contact are only scaled.
 int test_scaled_frames() {
@@ -409,6 +455,33 @@ int test_device_matches_host() {
     SFEM_TEST_ASSERT(go < 1e-12);
     return SFEM_TEST_SUCCESS;
 }
+
+// The union of two grids on the device against the host: gaps and the vectors to the surface.
+int test_union_device_matches_host() {
+    auto            comm   = sfem::Communicator::world();
+    auto            mesh   = sfem::Mesh::create_hex8_cube(comm, 4, 4, 4, 0, 0, real_t(0.1), 1, 1, real_t(1.1));
+    const ptrdiff_t nnodes = mesh->n_nodes(), ndofs = 3 * nnodes;
+    auto            nodes  = sfem::create_host_buffer<idx_t>(nnodes);
+    for (ptrdiff_t i = 0; i < nnodes; ++i) nodes->data()[i] = (idx_t)i;
+    sfem::NodeObstacleContact host(two_half_spaces(comm), comm, nodes, mesh->points(), ndofs, ndofs, 2);
+    sfem::NodeObstacleContact device(two_half_spaces(comm), comm, nodes, mesh->points(), ndofs, ndofs, 2, sfem::EXECUTION_SPACE_DEVICE);
+
+    std::vector<real_t> x(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) x[i] = real_t(0.05) * pseudo_random(i, 5);
+    auto dx = smesh::to_device(sfem::Buffer<real_t>::wrap(x.size(), x.data()));
+    host.update(x.data());
+    device.update(dx->data());
+    const real_t g = worst(std::vector<real_t>(host.gap()->data(), host.gap()->data() + nnodes), host_copy(device.gap()->data(), nnodes));
+
+    std::vector<real_t> field(ndofs);
+    auto                dfield = smesh::to_device(sfem::Buffer<real_t>::wrap(field.size(), field.data()));
+    host.gap_field(field.data());
+    device.gap_field(dfield->data());
+    const real_t f = worst(field, host_copy(dfield->data(), ndofs));
+    printf("  union gap %.3g, gap field %.3g\n", (double)g, (double)f);
+    SFEM_TEST_ASSERT(g < 1e-12 && f < 1e-12);
+    return SFEM_TEST_SUCCESS;
+}
 #endif
 
 int main(int argc, char *argv[]) {
@@ -419,8 +492,10 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_reaction);
     SFEM_RUN_TEST(test_psd3_removes_the_negative_eigenvalues);
     SFEM_RUN_TEST(test_project_velocity);
+    SFEM_RUN_TEST(test_union_of_grids);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_device_matches_host);
+    SFEM_RUN_TEST(test_union_device_matches_host);
 #endif
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

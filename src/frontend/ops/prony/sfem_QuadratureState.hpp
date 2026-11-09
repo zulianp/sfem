@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "sfem_HistoryStorage.hpp"
 #include "sfem_aliases.hpp"
@@ -103,6 +104,11 @@ namespace sfem {
         /// Present for the scaled formats (`is_scaled(storage)`) only; null for the others.
         scaling_t       *scales() { return scales_ ? scales_->data() : nullptr; }
         const scaling_t *scales() const { return scales_ ? scales_->data() : nullptr; }
+
+        /// The store as it is (values, scales, means) into files `prefix`.values, .scales and
+        /// .means, and back into a store of the same shape and format (a restart).
+        int write_state(const std::string &prefix) const;
+        int read_state(const std::string &prefix);
 
     private:
         int                               n_tensors_;

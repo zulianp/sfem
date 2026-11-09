@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "sfem_base.hpp"
 
 namespace sfem {
@@ -38,6 +40,12 @@ namespace sfem {
         /// The relaxation state the history is held in, for diagnostics: null when the history is
         /// not a Prony series's.
         virtual RelaxationGroups *relaxation_state() { return nullptr; }
+
+        /// The committed history into the folder `dir` (which must exist) and back, between steps
+        /// (a restart). By default the relaxation state's (RelaxationGroups::write_state); a
+        /// history without one is unsupported.
+        virtual int write_history(const std::string &dir);
+        virtual int read_history(const std::string &dir);
     };
 
 }  // namespace sfem

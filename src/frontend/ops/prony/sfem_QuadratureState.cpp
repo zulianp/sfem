@@ -1,4 +1,5 @@
 #include "sfem_QuadratureState.hpp"
+#include "sfem_StateFiles.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -204,6 +205,22 @@ namespace sfem {
                     values_per_tensor(), n_elements_, reinterpret_cast<const typename Codec::storage_t *>(data), s, values, m);
             return 0;
         });
+    }
+
+    int QuadratureState::write_state(const std::string &prefix) const {
+        if (write_state_buffer(smesh::Path(prefix + ".values"), data_) ||
+            write_state_buffer(smesh::Path(prefix + ".scales"), scales_)) {
+            return SFEM_FAILURE;
+        }
+        return means_ ? write_state_buffer(smesh::Path(prefix + ".means"), means_) : SFEM_SUCCESS;
+    }
+
+    int QuadratureState::read_state(const std::string &prefix) {
+        if (read_state_buffer(smesh::Path(prefix + ".values"), data_) ||
+            read_state_buffer(smesh::Path(prefix + ".scales"), scales_)) {
+            return SFEM_FAILURE;
+        }
+        return means_ ? read_state_buffer(smesh::Path(prefix + ".means"), means_) : SFEM_SUCCESS;
     }
 
 }  // namespace sfem
