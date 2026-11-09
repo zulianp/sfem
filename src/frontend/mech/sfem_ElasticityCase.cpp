@@ -72,6 +72,7 @@ namespace sfem {
                 "obstacle.gap",
                 "obstacle.curvature",
                 "obstacle.sdf.file",
+                "obstacle.sdf[].file",
                 "obstacle.shape.type",
                 "obstacle.shape.plane",
                 "obstacle.shape.slope",

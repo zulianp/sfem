@@ -203,6 +203,8 @@ namespace sfem {
         /// Whichever back-end there is, as the contact-stabilised scheme reads it.
         std::shared_ptr<ContactStabilisedNewmarkScheme::Contact> obstacle;
         std::shared_ptr<smesh::Grid<geom_t>>               obstacle_sdf;
+        /// node_sdf: every grid of obstacle.sdf (a list is their union), obstacle_sdf the first.
+        std::vector<std::shared_ptr<smesh::Grid<geom_t>>>  obstacle_sdfs;
         // The obstacle's grid whole, on one rank, for the output: a distributed run's ranks each
         // hold a part of it.
         std::function<std::shared_ptr<smesh::Grid<geom_t>>()> whole_obstacle_sdf;
@@ -754,8 +756,27 @@ namespace sfem {
             }
 
             if (has(node, "sdf")) {
-                const auto file    = config.resolve(read_string(child(node, "sdf"), "file", ""));
-                obstacle_sdf       = smesh::Grid<geom_t>::create_from_file(m->comm(), file);
+                // One grid, {file: ...}, or several, [{file: ...}, ...]: their union, each contact node
+                // against the nearest (UnionObstacle), e.g. a fine grid around small features and a
+                // coarse one around large ones. The output shows the first.
+                auto                     s = child(node, "sdf");
+                std::vector<std::string> files;
+                if (s.is_seq()) {
+                    for (auto item : s.children()) files.push_back(config.resolve(read_string(item, "file", "")));
+                } else {
+                    files.push_back(config.resolve(read_string(s, "file", "")));
+                }
+                if (files.size() > 1 && backend != "node_sdf") {
+                    fprintf(stderr, "Playground: several obstacle.sdf grids are node_sdf's\n");
+                    return SFEM_FAILURE;
+                }
+                for (const auto &file : files) {
+                    auto grid = smesh::Grid<geom_t>::create_from_file(m->comm(), file);
+                    if (!grid) return SFEM_FAILURE;
+                    obstacle_sdfs.push_back(grid);
+                }
+                const auto file    = files[0];
+                obstacle_sdf       = obstacle_sdfs[0];
                 whole_obstacle_sdf = [file]() { return smesh::Grid<geom_t>::create_from_file(Communicator::self(), file); };
             } else {
                 auto          s = child(node, "shape");
@@ -795,6 +816,7 @@ namespace sfem {
                 whole_obstacle_sdf = [shape, lo, hi]() { return create_obstacle_sdf(Communicator::self(), shape, lo, hi); };
             }
             if (!obstacle_sdf) return SFEM_FAILURE;
+            if (obstacle_sdfs.empty()) obstacle_sdfs.push_back(obstacle_sdf);
 
             // Every node of the body's surface by default: a free body can touch with any face.
             const auto which = read_string(node, "nodes", "skin");
@@ -850,7 +872,7 @@ namespace sfem {
                 std::copy(owned.begin(), owned.end(), nodes->data());
             }
             contact  = std::make_shared<NodeObstacleContact>(
-                    obstacle_sdf, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_dofs_owned(), dir, es);
+                    obstacle_sdfs, m->comm(), nodes, m->points(), fs->n_dofs(), fs->n_dofs_owned(), dir, es);
             obstacle = contact;
             // Over every rank: a rank may own none of the surface's nodes (many ranks, a thin body),
             // and returning on that rank alone leaves the others waiting in the solve's collectives.
