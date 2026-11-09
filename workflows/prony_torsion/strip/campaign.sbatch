@@ -44,7 +44,7 @@ go() {  # <run>
   echo "$MESH $run rc=$? wall=$(echo "$(date +%s.%N) - $start" | bc)s failed=$(grep -c 'attempt failed' run.log)" \
        "projected=$(grep -c ' projected,' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }
-REDUCED="float32 float16_scaled int16_scaled int8_scaled float16_md int8_md"
+REDUCED="float32 int16_scaled int8_scaled float16_md"
 if [ "${DIAG:-0}" = 1 ]; then
   RUNS="full_a"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
 else
