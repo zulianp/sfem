@@ -208,8 +208,9 @@ namespace sfem {
     }
 
     int QuadratureState::write_state(const std::string &prefix) const {
+        // The unscaled formats hold no scales (is_scaled), so they write no .scales file.
         if (write_state_buffer(smesh::Path(prefix + ".values"), data_) ||
-            write_state_buffer(smesh::Path(prefix + ".scales"), scales_)) {
+            (scales_ && write_state_buffer(smesh::Path(prefix + ".scales"), scales_))) {
             return SFEM_FAILURE;
         }
         return means_ ? write_state_buffer(smesh::Path(prefix + ".means"), means_) : SFEM_SUCCESS;
@@ -217,7 +218,7 @@ namespace sfem {
 
     int QuadratureState::read_state(const std::string &prefix) {
         if (read_state_buffer(smesh::Path(prefix + ".values"), data_) ||
-            read_state_buffer(smesh::Path(prefix + ".scales"), scales_)) {
+            (scales_ && read_state_buffer(smesh::Path(prefix + ".scales"), scales_))) {
             return SFEM_FAILURE;
         }
         return means_ ? read_state_buffer(smesh::Path(prefix + ".means"), means_) : SFEM_SUCCESS;
