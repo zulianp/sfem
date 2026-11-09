@@ -59,7 +59,8 @@ def row(folder):
         "scaling_ms": 1e3 * seconds(t, "NodeObstacleStep::update_scaling") / newton if newton else 0,
         "bound_ms": 1e3 * seconds(t, "NodeObstacleStep::max_eig", "NodeObstacleStep::estimate_max_eig") / newton if newton else 0,
         "qp_s": qp, "stepper_s": seconds(t, "Stepper::run"),
-        "tangent_mb": tangent / 1e6, "peak_mb": float(last.get("device_used_peak") or 0) / 1e6,
+        "tangent_mb": tangent / 1e6, "peak_mb": max(float(r.get("device_used_peak") or 0) for r in rows) / 1e6,
+        "pool_mb": max(float(r.get("device_pool_peak") or 0) for r in rows) / 1e6,
     }
 
 
@@ -80,10 +81,10 @@ def main(argv):
         r = row(folder)
         table.setdefault((m.group("tag"), m.group("mesh"), m.group("run")), {})[m.group("slot")] = r
         print("%-6s %-3s %-3s %-24s dofs %8d steps %4d failed %d newton %5d qp_its %8d us/it %7.1f cg %.2f update %6.2f "
-              "scaling %5.2f bound %6.2f ms/newton qp %7.1f s total %7.1f s tangent %7.1f MB peak %7.1f MB" % (
+              "scaling %5.2f bound %6.2f ms/newton qp %7.1f s total %7.1f s tangent %7.1f MB peak %7.1f MB pool %7.1f MB" % (
                   m.group("tag"), m.group("mesh"), m.group("slot"), m.group("run"), r["dofs"], r["steps"], r["failed"], r["newton"],
                   r["qp_its"], r["us_per_qp_it"], r["cg_share"], r["update_ms"], r["scaling_ms"], r["bound_ms"], r["qp_s"],
-                  r["stepper_s"], r["tangent_mb"], r["peak_mb"]))
+                  r["stepper_s"], r["tangent_mb"], r["peak_mb"], r["pool_mb"]))
     print()
     for (tag, mesh, run), slots in sorted(table.items()):
         a = [slots[s] for s in ("A1", "A2") if s in slots]
@@ -94,11 +95,13 @@ def main(argv):
         if not a or not b:
             continue
         med = lambda rs, k: statistics.median(r[k] for r in rs)
-        print("%-6s %-3s %-24s us/it A %7.1f B %7.1f (B/A %.3f, A spread %.3f)  total A %7.1f B %7.1f (B/A %.3f)  qp_its B/A %.3f" % (
+        print("%-6s %-3s %-24s us/it A %7.1f B %7.1f (B/A %.3f, A spread %.3f)  total A %7.1f B %7.1f (B/A %.3f)  qp_its B/A %.3f"
+              "  update ms A %6.2f B %6.2f  peak MB A %7.1f B %7.1f  pool MB A %7.1f B %7.1f" % (
             tag, mesh, run, med(a, "us_per_qp_it"), med(b, "us_per_qp_it"), med(b, "us_per_qp_it") / med(a, "us_per_qp_it"),
             max(r["us_per_qp_it"] for r in a) / min(r["us_per_qp_it"] for r in a) - 1,
             med(a, "stepper_s"), med(b, "stepper_s"), med(b, "stepper_s") / med(a, "stepper_s"),
-            med(b, "qp_its") / med(a, "qp_its")))
+            med(b, "qp_its") / med(a, "qp_its"), med(a, "update_ms"), med(b, "update_ms"),
+            med(a, "peak_mb"), med(b, "peak_mb"), med(a, "pool_mb"), med(b, "pool_mb")))
 
 
 if __name__ == "__main__":

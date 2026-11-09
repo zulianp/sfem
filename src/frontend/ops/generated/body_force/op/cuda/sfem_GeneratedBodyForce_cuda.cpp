@@ -312,11 +312,16 @@ namespace sfem {
     }
 
 
-    // The graph an assembly was last handed and found well formed.
+    // The graphs an assembly was last handed and found well formed: a few, as a stored
+    // tangent assembles window by window into graphs of its own (one per window of rows).
     struct CheckedGraph {
-      const count_t *rowptr{nullptr};
-      const idx_t *colidx{nullptr};
-      ptrdiff_t n_rows{-1};
+      struct Entry {
+        const count_t *rowptr{nullptr};
+        const idx_t *colidx{nullptr};
+        ptrdiff_t n_rows{-1};
+      };
+      Entry entries[16];
+      int next{0};
     };
 
   }  // namespace

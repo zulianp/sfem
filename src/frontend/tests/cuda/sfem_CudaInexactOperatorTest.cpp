@@ -10,7 +10,9 @@
 // host's projected BSR assembly.
 
 #include <cmath>
+#include <cstdlib>
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <vector>
@@ -374,6 +376,56 @@ int test_fused_extra() {
     return fused_extra(space(smesh::promote_to(smesh::TET10, coarse)), "TET10");
 }
 
+// The assembled store encoded a window of rows at a time (SFEM_QBSR_WINDOWS): as close to the exact
+// apply as in one window, and as symmetric. The blocks left of the diagonal are the transposes of the
+// records right of it; the implied diagonal blocks, -sum_j K_ij, are symmetric to the encoding's error,
+// in one window as in several, so x^T A y - y^T A x is what one window leaves.
+int windowed(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+    auto op = sfem::create_op(fs, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op && op->initialize() == SFEM_SUCCESS);
+    const ptrdiff_t ndofs = fs->n_dofs();
+    const auto      u = pseudo_random(ndofs, 0.01, 7), a = pseudo_random(ndofs, 1, 11), b = pseudo_random(ndofs, 1, 19);
+    std::vector<real_t> exact;
+    {
+        auto du = on_device(u), da = on_device(a), out = on_device(std::vector<real_t>(ndofs, 0));
+        SFEM_TEST_ASSERT(op->apply(du->data(), da->data(), out->data()) == SFEM_SUCCESS);
+        exact = from_device(out);
+    }
+    auto dot = [](const std::vector<real_t> &x, const std::vector<real_t> &y) {
+        double s = 0;
+        for (size_t i = 0; i < x.size(); ++i) s += (double)x[i] * (double)y[i];
+        return s;
+    };
+    for (const auto &c : {std::make_pair("f16", 5e-3), std::make_pair("i8", 5e-2)}) {
+        double single = 0;
+        for (const char *const windows : {"1", "3"}) {
+            setenv("SFEM_QBSR_WINDOWS", windows, 1);
+            op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", c.first));
+            const auto Aa = stored(op, true, sfem::InexactOptions::from_strings("bsr", c.first), u, a);
+            const auto Ab = stored(op, true, sfem::InexactOptions::from_strings("bsr", c.first), u, b);
+            unsetenv("SFEM_QBSR_WINDOWS");
+            SFEM_TEST_ASSERT(!Aa.empty() && !Ab.empty());
+            const double error = relative_difference(Aa, exact), asymmetry = std::abs(dot(b, Aa) - dot(a, Ab)) / std::abs(dot(b, Aa));
+            printf("%-6s bsr %-3s %s window(s): rel diff %.3e (bound %.0e), asymmetry %.3e\n", label, c.first, windows, error, c.second,
+                   asymmetry);
+            SFEM_TEST_ASSERT(error < c.second);
+            if (windows[0] == '1') {
+                single = asymmetry;
+            } else {
+                SFEM_TEST_ASSERT(asymmetry <= 2 * single + 1e-12);
+            }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_windowed() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 6, 5, 5, 0, 0, 0, 1, 1, 1);
+    if (windowed(space(mesh), "TET4") != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    auto coarse = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    return windowed(space(smesh::promote_to(smesh::TET10, coarse)), "TET10");
+}
+
 int test_projected_prony() {
     auto       tet4  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
     auto       tet10 = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1));
@@ -396,6 +448,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_projected_prony);
     SFEM_RUN_TEST(test_fused_extra);
+    SFEM_RUN_TEST(test_windowed);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

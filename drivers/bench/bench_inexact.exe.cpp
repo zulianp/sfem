@@ -13,7 +13,8 @@
 // pointers; a store: its bytes()), on the device also the bytes it holds per dof as the device
 // reports them (free memory before its creation less after its first set-up, 2 MiB granules), its
 // relative l2 distance to the exact apply, and a digest of its output's bits (two builds or thread
-// counts that compute the same bits print the same digest).
+// counts that compute the same bits print the same digest). "scratch B/dof" is the stream-ordered
+// pool's high-water mark over a set-up: memory the set-up holds only while it runs.
 // The rows reproduce the format tables of spikes/inexact_apply_compare/qp/RESULTS_QP.md from the
 // library alone.
 
@@ -53,6 +54,29 @@ namespace {
         }
 #endif
         (void)es;
+        return 0;
+    }
+
+    /// The stream-ordered pool's high-water mark since the last reset (bytes), 0 on the host: what an
+    /// update holds only while it runs (a stored tangent's window of single-precision values).
+    double pool_high(const sfem::ExecutionSpace es, const bool reset) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            cudaDeviceSynchronize();
+            int device = 0;
+            cudaGetDevice(&device);
+            cudaMemPool_t pool;
+            cudaDeviceGetDefaultMemPool(&pool, device);
+            cuuint64_t value = 0;
+            if (reset) {
+                cudaMemPoolSetAttribute(pool, cudaMemPoolAttrUsedMemHigh, &value);
+                return 0;
+            }
+            cudaMemPoolGetAttribute(pool, cudaMemPoolAttrUsedMemHigh, &value);
+            return (double)value;
+        }
+#endif
+        (void)es, (void)reset;
         return 0;
     }
 
@@ -180,13 +204,15 @@ int main(int argc, char *argv[]) {
 #endif
     printf("bench_inexact %s %s %s: %ld elements, %ld dofs, %s, %d threads, %d repeats\n", material.c_str(),
            element.c_str(), size.c_str(), (long)fs->mesh()->n_elements(), (long)ndofs, es_name ? es_name : "host", threads, repeats);
-    printf("%-26s %10s %10s %9s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "held B/dof", "rel diff",
-           "digest");
+    printf("%-26s %10s %10s %9s %9s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "held B/dof",
+           "scratch", "rel diff", "digest");
 
-    auto row = [&](const char *name, const double setup, const double apply, const double bytes, const double held,
+    double scratch = 0;
+    auto   row     = [&](const char *name, const double setup, const double apply, const double bytes, const double held,
                    const std::vector<real_t> &out, const std::vector<real_t> &exact) {
-        printf("%-26s %10.3f %10.4f %9.1f %9.1f %9.1f %10.2e %016llx\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply,
-               bytes / ndofs, held / ndofs, exact.empty() ? 0.0 : relative_difference(out, exact), digest(out));
+        printf("%-26s %10.3f %10.4f %9.1f %9.1f %9.1f %9.1f %10.2e %016llx\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply,
+               bytes / ndofs, held / ndofs, scratch / ndofs, exact.empty() ? 0.0 : relative_difference(out, exact), digest(out));
+        scratch = 0;
     };
 
     // The exact apply (matrix-free): the reference.
@@ -222,7 +248,9 @@ int main(int argc, char *argv[]) {
     for (const auto &fmt : formats) {
         op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1]));
         const double free0 = device_free(es);
+        pool_high(es, true);
         const double setup = seconds(es, 3, [&] { op->inexact_update(U); });
+        scratch            = pool_high(es, false);
         const double held  = free0 - device_free(es);
         blas->zeros(ndofs, Y);
         op->inexact_apply(H, Y);

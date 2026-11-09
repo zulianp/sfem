@@ -662,7 +662,9 @@ namespace sfem {
                 : comm_(comm), account_(account) {}
 
             std::vector<std::string> columns() const override {
-                std::vector<std::string> names{"host_peak_rss", "device_used_peak", "device_used_now"};
+                // device_used_* are sampled at step ends; device_pool_peak is the stream-ordered pool's
+                // high-water mark, buffers an update held while it ran (a stored tangent's window).
+                std::vector<std::string> names{"host_peak_rss", "device_used_peak", "device_used_now", "device_pool_peak"};
                 if (!account_) return names;
                 for (int c = 0; c < MemoryLedger::N_CATEGORIES; ++c) {
                     const std::string category = MemoryLedger::name(MemoryLedger::Category(c));
@@ -680,12 +682,13 @@ namespace sfem {
 #else
                 const real_t rss = real_t(usage.ru_maxrss) * 1024;  // kilobytes
 #endif
-                real_t device_now = 0;
+                real_t device_now = 0, pool_peak = 0;
 #ifdef SFEM_ENABLE_CUDA
                 device_now   = real_t(d_memory_in_use());
                 device_peak_ = std::max(device_peak_, device_now);
+                pool_peak    = real_t(d_memory_pool_peak());
 #endif
-                sums_.assign({rss, device_peak_, device_now});
+                sums_.assign({rss, device_peak_, device_now, pool_peak});
                 if (account_) {
                     MemoryLedger ledger;
                     account_(ledger);

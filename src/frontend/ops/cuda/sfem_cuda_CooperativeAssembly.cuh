@@ -118,13 +118,15 @@ namespace sfem {
             }
         }
 
-        /// Row `s` of the element: where the blocks (s, t) of its nodes ev[t] are in the BSR.
+        /// Row `s` of the element: where the blocks (s, t) of its nodes ev[t] are in the BSR, -1 where
+        /// the graph has none (a window of the rows, the others empty: `pair_blocks_bsr` skips them).
         template <int NS>
         __device__ __forceinline__ void row_map(const idx_t *const   ev,
                                                 const int            s,
                                                 const count_t *const rowptr,
                                                 const idx_t *const   colidx,
                                                 count_t (*const pos)[NS]) {
+            for (int t = 0; t < NS; ++t) pos[s][t] = count_t(-1);
             const count_t begin = rowptr[ev[s]], end = rowptr[ev[s] + 1];
             for (count_t k = begin; k < end; ++k) {
                 const idx_t column = colidx[k];
@@ -149,7 +151,9 @@ namespace sfem {
                 int       p  = task % PAIRS, s = 0;
                 while (p >= NS - s) p -= NS - s++;
                 const int t = s + p;
-                s_t       B[NC * NC] = {0};
+                // Neither block of the pair in the graph (outside a window of the rows): nothing to form.
+                if (pos[le][s][t] == count_t(-1) && pos[le][t][s] == count_t(-1)) continue;
+                s_t B[NC * NC] = {0};
                 for (int q = 0; q < NQ; ++q) {
                     s_t gs[ND], gt[ND];
                     for (int m = 0; m < ND; ++m) {
@@ -165,10 +169,12 @@ namespace sfem {
                             B[i * NC + j] += acc;
                         }
                 }
-                v_t *block = values + (ptrdiff_t)pos[le][s][t] * (NC * NC);
-                for (int k = 0; k < NC * NC; ++k) atomicAdd(&block[k], v_t(B[k]));
-                if (s != t) {
-                    block = values + (ptrdiff_t)pos[le][t][s] * (NC * NC);
+                if (pos[le][s][t] != count_t(-1)) {
+                    v_t *const block = values + (ptrdiff_t)pos[le][s][t] * (NC * NC);
+                    for (int k = 0; k < NC * NC; ++k) atomicAdd(&block[k], v_t(B[k]));
+                }
+                if (s != t && pos[le][t][s] != count_t(-1)) {
+                    v_t *const block = values + (ptrdiff_t)pos[le][t][s] * (NC * NC);
                     for (int i = 0; i < NC; ++i)
                         for (int j = 0; j < NC; ++j) atomicAdd(&block[j * NC + i], v_t(B[i * NC + j]));
                 }
