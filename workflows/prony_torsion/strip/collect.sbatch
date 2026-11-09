@@ -14,7 +14,9 @@ set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=$D/dev/wip/ldp_containment/python/collect_prony.py
-P=$D/runs/paper_strip; rm -rf $P; mkdir -p $P
+P=${OUT:-$D/runs/paper_strip}
+[ -e $P ] && { echo "collect: $P exists; give a new OUT"; exit 1; }
+mkdir -p $P
 REDUCED="float32 int16_scaled int8_scaled float16_md"
 RUNS="full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
 RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
