@@ -1,8 +1,10 @@
 # The LDP valves' EPDM in torsion, a strip wound by full turns: twist, hold, release, recover.
 #
-# A 100 x 30 x 6 mm strip (mesh/, strip/make_meshes.sh), clamped at x = 0, its other end wound about
+# A 100 x 30 x 6 mm strip (mesh/, strip/make_meshes.py), clamped at x = 0, its other end wound about
 # the strip's axis by `angle` (one turn here; --set constraints.0.angle=<N * 2 pi> for N turns) with a
-# smooth ramp over 1 s, held until 1.15 s, then released and followed to 2 s. Material, series and
+# smooth ramp over 1 s, held until 1.15 s, then released and followed to 2 s. The wound end keeps its
+# position along the axis (hold_axial): with it free, two turns buckle the strip into an S-fold
+# instead of a helicoid. Material, series and
 # time integration as epdm_torsion_release.yaml: Mooney-Rivlin with the 15-term EPDM series on the
 # isochoric part, density 1150, BDF2 at dt = 1e-3 s (four stored terms).
 
@@ -50,6 +52,7 @@ constraints:
     center: [0.1, 0.015, 0.003]
     angle: 6.283185307179586
     profile: {type: smooth_ramp, start_time: 0, end_time: 1.0, start_value: 0, end_value: 1}
+    hold_axial: true
     release: 1.15
 
 solver:
