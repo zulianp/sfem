@@ -1,0 +1,54 @@
+#!/bin/bash
+#SBATCH --job-name=collect-dt
+#SBATCH --account=c40
+#SBATCH --partition=normal
+#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/collect_dt_%j.out
+#SBATCH --uenv=prgenv-gnu/24.11:v2
+#SBATCH --view=default
+# The step-size study of the strokes on TET4 (tangent9_valves.sbatch with EXTRA="--set time.dt=<dt>
+# --set output.export_freq=<0.1 ms / dt>", PREFIX dt<us>_s0; dt 100 us is the campaign's tp10_s0):
+# per step, the reference twice (bsr32__full_a, _b) and t* with int16 remainders and float32 slots.
+# Into OUT (a new folder; the script stops if it exists): every run against the finest step's
+# reference (set dt_TET4), each step's repeat against its own reference (sets dt_floor_<us>), and
+# the valve events of every run.
+#   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025"] [OUT=runs/paper_dt_<finest tag>]
+set -u
+D=/ritom/scratch/cscs/zulianp/sfem-prony-md
+PY=$D/venv/bin/python
+COL=$D/dev/wip/ldp_containment/python/collect_prony.py
+CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
+TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025}
+finest=${TAGS##* }
+P=${OUT:-$D/runs/paper_dt_$finest}
+[ -e $P ] && { echo "collect_dt: $P exists; give a new OUT"; exit 1; }
+mkdir -p $P
+RUNS="bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a"
+all=""
+for tag in $TAGS; do for r in $RUNS; do all="$all ${tag}_s0_$r"; done; done
+ref=${finest}_s0_bsr32__full_a
+others=$(for r in $all; do [ $r != $ref ] && echo $r; done)
+# shellcheck disable=SC2086
+$PY $COL runs $P/dt_runs.csv $P/dt_series.csv dt_TET4 $CASE $ref $others > $P/dt.log 2>&1; echo "runs rc=$?"
+for tag in $TAGS; do
+  $PY $COL runs $P/dt_runs.csv $P/dt_floor_series.csv dt_floor_$tag $CASE ${tag}_s0_bsr32__full_a ${tag}_s0_bsr32__full_b \
+      >> $P/dt.log 2>&1; echo "floor $tag rc=$?"
+done
+# shellcheck disable=SC2086
+$PY $COL events $P/dt_events.csv dt_TET4 $CASE $all >> $P/dt.log 2>&1; echo "events rc=$?"
+# The collector reads the frames' times from out/time.txt: the campaign's repeat must match valve_runs.csv.
+$PY $COL runs $P/check_runs.csv $P/check_series.csv TET4 $CASE tp10_s0_bsr32__full_a tp10_s0_bsr32__full_b >> $P/dt.log 2>&1
+$PY - $P/check_runs.csv $D/runs/paper_data10/valve_runs.csv <<'PYEOF'
+import csv, sys
+new = {r["run"]: r for r in csv.DictReader(open(sys.argv[1]))}["tp10_s0_bsr32__full_b"]
+old = {(r["set"], r["run"]): r for r in csv.DictReader(open(sys.argv[2]))}[("TET4", "bsr32__full_b")]
+print("check e_u median", new["e_u_median"], "against", old["e_u_median"])
+PYEOF
+$PY - $P/dt_runs.csv <<'PYEOF'
+import csv, sys
+for r in csv.DictReader(open(sys.argv[1])):
+    print("%-14s %-36s steps %-6s failed %-2s e_u med %-10.3g max %-10.3g e_inf max %-10.3g stored %s time %s" % (
+        r["set"], r["run"], r["steps"], r["failed"], float(r["e_u_median"]), float(r["e_u_max"]), float(r["e_inf_max"]),
+        r["iso_stored"], r["stepper_s"]))
+PYEOF

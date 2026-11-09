@@ -13,7 +13,7 @@
 # the valve events, the history snapshots against the reference's, the TET10 mesh's analytic tangent
 # bytes, the transient runs (collect_transient.py), and the torsion rows of runs/paper_data8.
 # TAG names the campaign's folders (tangent9_valves.sbatch's PREFIX without _s0/_p2; default tp9),
-# DATA the output folder under runs (default paper_data9).
+# DATA the output folder under runs (default paper_data_<TAG>), a new one: the script stops if it exists.
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
@@ -21,7 +21,9 @@ PAPER=$D/dev/wip/ldp_containment/python
 COL=$PAPER/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 TAG=${TAG:-tp9}
-P=$D/runs/${DATA:-paper_data9}; rm -rf $P; mkdir -p $P
+P=$D/runs/${DATA:-paper_data_$TAG}
+[ -e $P ] && { echo "collect9: $P exists; give a new DATA"; exit 1; }
+mkdir -p $P
 for spec in TET4:${TAG}_s0_ TET10:${TAG}_p2_; do
   el=${spec%:*}; prefix=${spec#*:}
   # The finished runs: the history reaches the end of the strokes; the smoke runs (_s0) are not.
