@@ -35,7 +35,7 @@ floating-point geometry check, not an interval-arithmetic proof. The complete
 arrays, settings, counts and SHA256 hashes are saved. Transfer those arrays for
 measurement; a different Gmsh build is not assumed to reproduce identical bytes.
 
-## Operator and correctness contract
+## Operators and numerical checks
 
 The unknowns are three velocity components and physical pressure. Density is
 1.3, dynamic viscosity 0.027, and the Rhie–Chow scale is one with the steady
@@ -64,8 +64,8 @@ nonzero in all four fields and differ from one another. Before timing:
 - all four equations pass finite-output and interior-flux cancellation checks;
 - packed and atomic outputs agree within `1e-11`, using each equation's own
   infinity-norm scale;
-- both layouts' full Jacobian actions match centered differences at `1e-6` and
-  `1e-7`, with relative error below `1e-6`, for all three directions;
+- for first order, both layouts' full Jacobian actions match centered differences
+  at `1e-6` and `1e-7`, with relative error below `1e-6`, for all three directions;
 - omitting the reconstructed pressure-direction gradient must produce relative
   error above `1e-5` in every difference check.
 
@@ -76,7 +76,7 @@ both Rhie--Chow sensitivities. Fixed-state velocity and pressure gradients are
 reused; direction gradients remain live. The affine coefficient cache is not
 used on these non-affine cells.
 
-The Darwish derivative gate retains a coarse `1e-6` diagnostic, then requires
+The Darwish derivative test retains a coarse `1e-6` diagnostic, then requires
 whole-vector relative error below `1e-6` at **both** `1e-7` and `1e-8`. It also
 requires no sign crossing of either Darwish limiter argument at those two steps.
 The initial large-mesh local check crossed 6--7 limiter switches per direction at
@@ -86,7 +86,7 @@ velocity-direction gradients must produce relative error above `1e-5`.
 The element test independently checks the physical reconstruction point, its
 affine limit, scalar/SIMD agreement and directional finite differences.
 
-These gates exercise steady interior configurations. They do
+These tests cover steady interior configurations. They do
 not validate arbitrary limiter switches, curved high-order elements, assembled
 Jacobians, general boundary conditions, time integration or solver convergence.
 
@@ -123,8 +123,8 @@ The logs retain separate SFC-ordering and packing times. Storage is an explicit
 array ledger: original coordinate/connectivity arrays, additional packed
 connectivity/ownership/ghost/reduction/map arrays, ghost output buffer, resident
 field/vector capacities, and the packed thread arena. The arena uses 25 scalars
-per maximum pack node per thread after residual/action validation. State backups
-and test directions are listed separately as harness allocations. Shared result
+per maximum pack node per thread for first order and 55 for Darwish after
+residual/action validation. State backups and test directions are listed separately as harness allocations. Shared result
 references, temporary validation vectors, allocator metadata, stacks and other
 library/runtime storage are excluded. Thus this ledger is not peak RSS or a
 complete solver footprint, and retaining the original connectivity must not be
@@ -132,8 +132,9 @@ presented as a total-memory saving.
 
 ## Running and inspecting
 
-Build the new driver and `cvfem_isoparam_rc_test` through the standalone CVFEM
-CMake project. `scripts/unstructured_study.py --local-check` runs four small
+Build the driver, `cvfem_isoparam_rc_test` and `cvfem_isoparam_darwish_test`
+through the standalone CVFEM CMake project.
+`scripts/unstructured_study.py --local-check` runs four small
 numerical fixtures at 1/2 threads and a short paired timing smoke test. Production
 collection requires the 72-core Slurm allocation and the hashed mesh directories.
 Inside a 72-core allocation, invoke the controller from the repository root:
@@ -166,7 +167,8 @@ about 8.3% slower than atomic. This is evidence that the pack choice matters.
 
 The [saved result and replay instructions](../../../wip/paper/README.md)
 include the complete one-/72-thread table, sample ranges, setup measurements,
-explicit storage ledger and limits. The manuscript reports the 72-thread comparison; the full study remains in the external archive.
+explicit storage ledger and limits. The current manuscript replaces this
+historical table with the two-scheme comparison below; the historical study remains in the original external archive.
 
 
 ## First-order and Darwish extension

@@ -12,10 +12,10 @@ FGMRES uses node-block Jacobi, restart 480, final nonlinear relative tolerance
 Rhie–Chow derivative is consistent. Eight OpenMP threads are configured.
 
 Jobs 5077627 (n=16,24,32) and 5077906 (n=40) use an identical solver binary.
-All final nonlinear targets pass. Only the four reconstructed n=40 cases pass
-the fixed 0.01 maximum velocity-error gate; all sixteen failed accuracy gates
-and original exit codes remain in the report. The clip n=16 case accepts an
-intermediate continuation residual floor before meeting the final target.
+All twenty nonlinear solves meet the final residual tolerance. Only the four
+reconstructed n=40 cases meet the maximum velocity-error target of 0.01. The
+report includes all sixteen cases exceeding that target and the original exit
+codes. The clip n=16 case accepts an intermediate continuation residual floor before meeting the final target.
 Finest-interval velocity-L2 rates are approximately 2.04, 2.07, 1.49 and 1.36
 for the reconstructed schemes, and 0.73 for first-order upwind. They are
 observations, not a common asymptotic-order guarantee.
@@ -35,4 +35,5 @@ python3 spikes/cvfem/scripts/test_mms_refinement_summary.py
 ```
 
 The summary checks final nonlinear and spatial-accuracy targets separately.
-It does not turn a failed accuracy gate into a successful solve exit.
+Original nonzero exit codes are preserved when the spatial error exceeds the
+target, even if the nonlinear solve converged.

@@ -6,7 +6,7 @@ Manufactured velocity on all faces; zero-mean pressure; unfrozen convection and 
 FGMRES/block Jacobi, restart 480; final nonlinear relative tolerance 1e-10, linear tolerance 1e-6.
 Jobs 5077627 (n=16/24/32) and 5077906 (n=40) use the identical solver binary.
 
-| Scheme | n | Velocity L2 | Shifted pressure L2 | Velocity max | Fixed 0.01 gate | Adjacent velocity L2 rate |
+| Scheme | n | Velocity L2 | Shifted pressure L2 | Velocity max | Error <= 0.01 | Adjacent velocity L2 rate |
 |---|---:|---:|---:|---:|---|---:|
 | First-order | 16 | 0.1191008 | 0.04546217 | 0.1098873 | FAIL | - |
 | First-order | 24 | 0.09626501 | 0.03480003 | 0.08975286 | FAIL | 0.5250 |
@@ -29,8 +29,8 @@ Jobs 5077627 (n=16/24/32) and 5077906 (n=40) use the identical solver binary.
 | Darwish | 32 | 0.008453661 | 0.003480793 | 0.01295957 | FAIL | 1.5246 |
 | Darwish | 40 | 0.006247547 | 0.002553279 | 0.008738286 | PASS | 1.3552 |
 
-All twenty final nonlinear targets are met. Four fixed accuracy targets pass at n=40; all sixteen failed targets and original exits remain visible.
+All twenty nonlinear solves meet the final residual tolerance. The four reconstructed schemes meet the velocity-error target at n=40. The report includes all sixteen cases exceeding that target and preserves their original exit codes.
 Clip at n=16 accepts an intermediate continuation residual floor, then meets the final nonlinear target.
-Rates use physical spacing h=2/n. These observations do not establish a common asymptotic order, an unstructured solve or a performance comparison.
+Here n is the number of cells along each coordinate direction; rates use physical spacing h=2/n. These observations do not establish a common asymptotic order, an unstructured solve or a performance comparison.
 
 Raw evidence and replay: see the mesh/refinement section of [the paper README](../README.md).

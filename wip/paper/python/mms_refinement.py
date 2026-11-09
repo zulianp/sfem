@@ -42,7 +42,7 @@ def outputs(result):
              'Manufactured velocity on all faces; zero-mean pressure; unfrozen convection and consistent Rhie--Chow derivatives.',
              'FGMRES/block Jacobi, restart 480; final nonlinear relative tolerance 1e-10, linear tolerance 1e-6.',
              'Jobs 5077627 (n=16/24/32) and 5077906 (n=40) use the identical solver binary.', '',
-             '| Scheme | n | Velocity L2 | Shifted pressure L2 | Velocity max | Fixed 0.01 gate | Adjacent velocity L2 rate |',
+             '| Scheme | n | Velocity L2 | Shifted pressure L2 | Velocity max | Error <= 0.01 | Adjacent velocity L2 rate |',
              '|---|---:|---:|---:|---:|---|---:|']
     names = dict(lo='First-order', ho_lim0='Unlimited', ho_lim1='Clip',
                  ho_lim2_k0='Venkatakrishnan K=0', ho_lim3='Darwish')
@@ -51,9 +51,9 @@ def outputs(result):
         lines.append('| {} | {} | {:.7g} | {:.7g} | {:.7g} | {} | {} |'.format(
             names[row['scheme']], row['n'], row['u_l2'], row['p_l2_shifted'], row['u_linf'],
             'PASS' if row['absolute_accuracy_pass'] else 'FAIL', '-' if rate is None else '{:.4f}'.format(rate)))
-    lines += ['', 'All twenty final nonlinear targets are met. Four fixed accuracy targets pass at n=40; all sixteen failed targets and original exits remain visible.',
+    lines += ['', 'All twenty nonlinear solves meet the final residual tolerance. The four reconstructed schemes meet the velocity-error target at n=40. The report includes all sixteen cases exceeding that target and preserves their original exit codes.',
               'Clip at n=16 accepts an intermediate continuation residual floor, then meets the final nonlinear target.',
-              'Rates use physical spacing h=2/n. These observations do not establish a common asymptotic order, an unstructured solve or a performance comparison.', '',
+              'Here n is the number of cells along each coordinate direction; rates use physical spacing h=2/n. These observations do not establish a common asymptotic order, an unstructured solve or a performance comparison.', '',
               'Raw evidence and replay: see the mesh/refinement section of [the paper README](../README.md).', '']
     return macros, '\n'.join(lines)
 

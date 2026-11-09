@@ -758,7 +758,7 @@ paper, but \emph{which} operator is being measured is, so the variants are set o
 \paragraph{Geometry.} The cube campaigns use \emph{affine} element geometry: one
 Jacobian per element, its adjugate and determinant built once at setup, which is exact on the
 structured hexahedral meshes measured. The separate irregular-mesh study in \S\ref{sec:res:unstructured} evaluates
-trilinear geometry in each sweep. Cube rates do not apply to that path.
+trilinear geometry in each sweep. The cube timings therefore do not describe the cost of non-affine geometry.
 The affine nodal reconstruction of \S\ref{sec:res:hoexact} amortises
 per-element geometry over all its fields.
 
@@ -1648,10 +1648,10 @@ consistent Jacobian actions reuse them and rebuild direction gradients.
 Darwish reconstructs velocity using physical displacements from each node to
 the mapped integration point and retains the reconstruction and limiter
 sensitivities. The affine-only coefficient cache is not used.
-Linear-gradient, conservation, layout and whole-vector derivative checks pass.
-For Darwish, both prescribed finite-difference steps must agree without crossing
-limiter switches; omitting velocity- or pressure-gradient sensitivities fails
-the checks. These are steady interior operators without boundary or transient terms.
+For the tested states, the atomic and packed implementations agree and conserve
+the interior fluxes. Both correctly reconstruct gradients of linear fields.
+The consistent Jacobian agrees with finite differences away from limiter switches.
+These measurements cover steady interior operators without boundary or transient terms.
 
 \begin{table}[t]
   \centering\small
@@ -1659,10 +1659,10 @@ the checks. These are steady interior operators without boundary or transient te
   \caption{Irregular-mesh FP64 operators on \unstrThreads{} Grace cores.
     M/L: \num{\unstrMediumCells}/\num{\unstrLargeCells} cells.
     Ratios are mean atomic/packed times; brackets span all \unstrBlocks{}
-    paired ratios, not confidence intervals. Each arm uses \unstrWarmup{}
+    paired ratios, not confidence intervals. Each implementation uses \unstrWarmup{}
     warmups and \unstrRepeat{} timed applications per sample. The schemes
-    use the same source in separate allocations; each atomic/packed pair
-    is measured within one allocation. Both Jacobian actions are consistent.}
+    use the same code version in separate runs; each atomic/packed pair
+    is measured within the same run. Both Jacobian actions are consistent.}
   \label{tab:unstructured}
   \input{tables/unstructured}
 \end{table}
@@ -1686,19 +1686,17 @@ A separate manufactured-solution study checks spatial accuracy on affine
 meshes; it does not refine the irregular meshes of \S\ref{sec:res:unstructured}.
 The steady problem on $[0,2]^3$ uses density one and viscosity 0.01.
 Here $n$ is the number of uniform HEX8 cells along each coordinate direction,
-giving $n^3$ cells and mesh spacing $h=2/n$; it is not a refinement-level index.
+giving $n^3$ cells and mesh spacing $h=2/n$.
 We use $n=16,24,32,40$. The linear solves use FP64 FGMRES with node-block
-Jacobi for all five schemes. All \mmsCases{} final nonlinear targets are met;
-spatial error is checked separately against the manufactured solution.
+Jacobi for all five schemes. The nonlinear solves converge in all \mmsCases{}
+cases; spatial error is measured against the manufactured solution.
 At $n=\mmsFineN$, the four reconstructed schemes meet the fixed maximum
 velocity-error target \num{\mmsAccuracyTol}; first-order upwind does not.
 Their finest-interval velocity-$L^2$ rates span
 \mmsReconstructedMinRate--\mmsReconstructedMaxRate, so these observations do
-not establish a common second order. All failed accuracy gates and the full
-refinement table are retained in the reproducibility material. A failed
-accuracy target here means that the converged discrete solution exceeds the
-prescribed error threshold. Solution convergence on irregular meshes remains
-untested.
+not establish a common second order. The reproducibility material gives the
+full refinement table, including cases whose converged solutions exceed the
+velocity-error target. Solution convergence on irregular meshes remains untested.
 
 \section{Discussion and limitations}
 \label{sec:discussion}
@@ -1727,9 +1725,9 @@ owned ranges partition the numbering, and closing the remainder with a gather bu
 completes before the ghost reduction; stored index arrays fix each node's summation order.
 With one thread per pack, the result is bit-identical across the tested thread counts.
 
-In the affine-cube campaigns on one Grace socket, measured on the residual and
-matrix-free Jacobian action of a colocated CVFEM Navier--Stokes discretisation,
-the format is faster than a standard atomic sweep, than a
+For the residual and matrix-free Jacobian action on affine cubes, the
+experiments on one Grace socket show that the packed format is faster than
+a standard atomic sweep, than a
 coloured one, and than sparse matrix--vector products with the lagged matrix, whose matrix it
 replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedom, at an arithmetic
 intensity a factor of \rlMfOverSpmv{} higher. The controlled residual diagnostic finds
