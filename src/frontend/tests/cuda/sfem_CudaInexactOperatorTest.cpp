@@ -136,6 +136,16 @@ namespace {
                    device->inexact_bytes());
             SFEM_TEST_ASSERT(error < c.tolerance);
             SFEM_TEST_ASSERT(agreement < c.agreement);
+            if (!strcmp(c.store, "bsr")) {
+                // The paper's footprint (eq:tangent-footprint): a record per off-diagonal block, the node
+                // graph, A_i per node, and with f16 codes a scale per node and the window's maximum.
+                const auto      g   = fs->element_node_graph();
+                const bool      f16 = !strcmp(c.encoding, "f16");
+                const ptrdiff_t n = g->n_nodes(), nb = g->nnz();
+                const ptrdiff_t formula = (f16 ? 20 : 16) * (nb - n) + 4 * nb + 4 * (n + 1) + 36 * n + (f16 ? 4 * (n + 1) : 0);
+                printf("%-14s %-15s %-7s footprint %zu bytes, formula %ld\n", label, c.store, c.encoding, device->inexact_bytes(), (long)formula);
+                SFEM_TEST_ASSERT((ptrdiff_t)device->inexact_bytes() == formula);
+            }
 
             const auto dd = stored(device, true, options, u, h, true);
             const auto rd = stored(host, false, options, u, h, true);

@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "sfem_base.hpp"
 #include "sfem_cuda_InexactSetup.cuh"
 
 namespace sfem {
@@ -71,6 +72,10 @@ namespace sfem {
                     return lo;
                 }
 
+                /// The record of entry k of the node graph, (i, j) with j != i: the records hold the
+                /// off-diagonal blocks only, in the graph's order, and every row has its diagonal.
+                __device__ __forceinline__ int64_t slot(const int64_t k, const ptrdiff_t i, const idx_t j) { return k - i - (j > i ? 1 : 0); }
+
                 // ------------------------------------------------------------------ the update, by windows
                 // The tangent is assembled and encoded a window of rows at a time, so the single-precision
                 // assembly never exists in full: a window's graph has the node graph's rows of the window
@@ -101,13 +106,11 @@ namespace sfem {
                     if ((threadIdx.x & 31) == 0) atomicMax(top, __float_as_int(m));
                 }
 
-                /// The window's rows whose blocks do not sum to zero beyond the assembly's rounding (the
-                /// host's `correction`): their sum R_i into the next slot (`count`, over the windows), and
-                /// each row's slot or -1 (corrected_of); with f16 codes each row's scale, the window's.
+                /// The window's rows' sums A_i = sum_j K_ij, one block per node (in a dynamic step the inertia
+                /// makes every row's nonzero); with f16 codes each row's scale, the window's.
                 template <bool I8>
                 __global__ void rows_kernel(const ptrdiff_t r0, const ptrdiff_t r1, const count_t *const RSTR rp, const float *const RSTR v,
-                                            int *const RSTR count, idx_t *const RSTR rows, float *const RSTR blocks,
-                                            int32_t *const RSTR corrected_of, const int *const RSTR top, float *const RSTR row_scale) {
+                                            float *const RSTR blocks, const int *const RSTR top, float *const RSTR row_scale) {
                     const ptrdiff_t i = r0 + (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     if (i >= r1) return;
                     if constexpr (!I8) {
@@ -115,22 +118,10 @@ namespace sfem {
                         row_scale[i]  = t > 0 ? (float)Code<__half>::scale_for((double)t) : 1.0f;
                     }
                     const count_t k0 = rp[r0];
-                    double        R[9] = {0}, m = 0;
+                    double        A[9] = {0};
                     for (int64_t k = rp[i]; k < rp[i + 1]; ++k)
-                        for (int x = 0; x < 9; ++x) {
-                            R[x] += (double)v[(size_t)(k - k0) * 9 + x];
-                            m = fmax(m, fabs((double)v[(size_t)(k - k0) * 9 + x]));
-                        }
-                    double sum = 0;
-                    for (int x = 0; x < 9; ++x) sum = fmax(sum, fabs(R[x]));
-                    if (!(sum > 64 * FLT_EPSILON * m)) {
-                        corrected_of[i] = -1;
-                        return;
-                    }
-                    const int at    = atomicAdd(count, 1);
-                    rows[at]        = (idx_t)i;
-                    corrected_of[i] = at;
-                    for (int x = 0; x < 9; ++x) blocks[(size_t)at * 9 + x] = (float)R[x];
+                        for (int x = 0; x < 9; ++x) A[x] += (double)v[(size_t)(k - k0) * 9 + x];
+                    for (int x = 0; x < 9; ++x) blocks[(size_t)i * 9 + x] = (float)A[x];
                 }
 
                 template <bool I8>
@@ -163,7 +154,7 @@ namespace sfem {
                     const float   rs = I8 ? 1.0f : row_scale[i];
                     for (int64_t k = rp[i]; k < rp[i + 1]; ++k) {
                         const idx_t j = ci[k];
-                        if (j == i || (SYM && j < i)) continue;  // the diagonal's codes stay zero; the left ones are copies
+                        if (j == i || (SYM && j < i)) continue;  // the diagonal has no record; the left ones are copies
                         double S[9];
                         if (SYM && j < r1) {
                             const size_t kt = (size_t)find(rp, ci, j, (idx_t)i);
@@ -173,7 +164,7 @@ namespace sfem {
                         } else {
                             for (int x = 0; x < 9; ++x) S[x] = (double)v[(size_t)(k - k0) * 9 + x];
                         }
-                        encode_block<I8>(S, rs, records, (size_t)k);
+                        encode_block<I8>(S, rs, records, (size_t)slot(k, i, j));
                     }
                 }
 
@@ -191,7 +182,7 @@ namespace sfem {
                     for (int64_t k = rp[i]; k < rp[i + 1]; ++k) {
                         const idx_t j = ci[k];
                         if (j >= i) break;
-                        const rec_t src = out[find(rp, ci, j, (idx_t)i)];
+                        const rec_t src = out[slot(find(rp, ci, j, (idx_t)i), j, (idx_t)i)];
                         rec_t       dst = src;
                         if constexpr (I8) {
                             for (int r = 0; r < 3; ++r)
@@ -203,19 +194,19 @@ namespace sfem {
                                     dst.codes[r * 3 + c] =
                                             __half_as_ushort(__float2half(__half2float(__ushort_as_half(src.codes[c * 3 + r])) * factor));
                         }
-                        out[k] = dst;
+                        out[slot(k, i, j)] = dst;
                     }
                 }
 
-                // The records in the node graph's own order (rowptr, colidx), the diagonal slot's codes
-                // zero; applied as BSR's group kernel applies its blocks (bsr_spmv_group_kernel): G
+                // The records in the node graph's own order (rowptr, colidx), the diagonal left out
+                // (`slot`); applied as BSR's group kernel applies its blocks (bsr_spmv_group_kernel): G
                 // threads per row, each a stride of whole records, the partial sums added by shuffles in
                 // a fixed order. A thread per row in SELL-32 order, the layout before, is latency bound on
                 // an unstructured mesh's rows of uneven length (FF200: 60% occupancy, 37% of DRAM
                 // bandwidth against BSR's 87% and 82%); on the FF200 valves this layout applies 1.4 to
                 // 1.8 times as fast.
 
-                /// y_i += sum_j K_ij (x_j - x_i) + R_i x_i (the row's correction), G threads per row.
+                /// y_i += sum_{j != i} K_ij (x_j - x_i) + A_i x_i, G threads per row.
                 ///
                 /// FUSED: y = that + the extra blocks, the composed tangent's passes (zero y, product,
                 /// correction, curvature, shift) in one, in their order.
@@ -223,8 +214,8 @@ namespace sfem {
                 __global__ void __launch_bounds__(THREADS) apply_kernel(const ptrdiff_t n, const count_t *const RSTR rp,
                                                                            const idx_t *const RSTR ci, const void *const RSTR records,
                                                                            const float *const RSTR row_scale, const real_t *const RSTR x,
-                                                                           real_t *const RSTR y, const int32_t *const RSTR corrected_of,
-                                                                           const float *const RSTR cblocks, const DiagonalExtra extra) {
+                                                                           real_t *const RSTR y, const float *const RSTR ablocks,
+                                                                           const DiagonalExtra extra) {
                     using rec_t       = typename Records<I8>::rec_t;
                     const ptrdiff_t t      = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     const ptrdiff_t i      = t / G;
@@ -235,8 +226,9 @@ namespace sfem {
                         const real_t xi0 = x[(size_t)i * 3 + 0], xi1 = x[(size_t)i * 3 + 1], xi2 = x[(size_t)i * 3 + 2];
                         for (int64_t k = rp[i] + lane; k < rp[i + 1]; k += G) {
                             const idx_t j = __ldg(ci + k);
-                            float       K[9], sc;
-                            Records<I8>::load(reinterpret_cast<const rec_t *>(records) + k, K, sc);
+                            if (j == i) continue;
+                            float K[9], sc;
+                            Records<I8>::load(reinterpret_cast<const rec_t *>(records) + slot(k, i, j), K, sc);
                             const float d0 = float(x[(size_t)j * 3 + 0] - xi0) * sc, d1 = float(x[(size_t)j * 3 + 1] - xi1) * sc,
                                         d2 = float(x[(size_t)j * 3 + 2] - xi2) * sc;
                             a0 += K[0] * d0 + K[1] * d1 + K[2] * d2;
@@ -260,11 +252,8 @@ namespace sfem {
                         out[0] += (real_t)(a0 * ms);
                         out[1] += (real_t)(a1 * ms);
                         out[2] += (real_t)(a2 * ms);
-                        const int32_t c = corrected_of[i];
-                        if (c >= 0) {
-                            const float *const R = &cblocks[(size_t)c * 9];
-                            for (int a = 0; a < 3; ++a) out[a] += R[a * 3 + 0] * xi[0] + R[a * 3 + 1] * xi[1] + R[a * 3 + 2] * xi[2];
-                        }
+                        const float *const A = &ablocks[(size_t)i * 9];
+                        for (int a = 0; a < 3; ++a) out[a] += A[a * 3 + 0] * xi[0] + A[a * 3 + 1] * xi[1] + A[a * 3 + 2] * xi[2];
                         if constexpr (FUSED) {
                             if (extra.contact_of) {
                                 const idx_t b = extra.contact_of[i];
@@ -277,27 +266,25 @@ namespace sfem {
                     }
                 }
 
-                /// The diagonal: minus the stored blocks' diagonals of each row, plus its correction's.
+                /// The diagonal: minus the stored blocks' diagonals of each row, plus A_i's.
                 template <bool I8>
                 __global__ void diagonal_kernel(const ptrdiff_t n, const count_t *const RSTR rp, const idx_t *const RSTR ci,
                                                 const void *const RSTR records, const float *const RSTR row_scale,
-                                                const int32_t *const RSTR corrected_of, const float *const RSTR cblocks, real_t *const RSTR diag) {
+                                                const float *const RSTR ablocks, real_t *const RSTR diag) {
                     using rec_t       = typename Records<I8>::rec_t;
                     const ptrdiff_t i = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     if (i >= n) return;
                     const double ms   = I8 ? 1.0 : (double)row_scale[i];
                     double       d[3] = {0, 0, 0};
                     for (int64_t k = rp[i]; k < rp[i + 1]; ++k) {
-                        if (ci[k] == i) continue;
+                        const idx_t j = ci[k];
+                        if (j == i) continue;
                         float K[9], sc;
-                        Records<I8>::load(reinterpret_cast<const rec_t *>(records) + k, K, sc);
+                        Records<I8>::load(reinterpret_cast<const rec_t *>(records) + slot(k, i, j), K, sc);
                         const double f = (double)sc * ms;
                         for (int q = 0; q < 3; ++q) d[q] -= f * (double)K[q * 3 + q];
                     }
-                    for (int q = 0; q < 3; ++q) diag[(size_t)i * 3 + q] += (real_t)d[q];
-                    const int32_t c = corrected_of[i];
-                    if (c >= 0)
-                        for (int q = 0; q < 3; ++q) diag[(size_t)i * 3 + q] += cblocks[(size_t)c * 9 + q * 3 + q];
+                    for (int q = 0; q < 3; ++q) diag[(size_t)i * 3 + q] += (real_t)d[q] + ablocks[(size_t)i * 9 + q * 3 + q];
                 }
 
                 /// y += E x, E the extra diagonal blocks (curvature, then shift).
@@ -343,35 +330,40 @@ namespace sfem {
                         for (size_t w = 0; w + 1 < bounds_.size(); ++w) largest = std::max(largest, rp[bounds_[w + 1]] - rp[bounds_[w]]);
                         for (const ptrdiff_t b : bounds_) host_rp_.push_back(rp[b]);
                         name_ += ", " + std::to_string(g_) + " threads per row, " + std::to_string(bounds_.size() - 1) + " windows";
-                        records_      = DeviceArray<rec_t>((size_t)rp[n_]);  // zero: the diagonal slots' codes
-                        rp_           = DeviceArray<count_t>::from(rp, (std::size_t)n_ + 1);
-                        ci_           = DeviceArray<idx_t>::from(ci, (std::size_t)rp[n_]);
-                        window_rp_    = DeviceArray<count_t>((size_t)n_ + 1);
-                        largest_      = (size_t)largest;
-                        top_          = DeviceArray<int>(1);
-                        count_        = DeviceArray<int>(1);
-                        crows_        = DeviceArray<idx_t>((size_t)n_);
-                        cblocks_      = DeviceArray<float>((size_t)n_ * 9);
-                        corrected_of_ = DeviceArray<int32_t>((size_t)n_);
-                        if constexpr (!I8) row_scale_ = DeviceArray<float>((size_t)n_);
+                        // The records skip the diagonal (`slot`), which assumes every row has it.
+                        for (ptrdiff_t i = 0; i < n_; ++i) {
+                            if (!std::binary_search(ci + rp[i], ci + rp[i + 1], (idx_t)i)) {
+                                SFEM_ERROR("inexact::cuda::BsrStore: row %ld of the node graph has no diagonal\n", (long)i);
+                            }
+                        }
+                        records_ = DeviceArray<rec_t>((size_t)(rp[n_] - n_));
+                        rp_      = DeviceArray<count_t>::from(rp, (std::size_t)n_ + 1);
+                        ci_      = DeviceArray<idx_t>::from(ci, (std::size_t)rp[n_]);
+                        largest_ = (size_t)largest;
+                        ablocks_ = DeviceArray<float>((size_t)n_ * 9);
+                        if constexpr (!I8) {
+                            row_scale_ = DeviceArray<float>((size_t)n_);
+                            top_       = DeviceArray<int>(1);
+                        }
                     }
 
-                    /// Window by window: its graph, the assembly into its values (stream-ordered, freed at the
-                    /// end), the rows' corrections and scales, the records; then, symmetric, the copies left
-                    /// of the diagonal. No synchronization.
+                    /// Window by window: its graph, the assembly into its values (both stream-ordered, freed at
+                    /// the end), the rows' sums and scales, the records; then, symmetric, the copies left of
+                    /// the diagonal. No synchronization.
                     int update(const AssembleBSR &assemble) override {
                         SFEM_TRACE_SCOPE("inexact::cuda::BsrStore::update");
                         if (n_ == 0) return SFEM_SUCCESS;
-                        float *values = nullptr;
+                        float   *values    = nullptr;
+                        count_t *window_rp = nullptr;
                         check(cudaMallocAsync((void **)&values, largest_ * 9 * sizeof(float), stream_), "bsr values");
-                        check(cudaMemsetAsync(count_.data, 0, sizeof(int), stream_), "bsr correction");
+                        check(cudaMallocAsync((void **)&window_rp, ((size_t)n_ + 1) * sizeof(count_t), stream_), "bsr window rowptr");
                         int status = SFEM_SUCCESS;
                         for (size_t w = 0; w + 1 < bounds_.size() && status == SFEM_SUCCESS; ++w) {
                             const ptrdiff_t r0 = bounds_[w], r1 = bounds_[w + 1];
-                            window_rowptr_kernel<<<grid(n_ + 1, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, r0, r1, window_rp_.data);
+                            window_rowptr_kernel<<<grid(n_ + 1, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, r0, r1, window_rp);
                             check(cudaMemsetAsync(values, 0, largest_ * 9 * sizeof(float), stream_), "bsr values");
                             const count_t k0 = host_rowptr(r0);
-                            if (assemble(window_rp_.data, ci_.data + k0, smesh::SMESH_FLOAT32, values) != SFEM_SUCCESS) {
+                            if (assemble(window_rp, ci_.data + k0, smesh::SMESH_FLOAT32, values) != SFEM_SUCCESS) {
                                 status = SFEM_FAILURE;
                                 break;
                             }
@@ -379,8 +371,7 @@ namespace sfem {
                                 check(cudaMemsetAsync(top_.data, 0, sizeof(int), stream_), "bsr scale");
                                 max_kernel<<<1024, 256, 0, stream_>>>(r0, r1, rp_.data, ci_.data, values, top_.data);
                             }
-                            rows_kernel<I8><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, values, count_.data, crows_.data,
-                                                                                           cblocks_.data, corrected_of_.data, top_.data,
+                            rows_kernel<I8><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, values, ablocks_.data, top_.data,
                                                                                            row_scale_.data);
                             encode_kernel<I8, SYM><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, ci_.data, values,
                                                                                                    row_scale_.data, records_.data);
@@ -389,6 +380,7 @@ namespace sfem {
                                                                                                       row_scale_.data, records_.data);
                         }
                         check(cudaFreeAsync(values, stream_), "bsr values");
+                        check(cudaFreeAsync(window_rp, stream_), "bsr window rowptr");
                         check(cudaGetLastError(), "bsr encode");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                         return status;
@@ -412,17 +404,15 @@ namespace sfem {
                     void add_diagonal(real_t *const diag) const override {
                         if (n_ > 0)
                             diagonal_kernel<I8><<<grid(n_, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, ci_.data, records_.data, row_scale_.data,
-                                                                                            corrected_of_.data, cblocks_.data, diag);
+                                                                                            ablocks_.data, diag);
                         check(cudaGetLastError(), "bsr diagonal");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                     }
 
-                    /// The records, their structure (the node graph's device copy), the corrections and the
-                    /// rows' scales, and a window's row pointers. The window's single-precision values exist
-                    /// during the update only (largest window: `scratch_bytes`).
+                    /// The records, their structure (the node graph's device copy), the rows' sums and scales.
+                    /// A window's single-precision values and row pointers exist during the update only.
                     std::size_t bytes() const override {
-                        return records_.bytes() + rp_.bytes() + ci_.bytes() + window_rp_.bytes() + crows_.bytes() + cblocks_.bytes() +
-                               corrected_of_.bytes() + row_scale_.bytes() + top_.bytes() + count_.bytes();
+                        return records_.bytes() + rp_.bytes() + ci_.bytes() + ablocks_.bytes() + row_scale_.bytes() + top_.bytes();
                     }
 
                     std::string describe() const override { return name_; }
@@ -438,12 +428,9 @@ namespace sfem {
                     DeviceArray<rec_t>     records_;
                     DeviceArray<count_t>   rp_;
                     DeviceArray<idx_t>     ci_;
-                    DeviceArray<count_t>   window_rp_;
-                    DeviceArray<int>       top_, count_;
-                    DeviceArray<idx_t>     crows_;
-                    DeviceArray<float>     cblocks_;
-                    DeviceArray<int32_t>   corrected_of_;  // per node: its correction, -1 for none
-                    DeviceArray<float>     row_scale_;     // f16: per node, its window's scale
+                    DeviceArray<int>       top_;
+                    DeviceArray<float>     ablocks_;    // per node: A_i, the row's sum
+                    DeviceArray<float>     row_scale_;  // f16: per node, its window's scale
 
                     count_t host_rowptr(const ptrdiff_t row) const { return host_rp_[std::lower_bound(bounds_.begin(), bounds_.end(), row) - bounds_.begin()]; }
 
@@ -452,10 +439,10 @@ namespace sfem {
                         if (n_ == 0) return;
                         if (g_ == 4)
                             apply_kernel<I8, 4, FUSED><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(
-                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, corrected_of_.data, cblocks_.data, extra);
+                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, ablocks_.data, extra);
                         else
                             apply_kernel<I8, 8, FUSED><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(
-                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, corrected_of_.data, cblocks_.data, extra);
+                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, ablocks_.data, extra);
                         check(cudaGetLastError(), "bsr apply");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                     }
