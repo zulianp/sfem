@@ -707,7 +707,8 @@ def _inexact_declarations(material, publishes_inexact, team=False):
     int inexact_update(const real_t *const x) override;
     int inexact_apply(const real_t *const h, real_t *const out) override;
     std::size_t inexact_bytes() const override;
-    int inexact_diag(real_t *const diag) override;""" + _INEXACT_TEAM_DECLARATION[bool(team)]
+    int inexact_diag(real_t *const diag) override;
+    bool set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) override;""" + _INEXACT_TEAM_DECLARATION[bool(team)]
 
 
 _INEXACT_TEAM_DECLARATION = {
@@ -1233,6 +1234,10 @@ def _inexact_definitions(
       store->second->diagonal(domain.block->n_elements(), element_connectivity(domain), 3, diag);
       return SFEM_SUCCESS;
     });
+  }
+
+  bool %(op)s::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
   }
 
   int %(op)s::inexact_update(const real_t *const x) {

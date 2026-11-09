@@ -1344,6 +1344,10 @@ namespace sfem {
     });
   }
 
+  bool GeneratedLinearElasticity::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
+  }
+
   int GeneratedLinearElasticity::inexact_update(const real_t *const x) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::inexact_update");
     auto mesh = impl_->space->mesh();

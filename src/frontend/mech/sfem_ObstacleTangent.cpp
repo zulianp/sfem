@@ -204,13 +204,10 @@ namespace sfem {
                                 self->f->set_inexact_extra(nullptr, false);
                                 return;
                             }
-                            self->blas->zeros(self->ndofs, out);
+                            // The curvature and the shift write out in one pass, the material adds to it.
+                            self->contact->extra(
+                                    self->curved ? self->blocks->data() : nullptr, self->shift, self->reference->data(), in, out);
                             self->material->apply(in, out);
-                            if (self->curved) self->contact->apply_blocks(self->blocks->data(), in, out);
-                            if (self->shift != 0) {
-                                self->blas->xypaz(self->ndofs, self->reference->data(), in, 0, self->tmp->data());
-                                self->blas->axpy(self->ndofs, self->shift, self->tmp->data(), out);
-                            }
                         },
                         es);
             }

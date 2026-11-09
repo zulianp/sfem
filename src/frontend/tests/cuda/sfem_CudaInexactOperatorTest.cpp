@@ -17,6 +17,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_test.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_semistructured.hpp"
@@ -314,6 +315,65 @@ int test_linear_elasticity() {
 }
 
 // The projected tangent (tangent_projection) in the device stores: affine, isoparametric, folded.
+// The assembled store's product with extra diagonal blocks (Op::set_inexact_extra), one kernel that
+// overwrites its output, against the plain product plus a contact block at every third node and a
+// shift times |reference|, added on the host: the composed contact tangent's passes, fused. A store
+// that cannot take them says so.
+int fused_extra(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+    auto op = sfem::create_op(fs, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op && op->initialize() == SFEM_SUCCESS);
+    const ptrdiff_t ndofs = fs->n_dofs(), nnodes = ndofs / 3;
+    const auto      u = pseudo_random(ndofs, 0.01, 7), h = pseudo_random(ndofs, 1, 11);
+    std::vector<idx_t>  contact_of(nnodes, -1);
+    ptrdiff_t           ncontact = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i += 3) contact_of[i] = (idx_t)ncontact++;
+    const auto          blocks    = pseudo_random(6 * ncontact, 1, 13);
+    std::vector<real_t> reference = pseudo_random(ndofs, 1, 17);
+    for (auto &r : reference) r = std::abs(r);
+    const real_t shift = 0.3;
+
+    auto staged = sfem::create_host_buffer<idx_t>(nnodes);
+    std::copy(contact_of.begin(), contact_of.end(), staged->data());
+    auto d_contact = smesh::to_device(staged);
+    auto d_blocks = on_device(blocks), d_reference = on_device(reference);
+    sfem::inexact::DiagonalExtra extra;
+    extra.contact_of = d_contact->data();
+    extra.blocks     = d_blocks->data();
+    extra.shift      = shift;
+    extra.reference  = d_reference->data();
+
+    for (const char *const encoding : {"f16", "i8"}) {
+        op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", encoding));
+        auto du = on_device(u), dh = on_device(h);
+        SFEM_TEST_ASSERT(op->inexact_update(du->data()) == SFEM_SUCCESS);
+        auto plain = on_device(std::vector<real_t>(ndofs, 0));
+        SFEM_TEST_ASSERT(op->inexact_apply(dh->data(), plain->data()) == SFEM_SUCCESS);
+        std::vector<real_t> expected = from_device(plain);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            if (contact_of[i] >= 0) sfem::inexact::packed_sym_apply(&blocks[6 * contact_of[i]], &h[i * 3], &expected[i * 3]);
+            for (int d = 0; d < 3; ++d) expected[i * 3 + d] += shift * (reference[i * 3 + d] * h[i * 3 + d]);
+        }
+        // Garbage in the output: the fused product overwrites it.
+        auto fused = on_device(std::vector<real_t>(ndofs, real_t(1e30)));
+        SFEM_TEST_ASSERT(op->set_inexact_extra(&extra, true));
+        SFEM_TEST_ASSERT(op->inexact_apply(dh->data(), fused->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(op->set_inexact_extra(nullptr, false));
+        const real_t difference = relative_difference(from_device(fused), expected);
+        printf("%-6s bsr %-3s fused extra against the plain product and the blocks: %.3e\n", label, encoding, (double)difference);
+        SFEM_TEST_ASSERT(difference < 1e-13);
+    }
+    op->set_inexact_options(sfem::InexactOptions::from_strings("points", "f16"));
+    SFEM_TEST_ASSERT(!op->set_inexact_extra(&extra, true));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_fused_extra() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 6, 5, 5, 0, 0, 0, 1, 1, 1);
+    if (fused_extra(space(mesh), "TET4") != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    auto coarse = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    return fused_extra(space(smesh::promote_to(smesh::TET10, coarse)), "TET10");
+}
+
 int test_projected_prony() {
     auto       tet4  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
     auto       tet10 = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1));
@@ -335,6 +395,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_curved_tet10);
     SFEM_RUN_TEST(test_linear_elasticity);
     SFEM_RUN_TEST(test_projected_prony);
+    SFEM_RUN_TEST(test_fused_extra);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

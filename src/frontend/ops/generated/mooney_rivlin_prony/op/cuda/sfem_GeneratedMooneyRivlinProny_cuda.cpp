@@ -1311,6 +1311,10 @@ namespace sfem {
     });
   }
 
+  bool GPUGeneratedMooneyRivlinProny::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
+  }
+
   int GPUGeneratedMooneyRivlinProny::inexact_update(const real_t *const x) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::inexact_update");
     auto mesh = impl_->space->mesh();

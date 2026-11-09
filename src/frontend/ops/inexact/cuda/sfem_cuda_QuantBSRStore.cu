@@ -104,6 +104,12 @@ namespace sfem {
                     for (int x = 0; x < 9; ++x) blocks[(size_t)at * 9 + x] = (float)R[x];
                 }
 
+                /// corrected_of[rows[r]] = r: the correction of each corrected row (-1 elsewhere).
+                __global__ void correction_index_kernel(const int n, const idx_t *const RSTR rows, int32_t *const RSTR corrected_of) {
+                    const int r = blockIdx.x * blockDim.x + threadIdx.x;
+                    if (r < n) corrected_of[rows[r]] = r;
+                }
+
                 /// y_i += R_i x_i, and diag_i += diag(R_i), over the corrected rows.
                 __global__ void correction_apply_kernel(const int n, const idx_t *const RSTR rows, const float *const RSTR blocks,
                                                         const real_t *const RSTR x, real_t *const RSTR y) {
@@ -163,11 +169,15 @@ namespace sfem {
                 }
 
                 /// y_i += sum_j K_ij (x_j - x_i), G threads per row.
-                template <bool I8, int G>
+                ///
+                /// FUSED: y = that + R_i x_i (the row's correction) + the extra blocks, the composed tangent's
+                /// passes (zero y, product, correction, curvature, shift) in one, in their order.
+                template <bool I8, int G, bool FUSED>
                 __global__ void __launch_bounds__(THREADS) apply_kernel(const ptrdiff_t n, const count_t *const RSTR rp,
                                                                            const idx_t *const RSTR ci, const void *const RSTR records,
                                                                            const float matrix_scale, const real_t *const RSTR x,
-                                                                           real_t *const RSTR y) {
+                                                                           real_t *const RSTR y, const int32_t *const RSTR corrected_of,
+                                                                           const float *const RSTR cblocks, const DiagonalExtra extra) {
                     using rec_t       = typename Records<I8>::rec_t;
                     const ptrdiff_t t      = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     const ptrdiff_t i      = t / G;
@@ -196,9 +206,27 @@ namespace sfem {
                         }
                     }
                     if (active && lane == 0) {
-                        y[(size_t)i * 3 + 0] += (real_t)(a0 * matrix_scale);
-                        y[(size_t)i * 3 + 1] += (real_t)(a1 * matrix_scale);
-                        y[(size_t)i * 3 + 2] += (real_t)(a2 * matrix_scale);
+                        if constexpr (!FUSED) {
+                            y[(size_t)i * 3 + 0] += (real_t)(a0 * matrix_scale);
+                            y[(size_t)i * 3 + 1] += (real_t)(a1 * matrix_scale);
+                            y[(size_t)i * 3 + 2] += (real_t)(a2 * matrix_scale);
+                        } else {
+                            const real_t xi[3]  = {x[(size_t)i * 3 + 0], x[(size_t)i * 3 + 1], x[(size_t)i * 3 + 2]};
+                            real_t       out[3] = {real_t(0) + (real_t)(a0 * matrix_scale), real_t(0) + (real_t)(a1 * matrix_scale),
+                                                   real_t(0) + (real_t)(a2 * matrix_scale)};
+                            const int32_t c = corrected_of ? corrected_of[i] : -1;
+                            if (c >= 0) {
+                                const float *const R = &cblocks[(size_t)c * 9];
+                                for (int a = 0; a < 3; ++a) out[a] += R[a * 3 + 0] * xi[0] + R[a * 3 + 1] * xi[1] + R[a * 3 + 2] * xi[2];
+                            }
+                            if (extra.contact_of) {
+                                const idx_t b = extra.contact_of[i];
+                                if (b >= 0) packed_sym_apply(&extra.blocks[(size_t)b * 6], xi, out);
+                            }
+                            if (extra.shift != 0)
+                                for (int a = 0; a < 3; ++a) out[a] += extra.shift * (extra.reference[(size_t)i * 3 + a] * xi[a]);
+                            for (int a = 0; a < 3; ++a) y[(size_t)i * 3 + a] = out[a];
+                        }
                     }
                 }
 
@@ -280,11 +308,11 @@ namespace sfem {
                     void apply(const real_t *const x, real_t *const y) const override {
                         if (n_ > 0) {
                             if (g_ == 4)
-                                apply_kernel<I8, 4><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, ci_.data, records_.data,
-                                                                                                   matrix_scale_, x, y);
+                                apply_kernel<I8, 4, false><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(
+                                        n_, rp_.data, ci_.data, records_.data, matrix_scale_, x, y, nullptr, nullptr, DiagonalExtra());
                             else
-                                apply_kernel<I8, 8><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, ci_.data, records_.data,
-                                                                                                   matrix_scale_, x, y);
+                                apply_kernel<I8, 8, false><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(
+                                        n_, rp_.data, ci_.data, records_.data, matrix_scale_, x, y, nullptr, nullptr, DiagonalExtra());
                         }
                         if (n_corrected_ > 0)
                             correction_apply_kernel<<<grid(n_corrected_, THREADS), THREADS, 0, stream_>>>(n_corrected_, crows_.data,
@@ -293,9 +321,22 @@ namespace sfem {
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                     }
 
-                    /// The plain product, then the extra blocks in a pass of their own.
+                    /// Overwriting: one kernel (the product, the row's correction, the extra blocks). Adding:
+                    /// the plain product, then the extra blocks in a pass of their own.
                     void apply(const real_t *const x, real_t *const y, const DiagonalExtra &extra, const bool overwrite) const override {
-                        if (overwrite) check(cudaMemsetAsync(y, 0, (size_t)n_ * 3 * sizeof(real_t), stream_), "bsr apply");
+                        if (overwrite) {
+                            if (n_ == 0) return;
+                            const int32_t *const of = n_corrected_ > 0 ? corrected_of_.data : nullptr;
+                            if (g_ == 4)
+                                apply_kernel<I8, 4, true><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(
+                                        n_, rp_.data, ci_.data, records_.data, matrix_scale_, x, y, of, cblocks_.data, extra);
+                            else
+                                apply_kernel<I8, 8, true><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(
+                                        n_, rp_.data, ci_.data, records_.data, matrix_scale_, x, y, of, cblocks_.data, extra);
+                            check(cudaGetLastError(), "bsr apply");
+                            SFEM_DEBUG_SYNCHRONIZE(stream_);
+                            return;
+                        }
                         apply(x, y);
                         if (n_ > 0) extra_kernel<<<grid(n_, THREADS), THREADS, 0, stream_>>>(n_, extra, x, y);
                         check(cudaGetLastError(), "bsr apply");
@@ -316,7 +357,8 @@ namespace sfem {
                     /// The records, their structure (the node graph's device copy), the corrections, and
                     /// the single-precision assembly the records are encoded from.
                     std::size_t bytes() const override {
-                        return records_.bytes() + rp_.bytes() + ci_.bytes() + crows_.bytes() + cblocks_.bytes() + values_.bytes();
+                        return records_.bytes() + rp_.bytes() + ci_.bytes() + crows_.bytes() + cblocks_.bytes() + corrected_of_.bytes() +
+                               values_.bytes();
                     }
 
                     std::string describe() const override { return name_ + ", " + std::to_string(n_corrected_) + " corrected rows"; }
@@ -334,6 +376,7 @@ namespace sfem {
                     DeviceArray<int>       top_, count_;
                     DeviceArray<idx_t>     crows_;
                     DeviceArray<float>     cblocks_;
+                    DeviceArray<int32_t>   corrected_of_;  // per node: its correction, -1 for none
                     int                    n_corrected_{0};
 
                     /// Counts the rows to correct, sizes their arrays, then writes them.
@@ -351,6 +394,10 @@ namespace sfem {
                         check(cudaMemsetAsync(count_.data, 0, sizeof(int), stream_), "bsr correction");
                         correction_kernel<<<grid(n_, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, values_.data, count_.data, crows_.data,
                                                                                       cblocks_.data);
+                        if (!corrected_of_.data) corrected_of_ = DeviceArray<int32_t>((size_t)n_);
+                        check(cudaMemsetAsync(corrected_of_.data, 0xff, corrected_of_.bytes(), stream_), "bsr correction");
+                        correction_index_kernel<<<grid(n_corrected_, THREADS), THREADS, 0, stream_>>>(n_corrected_, crows_.data,
+                                                                                                     corrected_of_.data);
                         check(cudaGetLastError(), "bsr correction");
                     }
                 };

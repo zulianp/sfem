@@ -1191,6 +1191,10 @@ namespace sfem {
     });
   }
 
+  bool GPUGeneratedNeoHookeanOgden::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
+  }
+
   int GPUGeneratedNeoHookeanOgden::inexact_update(const real_t *const x) {
     SFEM_TRACE_SCOPE("GPUGeneratedNeoHookeanOgden::inexact_update");
     auto mesh = impl_->space->mesh();

@@ -1124,6 +1124,10 @@ namespace sfem {
     });
   }
 
+  bool GeneratedMooneyRivlinKelvinVoigt::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
+  }
+
   int GeneratedMooneyRivlinKelvinVoigt::inexact_update(const real_t *const x) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::inexact_update");
     auto mesh = impl_->space->mesh();

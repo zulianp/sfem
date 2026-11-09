@@ -1077,6 +1077,10 @@ namespace sfem {
     });
   }
 
+  bool GPUGeneratedLinearKelvinVoigt::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
+  }
+
   int GPUGeneratedLinearKelvinVoigt::inexact_update(const real_t *const x) {
     SFEM_TRACE_SCOPE("GPUGeneratedLinearKelvinVoigt::inexact_update");
     auto mesh = impl_->space->mesh();
