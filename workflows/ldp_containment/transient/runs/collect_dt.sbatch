@@ -11,8 +11,9 @@
 # --set output.export_freq=<0.1 ms / dt>", PREFIX dt<us>_s0; dt 100 us is the campaign's tp10_s0):
 # per step, the reference twice (bsr32__full_a, _b) and t* with int16 remainders and float32 slots.
 # Into OUT (a new folder; the script stops if it exists): every run against the finest step's
-# reference (set dt_TET4), each step's repeat against its own reference (sets dt_floor_<us>), and
-# the valve events of every run.
+# reference (set dt_TET4), every run of a step against that step's reference (sets dt_own_<us>:
+# the repeat's floor and each storage's error at that step), and the valve events of every run.
+# Runs a step lacks are left out.
 #   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025"] [OUT=runs/paper_dt_<finest tag>]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
@@ -24,16 +25,18 @@ finest=${TAGS##* }
 P=${OUT:-$D/runs/paper_dt_$finest}
 [ -e $P ] && { echo "collect_dt: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
-RUNS="bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a"
+RUNS=${RUNS:-bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__full_s32_a bsr32__float32_plain_s32_a}
 all=""
-for tag in $TAGS; do for r in $RUNS; do all="$all ${tag}_s0_$r"; done; done
+for tag in $TAGS; do for r in $RUNS; do [ -f $CASE/${tag}_s0_$r/sim2/history.csv ] && all="$all ${tag}_s0_$r"; done; done
 ref=${finest}_s0_bsr32__full_a
 others=$(for r in $all; do [ $r != $ref ] && echo $r; done)
 # shellcheck disable=SC2086
 $PY $COL runs $P/dt_runs.csv $P/dt_series.csv dt_TET4 $CASE $ref $others > $P/dt.log 2>&1; echo "runs rc=$?"
 for tag in $TAGS; do
-  $PY $COL runs $P/dt_runs.csv $P/dt_floor_series.csv dt_floor_$tag $CASE ${tag}_s0_bsr32__full_a ${tag}_s0_bsr32__full_b \
-      >> $P/dt.log 2>&1; echo "floor $tag rc=$?"
+  own=$(for r in $all; do case $r in ${tag}_s0_*) [ $r != ${tag}_s0_bsr32__full_a ] && echo $r ;; esac; done)
+  # shellcheck disable=SC2086
+  $PY $COL runs $P/dt_runs.csv $P/dt_own_series.csv dt_own_$tag $CASE ${tag}_s0_bsr32__full_a $own \
+      >> $P/dt.log 2>&1; echo "own $tag rc=$?"
 done
 # shellcheck disable=SC2086
 $PY $COL events $P/dt_events.csv dt_TET4 $CASE $all >> $P/dt.log 2>&1; echo "events rc=$?"
