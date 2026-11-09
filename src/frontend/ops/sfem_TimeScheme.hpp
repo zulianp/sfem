@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_aliases.hpp"
@@ -77,6 +78,12 @@ namespace sfem {
 
         /// The state it carries between steps (SCHEME).
         virtual void account(MemoryLedger & /*ledger*/) const {}
+
+        /// The state the method carries from one step to the next, into the folder `dir` (which
+        /// must exist) and back: a run restarted from it takes the next step as this one would
+        /// (Playground::write_state, a restart). Unsupported by default.
+        virtual int write_state(const std::string & /*dir*/) const { return SFEM_FAILURE; }
+        virtual int read_state(const std::string & /*dir*/) { return SFEM_FAILURE; }
 
         /// The derived states this method implies at an arbitrary `x`, without
         /// advancing the step.

@@ -5,6 +5,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MemoryLedger.hpp"
+#include "sfem_StateFiles.hpp"
 #include "sfem_blas_factory.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
@@ -137,6 +138,39 @@ namespace sfem {
         for (auto *buffer : {&impl.u_n, &impl.u_nm1, &impl.v_n, &impl.v_nm1, &impl.z, &impl.u_hat}) {
             ledger.add(MemoryLedger::SCHEME, *buffer);
         }
+    }
+
+    int BDF2Scheme::write_state(const std::string &dir) const {
+        auto      &impl = *impl_;
+        const auto d    = smesh::Path(dir);
+        if (write_state_buffer(d / "bdf2_u_n.raw", impl.u_n) || write_state_buffer(d / "bdf2_u_nm1.raw", impl.u_nm1) ||
+            write_state_buffer(d / "bdf2_v_n.raw", impl.v_n) || write_state_buffer(d / "bdf2_v_nm1.raw", impl.v_nm1)) {
+            return SFEM_FAILURE;
+        }
+        return write_state_numbers(d / "bdf2.txt",
+                                   {{"dt_n", (double)impl.dt_n}, {"started", impl.started ? 1.0 : 0.0}, {"real_bytes", (double)sizeof(real_t)}});
+    }
+
+    int BDF2Scheme::read_state(const std::string &dir) {
+        auto                         &impl = *impl_;
+        const auto                    d    = smesh::Path(dir);
+        std::map<std::string, double> numbers;
+        double                        dt_n = 0, started = 0, real_bytes = 0;
+        if (read_state_numbers(d / "bdf2.txt", numbers) || state_number(numbers, "dt_n", &dt_n) ||
+            state_number(numbers, "started", &started) || state_number(numbers, "real_bytes", &real_bytes)) {
+            return SFEM_FAILURE;
+        }
+        if (real_bytes != (double)sizeof(real_t)) {
+            fprintf(stderr, "BDF2Scheme::read_state: saved with %g-byte reals, this build has %zu\n", real_bytes, sizeof(real_t));
+            return SFEM_FAILURE;
+        }
+        if (read_state_buffer(d / "bdf2_u_n.raw", impl.u_n) || read_state_buffer(d / "bdf2_u_nm1.raw", impl.u_nm1) ||
+            read_state_buffer(d / "bdf2_v_n.raw", impl.v_n) || read_state_buffer(d / "bdf2_v_nm1.raw", impl.v_nm1)) {
+            return SFEM_FAILURE;
+        }
+        impl.dt_n    = (real_t)dt_n;
+        impl.started = started != 0;
+        return SFEM_SUCCESS;
     }
 
     void BDF2Scheme::advance(const real_t *const x) {

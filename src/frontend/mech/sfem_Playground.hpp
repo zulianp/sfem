@@ -29,6 +29,12 @@ namespace sfem {
         /// Every step of the case. SFEM_FAILURE when a step could not be solved.
         int run();
 
+        /// The state a run carries between steps, after a committed step at time `t` (step
+        /// `step`), into the folder `dir` (created): the solution, the time scheme's state, the
+        /// material's history. A case with `restart: <dir>` starts from it at `t` and runs on to
+        /// its t_end (the observers write afresh where the case says).
+        int write_state(const std::string &dir, const real_t t, const int step) const;
+
         std::shared_ptr<Function>   function() const;
         std::shared_ptr<Op>         material() const;
         std::shared_ptr<TimeScheme> scheme() const;

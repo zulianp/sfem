@@ -1,4 +1,5 @@
 #include "sfem_PronyRelaxation.hpp"
+#include "sfem_StateFiles.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -514,5 +515,97 @@ namespace sfem {
     }
 
     std::size_t PronyRelaxation::frozen_bytes() const { return history_->size() * sizeof(real_t); }
+
+    int PronyRelaxation::write_state(const std::string &prefix) const {
+        if (step_open_) {
+            fprintf(stderr, "PronyRelaxation::write_state: a step is open\n");
+            return SFEM_FAILURE;
+        }
+        const int                                     n_terms = static_cast<int>(slot_.size());
+        std::vector<std::pair<std::string, double>> numbers = {
+                {"n_terms", (double)n_terms},
+                {"n_components", (double)n_components_},
+                {"n_qp", (double)n_qp_},
+                {"n_elements", (double)n_elements_},
+                {"storage", (double)static_cast<int>(options_.history_storage)},
+                {"temperature", (double)temperature_},
+                {"n_live", (double)n_live_},
+                {"n_tensors", (double)(H_ ? H_->n_tensors() : 0)},
+                {"reference_full", reference_full_ ? 1.0 : 0.0},
+                {"reference_narrow", reference_narrow_ ? 1.0 : 0.0}};
+        for (int i = 0; i < n_terms; i++) {
+            numbers.push_back({"slot_" + std::to_string(i), (double)slot_[i]});
+            numbers.push_back({"coefficient_" + std::to_string(i), (double)coefficient_[i]});
+        }
+        for (size_t s = 0; s < term_of_slot_.size(); s++) {
+            numbers.push_back({"term_of_slot_" + std::to_string(s), (double)term_of_slot_[s]});
+            numbers.push_back({"slot_beta_" + std::to_string(s), (double)slot_beta_[s]});
+        }
+        numbers.push_back({"n_slot_terms", (double)term_of_slot_.size()});
+        if (write_state_numbers(smesh::Path(prefix + ".txt"), numbers)) return SFEM_FAILURE;
+        if (H_ && H_->n_tensors() > 0 && H_->write_state(prefix + "_H")) return SFEM_FAILURE;
+        if (reference_full_ && write_state_buffer(smesh::Path(prefix + "_R.raw"), reference_full_)) return SFEM_FAILURE;
+        if (reference_narrow_ && write_state_buffer(smesh::Path(prefix + "_R.float32"), reference_narrow_)) return SFEM_FAILURE;
+        return SFEM_SUCCESS;
+    }
+
+    int PronyRelaxation::read_state(const std::string &prefix) {
+        std::map<std::string, double> numbers;
+        if (read_state_numbers(smesh::Path(prefix + ".txt"), numbers)) return SFEM_FAILURE;
+        auto get = [&](const std::string &name, double *const v) { return state_number(numbers, name.c_str(), v); };
+        double n_terms = 0, n_components = 0, n_qp = 0, n_elements = 0, storage = 0, temperature = 0, n_live = 0,
+               n_tensors = 0, ref_full = 0, ref_narrow = 0, n_slot_terms = 0;
+        if (get("n_terms", &n_terms) || get("n_components", &n_components) || get("n_qp", &n_qp) ||
+            get("n_elements", &n_elements) || get("storage", &storage) || get("temperature", &temperature) ||
+            get("n_live", &n_live) || get("n_tensors", &n_tensors) || get("reference_full", &ref_full) ||
+            get("reference_narrow", &ref_narrow) || get("n_slot_terms", &n_slot_terms)) {
+            return SFEM_FAILURE;
+        }
+        if ((int)n_terms != (int)slot_.size() || (int)n_components != n_components_ || (int)n_qp != n_qp_ ||
+            (ptrdiff_t)n_elements != n_elements_ || (int)storage != static_cast<int>(options_.history_storage)) {
+            fprintf(stderr, "PronyRelaxation::read_state: %s was saved from another series, shape or storage\n", prefix.c_str());
+            return SFEM_FAILURE;
+        }
+        for (int i = 0; i < (int)n_terms; i++) {
+            double s = 0, c = 0;
+            if (get("slot_" + std::to_string(i), &s) || get("coefficient_" + std::to_string(i), &c)) return SFEM_FAILURE;
+            slot_[i]        = (int)s;
+            coefficient_[i] = (real_t)c;
+        }
+        term_of_slot_.assign((size_t)n_slot_terms, -1);
+        slot_beta_.assign((size_t)n_slot_terms, 0);
+        for (size_t s = 0; s < term_of_slot_.size(); s++) {
+            double t = 0, b = 0;
+            if (get("term_of_slot_" + std::to_string(s), &t) || get("slot_beta_" + std::to_string(s), &b)) return SFEM_FAILURE;
+            term_of_slot_[s] = (int)t;
+            slot_beta_[s]    = (real_t)b;
+        }
+        temperature_ = (real_t)temperature;
+        n_live_      = (int)n_live;
+        if ((int)n_tensors > 0) {
+            // A store of exactly the saved shape, its bytes read as they were written.
+            H_ = std::make_shared<QuadratureState>((int)n_tensors,
+                                                   n_components_,
+                                                   n_qp_,
+                                                   n_elements_,
+                                                   options_.history_storage,
+                                                   options_.execution_space,
+                                                   options_.history_elements_per_mean);
+            if (H_->read_state(prefix + "_H")) return SFEM_FAILURE;
+        }
+        const ptrdiff_t n = static_cast<ptrdiff_t>(n_components_) * n_qp_ * n_elements_;
+        reference_full_.reset();
+        reference_narrow_.reset();
+        if (ref_full != 0) {
+            reference_full_ = create_buffer<real_t>(n, options_.execution_space);
+            if (read_state_buffer(smesh::Path(prefix + "_R.raw"), reference_full_)) return SFEM_FAILURE;
+        }
+        if (ref_narrow != 0) {
+            reference_narrow_ = create_buffer<float>(n, options_.execution_space);
+            if (read_state_buffer(smesh::Path(prefix + "_R.float32"), reference_narrow_)) return SFEM_FAILURE;
+        }
+        step_open_ = false;
+        return SFEM_SUCCESS;
+    }
 
 }  // namespace sfem

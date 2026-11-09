@@ -740,6 +740,52 @@ int test_prony_starts_relaxed() {
     return SFEM_TEST_SUCCESS;
 }
 
+// A restart takes the next steps as the run it was saved from would: the Prony bar twisted under
+// inertia (BDF2, its history and the Prony terms' all carried), 12 steps straight against 6, the
+// state saved (Playground::write_state), and a new case with `restart` for the other 6.
+int test_restart_matches_straight_run() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_restart_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    const std::vector<std::string> common = {
+            "regime=dynamic",
+            "dynamics={scheme: bdf2, density: 1}",
+            "constraints=[{type: rotation, sideset: right, axis: x, center: [0, 0.5, 0.5], angle: 0.4, "
+            "profile: {type: linear_ramp, start_time: 0, end_time: 1, start_value: 0, end_value: 1}}]"};
+    auto with = [&](std::vector<std::string> more) {
+        more.insert(more.begin(), common.begin(), common.end());
+        return more;
+    };
+
+    auto straight = assemble(PRONY_TORSION, with({"time={dt: 0.25, t_end: 3}"}));
+    SFEM_TEST_ASSERT(straight != nullptr);
+    SFEM_TEST_ASSERT(straight->run() == SFEM_SUCCESS);
+
+    auto first = assemble(PRONY_TORSION, with({"time={dt: 0.25, t_end: 1.5}"}));
+    SFEM_TEST_ASSERT(first != nullptr);
+    SFEM_TEST_ASSERT(first->run() == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(first->write_state(dir + "/state", 1.5, 6) == SFEM_SUCCESS);
+
+    auto second = assemble(PRONY_TORSION, with({"time={dt: 0.25, t_end: 3}", "restart=" + dir + "/state"}));
+    SFEM_TEST_ASSERT(second != nullptr);
+    SFEM_TEST_ASSERT(second->stepper().options().steps == 6);
+    SFEM_TEST_ASSERT(second->run() == SFEM_SUCCESS);
+
+    const ptrdiff_t n    = straight->function()->space()->n_dofs();
+    const real_t   *a    = straight->solution()->data();
+    const real_t   *b    = second->solution()->data();
+    real_t          diff = 0, scale = 0;
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        diff  = std::max(diff, std::abs(a[i] - b[i]));
+        scale = std::max(scale, std::abs(a[i]));
+    }
+    printf("  max |restarted - straight| %g of max |x| %g\n", (double)diff, (double)scale);
+    SFEM_TEST_ASSERT(scale > 0 && diff <= 1e-10 * scale);
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 // A twist of 0.24 rad in one step moves the corners of the end face by about 2.7 of these
 // elements. Set on the face alone, the increment inverts the layer behind it and the step fails;
 // carried by Newton's first iteration, the interior follows and it converges. The case also has
@@ -836,6 +882,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_prony_torsion_release);
     SFEM_RUN_TEST(test_torque_control);
     SFEM_RUN_TEST(test_prony_starts_relaxed);
+    SFEM_RUN_TEST(test_restart_matches_straight_run);
     SFEM_RUN_TEST(test_prony_probe);
     SFEM_RUN_TEST(test_boundary_increment_is_carried);
     SFEM_RUN_TEST(test_large_increment_in_fractions);
