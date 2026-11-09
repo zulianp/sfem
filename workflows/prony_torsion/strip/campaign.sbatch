@@ -8,18 +8,20 @@
 #SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/strip_%j.out
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
-# The strip wound by two full turns (cases/epdm_strip_turns.yaml) per history format, on one mesh, for
+# The strip wound by one full turn, its end held axially (cases/epdm_strip_turns.yaml), per history
+# format, on one mesh, for
 # the LDP paper's torsion section: two repeats in double, each reduced format with the remainder form
 # (<format>) and without it (<format>_plain, remainder_horizon 0), and float32 stress slots (<run>_s32);
 # with DIAG=1 the diagnostics build's runs (lost updates) instead. One Grace chip (72 threads) per run,
 # four at once. Submit one job per mesh:
-#   MESH=HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60 [TURNS=2] [BUILD=build-x27] [DIAG=1]
+#   MESH=HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60 [TURNS=1] [BUILD=build-x28] [DIAG=1]
+# Two turns with the end held fail on TET10 near 1.3 turns (pilot 5305248).
 # Folders $OUT/<mesh>/<run> with OUT=runs/strip (DIAG: runs/strip_diag); meshes from make_meshes.py in
 # $OUT/meshes (TET10_60 is TET4_60 promoted by the case).
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-TURNS=${TURNS:-2}
-if [ "${DIAG:-0}" = 1 ]; then BUILD=${BUILD:-build-diag}; OUT=$D/runs/strip_diag; else BUILD=${BUILD:-build-x27}; OUT=$D/runs/strip; fi
+TURNS=${TURNS:-1}
+if [ "${DIAG:-0}" = 1 ]; then BUILD=${BUILD:-build-diag}; OUT=$D/runs/strip_diag; else BUILD=${BUILD:-build-x28}; OUT=$D/runs/strip; fi
 MESHES=$D/runs/strip/meshes
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
 [ -d $MESHES ] || $D/venv/bin/python $D/workflows/prony_torsion/strip/make_meshes.py $MESHES

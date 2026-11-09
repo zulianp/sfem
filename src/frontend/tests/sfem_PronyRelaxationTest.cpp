@@ -483,6 +483,10 @@ int test_mean_over_one_point_elements() {
     sfem::QuadratureState state(1, N_COMPONENTS, 1, N_ELEMENTS, sfem::HistoryStorage::INT8_MD, sfem::EXECUTION_SPACE_HOST, per_mean);
     SFEM_TEST_ASSERT(state.bytes() == size_t(N_COMPONENTS * N_ELEMENTS) + N_ELEMENTS * sizeof(scaling_t) +
                                               size_t(N_COMPONENTS * 7) * sizeof(sfem::history_mean_t));
+    // Patches that divide the elements: ceil(n_e / P) of them, the footprint's n_p, none more.
+    sfem::QuadratureState even(4, N_COMPONENTS, 1, 96, sfem::HistoryStorage::INT8_MD, sfem::EXECUTION_SPACE_HOST, per_mean);
+    SFEM_TEST_ASSERT(even.bytes() == 4 * (size_t(N_COMPONENTS * 96) + 96 * sizeof(scaling_t) +
+                                          size_t(N_COMPONENTS * (96 / per_mean)) * sizeof(sfem::history_mean_t)));
     return SFEM_TEST_SUCCESS;
 }
 

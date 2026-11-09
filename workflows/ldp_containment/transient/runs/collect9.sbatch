@@ -16,7 +16,7 @@
 # DATA the output folder under runs (default paper_data9).
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=/ritom/scratch/cscs/zulianp/sfem-sdf/venv/bin/python
+PY=$D/venv/bin/python
 PAPER=$D/dev/wip/ldp_containment/python
 COL=$PAPER/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
@@ -44,6 +44,13 @@ for spec in TET4:${TAG}_s0_ TET10:${TAG}_p2_; do
   snaps=""; for r in $runs; do [ -d $CASE/$prefix$r/sim2/history ] && [ $r != bsr32__full_a ] && snaps="$snaps $r"; done
   [ -n "$snaps" ] && $PY $COL snapshot $P/history_snapshots.csv $el $CASE bsr32__full_a $snaps --prefix $prefix >> $P/runs_$el.log 2>&1
   echo "snapshots $el rc=$? ($snaps)"
+done
+# The element blocks of each mesh (each keeps its own history store, so patches do not span them).
+echo "set,block,elements" > $P/valve_blocks.csv
+for spec in TET4:${TAG}_s0_ TET10:${TAG}_p2_; do
+  for d in $CASE/${spec#*:}bsr32__full_a/sim2/mesh/blocks/*/; do
+    echo "${spec%:*},$(basename $d),$(( $(stat -c %s $d/i0.int32) / 4 ))" >> $P/valve_blocks.csv
+  done
 done
 $PY $COL tangent $P/prony_tangent_FF200_p2.csv $CASE/${TAG}_p2_bsr32__full_a/sim2/mesh
 $PY $COL tangent $P/prony_tangent_FF200.csv $CASE/${TAG}_s0_bsr32__full_a/sim2/mesh
