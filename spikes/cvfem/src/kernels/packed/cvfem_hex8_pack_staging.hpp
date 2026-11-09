@@ -703,12 +703,14 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
         const scalar_t                      mu,
         const Hex8PackQGradT<scalar_t> *qg = nullptr,
         const Hex8RcConfigT<scalar_t> *rc_cfg = nullptr,
-        const bool with_rc = false, const bool with_qg = false) {
+        const bool with_rc = false, const bool with_qg = false,
+        const scalar_t *ugrad = nullptr, const scalar_t *vgrad = nullptr) {
     Hex8InputPackT<scalar_t>    u_pack;
     Hex8InputPackT<scalar_t>    du_pack;
     Hex8ResidualPackT<scalar_t> outp;
     Hex8CoordPackT<scalar_t>    xyz;
     Hex8RhieChowPackT<scalar_t> rcp;
+    Hex8UGradPackT<scalar_t> ho, hv;
         for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
             const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
             gather_hex8_isoparam_action_simd_from_pack(pack_elems,
@@ -726,9 +728,13 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
                 begin, nlanes, rcp, rc_cfg->tau);
             if (with_qg) cvfem_hex8_gather_qg_from_pack(pack_elems, qg->x, qg->y, qg->z,
                 begin, nlanes, rcp);
+            if (ugrad && vgrad) {
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ugrad, begin, nlanes, ho);
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, vgrad, begin, nlanes, hv);
+            }
             cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack,
                 outp, scalar_t(0), with_rc ? &rcp : nullptr,
-                with_rc ? rc_cfg->scale : scalar_t(0), with_qg);
+                with_rc ? rc_cfg->scale : scalar_t(0), with_qg, ugrad ? &ho : nullptr, vgrad ? &hv : nullptr);
             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
         }
 }

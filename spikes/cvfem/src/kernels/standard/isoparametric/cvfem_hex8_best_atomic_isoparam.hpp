@@ -44,7 +44,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
                                                                 const scalar_t        rho,
                                                                 const scalar_t        mu,
                                                                 const scalar_t *const dir,
-                                                                scalar_t *const       jv) {
+                                                                scalar_t *const       jv,
+        const scalar_t *ugrad = nullptr, const scalar_t *vgrad = nullptr) {
     cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
 
 #pragma omp parallel for schedule(static)
@@ -62,8 +63,14 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
             vz[a]                                  = dv[2];
             q[a]                                   = dv[3];
         }
+        scalar_t ug[72], vg[72];
+        if (ugrad && vgrad)
+            for (int a = 0; a < 8; ++a) for (int c = 0; c < 9; ++c) {
+                ug[a * 9 + c] = ugrad[mesh_elems[a][e] * 9 + c];
+                vg[a * 9 + c] = vgrad[mesh_elems[a][e] * 9 + c];
+            }
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, vx, vy, vz, q, r,
-                                                      ex.rc, p);
+                                                      ex.rc, p, scalar_t(0), ugrad ? ug : nullptr, vgrad ? vg : nullptr);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = mesh_elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 0, 0, r[a * 4 + 0]);
@@ -102,7 +109,8 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
                                               // kernel is not meant to name.
-                                              const Hex8Extras &opt, const scalar_t rho, const scalar_t mu) {
+                                              const Hex8Extras &opt, const scalar_t rho, const scalar_t mu,
+        const scalar_t *ugrad = nullptr) {
     reset_residual(nnodes, rx, ry, rz, rc_out);
 
 #pragma omp parallel for schedule(static)
@@ -112,7 +120,11 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(
         ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e, false);
         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
         gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc);
+        scalar_t ug[72];
+        if (ugrad)
+            for (int a = 0; a < 8; ++a) for (int c = 0; c < 9; ++c)
+                ug[a * 9 + c] = ugrad[mesh_elems[a][e] * 9 + c];
+        cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc, scalar_t(0), ugrad ? ug : nullptr);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = mesh_elems[a][e];

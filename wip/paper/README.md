@@ -623,46 +623,64 @@ unchanged so regeneration and source references remain valid.
 
 ## Irregular meshes and affine refinement
 
-These are separate studies: job 5052301 checks first-order interior operators
-on irregular, non-affine HEX8 meshes; jobs 5077627 and 5077906 solve an affine
-manufactured problem on four grids. Their combination does not establish
-unstructured solver convergence. The scalar physical-edge correction and packed
-Rhie–Chow flux/derivative are the geometry fixes needed by the first study.
-The refinement results are retained measurements of the identified historical
-solver binary, not a new solve of this branch. No transient or boundary fix is
-claimed by this extraction.
+The irregular-mesh operator study and affine refinement study answer different
+questions. The former tests first-order and consistent Darwish interior operators
+on non-affine HEX8 meshes. The latter solves a manufactured problem on affine
+meshes at four resolutions; it does not establish irregular-mesh PDE convergence.
+The affine results remain those of the identified historical solver binary.
 
-The external archive `pasc27-mesh-validation.zip` contains all three datasets,
-original source/binary manifests, launch settings, logs, failed accuracy gates
-and replay scripts. SHA256:
+The current irregular table uses first-order job 5306375 on nid005717 and
+Darwish job 5305511 on nid005379, both from the same frozen source snapshot.
+The schemes ran in separate allocations. All reported atomic/packed ratios
+compare paired measurements within the same run. Each campaign passed ten CTests,
+baseline comparisons at one and 72 threads, four small numerical cases and eight
+timing cases. All 768 timing samples are retained, including both medium-mesh
+pack1024 Jacobian slowdowns. The timed-out Darwish run 5305251 is not pooled in.
+This supersedes job 5052301 for the main irregular table; its historical evidence
+remains in the original archive.
+
+The external `pasc27-irregular-20261109.zip` archive contains the frozen source
+and measurement kit, public meshes, launch/build metadata, numerical checks,
+baseline reports, all case logs and every timing sample. Its SHA256 is
+`16e34f158aacf5625265fb8fde7b22524e37d69bafd1ce60cb16b8721aff07cd`.
+It is author-held; no public download is claimed. The original run directories are
+`/capstor/scratch/cscs/gandanie/git/pasc27-irregular-darwish-20261109/results/first_order-5306375-dFYDmz`
+and `.../darwish-5305511-JpkE3A`. Request the pinned ZIP for byte-identical replay.
+The source archive SHA256 is
+`754ea1e3643da64f11ffb677be3cecaba17189d015bf0fa1f5320466e703273c`.
+
+The unchanged affine MMS archive is `pasc27-mesh-validation.zip`, SHA256
 `44baa5b5943bd4a72f750d3aa390d2aba0bd4a9671bd7b86efa4de43cb0f4ec3`.
-The reader verifies the whole archive before loading its captured MMS analysis,
-then replays every case and checks recorded manifests, scopes and results.
-Raw evidence is deliberately outside the review diff.
+It contains jobs 5077627 and 5077906, their source/binary manifests, launch
+settings, logs and failed accuracy checks, plus the historical irregular study.
+The reader checks the archive hash before loading the captured MMS analysis.
+The irregular reader uses the maintained parser and executes no archived code.
+Raw evidence stays outside the review diff.
 
 From `wip/paper`:
 
 ```sh
 export SFEM_VALIDATION_ARCHIVE=/path/to/pasc27-mesh-validation.zip
+export SFEM_IRREGULAR_ARCHIVE=/path/to/pasc27-irregular-20261109.zip
 make mesh-validation PY=python3
 make check PY=python3
 ```
 
-Ordinary PDF builds use the generated inputs and do not need the archive.
-The complete refinement table is [here](reproducibility/mms-refinement.md).
-The irregular-mesh procedure, formulas and gates are documented in
+Ordinary PDF builds use generated inputs and need neither archive. The complete
+affine refinement table is [here](reproducibility/mms-refinement.md).
+The irregular-mesh formulas, checks and limitations are described in
 [unstructured_study.md](../../spikes/cvfem/docs/unstructured_study.md).
-Its archive `raw/study/summary.md` retains all one-/72-thread timings and ranges;
-`records.json` retains all samples, setup and explicit array capacities.
+For each irregular run, `study/summary.md` includes all one- and 72-thread
+results; `records.json` retains sample times, setup costs and array capacities.
 
-If the external archive is unavailable, its 117 files remain in the original
-review commit `fd4e81f1`, under `wip/paper/data/{unstructured_5052301,mms_5077627,mms_5077906}`.
-To recreate the exact ZIP, use the sorted `git ls-tree -r --name-only` list of
-those three directories, read each blob with `git show fd4e81f1:PATH`, remove
-the `wip/paper/data/` prefix, and write with Python `zipfile.ZipInfo` timestamp
+If the historical archive is unavailable, its 117 files remain in commit
+`fd4e81f1`, under `wip/paper/data/{unstructured_5052301,mms_5077627,mms_5077906}`.
+To recreate that ZIP, use the sorted `git ls-tree -r --name-only` list of those
+directories, read each blob with `git show fd4e81f1:PATH`, remove the
+`wip/paper/data/` prefix, and write with Python `zipfile.ZipInfo` timestamp
 `(2026,10,17,0,0,0)`, `ZIP_DEFLATED` and `external_attr=0o100644<<16`.
-Verify the SHA256 above before replay. This recovery uses local Git history;
-no public archive download URL is assumed.
+Verify its SHA256 before replay. This recovery applies to the historical
+archive only; the new two-scheme archive is distributed separately.
 
 ## Matched Jacobian layouts and precisions (job 5138025)
 

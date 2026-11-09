@@ -44,7 +44,9 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT rc,
         const size_t scratch_n,
         const scalar_t *pgx, const scalar_t *pgy, const scalar_t *pgz,
-        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg, const int with_rc,
+        const scalar_t *ugrad = nullptr) {
+        const auto ug = cvfem_hex8_pack_ugrad<scalar_t>(ugrad != nullptr, 14, max_actual_nodes_per_pack);
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always: this geometry derives its Jacobian from them.
@@ -62,6 +64,8 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
 
             cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc,
                 pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
+            if (ugrad) cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack,
+                x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
             // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, AND
             // THE REASON IS NOT THE ONE THIS COMMENT USED TO GIVE.
             //
@@ -88,14 +92,16 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
                 Hex8CoordPackT<scalar_t>    xyz;
                 Hex8ResidualPackT<scalar_t> outp;
                 Hex8RhieChowPackT<scalar_t> rcp;
+                Hex8UGradPackT<scalar_t> ho;
             for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
                 const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
                 gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
                                                     in, xyz);
                 if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
                     begin, nlanes, rcp, rc_cfg.tau);
+                if (ugrad) cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, ho);
                 cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp,
-                    scalar_t(0), with_rc ? &rcp : nullptr, rc_cfg.scale);
+                    scalar_t(0), with_rc ? &rcp : nullptr, rc_cfg.scale, ugrad ? &ho : nullptr);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
 
@@ -152,6 +158,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
+        const auto ug = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 14, max_actual_nodes_per_pack);
+        const auto vg = cvfem_hex8_pack_ugrad<scalar_t>(with_ho, 15, max_actual_nodes_per_pack);
         const auto qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
 
 
@@ -174,8 +182,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
                 pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
+            if (with_ho) {
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, ugrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, ug.g);
+                cvfem_hex8_fill_pack_ugrad(owned_nodes_ptr, vgrad, pack, x.n_contiguous, x.n_ghost, x.ghosts, vg.g);
+            }
             cvfem_hex8_action_lanes_isoparam(x, pk, pack_elems, pack_u, pack_dir, pack_out,
-                                             rho, mu, &qg, &rc_cfg, with_rc, with_qg);
+                                             rho, mu, &qg, &rc_cfg, with_rc, with_qg, ug.g, vg.g);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);

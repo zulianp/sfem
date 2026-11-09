@@ -8,10 +8,10 @@ import shutil
 from unstructured_study import check, mesh_identity
 
 
-def main(log, mesh, threads=2, pack=256, blocks=4, repeat=3):
+def main(log, mesh, threads=2, pack=256, blocks=4, repeat=3, scheme="first_order"):
     text=Path(log).read_text();identity=mesh_identity(mesh)
     def accept(value):
-        return check(value,identity,threads,pack,blocks,repeat,False)
+        return check(value,identity,threads,pack,blocks,repeat,False,scheme)
     accept(text)
     lines=text.splitlines()
     sample=next(line for line in lines if line.startswith('sample,'))
@@ -28,6 +28,14 @@ def main(log, mesh, threads=2, pack=256, blocks=4, repeat=3):
         bad.append(text.replace(sample,changed))
     changed=','.join('no_qgrad=0' if p.startswith('no_qgrad=') else p for p in fd.split(','))
     bad.append(text.replace(fd,changed))
+    bad.append(text.replace('scope,'+scheme+'_RC,','scope,unknown_RC,'))
+    if scheme == 'darwish':
+        control=next(line for line in lines if line.startswith('darwish_control,'))
+        coarse=next(line for line in lines if line.startswith('fd_coarse,'))
+        bad.extend([text.replace(coarse+'\n',''),
+                    text.replace('crossings=0','crossings=1'),
+                    text.replace(control+'\n',''),text.replace(control,control+'\n'+control),
+                    text.replace(control,control.rsplit('=',1)[0]+'=0')])
     for index,value in enumerate(bad):
         try:
             accept(value)
@@ -43,7 +51,7 @@ def main(log, mesh, threads=2, pack=256, blocks=4, repeat=3):
             pass
         else:
             raise AssertionError('accepted changed mesh bytes')
-    print('Unstructured accounting: real capture and 13 incomplete/invalid/hash refusal controls PASS')
+    print('Unstructured accounting: real {} capture and {} refusal controls PASS'.format(scheme,len(bad)+1))
 
 
 if __name__=='__main__':
@@ -52,7 +60,8 @@ if __name__=='__main__':
     parser.add_argument('--pack-size',type=int,default=256)
     parser.add_argument('--blocks',type=int,default=4)
     parser.add_argument('--repeat',type=int,default=3)
+    parser.add_argument('--scheme',choices=('first_order','darwish'),default='first_order')
     args=parser.parse_args()
     if min(args.threads,args.pack_size,args.blocks,args.repeat) <= 0:
         parser.error('threads, pack size, blocks and repeats must be positive')
-    main(args.log,Path(args.mesh),args.threads,args.pack_size,args.blocks,args.repeat)
+    main(args.log,Path(args.mesh),args.threads,args.pack_size,args.blocks,args.repeat,args.scheme)

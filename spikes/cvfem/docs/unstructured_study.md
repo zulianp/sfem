@@ -1,7 +1,7 @@
 # Public irregular-HEX8 operator comparison
 
-This experiment compares atomic and packed first-order residuals and consistent
-Jacobian actions on a public, procedurally generated irregular mesh. It extends
+This experiment compares atomic and packed first-order and Darwish residuals
+and their consistent Jacobian actions on a public, procedurally generated irregular mesh. It extends
 the affine-cube experiments to non-affine geometry and irregular connectivity.
 It does not measure a nonlinear solve or establish spatial accuracy.
 
@@ -39,7 +39,7 @@ measurement; a different Gmsh build is not assumed to reproduce identical bytes.
 
 The unknowns are three velocity components and physical pressure. Density is
 1.3, dynamic viscosity 0.027, and the Rhie–Chow scale is one with the steady
-combined time scale. First-order upwinding is used. Only interior sub-control
+combined time scale. Both first-order upwinding and Darwish reconstruction are tested. Only interior sub-control
 surface fluxes are applied; boundary closure, boundary elimination and transient
 terms are excluded. There is no Reynolds-number or physical flow claim.
 
@@ -69,14 +69,35 @@ nonzero in all four fields and differ from one another. Before timing:
 - omitting the reconstructed pressure-direction gradient must produce relative
   error above `1e-5` in every difference check.
 
-These gates exercise this first-order, steady interior configuration. They do
+For Darwish, each velocity component is reconstructed from its physical nodal
+gradient to the mapped SCS point. The Jacobian differentiates the limited
+increment, including the direction gradient, and its mass-flux weight, including
+both Rhie--Chow sensitivities. Fixed-state velocity and pressure gradients are
+reused; direction gradients remain live. The affine coefficient cache is not
+used on these non-affine cells.
+
+The Darwish derivative gate retains a coarse `1e-6` diagnostic, then requires
+whole-vector relative error below `1e-6` at **both** `1e-7` and `1e-8`. It also
+requires no sign crossing of either Darwish limiter argument at those two steps.
+The initial large-mesh local check crossed 6--7 limiter switches per direction at
+`1e-6`; that failed check is retained separately. No components or timing samples
+are removed. Omitting either reconstructed pressure-direction gradients or
+velocity-direction gradients must produce relative error above `1e-5`.
+The element test independently checks the physical reconstruction point, its
+affine limit, scalar/SIMD agreement and directional finite differences.
+
+These gates exercise steady interior configurations. They do
 not validate arbitrary limiter switches, curved high-order elements, assembled
 Jacobians, general boundary conditions, time integration or solver convergence.
+
+The complete Grace campaigns for both schemes have been replayed and reviewed.
+The paper now reports both schemes; the affine MMS already includes Darwish
+and remains a separate accuracy study.
 
 ## Timing and storage
 
 `cvfem_hex8_unstructured_bench` retains both layouts in one process. A residual
-includes pressure-gradient reconstruction; a Jacobian action reuses the fixed
+includes state-gradient reconstruction (pressure alone for first order, pressure and velocity for Darwish); a Jacobian action reuses the fixed
 state gradient and reconstructs the current direction gradient. Neither arm
 caches direction gradients. Geometry is evaluated in the operator, and neither
 arm builds an unused affine Rhie–Chow coefficient table.
@@ -134,7 +155,7 @@ commands, setup, storage and every accepted capture; `summary.md` reports the
 paired times. No manuscript result is updated until the complete Grace run has
 been reviewed.
 
-## Accepted Grace run
+## Historical first-order Grace run
 
 Job 5052301 on nid006545 passed the complete campaign on 2026-10-14. The source
 and mesh hashes, all twelve case logs and the generated timing table were
@@ -146,3 +167,28 @@ about 8.3% slower than atomic. This is evidence that the pack choice matters.
 The [saved result and replay instructions](../../../wip/paper/README.md)
 include the complete one-/72-thread table, sample ranges, setup measurements,
 explicit storage ledger and limits. The manuscript reports the 72-thread comparison; the full study remains in the external archive.
+
+
+## First-order and Darwish extension
+
+The updated source was tested in two separate Grace allocations on 9 November
+2026: first-order job 5306375 on nid005717 and Darwish job 5305511 on nid005379.
+Both passed ten CTests, baseline comparisons at one and 72 threads, four small
+numerical cases and eight paired timing cases. Each scheme retains 384 timing
+samples, with 12 pairs per operator and configuration. The earlier Darwish
+job 5305251 exceeded its time limit; none of its samples is pooled into these runs.
+
+On 72 cores and the large mesh, packed residual speedups are 1.60–1.69x for
+first order and 1.66–1.69x for Darwish; consistent Jacobian speedups are
+1.38–1.47x and 1.33–1.36x, respectively. These are within-run layout comparisons,
+not a cross-allocation measurement of the cost of changing schemes.
+On the medium mesh, pack1024 makes the Jacobian 12.6% slower for first order
+and 17.9% slower for Darwish. Both slow cases persist in all 12 pairs.
+Pack256 benefits both operators for both schemes. All samples remain in the report.
+
+The numerical kernels match the frozen source snapshot used in these runs.
+Table regeneration checks the external archive, source and mesh hashes,
+commands, binary identities, full numerical/timing coverage and saved summaries.
+The archive and regeneration instructions are in the paper README linked above.
+No nonlinear solve, irregular-mesh PDE convergence or boundary/transient
+validation is claimed by these operator studies.

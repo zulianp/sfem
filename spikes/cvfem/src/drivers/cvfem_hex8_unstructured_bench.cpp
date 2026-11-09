@@ -8,7 +8,8 @@
 struct UnstructuredRun {
     MeshData d;
     PackedData p;
-    bool packed = false;
+    bool packed = false, darwish = false;
+    std::vector<scalar_t> ugrad, vgrad;
     std::vector<scalar_t> grad_buffer, out;
     std::array<std::vector<scalar_t>, 3> direction;
     std::array<std::vector<scalar_t>, 4> state;
@@ -43,9 +44,32 @@ static void gradient(UnstructuredRun &r, const scalar_t *src, int stride,
     else cvfem_hex8_assemble_nodal_grads_atomic(r.d,1,src,stride,gx,gy,gz);
 }
 
-static void state_gradient(UnstructuredRun &r) {
-    gradient(r,r.d.p.data(),1,r.d.pgx,r.d.pgy,r.d.pgz);
+static void reconstruct(UnstructuredRun &r, const scalar_t *direction = nullptr) {
+    auto &d = r.d;
+    auto &g = direction ? r.vgrad : r.ugrad;
+    auto &gx = direction ? d.qgx : d.pgx;
+    auto &gy = direction ? d.qgy : d.pgy;
+    auto &gz = direction ? d.qgz : d.pgz;
+    if (!r.darwish) {
+        gradient(r, direction ? direction + 3 : d.p.data(), direction ? 4 : 1, gx, gy, gz);
+        return;
+    }
+    g.resize(size_t(d.nnodes) * 9);
+    gx.resize(d.nnodes); gy.resize(d.nnodes); gz.resize(d.nnodes);
+    const scalar_t *src[4] = {direction ? direction : d.ux.data(),
+        direction ? direction + 1 : d.uy.data(), direction ? direction + 2 : d.uz.data(),
+        direction ? direction + 3 : d.p.data()};
+    const int stride = direction ? 4 : 1;
+    const int strides[4] = {stride, stride, stride, stride};
+    scalar_t *dst[12]; ptrdiff_t out_stride[12];
+    for (int c = 0; c < 9; ++c) { dst[c] = g.data() + c; out_stride[c] = 9; }
+    dst[9] = gx.data(); dst[10] = gy.data(); dst[11] = gz.data();
+    for (int c = 9; c < 12; ++c) out_stride[c] = 1;
+    if (r.packed) cvfem_hex8_assemble_nodal_grads_packed(d, r.p, 1, src, strides, 4, dst, out_stride, r.grad_buffer);
+    else cvfem_hex8_assemble_nodal_grads_atomic(d, 1, src, strides, 4, dst, out_stride);
 }
+
+static void state_gradient(UnstructuredRun &r) { reconstruct(r); }
 
 static void verify_linear_gradient(UnstructuredRun &r) {
     std::vector<scalar_t> pressure(size_t(r.d.nnodes)), gx, gy, gz;
@@ -61,25 +85,28 @@ static void verify_linear_gradient(UnstructuredRun &r) {
     require(error<1e-11,"physical linear gradient is not reproduced");
 }
 
-static void apply(UnstructuredRun &r, bool jacobian, int direction=0, bool omit_qgrad=false) {
+static void apply(UnstructuredRun &r, bool jacobian, int direction=0, bool omit_qgrad=false, bool omit_vgrad=false) {
     auto &d=r.d;
     constexpr scalar_t rho=1.3, mu=.027;
     if(jacobian) {
         const auto &v=r.direction[direction];
-        gradient(r,v.data()+3,4,d.qgx,d.qgy,d.qgz);
+        reconstruct(r, v.data());
+        if (omit_vgrad) std::fill(r.vgrad.begin(), r.vgrad.end(), scalar_t(0));
         if(omit_qgrad) { d.qgx.clear();d.qgy.clear();d.qgz.clear(); }
-        if(r.packed) apply_jacobian_action_packed(d,r.p,rho,mu,GeomKind::Isoparam,v.data(),r.out.data());
+        if(r.packed) apply_jacobian_action_packed(d,r.p,rho,mu,GeomKind::Isoparam,v.data(),r.out.data(),
+            r.darwish ? r.ugrad.data() : nullptr, r.darwish ? r.vgrad.data() : nullptr, 3);
         else apply_jacobian_action_atomic_isoparam(d.adj_ptr,d.det_ptr,d.elems,d.face_mask.data(),
             d.nelements,d.nnodes,d.p.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),d.points,
             d.qgx.data(),d.qgy.data(),d.qgz.data(),d.ux.data(),d.uy.data(),d.uz.data(),
-            cvfem_hex8_extras_of(d),rho,mu,v.data(),r.out.data());
+            cvfem_hex8_extras_of(d),rho,mu,v.data(),r.out.data(),
+            r.darwish ? r.ugrad.data() : nullptr, r.darwish ? r.vgrad.data() : nullptr);
     } else {
         state_gradient(r);
-        if(r.packed) apply_residual_packed(d,r.p,rho,mu,GeomKind::Isoparam);
+        if(r.packed) apply_residual_packed(d,r.p,rho,mu,GeomKind::Isoparam, r.darwish ? r.ugrad.data() : nullptr);
         else apply_residual_atomic_isoparam(d.adj_ptr,d.det_ptr,d.elems,d.face_mask.data(),
             d.nelements,d.nnodes,d.p.data(),d.pgx.data(),d.pgy.data(),d.pgz.data(),d.points,
             d.qgx.data(),d.qgy.data(),d.qgz.data(),d.rc.data(),d.rx.data(),d.ry.data(),d.rz.data(),
-            d.ux.data(),d.uy.data(),d.uz.data(),cvfem_hex8_extras_of(d),rho,mu);
+            d.ux.data(),d.uy.data(),d.uz.data(),cvfem_hex8_extras_of(d),rho,mu, r.darwish ? r.ugrad.data() : nullptr);
         // Result packing is checked outside timing; the residual writes its native SoA.
     }
 }
@@ -122,18 +149,66 @@ static void set_step(UnstructuredRun &r, double step, int k) {
     ++d.state_stamp;
 }
 
+// Count limiter sign crossings at the actual finite-difference step, outside timing.
+static size_t darwish_crossings(const UnstructuredRun &r, int k, double eps) {
+    const auto &d=r.d;
+    size_t crossings=0;
+    for(ptrdiff_t e=0;e<d.nelements;++e) {
+        scalar_t x[8],y[8],z[8],g[72],dg[72];
+        for(int a=0;a<8;++a) {
+            const auto n=d.elems[a][e];
+            x[a]=d.points[0][n];y[a]=d.points[1][n];z[a]=d.points[2][n];
+            for(int c=0;c<9;++c) {g[9*a+c]=r.ugrad[9*n+c];dg[9*a+c]=r.vgrad[9*n+c];}
+        }
+        cvfem_hex8_defcor_isoparam_increments<1>(g,x,y,z);
+        cvfem_hex8_defcor_isoparam_increments<1>(dg,x,y,z);
+        const std::vector<scalar_t>* fields[]={&d.ux,&d.uy,&d.uz};
+        for(int s=0;s<12;++s) {
+            const int i=CVFEM_HEX8_SCS[s].i,j=CVFEM_HEX8_SCS[s].j;
+            const auto ni=d.elems[i][e],nj=d.elems[j][e];
+            for(int c=0;c<3;++c) {
+                const double b=(*fields[c])[nj]-(*fields[c])[ni];
+                const double db=r.direction[k][4*nj+c]-r.direction[k][4*ni+c];
+                if((b-eps*db)*(b+eps*db)<0) ++crossings;
+                for(int a:{i,j}) {
+                    const int off=a*9+c*3+(s>>2);
+                    if((g[off]-eps*dg[off])*(g[off]+eps*dg[off])<0) ++crossings;
+                }
+            }
+        }
+    }
+    return crossings;
+}
+
 static void verify_fd(UnstructuredRun &r) {
     for(int k=0;k<3;++k) {
         set_step(r,0,k);state_gradient(r);apply(r,true,k);auto exact=r.out;
+        const std::array<double,3> steps = r.darwish ? std::array<double,3>{1e-6,1e-7,1e-8}
+                                                    : std::array<double,3>{1e-6,1e-7,0};
+        std::array<size_t,3> crossings{};
+        if (r.darwish) for (int e=0;e<3;++e) crossings[e]=darwish_crossings(r,k,steps[e]);
         apply(r,true,k,true);auto omitted=r.out;
-        for(double eps:{1e-6,1e-7}) {
+        std::vector<scalar_t> no_vgrad;
+        if (r.darwish) { apply(r,true,k,false,true); no_vgrad=r.out; }
+        for(int step=0;step<(r.darwish?3:2);++step) {
+            const double eps=steps[step];
+            const bool diagnostic=r.darwish && step==0;
             set_step(r,eps,k);apply(r,false);auto plus=output(r,false);
             set_step(r,-eps,k);apply(r,false);auto minus=output(r,false);
             for(size_t i=0;i<plus.size();++i) plus[i]=(plus[i]-minus[i])/(2*eps);
             double err=relative_error(exact,plus),control=relative_error(omitted,plus);
-            std::printf("fd,%s,direction=%d,eps=%.1e,error=%.12g,no_qgrad=%.12g\n",
-                        r.packed?"packed":"atomic",k,eps,err,control);
-            require(err<1e-6,"composed isoparametric finite difference failed");
+            std::printf("%s,%s,direction=%d,eps=%.1e,error=%.12g,no_qgrad=%.12g,crossings=%zu\n",
+                        diagnostic?"fd_coarse":"fd",r.packed?"packed":"atomic",k,eps,err,control,crossings[step]);
+            if (r.darwish && !diagnostic) {
+                const double missing_velocity=relative_error(no_vgrad,plus);
+                std::printf("darwish_control,layout=%s,direction=%d,eps=%.1e,no_vgrad=%.12g\n",
+                    r.packed?"packed":"atomic",k,eps,missing_velocity);
+                require(missing_velocity>1e-5,"velocity-gradient omission control was not detected");
+            }
+            if (!diagnostic) {
+                require(crossings[step]==0,"finite difference crosses a Darwish limiter switch");
+                require(err<1e-6,"composed isoparametric finite difference failed");
+            }
             require(control>1e-5,"direction-gradient omission control was not detected");
         }
     }
@@ -158,13 +233,14 @@ static size_t mesh_bytes(const UnstructuredRun &r) {
 }
 
 static int run(int argc,char **argv) {
-    std::string path;int pack=1024,repeat=3,warmup=3,blocks=12;bool verify_only=false;
+    std::string path, scheme="first_order";int pack=1024,repeat=3,warmup=3,blocks=12;bool verify_only=false;
     for(int i=1;i<argc;++i) {
         std::string arg=argv[i];
         if(arg=="--verify-only") {verify_only=true;continue;}
         require(i+1<argc,"missing argument value");
         std::string value=argv[++i];
         if(arg=="--mesh") path=value;
+        else if(arg=="--scheme") scheme=value;
         else {
             size_t pos=0;int n=std::stoi(value,&pos);require(pos==value.size()&&n>0,"invalid positive integer");
             if(arg=="--pack-size")pack=n;else if(arg=="--repeat")repeat=n;
@@ -172,6 +248,7 @@ static int run(int argc,char **argv) {
             else throw std::runtime_error("unknown argument: "+arg);
         }
     }
+    require(scheme=="first_order" || scheme=="darwish", "unsupported convection scheme");
     require(!path.empty()&&pack<=8192&&blocks<=100&&repeat<=1000&&warmup<=100,"unsupported run scope");
     int threads=1;
 #pragma omp parallel
@@ -180,6 +257,7 @@ static int run(int argc,char **argv) {
         threads=omp_get_num_threads();
     }
     UnstructuredRun atomic,packed;
+    atomic.darwish=packed.darwish=scheme=="darwish";
     load_run(atomic,path,0);load_run(packed,path,pack);
     require(atomic.d.nnodes==packed.d.nnodes&&atomic.d.nelements==packed.d.nelements,"different meshes");
     geometry_check(atomic.d);
@@ -205,8 +283,8 @@ static int run(int argc,char **argv) {
         require(cfg.scale==1&&cfg.tau.u2_scale==1&&cfg.tau.inv_dt_a0==0,"requires the steady combined RC coefficient");
         state_gradient(*r);
     }
-    std::printf("scope,first_order_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=%d,elements=%td,nodes=%td,pack=%d\n",
-        threads,atomic.d.nelements,atomic.d.nnodes,pack);
+    std::printf("scope,%s_RC,isoparametric,steady_interior,rho=1.3,mu=0.027,threads=%d,elements=%td,nodes=%td,pack=%d\n",
+        scheme.c_str(),threads,atomic.d.nelements,atomic.d.nnodes,pack);
     verify_fd(atomic);verify_fd(packed);
     std::array<std::array<std::vector<scalar_t>,3>,2> reference;
     for(int op=0;op<2;++op)for(int k=0;k<(op?3:1);++k) {
@@ -223,12 +301,13 @@ static int run(int argc,char **argv) {
         size_t fields=0, harness=0;
         for(const auto *v:{&r->d.ux,&r->d.uy,&r->d.uz,&r->d.p,&r->d.rx,&r->d.ry,&r->d.rz,&r->d.rc,
                          &r->d.pgx,&r->d.pgy,&r->d.pgz,&r->d.qgx,&r->d.qgy,&r->d.qgz,&r->d.grad_w_inv,
-                         &r->out,&r->grad_buffer}) fields+=v->capacity()*sizeof(scalar_t);
+                         &r->out,&r->grad_buffer,&r->ugrad,&r->vgrad}) fields+=v->capacity()*sizeof(scalar_t);
         for(const auto &v:r->state)harness+=v.capacity()*sizeof(scalar_t);
         for(const auto &v:r->direction)harness+=v.capacity()*sizeof(scalar_t);
         // Slots 0/1/2 hold 4 fields each; 3 holds xyz+pg; 4 holds qg;
-        // reconstruction slots 7/8 hold one input and three outputs.
-        const size_t arena=r->packed?size_t(threads)*25*size_t(r->p.max_actual_nodes_per_pack)*sizeof(scalar_t):0;
+        // Reconstruction slots 7/8 hold four inputs and twelve outputs for Darwish;
+        // slots 14/15 add eighteen velocity-gradient entries per node.
+        const size_t arena=r->packed?size_t(threads)*(r->darwish ? 55 : 25)*size_t(r->p.max_actual_nodes_per_pack)*sizeof(scalar_t):0;
         std::printf("payload,layout=%s,field_capacity_bytes=%zu,packed_arena_bytes=%zu,harness_capacity_bytes=%zu\n",
             r->packed?"packed":"atomic",fields,arena,harness);
     }
