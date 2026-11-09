@@ -12,7 +12,7 @@
 #   ELEMENT=TET4|TET10 RUNS="<run> ..." [SNAP="t0, t1, ..."] [SNAP_RUNS="<run> ..."]
 # A run is <tangent>__<history>[_p<P>][_plain][_s32]_<repeat>, its folder
 # $CASE/tp9_{s0|p2}_<run>:
-#   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16, qbsr8 (stored: bsr f16/i8), em32, em16, em8p
+#   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16 (stored: bsr f16), em32, em16, em8p
 #            (element_matrix f32/f16/i8pair), pt32, pt16, pt8md (points f32/f16/i8md); -np: the
 #            tangent projection off
 #   history  full, float32, float16, int16_scaled, float16_md; _p<P> elements per
@@ -43,7 +43,6 @@ tangent_args() {  # <tangent>
     bsr64) a="--set solver.linear.format=BSR --set solver.linear.storage_bytes=8" ;;
     bsr32) a="--set solver.linear.format=BSR --set solver.linear.storage_bytes=4" ;;
     qbsr16) a="$I=bsr $E=f16" ;;
-    qbsr8) a="$I=bsr $E=i8" ;;
     em32) a="$I=element_matrix $E=f32" ;;
     em16) a="$I=element_matrix $E=f16" ;;
     em8p) a="$I=element_matrix $E=i8pair" ;;
