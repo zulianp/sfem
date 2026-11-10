@@ -9551,17 +9551,37 @@ def _holding_one_element_hessian_matrix_assembly_function(
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
             lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
         lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
+        # On the device a stored tangent assembles a window of rows at a time
+        # into a graph whose other rows are empty: an element none of whose
+        # rows it has adds nothing, and is left before its data is read.
+        skips_outside_rows = current_target().supports_device_kernels and "bsr" in formats
+        if skips_outside_rows:
+            lines.extend(
+                [
+                    "",
+                    "    for (int shape = 0; shape < NS; ++shape) ev[shape] = elements[shape][element];",
+                    "    if constexpr (FORMAT == %d) {" % dict(_MATRIX_FORMAT_IDS)["bsr"],
+                    "      bool touches = false;",
+                    "      for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[shape]] < rowptr[ev[shape] + 1];",
+                    "      if (!touches) continue;",
+                    "    }",
+                ]
+            )
         lines.extend(
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
-                "      const idx_t node = elements[shape][element];",
+                (
+                    "      const idx_t node = ev[shape];"
+                    if skips_outside_rows
+                    else "      const idx_t node = elements[shape][element];"
+                ),
                 *(
                     []
                     if is_affine_assembly or identity_stream_shape_order
                     else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]
                 ),
-                "      ev[shape] = node;",
+                *([] if skips_outside_rows else ["      ev[shape] = node;"]),
             ]
         )
         component_loop_body = [
@@ -9855,10 +9875,17 @@ def _sfem_soa_cooperative_assembly_body_lines(
         "    }",
         "  }",
         "  __syncthreads();",
+        "  // An element none of whose rows the graph has (a window of the rows) adds nothing.",
+        "  bool touches = false;",
+        "  if (active) {",
+        "    for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[le][shape]] < rowptr[ev[le][shape] + 1];",
+        "  }",
         "  if (active) {",
         "    for (int shape = q; shape < NS; shape += NQ) {",
         "      sfem::cooperative::row_map<NS>(ev[le], shape, rowptr, colidx, pos[le]);",
         "    }",
+        "  }",
+        "  if (active && touches) {",
         "    s_t adj[ND * ND];",
         "    s_t det;",
         "    sfem::cooperative::point_geometry<s_t, NS, ND>(bcoordinate_data[le], grad_ref, q, adj, det);",
@@ -10170,6 +10197,12 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     The values are of their own type ``v_t``: a tangent stored in single
     precision is assembled in place from the element matrix in ``s_t``, each
     entry rounded once as it is added.
+
+    A row without entries is skipped: a graph that leaves rows out -- a window
+    of the rows, the others empty, which a stored tangent assembles and encodes
+    one window at a time -- takes only the blocks of the rows it has. Every row
+    of a full node graph holds at least its diagonal block, so on it nothing
+    is skipped.
     """
     # The block is the field's components, not the spatial dimension.
     n_field_components = dim if n_field_components is None else n_field_components
@@ -10204,6 +10237,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         BufferDeclNode("static constexpr int", "NS", (), expr_ref(str(n_nodes))),
         BufferDeclNode("count_t", "entries", ("NS * NS",)),
         BufferDeclNode("idx_t", "ks", ("NS",)),
+        BufferDeclNode("bool", "has_row", ("NS",)),
         _counting_loop(
             "i",
             0,
@@ -10225,6 +10259,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                     (),
                     expr_ref("&%s[row_begin]" % column_index),
                 ),
+                AssignmentNode(expr_ref("has_row[i]"), expr_ref("lenrow > 0")),
                 CallNode(
                     "%s_find_cols" % function_base, ("ev", "cols", "lenrow", "ks")
                 ),
@@ -10236,30 +10271,35 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
             0,
             expr_ref("NS"),
             [
-                _counting_loop(
-                    "j",
-                    0,
-                    expr_ref("NS"),
-                    [
-                        BufferDeclNode(
-                            "v_t *const",
-                            "block",
-                            (),
-                            expr_ref("&%s[(ptrdiff_t)entries[i * NS + j] * NC * NC]" % value_stream),
-                        ),
+                IfNode(
+                    expr_ref("has_row[i]"),
+                    body=(
                         _counting_loop(
-                            "bi",
+                            "j",
                             0,
-                            expr_ref("NC"),
+                            expr_ref("NS"),
                             [
                                 BufferDeclNode(
-                                    "const int", "row", (), expr_ref("bi * NS + i")
+                                    "v_t *const",
+                                    "block",
+                                    (),
+                                    expr_ref("&%s[(ptrdiff_t)entries[i * NS + j] * NC * NC]" % value_stream),
                                 ),
-                                _counting_loop("bj", 0, expr_ref("NC"), accumulate),
+                                _counting_loop(
+                                    "bi",
+                                    0,
+                                    expr_ref("NC"),
+                                    [
+                                        BufferDeclNode(
+                                            "const int", "row", (), expr_ref("bi * NS + i")
+                                        ),
+                                        _counting_loop("bj", 0, expr_ref("NC"), accumulate),
+                                    ],
+                                ),
                             ],
                         ),
-                    ],
-                )
+                    ),
+                ),
             ],
         ),
     ]

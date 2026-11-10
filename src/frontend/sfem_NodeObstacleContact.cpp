@@ -242,6 +242,14 @@ namespace sfem {
         node_obstacle_apply_blocks(view(normals_, gap_), blocks, in, out);
     }
 
+    void NodeObstacleContact::extra(const real_t *const blocks,
+                                    const real_t        shift,
+                                    const real_t *const reference,
+                                    const real_t *const in,
+                                    real_t *const       out) const {
+        node_obstacle_extra(view(normals_, gap_), blocks, shift, reference, in, out);
+    }
+
     void NodeObstacleContact::blocks_diagonal(const real_t *const blocks, real_t *const d) const {
         node_obstacle_blocks_diagonal(view(normals_, gap_), blocks, d);
     }

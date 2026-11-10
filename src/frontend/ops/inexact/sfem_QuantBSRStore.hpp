@@ -60,6 +60,25 @@ namespace sfem {
                 team_apply(Team::current(n_ * 3), x, y);
             }
 
+            /// The plain product, then the extra blocks node by node: the host's composed tangent
+            /// runs the team product, so this is the reference, not a fast path.
+            void apply(const real_t *const x, real_t *const y, const DiagonalExtra &extra, const bool overwrite) const override {
+                const ptrdiff_t n3 = n_ * 3;
+                if (overwrite) {
+#pragma omp parallel for
+                    for (ptrdiff_t k = 0; k < n3; ++k) y[k] = 0;
+                }
+                apply(x, y);
+#pragma omp parallel for
+                for (ptrdiff_t i = 0; i < n_; ++i) {
+                    if (extra.contact_of && extra.contact_of[i] >= 0) {
+                        packed_sym_apply(&extra.blocks[(size_t)extra.contact_of[i] * 6], &x[i * 3], &y[i * 3]);
+                    }
+                    if (extra.shift != 0)
+                        for (int d = 0; d < 3; ++d) y[i * 3 + d] += extra.shift * (extra.reference[i * 3 + d] * x[i * 3 + d]);
+                }
+            }
+
             /// The quantized product, each row's correction added by the thread that completed it.
             void team_apply(const Team &team, const real_t *const x, real_t *const y) const override {
                 const idx_t *const rows = rows_.data();

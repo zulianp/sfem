@@ -348,11 +348,16 @@ namespace sfem {
       }
     }
 
-    // The graph an assembly was last handed and found well formed.
+    // The graphs an assembly was last handed and found well formed: a few, as a stored
+    // tangent assembles window by window into graphs of its own (one per window of rows).
     struct CheckedGraph {
-      const count_t *rowptr{nullptr};
-      const idx_t *colidx{nullptr};
-      ptrdiff_t n_rows{-1};
+      struct Entry {
+        const count_t *rowptr{nullptr};
+        const idx_t *colidx{nullptr};
+        ptrdiff_t n_rows{-1};
+      };
+      Entry entries[16];
+      int next{0};
     };
 
     // Establish once per graph, at the first assembly into it, that the graph is well formed:
@@ -371,7 +376,7 @@ namespace sfem {
     // Not at setup: `initialize` built the space's scalar dof graph for this, which a
     // matrix-free solver never uses -- on a 76.6M-dof semi-structured mesh 6.2e9 entries,
     // past count_t -- while the block assembly writes into the node graph, which it never
-    // checked.  `checked` remembers the last graph that passed.
+    // checked.  `checked` remembers the last graphs that passed.
     //
     // Raw pointers rather than the graph type, so this does not depend on which
     // headers the generated wrapper happens to pull in.
@@ -379,8 +384,8 @@ namespace sfem {
                     const count_t *const rowptr,
                     const idx_t *const colidx,
                     const ptrdiff_t n_rows) {
-      if (rowptr == checked.rowptr && colidx == checked.colidx && n_rows == checked.n_rows) {
-        return SFEM_SUCCESS;
+      for (const auto &entry : checked.entries) {
+        if (rowptr == entry.rowptr && colidx == entry.colidx && n_rows == entry.n_rows) return SFEM_SUCCESS;
       }
       if (!rowptr || !colidx || n_rows < 0) {
         return SFEM_FAILURE;
@@ -406,7 +411,8 @@ namespace sfem {
           }
         }
       }
-      checked = CheckedGraph{rowptr, colidx, n_rows};
+      checked.entries[checked.next] = CheckedGraph::Entry{rowptr, colidx, n_rows};
+      checked.next = (checked.next + 1) % 16;
       return SFEM_SUCCESS;
     }
   }  // namespace
@@ -1448,6 +1454,10 @@ namespace sfem {
       store->second->diagonal(domain.block->n_elements(), element_connectivity(domain), 3, diag);
       return SFEM_SUCCESS;
     });
+  }
+
+  bool GeneratedMooneyRivlinProny::set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) {
+    return impl_->inexact.set_extra(extra, overwrite);
   }
 
   int GeneratedMooneyRivlinProny::inexact_update(const real_t *const x) {

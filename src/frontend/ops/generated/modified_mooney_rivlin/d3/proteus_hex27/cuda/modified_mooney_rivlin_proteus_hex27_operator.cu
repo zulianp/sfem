@@ -1266,24 +1266,28 @@ __host__ __device__ __forceinline__ void modified_mooney_rivlin_proteus_hex27_he
   static constexpr int NS = 27;
   count_t entries[NS * NS];
   idx_t ks[NS];
+  bool has_row[NS];
   for (int i = 0; i < NS; ++i) {
     const idx_t dof_i = ev[i];
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
+    has_row[i] = lenrow > 0;
     modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
   }
   for (int i = 0; i < NS; ++i) {
-    for (int j = 0; j < NS; ++j) {
-      v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
-      for (int bi = 0; bi < NC; ++bi) {
-        const int row = bi * NS + i;
-        for (int bj = 0; bj < NC; ++bj) {
-          const int col = bj * NS + j;
-          atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
+    if (has_row[i]) {
+      for (int j = 0; j < NS; ++j) {
+        v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
+        for (int bi = 0; bi < NC; ++bi) {
+          const int row = bi * NS + i;
+          for (int bj = 0; bj < NC; ++bj) {
+            const int col = bj * NS + j;
+            atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
+          }
         }
       }
     }
@@ -1342,9 +1346,15 @@ __global__ void modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_assemble_imp
     s_t badj8[NQ];
     s_t bdet0[NQ];
 
+    for (int shape = 0; shape < NS; ++shape) ev[shape] = elements[shape][element];
+    if constexpr (FORMAT == 1) {
+      bool touches = false;
+      for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[shape]] < rowptr[ev[shape] + 1];
+      if (!touches) continue;
+    }
+
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t node = elements[shape][element];
-      ev[shape] = node;
+      const idx_t node = ev[shape];
       for (int d = 0; d < ND; ++d) {
         bcoordinate_data[shape * ND + d] = s_t(points[d][node]);
         bu_data[shape * NC + d] = u_components[d][node * u_stride];

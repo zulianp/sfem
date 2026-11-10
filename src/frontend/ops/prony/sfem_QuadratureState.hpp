@@ -101,9 +101,9 @@ namespace sfem {
         const void *raw() const { return data_->data(); }
 
         /// One scale per (tensor, element): scale(t, e) = scales[t * n_elements + e].
-        /// Present for every format, and all ones for the unscaled ones.
-        scaling_t       *scales() { return scales_->data(); }
-        const scaling_t *scales() const { return scales_->data(); }
+        /// Present for the scaled formats (`is_scaled(storage)`) only; null for the others.
+        scaling_t       *scales() { return scales_ ? scales_->data() : nullptr; }
+        const scaling_t *scales() const { return scales_ ? scales_->data() : nullptr; }
 
         /// The store as it is (values, scales, means) into files `prefix`.values, .scales and
         /// .means, and back into a store of the same shape and format (a restart).
@@ -118,6 +118,7 @@ namespace sfem {
         HistoryStorage                    storage_;
         ExecutionSpace                    es_;
         std::shared_ptr<Buffer<uint8_t>>  data_;
+        //! Empty unless scaled.
         std::shared_ptr<Buffer<scaling_t>> scales_;
         int                               elements_per_mean_{1};
         ptrdiff_t                         n_groups_{0};

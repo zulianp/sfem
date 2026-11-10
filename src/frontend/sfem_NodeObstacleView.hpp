@@ -95,6 +95,14 @@ namespace sfem {
     void node_obstacle_apply_blocks(const NodeObstacleView &c, const real_t *const blocks, const real_t *const in, real_t *const out);
     // d += the diagonal of B_i at each contact node.
     void node_obstacle_blocks_diagonal(const NodeObstacleView &c, const real_t *const blocks, real_t *const d);
+    // out = B_i in at each contact node (blocks null: none) plus shift reference .* in (shift 0: none),
+    // over every node: the composed tangent's extra terms written where its store adds after.
+    void node_obstacle_extra(const NodeObstacleView &c,
+                             const real_t *const     blocks,
+                             const real_t            shift,
+                             const real_t *const     reference,
+                             const real_t *const     in,
+                             real_t *const           out);
 
     // out (zeroed by the caller) at the contact nodes: -mu n.
     void node_obstacle_reaction(const NodeObstacleView &c, real_t *const out);

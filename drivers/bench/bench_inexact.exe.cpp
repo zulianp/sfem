@@ -2,13 +2,19 @@
 // apply, on the host or the device (SFEM_EXECUTION_SPACE=device).
 //
 //   bench_inexact <HEX8|TET4|TET10|PROTEUS_HEX27> <n> [repeats] [material]
+//   bench_inexact MESH <folder> [repeats] [material]
 //
+// MESH reads a mesh folder (Mesh::create_from_file), e.g. a run's output mesh: the graph and the
+// element order of the case itself, which a cube's regular numbering does not have.
 // The mesh is the unit cube: n^3 hexahedra, n^3 cubes of tetrahedra (TET10 promoted), or n^3 macro
 // elements of degree 2.  The state is a smooth deformation (no element inverts), the increment white
 // noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call,
-// MDOF/s, the bytes the operator holds per dof (BSR: its values and column indices), its relative
-// l2 distance to the exact apply, and a digest of its output's bits (two builds or thread counts
-// that compute the same bits print the same digest).
+// MDOF/s, the bytes the operator accounts for per dof (BSR: its values, column indices and row
+// pointers; a store: its bytes()), on the device also the bytes it holds per dof as the device
+// reports them (free memory before its creation less after its first set-up, 2 MiB granules), its
+// relative l2 distance to the exact apply, and a digest of its output's bits (two builds or thread
+// counts that compute the same bits print the same digest). "scratch B/dof" is the stream-ordered
+// pool's high-water mark over a set-up: memory the set-up holds only while it runs.
 // The rows reproduce the format tables of spikes/inexact_apply_compare/qp/RESULTS_QP.md from the
 // library alone.
 
@@ -23,6 +29,7 @@
 #include "sfem_API.hpp"
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_MemoryLedger.hpp"
 #include "smesh_mesh.hpp"
 #include "smesh_semistructured.hpp"
 
@@ -35,6 +42,43 @@
 
 namespace {
     using clock_type = std::chrono::steady_clock;
+
+    /// Free device memory (bytes), 0 on the host.
+    double device_free(const sfem::ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            cudaDeviceSynchronize();
+            size_t free = 0, total = 0;
+            cudaMemGetInfo(&free, &total);
+            return (double)free;
+        }
+#endif
+        (void)es;
+        return 0;
+    }
+
+    /// The stream-ordered pool's high-water mark since the last reset (bytes), 0 on the host: what an
+    /// update holds only while it runs (a stored tangent's window of single-precision values).
+    double pool_high(const sfem::ExecutionSpace es, const bool reset) {
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            cudaDeviceSynchronize();
+            int device = 0;
+            cudaGetDevice(&device);
+            cudaMemPool_t pool;
+            cudaDeviceGetDefaultMemPool(&pool, device);
+            cuuint64_t value = 0;
+            if (reset) {
+                cudaMemPoolSetAttribute(pool, cudaMemPoolAttrUsedMemHigh, &value);
+                return 0;
+            }
+            cudaMemPoolGetAttribute(pool, cudaMemPoolAttrUsedMemHigh, &value);
+            return (double)value;
+        }
+#endif
+        (void)es, (void)reset;
+        return 0;
+    }
 
     void synchronize(const sfem::ExecutionSpace es) {
 #ifdef SFEM_ENABLE_CUDA
@@ -82,9 +126,19 @@ namespace {
         return std::sqrt(num / den);
     }
 
-    std::shared_ptr<sfem::FunctionSpace> space(const std::string &element, const int n, const sfem::ExecutionSpace es) {
+    std::shared_ptr<sfem::FunctionSpace> space(const std::string &element,
+                                               const std::string &size,
+                                               const sfem::ExecutionSpace es) {
         auto comm = sfem::Communicator::world();
         std::shared_ptr<sfem::Mesh> mesh;
+        if (element == "MESH") {
+            mesh = sfem::Mesh::create_from_file(comm, smesh::Path(size.c_str()));
+            if (!mesh) return nullptr;
+            auto fs = sfem::FunctionSpace::create(mesh, 3);
+            if (es == sfem::EXECUTION_SPACE_HOST && fs->initialize_packed_mesh() != SFEM_SUCCESS) return nullptr;
+            return fs;
+        }
+        const int n = atoi(size.c_str());
         if (element == "HEX8" || element == "PROTEUS_HEX27") {
             mesh = sfem::Mesh::create_hex8_cube(comm, n, n, n, 0, 0, 0, 1, 1, 1);
         } else {
@@ -102,17 +156,18 @@ namespace {
 int main(int argc, char *argv[]) {
     auto context = sfem::initialize(argc, argv);
     if (argc < 3) {
-        fprintf(stderr, "usage: %s <HEX8|TET4|TET10|PROTEUS_HEX27> <n> [repeats] [material]\n", argv[0]);
+        fprintf(stderr, "usage: %s <HEX8|TET4|TET10|PROTEUS_HEX27> <n> [repeats] [material]\n"
+                        "       %s MESH <folder> [repeats] [material]\n", argv[0], argv[0]);
         return EXIT_FAILURE;
     }
     const std::string element  = argv[1];
-    const int         n        = atoi(argv[2]);
+    const std::string size     = argv[2];
     const int         repeats  = argc > 3 ? atoi(argv[3]) : 50;
     const std::string material = argc > 4 ? argv[4] : "GeneratedNeoHookeanOgden";
     const char *const es_name  = getenv("SFEM_EXECUTION_SPACE");
     const auto        es       = sfem::execution_space_from_string(es_name ? es_name : "host");
 
-    auto fs = space(element, n, es);
+    auto fs = space(element, size, es);
     if (!fs) return EXIT_FAILURE;
     auto f  = sfem::Function::create(fs);
     auto op = sfem::create_op(fs, material.c_str(), es);
@@ -147,14 +202,17 @@ int main(int argc, char *argv[]) {
 #ifdef _OPENMP
     threads = omp_get_max_threads();
 #endif
-    printf("bench_inexact %s %s n=%d: %ld elements, %ld dofs, %s, %d threads, %d repeats\n", material.c_str(),
-           element.c_str(), n, (long)fs->mesh()->n_elements(), (long)ndofs, es_name ? es_name : "host", threads, repeats);
-    printf("%-26s %10s %10s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "rel diff", "digest");
+    printf("bench_inexact %s %s %s: %ld elements, %ld dofs, %s, %d threads, %d repeats\n", material.c_str(),
+           element.c_str(), size.c_str(), (long)fs->mesh()->n_elements(), (long)ndofs, es_name ? es_name : "host", threads, repeats);
+    printf("%-26s %10s %10s %9s %9s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "held B/dof",
+           "scratch", "rel diff", "digest");
 
-    auto row = [&](const char *name, const double setup, const double apply, const double bytes, const std::vector<real_t> &out,
-                   const std::vector<real_t> &exact) {
-        printf("%-26s %10.3f %10.4f %9.1f %9.1f %10.2e %016llx\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply,
-               bytes / ndofs, exact.empty() ? 0.0 : relative_difference(out, exact), digest(out));
+    double scratch = 0;
+    auto   row     = [&](const char *name, const double setup, const double apply, const double bytes, const double held,
+                   const std::vector<real_t> &out, const std::vector<real_t> &exact) {
+        printf("%-26s %10.3f %10.4f %9.1f %9.1f %9.1f %9.1f %10.2e %016llx\n", name, 1e3 * setup, 1e3 * apply, 1e-6 * ndofs / apply,
+               bytes / ndofs, held / ndofs, scratch / ndofs, exact.empty() ? 0.0 : relative_difference(out, exact), digest(out));
+        scratch = 0;
     };
 
     // The exact apply (matrix-free): the reference.
@@ -162,19 +220,25 @@ int main(int argc, char *argv[]) {
     f->apply(U, H, Y);
     const std::vector<real_t> exact = on_host(y, es);
     const double              t_mf  = seconds(es, repeats, [&] { f->apply(U, H, Y); });
-    row("matrix-free", 0, t_mf, 0, exact, {});
+    row("matrix-free", 0, t_mf, 0, 0, exact, {});
 
     // The assembled tangent, double and single precision values.
     for (const int bytes : {8, 4}) {
+        const double free0   = device_free(es);
         auto         tangent = sfem::BSRTangent::create(f, op->execution_context(), bytes);
         const double setup   = seconds(es, 1, [&] { tangent->assemble(U); });
+        const double held    = free0 - device_free(es);
         auto         K       = tangent->op(0);
         blas->zeros(ndofs, Y);
         K->apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
         const double t = seconds(es, repeats, [&] { K->apply(H, Y); });
-        const double read = (double)tangent->rowptr()[tangent->block_rows()] * (9 * bytes + sizeof(idx_t));
-        row(bytes == 8 ? "BSR f64" : "BSR f32", setup, t, read, out, exact);
+        // Its values, column indices and row pointers, as the memory ledger counts them where they live.
+        sfem::MemoryLedger ledger;
+        tangent->account(ledger);
+        const double read = 0.0 + ledger.host(sfem::MemoryLedger::TANGENT_VALUES) + ledger.device(sfem::MemoryLedger::TANGENT_VALUES) +
+                            ledger.host(sfem::MemoryLedger::TANGENT_STRUCTURE) + ledger.device(sfem::MemoryLedger::TANGENT_STRUCTURE);
+        row(bytes == 8 ? "BSR f64" : "BSR f32", setup, t, read, held, out, exact);
     }
 
     const char *const formats[][2] = {{"points", "f64"},          {"points", "f32"},          {"points", "f16"},
@@ -183,13 +247,17 @@ int main(int argc, char *argv[]) {
                                       {"bsr", "i8"}};
     for (const auto &fmt : formats) {
         op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1]));
+        const double free0 = device_free(es);
+        pool_high(es, true);
         const double setup = seconds(es, 3, [&] { op->inexact_update(U); });
+        scratch            = pool_high(es, false);
+        const double held  = free0 - device_free(es);
         blas->zeros(ndofs, Y);
         op->inexact_apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
         const double t = seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
         const std::string name = std::string(fmt[0]) + " " + fmt[1];
-        row(name.c_str(), setup, t, (double)op->inexact_bytes(), out, exact);
+        row(name.c_str(), setup, t, (double)op->inexact_bytes(), held, out, exact);
     }
     return EXIT_SUCCESS;
 }

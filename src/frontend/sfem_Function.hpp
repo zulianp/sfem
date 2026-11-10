@@ -33,6 +33,9 @@
 #include "sfem_Constraint.hpp"
 
 namespace sfem {
+    namespace inexact {
+        struct DiagonalExtra;
+    }
     class MemoryLedger;
 
     // using Output = smesh::Output;
@@ -130,6 +133,10 @@ namespace sfem {
 
         /// The bytes of every operator's stored tangent (Op::inexact_bytes), where they run.
         std::size_t inexact_bytes() const;
+        /// Extra diagonal blocks inexact_apply adds in the stored tangent's own pass, overwriting
+        /// `out` when `overwrite` (Op::set_inexact_extra); null removes them. False, and nothing
+        /// set, unless one operator with a store that takes them makes the whole product.
+        bool set_inexact_extra(const inexact::DiagonalExtra *const extra, const bool overwrite);
 
         /// What it keeps between steps beside its operators' states: the mesh, the space's graphs,
         /// the operators' cached geometry.

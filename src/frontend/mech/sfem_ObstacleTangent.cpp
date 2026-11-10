@@ -1,5 +1,6 @@
 #include "sfem_ObstacleTangent.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <vector>
@@ -7,6 +8,7 @@
 #include "sfem_BSRTangent.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_FunctionSpace.hpp"
+#include "sfem_InexactInterface.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
 #include "sfem_MemoryLedger.hpp"
 #include "sfem_NodeObstacleContact.hpp"
@@ -88,9 +90,14 @@ namespace sfem {
             // 6 per contact node (node_obstacle_curvature_blocks), when `curved`.
             SharedBuffer<real_t>                 blocks;
             bool                                 curved{false};
-            // K_dd += shift reference_d (shift_diagonal), with tmp for its product.
-            SharedBuffer<real_t>                 reference, tmp;
+            // K_dd += shift reference_d (shift_diagonal).
+            SharedBuffer<real_t>                 reference;
             real_t                               shift{0};
+            // Where the stored tangent takes the curvature and the shift in its own pass
+            // (Function::set_inexact_extra, the device's assembled store): the extra the product
+            // hands it.
+            bool                                 fused{false};
+            inexact::DiagonalExtra               extra;
 
             int assemble(const real_t *const x) override {
                 blas->copy(ndofs, x, state->data());
@@ -145,7 +152,7 @@ namespace sfem {
                 ledger.add(MemoryLedger::TANGENT_VALUES,
                            f->inexact_bytes(),
                            es == EXECUTION_SPACE_DEVICE ? smesh::MEMORY_SPACE_DEVICE : smesh::MEMORY_SPACE_HOST);
-                for (auto *buffer : {&state, &reference, &tmp, &blocks}) ledger.add(MemoryLedger::TANGENT_WORK, *buffer);
+                for (auto *buffer : {&state, &reference, &blocks}) ledger.add(MemoryLedger::TANGENT_WORK, *buffer);
             }
 
             void build() {
@@ -180,17 +187,27 @@ namespace sfem {
                     product = team_product_operator();
                     return;
                 }
+                fused = es == EXECUTION_SPACE_DEVICE && format == op_type::INEXACT && f->set_inexact_extra(&extra, true);
+                f->set_inexact_extra(nullptr, false);
                 product           = make_op<real_t>(
                         ndofs,
                         ndofs,
                         [self](const real_t *const in, real_t *const out) {
-                            self->blas->zeros(self->ndofs, out);
-                            self->material->apply(in, out);
-                            if (self->curved) self->contact->apply_blocks(self->blocks->data(), in, out);
-                            if (self->shift != 0) {
-                                self->blas->xypaz(self->ndofs, self->reference->data(), in, 0, self->tmp->data());
-                                self->blas->axpy(self->ndofs, self->shift, self->tmp->data(), out);
+                            if (self->fused) {
+                                // One pass writes out: the stored product, the curvature, the shift.
+                                self->extra.contact_of = self->curved ? self->contact->frame_of() : nullptr;
+                                self->extra.blocks     = self->blocks->data();
+                                self->extra.shift      = self->shift;
+                                self->extra.reference  = self->reference->data();
+                                self->f->set_inexact_extra(&self->extra, true);
+                                self->material->apply(in, out);
+                                self->f->set_inexact_extra(nullptr, false);
+                                return;
                             }
+                            // The curvature and the shift write out in one pass, the material adds to it.
+                            self->contact->extra(
+                                    self->curved ? self->blocks->data() : nullptr, self->shift, self->reference->data(), in, out);
+                            self->material->apply(in, out);
                         },
                         es);
             }
@@ -265,7 +282,6 @@ namespace sfem {
         ret->blas      = blas<real_t>(es);
         ret->state     = create_buffer<real_t>(ret->ndofs, es);
         ret->reference = create_buffer<real_t>(ret->ndofs, es);
-        ret->tmp       = create_buffer<real_t>(ret->ndofs, es);
         ret->blocks    = create_buffer<real_t>(6 * contact->size(), es);
         ret->build();
         return ret;

@@ -60,6 +60,7 @@ namespace sfem {
     int inexact_apply(const real_t *const h, real_t *const out) override;
     std::size_t inexact_bytes() const override;
     int inexact_diag(real_t *const diag) override;
+    bool set_inexact_extra(const inexact::DiagonalExtra *extra, const bool overwrite) override;
     bool tangent_projection_supported() const override;
     void set_tangent_projection(const bool on) override;
     std::size_t geometry_bytes() const override;

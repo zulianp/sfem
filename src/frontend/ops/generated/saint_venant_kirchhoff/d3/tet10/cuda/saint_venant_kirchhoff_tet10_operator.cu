@@ -1379,24 +1379,28 @@ __host__ __device__ __forceinline__ void saint_venant_kirchhoff_tet10_hessian_i_
   static constexpr int NS = 10;
   count_t entries[NS * NS];
   idx_t ks[NS];
+  bool has_row[NS];
   for (int i = 0; i < NS; ++i) {
     const idx_t dof_i = ev[i];
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
+    has_row[i] = lenrow > 0;
     saint_venant_kirchhoff_tet10_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
   }
   for (int i = 0; i < NS; ++i) {
-    for (int j = 0; j < NS; ++j) {
-      v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
-      for (int bi = 0; bi < NC; ++bi) {
-        const int row = bi * NS + i;
-        for (int bj = 0; bj < NC; ++bj) {
-          const int col = bj * NS + j;
-          atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
+    if (has_row[i]) {
+      for (int j = 0; j < NS; ++j) {
+        v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
+        for (int bi = 0; bi < NC; ++bi) {
+          const int row = bi * NS + i;
+          for (int bj = 0; bj < NC; ++bj) {
+            const int col = bj * NS + j;
+            atomicAdd(&(block[bi * NC + bj]), v_t(element_matrix[row * (NC * NS) + col]));
+          }
         }
       }
     }
@@ -1459,10 +1463,17 @@ __global__ void __launch_bounds__(sfem::cooperative::threads<11>(), sfem::cooper
     }
   }
   __syncthreads();
+  // An element none of whose rows the graph has (a window of the rows) adds nothing.
+  bool touches = false;
+  if (active) {
+    for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[le][shape]] < rowptr[ev[le][shape] + 1];
+  }
   if (active) {
     for (int shape = q; shape < NS; shape += NQ) {
       sfem::cooperative::row_map<NS>(ev[le], shape, rowptr, colidx, pos[le]);
     }
+  }
+  if (active && touches) {
     s_t adj[ND * ND];
     s_t det;
     sfem::cooperative::point_geometry<s_t, NS, ND>(bcoordinate_data[le], grad_ref, q, adj, det);

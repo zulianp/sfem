@@ -13,7 +13,7 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>       space;
         std::shared_ptr<DirichletConditions> conditions;
         SharedBuffer<idx_t>                  nodeset;
-        SharedBuffer<real_t>                 u0, u1;
+        SharedBuffer<real_t>                 u0, u1, u2;
         int                                  a0{1}, a1{2};
         real_t                               center[3]{0, 0, 0};
         real_t                               angle{0};
@@ -29,7 +29,8 @@ namespace sfem {
                                                const int                                    axis,
                                                const real_t                                 center[3],
                                                const real_t                                 angle,
-                                               const LoadProfile                           &profile) {
+                                               const LoadProfile                           &profile,
+                                               const bool                                   hold_axial) {
         if (axis < 0 || axis > 2 || space->block_size() != 3) {
             SFEM_ERROR("Rotation: the axis must be 0, 1 or 2 of a three-dimensional displacement\n");
             return nullptr;
@@ -52,7 +53,13 @@ namespace sfem {
         // The prescribed values are these two buffers, which set_angle rewrites in place.
         DirichletConditions::Condition c0{.sidesets = sidesets, .nodeset = impl.nodeset, .values = impl.u0, .component = impl.a0};
         DirichletConditions::Condition c1{.sidesets = sidesets, .nodeset = impl.nodeset, .values = impl.u1, .component = impl.a1};
-        impl.conditions = DirichletConditions::create(space, {c0, c1});
+        std::vector<DirichletConditions::Condition> conditions{c0, c1};
+        if (hold_axial) {
+            // The face also keeps its position along the axis; a release frees all three components.
+            impl.u2 = create_host_buffer<real_t>(impl.nodeset->size());
+            conditions.push_back(DirichletConditions::Condition{.sidesets = sidesets, .nodeset = impl.nodeset, .values = impl.u2, .component = axis});
+        }
+        impl.conditions = DirichletConditions::create(space, conditions);
         return ret;
     }
 

@@ -166,6 +166,7 @@ Rigid rotations of a sideset (host only).
 | `control.tol`, `control.max_it` | real, int | `1e-6` (relative), `20` | |
 | `profile` | [profile](#profiles) | constant 1 | |
 | `release` | time | | The constraint is removed from the first step that ends at or after this time. |
+| `hold_axial` | bool | `false` | The face also keeps its position along the axis (otherwise free); a release frees it too. |
 
 ```yaml
 constraints:
@@ -336,7 +337,7 @@ Probes, each with a `type` and an optional `name` that prefixes its columns:
 | `torque` | `constraint` (index into `constraints`, default 0) | `angle, released, torque` |
 | `contact` | | `reaction_x, reaction_y, reaction_z, touched` (with an obstacle) |
 | `prony` | | `<group>_gamma`, `<group>_H<k>`, `<group>_stored` (terms holding a tensor), `bytes_history, bytes_increment, bytes_frozen, bytes_stress` (persistent bytes over all ranks; with a Prony material); `updates, updates_lost` when built with `SFEM_ENABLE_PRONY_DIAGNOSTICS` (history values `advance` meant to change, and those the storage format rounded away; cumulative, host only) |
-| `memory` | | `host_peak_rss, device_used_peak, device_used_now` (bytes over all ranks; the device's total minus free), and what the solve keeps between steps by category, `bytes_<category>` on the host and `bytes_<category>_device`: `mesh, geometry, graph, tangent_values, tangent_structure, tangent_work, step, contact, obstacle_grid, scheme, newton` (the Prony state is the `prony` probe's) |
+| `memory` | | `host_peak_rss, device_used_peak, device_used_now` (bytes over all ranks; the device's total minus free, at step ends), `device_pool_peak` (the stream-ordered pool's high-water mark: buffers an update holds only while it runs), and what the solve keeps between steps by category, `bytes_<category>` on the host and `bytes_<category>_device`: `mesh, geometry, graph, tangent_values, tangent_structure, tangent_work, step, contact, obstacle_grid, scheme, newton` (the Prony state is the `prony` probe's) |
 
 See [outputs](outputs.md) for the files.
 

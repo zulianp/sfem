@@ -1458,25 +1458,29 @@ static SFEM_INLINE void laplace_tet4_hessian_a_msoa_scatter_bsr(
   static constexpr int NS = 4;
   count_t entries[NS * NS];
   idx_t ks[NS];
+  bool has_row[NS];
   for (int i = 0; i < NS; ++i) {
     const idx_t dof_i = ev[i];
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
+    has_row[i] = lenrow > 0;
     laplace_tet4_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
   }
   for (int i = 0; i < NS; ++i) {
-    for (int j = 0; j < NS; ++j) {
-      v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
-      for (int bi = 0; bi < NC; ++bi) {
-        const int row = bi * NS + i;
-        for (int bj = 0; bj < NC; ++bj) {
-          const int col = bj * NS + j;
+    if (has_row[i]) {
+      for (int j = 0; j < NS; ++j) {
+        v_t *const block = &values[(ptrdiff_t)entries[i * NS + j] * NC * NC];
+        for (int bi = 0; bi < NC; ++bi) {
+          const int row = bi * NS + i;
+          for (int bj = 0; bj < NC; ++bj) {
+            const int col = bj * NS + j;
 #pragma omp atomic update
-          block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);
+            block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);
+          }
         }
       }
     }
