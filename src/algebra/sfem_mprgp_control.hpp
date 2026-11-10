@@ -7,7 +7,8 @@
 
 namespace sfem {
 
-    /// What a step along the current direction does, decided from the curvature pass.
+    /// What a step along the current direction does, decided from the curvature pass. UNBOUNDED:
+    /// none, the energy falls without end along it (negative curvature, or none and no bound).
     enum class MPRGPMove : int { STEP = 0, EXPAND = 1, UNBOUNDED = 2 };
 
     /// Which decision the curvature pass makes once its sums are final.
@@ -60,6 +61,14 @@ namespace sfem {
         return dd > 0 && dAd <= 64 * p.epsilon * p.max_eig * dd;
     }
 
+    /// Whether d sees negative curvature beyond rounding: the operator is indefinite, and the
+    /// energy falls without end along d past every bound that stops one step (a bound only on the
+    /// normal of a contact node, the tangential motion free). Within rounding of zero d is flat.
+    template <typename T>
+    SFEM_DEVICE_INLINE bool mprgp_negative_curvature(const T dAd, const T dd, const MPRGPParams<T>& p) {
+        return dd > 0 && dAd < -64 * p.epsilon * p.max_eig * dd;
+    }
+
     /// Whether no bound stops a step of alpha_feas along d (d.d = dd): none limits it (infty), or
     /// only the bounds that stand for none (infty) do.
     template <typename T>
@@ -77,11 +86,12 @@ namespace sfem {
     }
 
     /// Along the conjugate direction: the CG step if it stays feasible, else the expansion to the
-    /// bound; unbounded where the direction has no curvature and no bound stops it.
+    /// bound; unbounded where the direction has no curvature and no bound stops it, or negative
+    /// curvature.
     template <typename T>
     SFEM_DEVICE_INLINE void mprgp_decide_cg(MPRGPControl<T>& c, const MPRGPParams<T>& p) {
         const bool flat = mprgp_no_curvature(c.dAd, c.dd, p);
-        if (flat && mprgp_unbounded(c.alpha_feas, c.dd, p)) {
+        if (mprgp_negative_curvature(c.dAd, c.dd, p) || (flat && mprgp_unbounded(c.alpha_feas, c.dd, p))) {
             c.move  = T(MPRGPMove::UNBOUNDED);
             c.alpha = 0;
             return;
@@ -97,11 +107,11 @@ namespace sfem {
     }
 
     /// Along the chopped gradient: the CG step, or to the first bound where it has no curvature;
-    /// unbounded where no bound stops it either.
+    /// unbounded where no bound stops it either, or where its curvature is negative.
     template <typename T>
     SFEM_DEVICE_INLINE void mprgp_decide_proportioning(MPRGPControl<T>& c, const MPRGPParams<T>& p) {
         if (mprgp_no_curvature(c.dAd, c.dd, p)) {
-            if (mprgp_unbounded(c.alpha_feas, c.dd, p)) {
+            if (mprgp_negative_curvature(c.dAd, c.dd, p) || mprgp_unbounded(c.alpha_feas, c.dd, p)) {
                 c.move  = T(MPRGPMove::UNBOUNDED);
                 c.alpha = 0;
                 return;
