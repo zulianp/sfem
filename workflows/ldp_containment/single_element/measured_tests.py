@@ -5,7 +5,7 @@
 
 <measurements> holds uniaxial.csv, equibiax.csv and pureshear.csv (t, engineering strain, engineering
 stress in MPa; epdm281_extract.py). Per test, one HEX8 unit cube follows the measured strain history,
-quasi-statically, the history in double, with the full series (15) and the series cut to its K slowest
+quasi-statically, the history in double, with the full series (14) and the series cut to its K slowest
 terms and rescaled (stress_strain.py):
   uniaxial   x pulled; x, y, z = 0 held normal;
   equibiax   x and y pulled alike; x, y, z = 0 held normal;
@@ -89,7 +89,7 @@ def main():
     p.add_argument("playground", type=Path)
     p.add_argument("measurements", type=Path)
     p.add_argument("out", type=Path)
-    p.add_argument("--terms", default="4,15")
+    p.add_argument("--terms", default="3,14")
     p.add_argument("--steps", type=int, default=2000)
     a = p.parse_args()
     if a.out.exists():

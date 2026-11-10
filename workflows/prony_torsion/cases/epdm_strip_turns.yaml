@@ -5,8 +5,8 @@
 # smooth ramp over 1 s, held until 1.15 s, then released and followed to 2 s. The wound end keeps its
 # position along the axis (hold_axial): with it free, two turns buckle the strip into an S-fold
 # instead of a helicoid. Material, series and
-# time integration as epdm_torsion_release.yaml: Mooney-Rivlin with the 15-term EPDM series on the
-# isochoric part, density 1150, BDF2 at dt = 1e-3 s (four stored terms).
+# time integration as epdm_torsion_release.yaml: Mooney-Rivlin with the 14-term EPDM series on the
+# isochoric part, density 1150, BDF2 at dt = 1e-3 s (three stored terms).
 
 mesh:
   path: mesh
@@ -24,7 +24,6 @@ material:
   relaxation:
     iso:
       prony:
-        - {g: 1.553624e-9, tau: 1.61e+03}
         - {g: 6.954807e-4, tau: 1.29e+01}
         - {g: 3.012002e-4, tau: 1.53e-01}
         - {g: 2.802263e-3, tau: 9.89e-04}

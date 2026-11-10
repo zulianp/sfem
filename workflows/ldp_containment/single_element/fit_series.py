@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fit the valves' material to 70 EPDM 281: the relaxed shear modulus and the slow terms' weights.
 
-    fit_series.py <playground> <measurements> <out> [--slow 4] [--steps 1000] [--dma-temp 30]
+    fit_series.py <playground> <measurements> <out> [--slow 3] [--steps 1000] [--dma-temp 30]
                   [--dma-weight 1]
 
 The relaxation times stay those of the series in simulation 2's case file; so do the absolute weights
@@ -13,7 +13,8 @@ terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (sc
   - the storage and loss moduli at --dma-temp from 0.1 to 10 Hz, relative, small strain (the
     complex Young's modulus of mu(omega) and K), weighted --dma-weight/sqrt(their count).
 K stays tied to mu_inf by nu = 0.4, C01/C10 stays 4. <measurements> holds uniaxial.csv, equibiax.csv,
-pureshear.csv and dma.csv (epdm281_extract.py). <out> must not exist; writes <out>/fit.yaml (the
+pureshear.csv and dma.csv (epdm281_extract.py). The case files' fit (job 5316026) ran with --slow 4 on
+the 15-term series scaled by 0.6375; it left the 1610 s term a weight of 1.6e-9, which was then dropped. <out> must not exist; writes <out>/fit.yaml (the
 material block, the parameters, and the misfit before and after) and <out>/evals.csv.
 """
 
@@ -82,7 +83,7 @@ def main():
     p.add_argument("playground", type=Path)
     p.add_argument("measurements", type=Path)
     p.add_argument("out", type=Path)
-    p.add_argument("--slow", type=int, default=4)
+    p.add_argument("--slow", type=int, default=3)
     p.add_argument("--steps", type=int, default=1000)
     p.add_argument("--dma-temp", type=float, default=30)
     p.add_argument("--dma-weight", type=float, default=1.0)

@@ -3,9 +3,9 @@
 
 One HEX8 unit cube with three symmetry planes (x, y, z = 0 held normal), its face x = 1 pulled to
 strain EPS and back at a constant strain rate, quasi-static, the history in double. Per rate, the
-full 15-term series of simulation 2 and the series truncated to its K slowest terms, rescaled to the
-same relaxation beyond them (g_i/D, C10 and C01 times D, D = g_inf + g_1 + ... + g_K; the four-term
-series of the paper's step study is K = 4). A run whose Newton fails is recorded as such.
+full 14-term series of simulation 2 and the series truncated to its K slowest terms, rescaled to the
+same relaxation beyond them (g_i/D, C10 and C01 times D, D = g_inf + g_1 + ... + g_K; the step
+study's cut series holds the terms the campaign's step stores). A run whose Newton fails is recorded as such.
 
     stress_strain.py <playground> <out> [--rates 1e1,1e5,1e7,1e9] [--terms 4,5,6,15] [--eps 0.5]
                      [--steps 200]
@@ -100,7 +100,7 @@ def main():
     p.add_argument("playground", type=Path)
     p.add_argument("out", type=Path)
     p.add_argument("--rates", default="1e1,1e5,1e7,1e9")
-    p.add_argument("--terms", default="4,5,6,15")
+    p.add_argument("--terms", default="3,4,5,14")
     p.add_argument("--eps", type=float, default=0.5)
     p.add_argument("--steps", type=int, default=200, help="steps per ramp, up and down")
     p.add_argument("--jobs", type=int, default=16)
