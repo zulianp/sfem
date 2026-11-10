@@ -21,9 +21,9 @@ mesh:
 
 material:
   type: GeneratedMooneyRivlinProny
-  C10: 1.460e8
-  C01: 5.853e8
-  K: 1.529e7
+  C10: 9.308e7
+  C01: 3.731e8
+  K: 9.747e6
   relaxation:
     iso:
       prony:

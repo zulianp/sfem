@@ -32,7 +32,7 @@ SIM2 = ROOT / "workflows/ldp_containment/transient/FF200_ExodusMesh/sim2.yaml"
 def material(terms):
     """Simulation 2's material with its series truncated to the `terms` slowest, rescaled."""
     m = yaml.safe_load(SIM2.read_text())["material"]
-    # PyYAML reads 1.460e8 as a string (YAML 1.1 wants a sign in the exponent).
+    # PyYAML reads 9.308e7 as a string (YAML 1.1 wants a sign in the exponent).
     series = sorted(({"g": float(p["g"]), "tau": float(p["tau"])} for p in m["relaxation"]["iso"]["prony"]),
                     key=lambda p: -p["tau"])
     m.update({k: float(m[k]) for k in ("C10", "C01", "K")})
