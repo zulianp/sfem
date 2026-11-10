@@ -32,9 +32,12 @@ SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
 T=$SRC/workflows/ldp_containment/transient
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
+# CASE_ARGS: the element's own options (LDP24A TET10: its QPs need up to 60,000 iterations, sim2.yaml).
+CASE_ARGS=""
 case ${PUMP:-LDP24A}/${ELEMENT:-TET4} in
   LDP24A/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_s0/sim1}; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
-  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_p2/sim1}; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A ;;
+  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_p2/sim1}; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A
+                CASE_ARGS="--set obstacle.qp.max_it=60000" ;;
   FF200/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; DB=solid; FILES=FF200_ExodusMesh ;;
   FF200/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; DB=solid_p2; FILES=FF200_ExodusMesh ;;
   *) echo "unknown PUMP/ELEMENT ${PUMP:-LDP24A}/${ELEMENT:-TET4}"; exit 1 ;;
@@ -94,7 +97,7 @@ go() {  # <run>
   start=$(date +%s.%N)
   # shellcheck disable=SC2086
   SMESH_TRACE_FILE=$W/smesh.trace.csv srun --exact -n 1 -c 72 --gpus-per-task=1 "$PLAYGROUND" sim2.yaml \
-      --set execution_space=device $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
+      --set execution_space=device $CASE_ARGS $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
       --set output.path=sim2 --set output.history_csv=sim2/history.csv > run.log 2>&1
   local rc=$?
   echo "$ELEMENT $run rc=$rc wall=$(echo "$(date +%s.%N) - $start" | bc)s steps=$(grep -cE '^step .*converged' run.log)" \
