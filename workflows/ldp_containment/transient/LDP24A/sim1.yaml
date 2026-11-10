@@ -1,0 +1,63 @@
+# LDP24A, simulation 1: the containment. The umbrella valves, as moulded, lie inside the rigid seat at
+# their heads and rims; quasi-static steps far longer than every relaxation time release them out of
+# it (obstacle.release), which is their pre-stress, relaxed. The pressure valve carries the outlet's
+# 1 bar on its dome, the suction valve 1 kPa, as the FSI's simulation 1 (ldp_fsi
+# cases/ldp24a/sim1_valves_1bar.yaml, from scripts/pump_design_a/write_cases_a.py): the dome's load
+# side-set is its true surface, so the traction is p A_seal / A_surface, 0.919119 p. Round stems in
+# frictionless contact spin freely about their axes: a small patch on each dome is held in z.
+# The mesh: LDP24AT_v3's valves (db/solid, TET4, sfc order); TET10 is db/solid_p2 (smesh mesh_promote,
+# sfc). Read from <case>/<run folder>.
+execution_space: host
+mesh:
+  path: ../db/solid
+  blocks: [PRESSURE_VALVE, SUCTION_VALVE]
+  sidesets:
+    - {name: pv_disc, file: ../db/solid/sidesets/PV_TOP}
+    - {name: sv_disc, file: ../db/solid/sidesets/SV_TOP}
+    - {name: pv_pin, file: ../db/solid/sidesets/PV_PIN}
+    - {name: sv_pin, file: ../db/solid/sidesets/SV_PIN}
+material:
+  # As FF200's (FF200_ExodusMesh/sim1.yaml): 70 EPDM 281, fitted (single_element/fit_series.py).
+  type: GeneratedMooneyRivlinProny
+  C10: 9.338236e7
+  C01: 3.735294e8
+  K: 9.027840e6
+  relaxation:
+    iso:
+      prony:
+        - {g: 6.954807e-4, tau: 1.29e+01}
+        - {g: 3.012002e-4, tau: 1.53e-01}
+        - {g: 2.802263e-3, tau: 9.89e-04}
+        - {g: 6.080455e-3, tau: 1.18e-06}
+        - {g: 6.729436e-2, tau: 8.51e-09}
+        - {g: 2.216521e-1, tau: 1.42e-10}
+        - {g: 1.897022e-1, tau: 1.80e-12}
+        - {g: 1.118245e-1, tau: 1.27e-14}
+        - {g: 5.062054e-2, tau: 2.00e-16}
+        - {g: 6.899170e-2, tau: 1.10e-19}
+        - {g: 4.582806e-2, tau: 1.38e-22}
+        - {g: 8.606490e-2, tau: 1.62e-24}
+        - {g: 6.749405e-2, tau: 6.62e-26}
+        - {g: 7.857665e-2, tau: 1.82e-27}
+loads:
+  neumann:
+    - {type: sideset, format: name, name: pv_disc, component: 1, value: -91911.9, profile: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}}
+    - {type: sideset, format: name, name: sv_disc, component: 1, value: 919.119, profile: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: pv_pin, component: 2, value: 0}
+  - {type: sideset, format: name, name: sv_pin, component: 2, value: 0}
+obstacle:
+  backend: node_sdf
+  # Every skin node, against the fluid's boundary with the seats' holes carved in (carve_bore_sdf.py).
+  nodes: skin
+  sdf: {file: ../db/sdf_valves}
+  shift: 1e-5
+  cutoff: 1e-4
+  curvature: true
+  gap_tol: 1e-9
+  qp: {max_it: 15000, rtol: 1e-3}
+  release: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}
+regime: quasi_static
+time: {dt: 6.25e3, t_end: 1e5, max_cutbacks: 8}
+solver: {newton: {max_it: 40, verbose: true}}
+output: {fields: [gap, contact_force], probes: [{type: contact}]}

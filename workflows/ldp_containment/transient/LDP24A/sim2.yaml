@@ -1,0 +1,79 @@
+# LDP24A, simulation 2: four pump strokes (1450 rpm, 41.4 ms each) from simulation 1's state, at rest
+# and relaxed there. Each valve takes the pressure difference across it as a vertical traction on its
+# dome (PV_TOP, SV_TOP; 0.919119 p, see sim1.yaml), positive upward: below minus above, from the
+# fluid of the FSI run LDP24AT_v3 a3_pp (one stroke at 1 bar, repeated; valve_pressure.py, which
+# keeps the pressure valve's preload from simulation 1 fading over each stroke's first 3 ms, as the
+# FSI). Free bodies: the seats and the retention plates alone hold them. Read from <case>/<run folder>.
+execution_space: host
+mesh:
+  path: ../db/solid
+  blocks: [PRESSURE_VALVE, SUCTION_VALVE]
+  sidesets:
+    - {name: pv_disc, file: ../db/solid/sidesets/PV_TOP}
+    - {name: sv_disc, file: ../db/solid/sidesets/SV_TOP}
+material:
+  # As FF200's (FF200_ExodusMesh/sim1.yaml): 70 EPDM 281, fitted (single_element/fit_series.py).
+  type: GeneratedMooneyRivlinProny
+  C10: 9.338236e7
+  C01: 3.735294e8
+  K: 9.027840e6
+  relaxation:
+    iso:
+      prony:
+        - {g: 6.954807e-4, tau: 1.29e+01}
+        - {g: 3.012002e-4, tau: 1.53e-01}
+        - {g: 2.802263e-3, tau: 9.89e-04}
+        - {g: 6.080455e-3, tau: 1.18e-06}
+        - {g: 6.729436e-2, tau: 8.51e-09}
+        - {g: 2.216521e-1, tau: 1.42e-10}
+        - {g: 1.897022e-1, tau: 1.80e-12}
+        - {g: 1.118245e-1, tau: 1.27e-14}
+        - {g: 5.062054e-2, tau: 2.00e-16}
+        - {g: 6.899170e-2, tau: 1.10e-19}
+        - {g: 4.582806e-2, tau: 1.38e-22}
+        - {g: 8.606490e-2, tau: 1.62e-24}
+        - {g: 6.749405e-2, tau: 6.62e-26}
+        - {g: 7.857665e-2, tau: 1.82e-27}
+initial_conditions:
+  displacement:
+    components: [sim1/whole/point_data/disp_x.float64, sim1/whole/point_data/disp_y.float64,
+                 sim1/whole/point_data/disp_z.float64]
+loads:
+  neumann:
+    - {type: sideset, format: name, name: pv_disc, component: 1, value: 0.919119,
+       profile: {type: tabulated, path: pv_load.csv}}
+    - {type: sideset, format: name, name: sv_disc, component: 1, value: 0.919119,
+       profile: {type: tabulated, path: sv_load.csv}}
+obstacle:
+  backend: node_sdf
+  nodes: skin
+  sdf: {file: ../db/sdf_valves}
+  shift: 1e-5
+  cutoff: 1e-4
+  curvature: true
+  # Penetration resolved to 1 nm, 1e-4 of the shift.
+  gap_tol: 1e-9
+  # The QP to 1e-3 of the outer merit (inexact Newton), as the containment.
+  qp: {max_it: 15000, rtol: 1e-3}
+regime: dynamic
+# EPDM's density: solid only, the fluid enters by its pressure alone (the FSI's 150 = EPDM less water
+# stands for the water its fictitious domain moves with the bodies).
+dynamics: {scheme: bdf2, density: 1150, mass: lumped}
+time: {dt: 1e-4, t_end: 0.1655172, max_cutbacks: 8}
+# Where the QP meets negative curvature, Newton repeats the iteration on the tangent projected per
+# quadrature point.
+solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false, tangent_projection: on_failure},
+         linear: {storage_bytes: 4}}
+output:
+  export_freq: 1
+  # Each valve's centre and the two ends of its canopy (x), as the FSI's probes; the Prony series.
+  probes:
+    - {type: contact}
+    - {type: prony}
+    - {type: memory}
+    - {type: control_point, name: pv_centre, at: [-0.012, 0.00255, 0]}
+    - {type: control_point, name: pv_end0, at: [-0.02025, 0.00255, 0]}
+    - {type: control_point, name: pv_end1, at: [-0.00375, 0.00255, 0]}
+    - {type: control_point, name: sv_centre, at: [0.012, 0.00245, 0]}
+    - {type: control_point, name: sv_end0, at: [0.00375, 0.00245, 0]}
+    - {type: control_point, name: sv_end1, at: [0.02025, 0.00245, 0]}

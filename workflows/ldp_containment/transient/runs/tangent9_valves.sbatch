@@ -6,12 +6,14 @@
 #SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/tangent9_%j.out
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
-# The tangent x Prony history campaign of the LDP paper: FF200 simulation 2 (four strokes, BDF2,
+# The tangent x Prony history campaign of the LDP paper: simulation 2 of a pump (four strokes, BDF2,
 # tangent projection on failure), one H100 with 72 cores per run, four at once. Submit with the
-# partition and time the element needs (TET4: debug; TET10: normal, --time=00:50:00):
-#   ELEMENT=TET4|TET10 RUNS="<run> ..." [SNAP="t0, t1, ..."] [SNAP_RUNS="<run> ..."]
+# partition and time the element needs (FF200 TET4: debug; TET10: normal, --time=00:50:00):
+#   [PUMP=LDP24A|FF200] ELEMENT=TET4|TET10 RUNS="<run> ..." [SNAP="t0, t1, ..."] [SNAP_RUNS="<run> ..."]
+# PUMP: LDP24A (the default; ldp_cases/LDP24A, its containment s1_s0 and s1_p2, LDP24A/sim1.sbatch)
+# or FF200 (ldp_cases/FF200_ExodusMesh, prony3_sim1 and p2_sim1). TET10 reads db/solid_p2.
 # A run is <tangent>__<history>[_p<P>][_plain][_s32]_<repeat>, its folder
-# $CASE/tp9_{s0|p2}_<run>:
+# $CASE/<PREFIX>_<run>, PREFIX la_{s0|p2} (LDP24A) or tp9_{s0|p2} (FF200):
 #   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16 (stored: bsr f16), em32, em16, em8p
 #            (element_matrix f32/f16/i8pair), pt32, pt16, pt8md (points f32/f16/i8md); -np: the
 #            tangent projection off
@@ -27,13 +29,14 @@
 set -u
 SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
-CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 T=$SRC/workflows/ldp_containment/transient
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
-case ${ELEMENT:-TET4} in
-  TET4) SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; MESH="" ;;
-  TET10) SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; MESH="--set mesh.path=../db/solid_p2" ;;
-  *) echo "unknown ELEMENT ${ELEMENT}"; exit 1 ;;
+case ${PUMP:-LDP24A}/${ELEMENT:-TET4} in
+  LDP24A/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A; SIM1=$CASE/s1_s0/sim1; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
+  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A; SIM1=$CASE/s1_p2/sim1; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A ;;
+  FF200/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; DB=solid; FILES=FF200_ExodusMesh ;;
+  FF200/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; DB=solid_p2; FILES=FF200_ExodusMesh ;;
+  *) echo "unknown PUMP/ELEMENT ${PUMP:-LDP24A}/${ELEMENT:-TET4}"; exit 1 ;;
 esac
 I="--set solver.linear.format=INEXACT --set solver.linear.inexact.store"
 E="--set solver.linear.inexact.encoding"
@@ -78,13 +81,19 @@ go() {  # <run>
   W=$CASE/${PREFIX}_$run
   [ -e "$W" ] && { echo "$run: $W exists; give a new PREFIX"; return; }
   mkdir -p "$W"; cd "$W"
-  ln -s "$SIM1" sim1; cp "$T/fp70_membrane_pressure.csv" .; cp "$T/FF200_ExodusMesh/sim2.yaml" .
+  ln -s "$SIM1" sim1
+  case ${PUMP:-LDP24A} in
+    LDP24A) cp "$T/LDP24A/pv_load.csv" "$T/LDP24A/sv_load.csv" . ;;
+    FF200) cp "$T/fp70_membrane_pressure.csv" . ;;
+  esac
+  # The case file reads db/solid (mesh and side-set files); TET10 reads db/solid_p2.
+  sed "s#\.\./db/solid/#../db/$DB/#g; s#path: \.\./db/solid\$#path: ../db/$DB#" "$T/$FILES/sim2.yaml" > sim2.yaml
   # The block from initial_conditions: to the next top-level key, in this run's copy.
   [ "${NO_IC:-0}" = 1 ] && sed -i '/^initial_conditions:/,/^[a-z]/{/^initial_conditions:/d;/^[a-z]/!d}' sim2.yaml
   start=$(date +%s.%N)
   # shellcheck disable=SC2086
   SMESH_TRACE_FILE=$W/smesh.trace.csv srun --exact -n 1 -c 72 --gpus-per-task=1 "$PLAYGROUND" sim2.yaml \
-      --set execution_space=device $MESH $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
+      --set execution_space=device $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
       --set output.path=sim2 --set output.history_csv=sim2/history.csv > run.log 2>&1
   local rc=$?
   echo "$ELEMENT $run rc=$rc wall=$(echo "$(date +%s.%N) - $start" | bc)s steps=$(grep -cE '^step .*converged' run.log)" \
