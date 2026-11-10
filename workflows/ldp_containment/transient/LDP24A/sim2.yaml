@@ -12,7 +12,7 @@ mesh:
     - {name: pv_disc, file: ../db/solid/sidesets/PV_TOP}
     - {name: sv_disc, file: ../db/solid/sidesets/SV_TOP}
 material:
-  # As FF200's (FF200_ExodusMesh/sim1.yaml): 70 EPDM 281, fitted (single_element/fit_series.py).
+  # As in sim1.yaml.
   type: GeneratedMooneyRivlinProny
   C10: 9.338236e7
   C01: 3.735294e8

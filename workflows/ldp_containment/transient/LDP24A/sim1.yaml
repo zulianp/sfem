@@ -17,7 +17,13 @@ mesh:
     - {name: pv_pin, file: ../db/solid/sidesets/PV_PIN}
     - {name: sv_pin, file: ../db/solid/sidesets/SV_PIN}
 material:
-  # As FF200's (FF200_ExodusMesh/sim1.yaml): 70 EPDM 281, fitted (single_element/fit_series.py).
+  # EPDM: the relaxation times of the broadband series of Felhos et al., eXPRESS Polymer Letters 2(3)
+  # 157-164 (2008), with C01 / C10 = 4; the relaxed shear modulus and the four slowest terms' weights
+  # fitted to 70 EPDM 281 (least squares to its uniaxial, equibiaxial and planar tests and its storage
+  # and loss moduli at 30 C, 0.1-10 Hz; workflows/ldp_containment/single_element/fit_series.py), the
+  # other terms' absolute weights kept, and the slowest term (1610 s), left a weight of 1.6e-9,
+  # dropped: g_inf = 0.002072, mu_inf = 2 g_inf (C10 + C01) = 1.934 MPa, relaxed small-strain E
+  # 5.416 MPa, nu 0.4; K = E / (3 (1 - 2 nu)), not relaxed.
   type: GeneratedMooneyRivlinProny
   C10: 9.338236e7
   C01: 3.735294e8

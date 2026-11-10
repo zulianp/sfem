@@ -26,7 +26,7 @@ import yaml
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
-SIM2 = ROOT / "workflows/ldp_containment/transient/FF200_ExodusMesh/sim2.yaml"
+SIM2 = ROOT / "workflows/ldp_containment/transient/LDP24A/sim2.yaml"
 
 
 def material(terms):
