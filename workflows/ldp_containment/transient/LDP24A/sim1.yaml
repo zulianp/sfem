@@ -62,7 +62,10 @@ obstacle:
   cutoff: 1e-4
   curvature: true
   gap_tol: 1e-9
-  qp: {max_it: 15000, rtol: 1e-3}
+  # TET10's QP takes up to 40,517 iterations here (the Jacobi-scaled MPRGP on the quasi-static
+  # tangent, no inertia): at 15,000 every Newton step fell back to a shifted tangent, and Newton,
+  # linear on it, did not converge. TET4's take fewer than 15,000: the limit leaves them unchanged.
+  qp: {max_it: 60000, rtol: 1e-3}
   release: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}
 regime: quasi_static
 time: {dt: 6.25e3, t_end: 1e5, max_cutbacks: 8}
