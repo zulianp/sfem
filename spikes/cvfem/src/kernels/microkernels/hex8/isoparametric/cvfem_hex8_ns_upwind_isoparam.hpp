@@ -13,6 +13,45 @@
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 
 
+// Reconstruct at the mapped SCS point, not with an affine edge approximation.
+// Each node touches one SCS per reference direction. Gradients are physical.
+template <int W, bool WithScale = false, typename T>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_defcor_isoparam_increments(
+        T *g, const T *x, const T *y, const T *z, T *scale = nullptr) {
+    T inc[72 * W];
+    if constexpr (WithScale)
+        for (int k = 0; k < 24 * W; ++k) scale[k] = 0;
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        for (int side = 0; side < 2; ++side) {
+            const int a = side ? CVFEM_HEX8_SCS[s].j : CVFEM_HEX8_SCS[s].i;
+            for (int c = 0; c < 3; ++c) {
+#pragma omp simd
+                for (int lane = 0; lane < W; ++lane) {
+                    T dx = 0, dy = 0, dz = 0;
+                    for (int b = 0; b < 8; ++b) {
+                        const T w = T(CVFEM_HEX8_SCS_N[s][b]);
+                        // Differences avoid cancellation from a translated mesh origin.
+                        dx += w * (x[b * W + lane] - x[a * W + lane]);
+                        dy += w * (y[b * W + lane] - y[a * W + lane]);
+                        dz += w * (z[b * W + lane] - z[a * W + lane]);
+                    }
+                    const int k = (a * 9 + c * 3) * W + lane;
+                    const T tx = g[k] * dx, ty = g[k + W] * dy, tz = g[k + 2 * W] * dz;
+                    inc[k + (s >> 2) * W] = tx + ty + tz;
+                    if constexpr (WithScale) {
+                        const auto mag = [](T v) { return v < 0 ? -v : v; };
+                        const T bound = mag(tx) + mag(ty) + mag(tz);
+                        T &v = scale[(a * 3 + c) * W + lane];
+                        if (bound > v) v = bound;
+                    }
+                }
+            }
+        }
+    }
+    for (int k = 0; k < 72 * W; ++k) g[k] = inc[k];
+}
+
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_isoparam(const scalar_t                        rho,
                                                               const scalar_t                        mu,
@@ -25,8 +64,11 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_isoparam(
                                                               const scalar_t *const SFEM_RESTRICT   p,
                                                               scalar_t *const SFEM_RESTRICT         r,
                                                               const Hex8RhieChowT<scalar_t>        &rc = {},
-                                                              const scalar_t ueps = scalar_t(0)) {
+                                                              const scalar_t ueps = scalar_t(0),
+                                                              scalar_t *ugrad = nullptr) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+
+    if (ugrad) cvfem_hex8_defcor_isoparam_increments<1>(ugrad, x, y, z);
 
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
         scalar_t dN[CVFEM_HEX8_N_NODES][3];
@@ -66,6 +108,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_isoparam(
         const scalar_t mdot_rc = cvfem_hex8_rhie_chow_mdotc(rho, mu, rc, i, j, ax, ay, az, p[i], p[j]);
         cvfem_hex8_scs_convection(rho, ux[i], ux[j], uy[i], uy[j], uz[i], uz[j], p[i], p[j], ax, ay, az, fx, fy, fz, mdot,
                                   mdot_rc, ueps);
+        if (ugrad) {
+            scalar_t amdot, sign, cx, cy, cz;
+            cvfem_upwind_abs(mdot, ueps, amdot, sign);
+            cvfem_hex8_scs_defcor<1, 3, false>(ugrad, ux, uy, uz, s >> 2, i, j,
+                scalar_t(.5) * (mdot + amdot), scalar_t(.5) * (mdot - amdot),
+                scalar_t(0), nullptr, 0, cx, cy, cz);
+            fx += cx; fy += cy; fz += cz;
+        }
         fx -= tau_x;
         fy -= tau_y;
         fz -= tau_z;
@@ -97,9 +147,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action_is
                                                                      scalar_t *const SFEM_RESTRICT         r,
                                                                      const Hex8RhieChowT<scalar_t>        &rc = {},
                                                                      const scalar_t *const SFEM_RESTRICT   p  = nullptr,
-                                                                     const scalar_t ueps = scalar_t(0)) {
+                                                                     const scalar_t ueps = scalar_t(0),
+                                                                     scalar_t *ugrad = nullptr, scalar_t *vgrad = nullptr) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
+    scalar_t scale[24];
+    if (ugrad && vgrad) {
+        cvfem_hex8_defcor_isoparam_increments<1, true>(ugrad, x, y, z, scale);
+        cvfem_hex8_defcor_isoparam_increments<1>(vgrad, x, y, z);
+    }
     const scalar_t half = scalar_t(0.5);
     const scalar_t one  = scalar_t(1);
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
@@ -160,9 +216,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action_is
         const scalar_t dpos  = d_pos * dmdot;
         const scalar_t dneg  = d_neg * dmdot;
         const scalar_t qmid  = half * (q[i] + q[j]);
-        const scalar_t fx    = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
-        const scalar_t fy    = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
-        const scalar_t fz    = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        scalar_t fx    = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
+        scalar_t fy    = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
+        scalar_t fz    = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        if (ugrad && vgrad) {
+            scalar_t cx, cy, cz;
+            cvfem_hex8_scs_defcor_jv<1, 3>(ugrad, vgrad, ux, uy, uz, vx, vy, vz,
+                s >> 2, i, j, mpos, mneg, dpos, dneg, scalar_t(0), scale, 0, cx, cy, cz);
+            fx += cx; fy += cy; fz += cz;
+        }
         r[i * 4 + 0] += fx;
         r[i * 4 + 1] += fy;
         r[i * 4 + 2] += fz;
@@ -289,18 +351,60 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots
     }
 }
 
+// Use the same face coefficient and its velocity derivative as the scalar path.
+template <bool Action, typename T>
+static SFEM_INLINE void cvfem_hex8_isoparam_rc_flux(
+        const T rho, const T mu, const Hex8CoordPackT<T> &xyz,
+        const Hex8InputPackT<T> &u, const Hex8InputPackT<T> &du,
+        const Hex8RhieChowPackT<T> &rc, const T scale, const bool with_qg,
+        const int i, const int j, const int lane, const T ax, const T ay, const T az,
+        T &flux, T &dflux) {
+    const T half = T(0.5);
+    const T dx = xyz.x[j][lane] - xyz.x[i][lane];
+    const T dy = xyz.y[j][lane] - xyz.y[i][lane];
+    const T dz = xyz.z[j][lane] - xyz.z[i][lane];
+    const T ux = half * (u.ux[i][lane] + u.ux[j][lane]);
+    const T uy = half * (u.uy[i][lane] + u.uy[j][lane]);
+    const T uz = half * (u.uz[i][lane] + u.uz[j][lane]);
+    const T coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, scale, dx, dy, dz,
+        ax, ay, az, rc.tau.u2_scale * (ux*ux + uy*uy + uz*uz), rc.tau.inv_dt_a0);
+    flux = dflux = T(0);
+    if (coeff == T(0)) return;
+    const T corr = (u.p[j][lane] - u.p[i][lane]) - half *
+        ((rc.pgx[i][lane] + rc.pgx[j][lane]) * dx +
+         (rc.pgy[i][lane] + rc.pgy[j][lane]) * dy +
+         (rc.pgz[i][lane] + rc.pgz[j][lane]) * dz);
+    flux = -coeff * corr;
+    if constexpr (Action) {
+        T qcorr = du.p[j][lane] - du.p[i][lane];
+        if (with_qg) qcorr -= half *
+            ((rc.qgx[i][lane] + rc.qgx[j][lane]) * dx +
+             (rc.qgy[i][lane] + rc.qgy[j][lane]) * dy +
+             (rc.qgz[i][lane] + rc.qgz[j][lane]) * dz);
+        const T w = cvfem_hex8_rhie_chow_du_weight(scale, ax*ax + ay*ay + az*az,
+            ax*dx + ay*dy + az*dz, dx*dx + dy*dy + dz*dz, rc.tau.u2_scale);
+        const T udotv = half * (ux * (du.ux[i][lane] + du.ux[j][lane]) +
+            uy * (du.uy[i][lane] + du.uy[j][lane]) + uz * (du.uz[i][lane] + du.uz[j][lane]));
+        dflux = -coeff * qcorr + cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr * udotv;
+    }
+}
+
 template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar_t      rho_s,
                                                                    const scalar_t      mu_s,
                                                                    const Hex8CoordPackT<scalar_t> &xyz,
                                                                    const Hex8InputPackT<scalar_t> &in,
                                                                    Hex8ResidualPackT<scalar_t>    &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0),
+        Hex8UGradPackT<scalar_t> *ho = nullptr) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
     const scalar_t qtr  = scalar_t(0.25);
 
+    if (ho) cvfem_hex8_defcor_isoparam_increments<cvfem_hex8_vec_size<scalar_t>>(
+        &ho->g[0][0][0], &xyz.x[0][0], &xyz.y[0][0], &xyz.z[0][0]);
     cvfem_hex8_zero_residual_pack(out);
 
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
@@ -373,15 +477,25 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
             const scalar_t adv_x = half * (in.ux[i][lane] + in.ux[j][lane]);
             const scalar_t adv_y = half * (in.uy[i][lane] + in.uy[j][lane]);
             const scalar_t adv_z = half * (in.uz[i][lane] + in.uz[j][lane]);
-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+            scalar_t rc_flux = 0, unused = 0;
+            if (rc) cvfem_hex8_isoparam_rc_flux<false>(rho, mu, xyz, in, in, *rc,
+                rc_scale, false, i, j, lane, ax, ay, az, rc_flux, unused);
+            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
             scalar_t amdot, sgn;
             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
             const scalar_t mpos  = half * (mdot + amdot);
             const scalar_t mneg  = half * (mdot - amdot);
             const scalar_t pmid  = half * (in.p[i][lane] + in.p[j][lane]);
-            const scalar_t fx    = mpos * in.ux[i][lane] + mneg * in.ux[j][lane] + pmid * ax - tau_x;
-            const scalar_t fy    = mpos * in.uy[i][lane] + mneg * in.uy[j][lane] + pmid * ay - tau_y;
-            const scalar_t fz    = mpos * in.uz[i][lane] + mneg * in.uz[j][lane] + pmid * az - tau_z;
+            scalar_t fx    = mpos * in.ux[i][lane] + mneg * in.ux[j][lane] + pmid * ax - tau_x;
+            scalar_t fy    = mpos * in.uy[i][lane] + mneg * in.uy[j][lane] + pmid * ay - tau_y;
+            scalar_t fz    = mpos * in.uz[i][lane] + mneg * in.uz[j][lane] + pmid * az - tau_z;
+            if (ho) {
+                scalar_t cx, cy, cz;
+                cvfem_hex8_scs_defcor<cvfem_hex8_vec_size<scalar_t>, 3, false>(
+                    &ho->g[0][0][0], &in.ux[0][0], &in.uy[0][0], &in.uz[0][0],
+                    d, i, j, mpos, mneg, scalar_t(0), nullptr, lane, cx, cy, cz);
+                fx += cx; fy += cy; fz += cz;
+            }
             out.rx[i][lane] += fx;
             out.ry[i][lane] += fy;
             out.rz[i][lane] += fz;
@@ -401,13 +515,23 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
                                                                           const Hex8InputPackT<scalar_t> &u,
                                                                           const Hex8InputPackT<scalar_t> &du,
                                                                           Hex8ResidualPackT<scalar_t>    &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+        const Hex8RhieChowPackT<scalar_t> *rc = nullptr, const scalar_t rc_scale = scalar_t(0),
+        const bool with_qg = false,
+        Hex8UGradPackT<scalar_t> *ho = nullptr, Hex8UGradPackT<scalar_t> *hv = nullptr) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
     const scalar_t one  = scalar_t(1);
     const scalar_t qtr  = scalar_t(0.25);
 
+    scalar_t scale[24 * cvfem_hex8_vec_size<scalar_t>];
+    if (ho && hv) {
+        cvfem_hex8_defcor_isoparam_increments<cvfem_hex8_vec_size<scalar_t>, true>(
+            &ho->g[0][0][0], &xyz.x[0][0], &xyz.y[0][0], &xyz.z[0][0], scale);
+        cvfem_hex8_defcor_isoparam_increments<cvfem_hex8_vec_size<scalar_t>>(
+            &hv->g[0][0][0], &xyz.x[0][0], &xyz.y[0][0], &xyz.z[0][0]);
+    }
     cvfem_hex8_zero_residual_pack(out);
 
     for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
@@ -477,7 +601,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
             const scalar_t adv_x = half * (u.ux[i][lane] + u.ux[j][lane]);
             const scalar_t adv_y = half * (u.uy[i][lane] + u.uy[j][lane]);
             const scalar_t adv_z = half * (u.uz[i][lane] + u.uz[j][lane]);
-            const scalar_t mdot  = rho * (adv_x * ax + adv_y * ay + adv_z * az);
+            scalar_t rc_flux = 0, rc_dflux = 0;
+            if (rc) cvfem_hex8_isoparam_rc_flux<true>(rho, mu, xyz, u, du, *rc,
+                rc_scale, with_qg, i, j, lane, ax, ay, az, rc_flux, rc_dflux);
+            const scalar_t mdot = rho * (adv_x * ax + adv_y * ay + adv_z * az) + rc_flux;
             scalar_t amdot, sgn;
             cvfem_upwind_abs(mdot, ueps, amdot, sgn);
             const scalar_t mpos  = half * (mdot + amdot);
@@ -486,19 +613,27 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
             const scalar_t d_neg = half * (one - sgn);
             const scalar_t dmdot = rho * half *
                                    ((du.ux[i][lane] + du.ux[j][lane]) * ax + (du.uy[i][lane] + du.uy[j][lane]) * ay +
-                                    (du.uz[i][lane] + du.uz[j][lane]) * az);
+                                    (du.uz[i][lane] + du.uz[j][lane]) * az) + rc_dflux;
             const scalar_t dpos = d_pos * dmdot;
             const scalar_t dneg = d_neg * dmdot;
             const scalar_t qmid = half * (du.p[i][lane] + du.p[j][lane]);
-            const scalar_t fx =
+            scalar_t fx =
                     dpos * u.ux[i][lane] + mpos * du.ux[i][lane] + dneg * u.ux[j][lane] + mneg * du.ux[j][lane] + qmid * ax -
                     tx;
-            const scalar_t fy =
+            scalar_t fy =
                     dpos * u.uy[i][lane] + mpos * du.uy[i][lane] + dneg * u.uy[j][lane] + mneg * du.uy[j][lane] + qmid * ay -
                     ty;
-            const scalar_t fz =
+            scalar_t fz =
                     dpos * u.uz[i][lane] + mpos * du.uz[i][lane] + dneg * u.uz[j][lane] + mneg * du.uz[j][lane] + qmid * az -
                     tz;
+            if (ho && hv) {
+                scalar_t cx, cy, cz;
+                cvfem_hex8_scs_defcor_jv<cvfem_hex8_vec_size<scalar_t>, 3>(
+                    &ho->g[0][0][0], &hv->g[0][0][0], &u.ux[0][0], &u.uy[0][0], &u.uz[0][0],
+                    &du.ux[0][0], &du.uy[0][0], &du.uz[0][0], d, i, j,
+                    mpos, mneg, dpos, dneg, scalar_t(0), scale, lane, cx, cy, cz);
+                fx += cx; fy += cy; fz += cz;
+            }
             out.rx[i][lane] += fx;
             out.ry[i][lane] += fy;
             out.rz[i][lane] += fz;
