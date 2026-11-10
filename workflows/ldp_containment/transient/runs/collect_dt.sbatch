@@ -8,20 +8,22 @@
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
 # The step-size study of the strokes on TET4 (tangent9_valves.sbatch with EXTRA="--set time.dt=<dt>
-# --set output.export_freq=<0.1 ms / dt>", PREFIX dt<us>_s0; dt 100 us is the campaign's tp10_s0):
+# --set output.export_freq=<0.1 ms / dt>", PREFIX dt<us>_s0; dt 100 us is the campaign's tp10_s0;
+# below 0.313 us the sixth term stores a tensor):
 # per step, the reference twice (bsr32__full_a, _b) and t* with int16 remainders and float32 slots.
 # Into OUT (a new folder; the script stops if it exists): every run against the finest step's
 # reference (set dt_TET4), every run of a step against that step's reference (sets dt_own_<us>:
 # the repeat's floor and each storage's error at that step), and the valve events of every run.
 # Runs a step lacks are left out.
 # MESH names the folders' mesh part, s0 (TET4) or p2 (TET10).
-#   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025"] [MESH=s0] [OUT=runs/paper_dt_<finest tag>]
+#   [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625"] [MESH=s0]
+#   [OUT=runs/paper_dt_<finest tag>]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=$D/dev/wip/ldp_containment/python/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
-TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025}
+TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625}
 MESH=${MESH:-s0}
 SET=dt_TET4; [ $MESH = p2 ] && SET=dt_TET10
 finest=${TAGS##* }

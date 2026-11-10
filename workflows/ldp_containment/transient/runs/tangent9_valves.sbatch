@@ -22,7 +22,8 @@
 # options for every run (a smoke run: EXTRA="--set time.t_end=3e-4"). PREFIX names the folders
 # instead of tp9_{s0|p2}, PLAYGROUND another build's binary (an A/B gate, qp_window.sbatch). NO_IC=1
 # starts from rest: the run's copy of sim2.yaml loses its initial_conditions (simulation 1's state
-# lives on the original mesh; the storage at scale, scale_mesh.sbatch, needs none).
+# lives on the original mesh; the storage at scale, scale_mesh.sbatch, needs none). A run whose
+# folder exists is skipped: nothing is overwritten.
 set -u
 SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
@@ -75,7 +76,8 @@ go() {  # <run>
   hargs=$(history_args "$history") || { echo "$run: unknown history $history"; return; }
   case " ${SNAP_RUNS:-} " in *" $run "*) snap=(--set "output.history_snapshots={times: [${SNAP}]}") ;; esac
   W=$CASE/${PREFIX}_$run
-  rm -rf "$W"; mkdir -p "$W"; cd "$W"
+  [ -e "$W" ] && { echo "$run: $W exists; give a new PREFIX"; return; }
+  mkdir -p "$W"; cd "$W"
   ln -s "$SIM1" sim1; cp "$T/fp70_membrane_pressure.csv" .; cp "$T/FF200_ExodusMesh/sim2.yaml" .
   # The block from initial_conditions: to the next top-level key, in this run's copy.
   [ "${NO_IC:-0}" = 1 ] && sed -i '/^initial_conditions:/,/^[a-z]/{/^initial_conditions:/d;/^[a-z]/!d}' sim2.yaml
