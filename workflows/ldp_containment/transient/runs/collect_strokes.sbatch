@@ -13,5 +13,5 @@
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 OUT=${OUT:-$D/runs/paper_strokes10}
-$D/venv/bin/python $D/dev/wip/ldp_containment/python/collect_transient.py $OUT || exit 1
+$D/venv/bin/python ${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_transient.py $OUT || exit 1
 wc -l $OUT/*.csv

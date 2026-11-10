@@ -15,7 +15,7 @@
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
-COL=$D/dev/wip/ldp_containment/python/collect_prony.py
+COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 P=${OUT:-$D/runs/paper_scale}
 [ -e $P ] && { echo "collect_scale: $P exists; give a new OUT"; exit 1; }

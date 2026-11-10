@@ -21,7 +21,7 @@
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
-COL=$D/dev/wip/ldp_containment/python/collect_prony.py
+COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625}
 MESH=${MESH:-s0}

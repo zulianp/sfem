@@ -17,7 +17,8 @@
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
-PAPER=$D/dev/wip/ldp_containment/python
+# The paper's collectors (the paper lives in the private repository xsesfsi_papers, ldp_containment).
+PAPER=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}
 COL=$PAPER/collect_prony.py
 CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
 TAG=${TAG:-tp9}

@@ -35,7 +35,7 @@ go float16_md float16_md &
 wait
 P=$D/runs/paper_strip; mkdir -p $P
 rm -f $P/strip_tolerance_runs.csv $P/strip_tolerance_series.csv
-$D/venv/bin/python $D/dev/wip/ldp_containment/python/collect_prony.py runs $P/strip_tolerance_runs.csv $P/strip_tolerance_series.csv \
+$D/venv/bin/python ${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py runs $P/strip_tolerance_runs.csv $P/strip_tolerance_series.csv \
     strip_tolerance $OUT full_a_tight full_a full_b int16_scaled int16_scaled_tight float16_md float16_md_tight --sub results \
     > $P/strip_tolerance.log 2>&1
 echo "collect rc=$?"

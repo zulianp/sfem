@@ -7,7 +7,7 @@ Writes into <out> (a new folder; stops if it exists) uniaxial.csv, equibiax.csv,
 (t in s, engineering strain, engineering stress in MPa: the "Measurement" columns) and dma.csv
 (frequency in Hz, temperature in C, storage and loss modulus in MPa: the "Messung" columns). The
 workbook's simulation columns are left out. The data are not ours to publish: keep <out> out of git
-(dev/wip/ldp_containment/data/private is ignored).
+(the paper's data/private, xsesfsi_papers/ldp_containment, is ignored).
 """
 
 import csv
