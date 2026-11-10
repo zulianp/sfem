@@ -2,7 +2,9 @@
 // vector is a null direction, as a free body's rigid motions are of its tangent. With a consistent
 // right-hand side the bounded problem has solutions and MPRGP finds one; a net load toward the bound
 // moves the chain along its free direction until the bound holds it, as the wall holds a free valve;
-// when the energy decreases without end along the free direction it fails, and returns no NaN.
+// when the energy decreases without end along the free direction it fails, and returns no NaN. On an
+// indefinite operator it fails at the first direction of negative curvature, bounded or not, and says
+// so: MPRGP solves convex QPs, and a contact step's caller then projects its tangent.
 
 #include <cmath>
 #include <vector>
@@ -69,11 +71,48 @@ int test_unbounded_direction_fails_cleanly() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The chain's Laplacian less 0.1 I, its lowest modes negative, in a box: every direction meets a
+// bound, so the energy is bounded, but the QP is not convex. MPRGP stops at the first direction of
+// negative curvature and reports it, rather than descending from bound to bound.
+int test_negative_curvature_is_reported() {
+    auto op = sfem::make_op<real_t>(
+            n,
+            n,
+            [](const real_t *const in, real_t *const out) {
+                laplacian(in, out);
+                for (ptrdiff_t i = 0; i < n; ++i) out[i] -= real_t(0.1) * in[i];
+            },
+            sfem::EXECUTION_SPACE_HOST);
+    auto qp    = sfem::create_mprgp(op, sfem::EXECUTION_SPACE_HOST);
+    auto lower = sfem::create_host_buffer<real_t>(n);
+    auto upper = sfem::create_host_buffer<real_t>(n);
+    std::vector<real_t> b(n), x(n, 0);
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        lower->data()[i] = real_t(-0.5);
+        upper->data()[i] = real_t(0.5);
+        b[i]             = real_t(0.01) * real_t(i % 3 - 1);
+    }
+    qp->verbose    = false;
+    qp->check_each = 1 << 30;
+    qp->set_lower_bound(lower);
+    qp->set_upper_bound(upper);
+    qp->set_max_eig(4);
+    qp->set_max_it(10 * n);
+    qp->set_rtol(1e-12);
+    qp->set_atol(1e-14);
+    SFEM_TEST_ASSERT(qp->apply(b.data(), x.data()) != SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(qp->met_negative_curvature());
+    SFEM_TEST_ASSERT(qp->iterations() < n);
+    for (const real_t v : x) SFEM_TEST_ASSERT(std::isfinite(v));
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_consistent_load_converges);
     SFEM_RUN_TEST(test_bound_holds_the_free_direction);
     SFEM_RUN_TEST(test_unbounded_direction_fails_cleanly);
+    SFEM_RUN_TEST(test_negative_curvature_is_reported);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

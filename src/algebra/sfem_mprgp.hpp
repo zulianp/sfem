@@ -426,7 +426,7 @@ namespace sfem {
                                 unbounded = true;
                                 if (team.leader())
                                     fprintf(stderr,
-                                            "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n",
+                                            "[Warning][MPRGP] Negative curvature, or none and no bound, along the search direction (%g)\n",
                                             (double)c.dAd);
                                 break;
                             }
@@ -465,7 +465,7 @@ namespace sfem {
                             if (c.move == T(MPRGPMove::UNBOUNDED)) {
                                 unbounded = true;
                                 if (team.leader())
-                                    fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                                    fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the chopped gradient\n");
                                 break;
                             }
                             n_proportioning++;
@@ -641,7 +641,7 @@ namespace sfem {
                     // it: the expansion step, at the bound. A free body's rigid motions are such
                     // directions, held only by the bounds.
                     if (c.move == T(MPRGPMove::UNBOUNDED)) {
-                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the search direction (%g)\n", (double)c.dAd);
+                        fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the search direction (%g)\n", (double)c.dAd);
                         negative_curvature_ = true;
                         break;
                     }
@@ -659,7 +659,7 @@ namespace sfem {
                     SFEM_TRACE_SCOPE("MPRGP::proportioning_step");
                     // apply_op inside!
                     if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
-                        fprintf(stderr, "[Warning][MPRGP] No positive curvature and no bound along the chopped gradient\n");
+                        fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the chopped gradient\n");
                         negative_curvature_ = true;
                         break;
                     }
