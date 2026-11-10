@@ -12,7 +12,8 @@
 # CASE/s1_s0 and CASE/s1_p2 (a run whose folder exists is skipped): the playground's output in sim1/,
 # its last state on the whole mesh in sim1/whole (smesh raw_point_data_to_parent), where the strokes
 # start. TET10 reads db/solid_p2 (mesh and side-sets). SUFFIX is appended to the folders' names, EXTRA
-# passes further options ("--set solver.newton.tangent_projection=on_failure").
+# passes further options ("--set solver.newton.max_it=60"). The job fails when a run does, so that
+# jobs depending on it (afterok) do not start.
 #   [CASE=ldp_cases/LDP24A_r100] [ELEMENTS="TET4 TET10"] [SUFFIX=] [EXTRA=]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
@@ -32,6 +33,10 @@ go() {  # <element>
   $D/venv/bin/python $D/external/smesh/python/smesh/raw_point_data_to_parent.py sim1/out sim1/mesh $CASE/db/$db sim1/whole \
       --fields=disp > map.log 2>&1
   echo "$el rc=$rc map=$? wall=$(( $(date +%s) - start ))s $(tail -1 sim1.log)"
+  return $rc
 }
-for el in ${ELEMENTS:-TET4 TET10}; do go $el & done
-wait
+pids=()
+for el in ${ELEMENTS:-TET4 TET10}; do go $el & pids+=($!); done
+fail=0
+for p in "${pids[@]}"; do wait $p || fail=1; done
+exit $fail

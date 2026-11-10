@@ -66,5 +66,7 @@ obstacle:
   release: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}
 regime: quasi_static
 time: {dt: 6.25e3, t_end: 1e5, max_cutbacks: 8}
-solver: {newton: {max_it: 40, verbose: true}}
+# The tangent projected when the contact QP meets negative curvature (as the strokes): without it
+# TET4 stops at t = 8100 s on the rounded seats, every step size's line search failing.
+solver: {newton: {max_it: 40, verbose: true, tangent_projection: on_failure}}
 output: {fields: [gap, contact_force], probes: [{type: contact}]}
