@@ -10,7 +10,7 @@
 # tangent projection on failure), one H100 with 72 cores per run, four at once. Submit with the
 # partition and time the element needs (FF200 TET4: debug; TET10: normal, --time=00:50:00):
 #   [PUMP=LDP24A|FF200] ELEMENT=TET4|TET10 RUNS="<run> ..." [SNAP="t0, t1, ..."] [SNAP_RUNS="<run> ..."]
-# PUMP: LDP24A (the default; ldp_cases/LDP24A, its containment s1_s0 and s1_p2, LDP24A/sim1.sbatch)
+# PUMP: LDP24A (the default; ldp_cases/LDP24A_r100, its containment s1_s0 and s1_p2, LDP24A/sim1.sbatch)
 # or FF200 (ldp_cases/FF200_ExodusMesh, prony3_sim1 and p2_sim1). TET10 reads db/solid_p2.
 # A run is <tangent>__<history>[_p<P>][_plain][_s32]_<repeat>, its folder
 # $CASE/<PREFIX>_<run>, PREFIX la_{s0|p2} (LDP24A) or tp9_{s0|p2} (FF200):
@@ -24,16 +24,17 @@
 # options for every run (a smoke run: EXTRA="--set time.t_end=3e-4"). PREFIX names the folders
 # instead of tp9_{s0|p2}, PLAYGROUND another build's binary (an A/B gate, qp_window.sbatch). NO_IC=1
 # starts from rest: the run's copy of sim2.yaml loses its initial_conditions (simulation 1's state
-# lives on the original mesh; the storage at scale, scale_mesh.sbatch, needs none). A run whose
-# folder exists is skipped: nothing is overwritten.
+# lives on the original mesh; the storage at scale, scale_mesh.sbatch, needs none). SIM1 starts the
+# strokes from another containment (LDP24A: a sim1.sbatch SUFFIX, e.g. $CASE/s1_s0_proj/sim1). A
+# run whose folder exists is skipped: nothing is overwritten.
 set -u
 SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
 T=$SRC/workflows/ldp_containment/transient
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
 case ${PUMP:-LDP24A}/${ELEMENT:-TET4} in
-  LDP24A/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A; SIM1=$CASE/s1_s0/sim1; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
-  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A; SIM1=$CASE/s1_p2/sim1; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A ;;
+  LDP24A/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_s0/sim1}; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
+  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_p2/sim1}; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A ;;
   FF200/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; DB=solid; FILES=FF200_ExodusMesh ;;
   FF200/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; DB=solid_p2; FILES=FF200_ExodusMesh ;;
   *) echo "unknown PUMP/ELEMENT ${PUMP:-LDP24A}/${ELEMENT:-TET4}"; exit 1 ;;

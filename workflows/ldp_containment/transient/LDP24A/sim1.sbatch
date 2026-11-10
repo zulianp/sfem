@@ -13,10 +13,10 @@
 # its last state on the whole mesh in sim1/whole (smesh raw_point_data_to_parent), where the strokes
 # start. TET10 reads db/solid_p2 (mesh and side-sets). SUFFIX is appended to the folders' names, EXTRA
 # passes further options ("--set solver.newton.tangent_projection=on_failure").
-#   [CASE=ldp_cases/LDP24A] [ELEMENTS="TET4 TET10"] [SUFFIX=] [EXTRA=]
+#   [CASE=ldp_cases/LDP24A_r100] [ELEMENTS="TET4 TET10"] [SUFFIX=] [EXTRA=]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A}
+CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100}
 T=$D/workflows/ldp_containment/transient/LDP24A
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
 go() {  # <element>

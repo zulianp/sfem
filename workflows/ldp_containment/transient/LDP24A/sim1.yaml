@@ -56,7 +56,8 @@ obstacle:
   backend: node_sdf
   # Every skin node, against the fluid's boundary with the seats' holes carved in (carve_bore_sdf.py).
   nodes: skin
-  sdf: {file: ../db/sdf_valves}
+  # Its edges rounded by 0.1 mm (prepare.sbatch, sdf_round).
+  sdf: {file: ../db/sdf_valves_r100}
   shift: 1e-5
   cutoff: 1e-4
   curvature: true

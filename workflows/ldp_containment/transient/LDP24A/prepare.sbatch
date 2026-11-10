@@ -11,13 +11,18 @@
 # their obstacle from the FSI's case LDP24AT_v3 (db/solid: TET4, sfc order, with the side-sets PV_TOP,
 # SV_TOP, PV_PIN, SV_PIN; db/sdf_valves), copied; db/solid_p2: db/solid promoted to TET10 (smesh
 # mesh_promote) and put in sfc order (smesh sfc), as the FF200 cases' prepare.sh; db/solid_r1:
-# db/solid refined once (smesh refine, every element into eight). Prints the nodes and elements.
-#   [CASE=ldp_cases/LDP24A] [SRC=ldp_cases/LDP24AT_v3]
+# db/solid refined once (smesh refine, every element into eight); db/sdf_valves_r100: the obstacle
+# with its edges rounded by 0.1 mm, convex and concave, and the exact distance to the result (ssdf
+# sdf_round, a build of ssdf's sdf-round branch: SSDF). The case files read db/sdf_valves_r100: the
+# seats' edges as cut are half a cell sharp, and the strokes failed where the valves slam onto them.
+# Prints the nodes and elements.
+#   [CASE=ldp_cases/LDP24A_r100] [SRC=ldp_cases/LDP24AT_v3] [SSDF=<ssdf build>]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 SMESH=$D/build-cuda/external/smesh
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A}
+CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100}
 SRC=${SRC:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24AT_v3}
+SSDF=${SSDF:-/ritom/scratch/cscs/zulianp/ssdf-round-build-4}
 [ -e $CASE ] && { echo "prepare: $CASE exists"; exit 1; }
 mkdir -p $CASE/db
 cp -r $SRC/db/solid $SRC/db/sdf_valves $CASE/db/ || exit 1
@@ -26,6 +31,8 @@ export OMP_NUM_THREADS=72
 srun -n 1 -c 72 $SMESH/mesh_promote TET10 solid solid_p2_promoted > promote.log 2>&1 || { echo "prepare: mesh_promote failed"; exit 1; }
 srun -n 1 -c 72 $SMESH/sfc solid_p2_promoted solid_p2 > sfc.log 2>&1 || { echo "prepare: sfc failed"; exit 1; }
 SMESH_REFINEMENT_LEVELS=1 srun -n 1 -c 72 $D/build-x28/external/smesh/refine solid solid_r1 > refine.log 2>&1 || { echo "prepare: refine failed"; exit 1; }
+srun -n 1 -c 72 $SSDF/bin/sdf_round sdf_valves 1e-4 sdf_valves_r100 > round.log 2>&1 || { echo "prepare: sdf_round failed"; exit 1; }
+grep "^sdf_round" round.log
 for m in solid solid_p2 solid_r1; do
   echo "$m nodes $(( $(stat -c %s $m/x.float32) / 4 )) sidesets: $(ls $m/sidesets 2>/dev/null | tr '\n' ' ')"
   for b in $m/blocks/*/; do echo "  $(basename $b) elements $(( $(stat -c %s $b/i0.int32) / 4 ))"; done
