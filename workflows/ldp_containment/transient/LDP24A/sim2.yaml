@@ -61,8 +61,9 @@ regime: dynamic
 dynamics: {scheme: bdf2, density: 1150, mass: lumped}
 time: {dt: 1e-4, t_end: 0.1655172, max_cutbacks: 8}
 # Where the QP meets negative curvature, Newton repeats the iteration on the tangent projected per
-# quadrature point.
-solver: {newton: {max_it: 20, atol: 1e-6, rtol: 0, verbose: false, tangent_projection: on_failure},
+# quadrature point. 40 iterations: the projected tangent converges linearly at the valves' slams
+# (the FSI's pressure pulses as they close); 20 left 158-229 failed attempts per run, 40 a seventh.
+solver: {newton: {max_it: 40, atol: 1e-6, rtol: 0, verbose: false, tangent_projection: on_failure},
          linear: {storage_bytes: 4}}
 output:
   export_freq: 1
