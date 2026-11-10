@@ -36,7 +36,7 @@ PLANES = [("pull_x", "x", "max"), ("pull_y", "y", "max"), ("top_y", "y", "max"),
           ("sym_x", "x", "min"), ("sym_y", "y", "min"), ("sym_z", "z", "min")]
 
 
-def case(mesh, test, terms, t_end, steps):
+def case(mesh, test, mat, t_end, steps):
     pulled, held = TESTS[test]
     used = set(pulled) | {n for n, _ in held}
     # Condition 0 is the pulled x face: its reaction is the force.
@@ -46,7 +46,7 @@ def case(mesh, test, terms, t_end, steps):
     return {
         "mesh": {"path": str(mesh), "packed": False,
                  "sidesets": [{"name": n, "plane": {"axis": a, "at": w}} for n, a, w in PLANES if n in used]},
-        "material": material(terms),
+        "material": mat,
         "dirichlet_conditions": dirichlet,
         "regime": "quasi_static",
         "time": {"dt": t_end / steps, "steps": steps, "max_cutbacks": 8},
@@ -57,13 +57,14 @@ def case(mesh, test, terms, t_end, steps):
     }
 
 
-def run(playground, root, mesh, test, terms, history, steps):
+def run(playground, root, mesh, test, terms, history, steps, mat=None):
+    """One test; `mat` replaces the series cut to `terms` (stress_strain.material) when given."""
     w = root / ("%s_k%02d" % (test, terms))
     w.mkdir()
     # The unit cube's displacement is the engineering strain.
     (w / "profile.csv").write_text("".join("%.10g, %.10g\n" % (t, e) for t, e in history))
     t_end = history[-1][0]
-    (w / "case.yaml").write_text(yaml.safe_dump(case(mesh, test, terms, t_end, steps), sort_keys=False))
+    (w / "case.yaml").write_text(yaml.safe_dump(case(mesh, test, mat or material(terms), t_end, steps), sort_keys=False))
     with open(w / "run.log", "w") as log:
         rc = subprocess.run([str(playground), "case.yaml", "--set", "execution_space=host"], cwd=w,
                             env=dict(os.environ, OMP_NUM_THREADS="1"), stdout=log, stderr=subprocess.STDOUT).returncode
