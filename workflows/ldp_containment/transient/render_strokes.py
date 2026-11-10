@@ -2,7 +2,7 @@
 
 usage: pvbatch render_strokes.py <sim2 folder> <frames folder> [--every=N] [--size=W,H]
                                   [--first=K] [--count=M] [--frames=K1,K2,...] [--panels] [--sdf=folder]
-                                  [--history=file]
+                                  [--history=file] [--pump=FF200|LDP24A] [--load-factor=f]
 
 Reads the run's raw output -- the valve mesh (<sim2>/mesh: x, y, z and blocks/<name>/i0..i3, TET4),
 every exported step (<sim2>/out/disp.<d>.<step>.float64, time.txt) and the obstacle's grid
@@ -26,6 +26,9 @@ process per range (the EGL driver of the Alps nodes, 595.91.07, aborts a process
 Encode them with ffmpeg, e.g.
 ffmpeg -framerate 30 -i %05d.png -c:v libx264 -pix_fmt yuv420p strokes.mp4.
 
+--pump sets the views and the colour range for the pump's geometry (default FF200). LDP24A has no
+chamber pressure; its chart shows the valves' tabulated loads (<sim2>/../pv_load.csv, sv_load.csv)
+times --load-factor (the case's value, 0.919119) instead, and the overview their values.
 --history reads the charts' history from another file than <sim2>/history.csv. --sdf reads the
 obstacle's grid from another folder (a run before the fix of the playground's
 output wrote only rank 0's part of it). --frames renders the listed frames instead of a range. --panels writes each view on its own,
@@ -65,8 +68,16 @@ from paraview.simple import (
 )
 from vtk.util import numpy_support
 
-# The valves and their centres in x (m), where each section is centred.
-VALVES = (("pressure valve", -0.011), ("suction valve", 0.011))
+# Per pump (--pump): the valves' centres in x (m), where each section is centred; the sections'
+# height and half-height, the top view's half-height and the overview's distance (m); the colour
+# range of u_y (mm).
+PUMPS = {
+    "FF200": {"valves": (("pressure valve", -0.011), ("suction valve", 0.011)), "section_y": -0.0008,
+              "section_scale": 0.0055, "top_scale": 0.0145, "distance": 0.065, "range": (-1.4, 1.1)},
+    "LDP24A": {"valves": (("pressure valve", -0.012), ("suction valve", 0.012)), "section_y": 0.0025,
+               "section_scale": 0.009, "top_scale": 0.019, "distance": 0.08, "range": (-2.2, 2.2)},
+}
+VALVES = PUMPS["FF200"]["valves"]
 
 
 def read(path_glob, dtype):
@@ -149,10 +160,11 @@ def history(path):
 
 
 def prony_legend(sim):
-    """{column: tau} from the probe's lines in the run's log."""
+    """{column: tau} from the probe's lines in the run's log (<sim2>/run.log or <sim2>/../run.log, where
+    tangent9_valves.sbatch writes it)."""
     legend = {}
-    log = os.path.join(sim, "run.log")
-    if os.path.isfile(log):
+    logs = [p for p in (os.path.join(sim, "run.log"), os.path.join(sim, "..", "run.log")) if os.path.isfile(p)]
+    for log in logs[:1]:
         for m in re.finditer(r"Prony probe: (\w+) is the term g = ([0-9.eE+-]+), tau = ([0-9.eE+-]+)", open(log).read()):
             legend[m.group(1)] = (float(m.group(2)), float(m.group(3)))
     return legend
@@ -161,7 +173,7 @@ def prony_legend(sim):
 class Charts:
     """The two history charts, drawn once; each frame moves their cursors."""
 
-    def __init__(self, sim, t_p, size, history_path):
+    def __init__(self, sim, t_p, loads, size, history_path):
         h = history(history_path)
         legend = prony_legend(sim)
         dpi = 100
@@ -173,7 +185,12 @@ class Charts:
         if t_p is not None and len(t):
             mask = t_p[:, 0] <= t[-1] / 1e3
             ax.plot(t_p[mask, 0] * 1e3, t_p[mask, 1] / 1e3, color="0.3", lw=1.2, label="chamber pressure")
-        ax.axhline(90.543, color="0.3", lw=0.8, ls=":", label="outlet pressure")
+            ax.axhline(90.543, color="0.3", lw=0.8, ls=":", label="outlet pressure")
+        for name, (table, color) in loads.items():
+            if len(t):
+                mask = table[:, 0] <= t[-1] / 1e3
+                ax.plot(table[mask, 0] * 1e3, table[mask, 1] / 1e3, color=color, lw=0.8, ls="--",
+                        label="%s valve load" % name)
         ax.set_xlabel("t (ms)")
         ax.set_ylabel("pressure (kPa)")
         lift = ax.twinx()
@@ -233,6 +250,7 @@ def main(argv):
     first = int(opts.get("first", "0"))
     width, height = (int(v) for v in opts.get("size", "1920,1080").split(","))
     panels = "panels" in opts
+    pump = PUMPS[opts.get("pump", "FF200")]
     os.makedirs(frames, exist_ok=True)
 
     X, grid, points = valve_grid(os.path.join(sim, "mesh"))
@@ -280,7 +298,7 @@ def main(argv):
         d.LookupTable = lut
     # The range fixed after the colouring, which rescales it to the data it first sees.
     lut.AutomaticRescaleRangeMode = "Never"
-    lut.RescaleTransferFunction(-1.4, 1.1)
+    lut.RescaleTransferFunction(*pump["range"])
     bar = GetScalarBar(lut, overview)
     bar.Orientation = "Horizontal"
     bar.WindowLocation = "Lower Center"
@@ -292,12 +310,13 @@ def main(argv):
     clock = None if panels else label(overview, "", 22)
     if not panels:
         label(top, "from above", 18)
-        for v, (name, _) in zip(sections, VALVES):
+        for v, (name, _) in zip(sections, pump["valves"]):
             label(v, "%s, section z = 0" % name, 18)
 
     # The cameras after a first screenshot, which resets them to the data: a Render alone does not,
     # and the first frame of each process would show the reset cameras.
-    scratch = os.path.join(frames, "panel.png")
+    # One per process: several render ranges of one movie into the same folder.
+    scratch = os.path.join(frames, "panel_%d.png" % os.getpid())
     for v in views:
         Render(v)
         SaveScreenshot(scratch, v, ImageResolution=list(panel))
@@ -305,20 +324,20 @@ def main(argv):
 
     def place_cameras():
         overview.CameraFocalPoint = list(centre)
-        overview.CameraPosition = [centre[0], centre[1] + 0.014, centre[2] + 0.065]
+        overview.CameraPosition = [centre[0], centre[1] + 0.014 * pump["distance"] / 0.065, centre[2] + pump["distance"]]
         overview.CameraViewUp = [0, 1, 0]
         overview.CameraViewAngle = 30
         top.CameraFocalPoint = list(centre)
         top.CameraPosition = [centre[0], centre[1] + 0.08, centre[2]]
         top.CameraViewUp = [0, 0, -1]
         top.CameraParallelProjection = 1
-        top.CameraParallelScale = 0.0145
-        for v, (_, x) in zip(sections, VALVES):
-            v.CameraFocalPoint = [x, -0.0008, 0]
-            v.CameraPosition = [x, -0.0008, 0.05]
+        top.CameraParallelScale = pump["top_scale"]
+        for v, (_, x) in zip(sections, pump["valves"]):
+            v.CameraFocalPoint = [x, pump["section_y"], 0]
+            v.CameraPosition = [x, pump["section_y"], 0.05]
             v.CameraViewUp = [0, 1, 0]
             v.CameraParallelProjection = 1
-            v.CameraParallelScale = 0.0055
+            v.CameraParallelScale = pump["section_scale"]
 
     place_cameras()
 
@@ -327,7 +346,15 @@ def main(argv):
     steps = sorted(int(p.split(".")[-2]) for p in glob.glob(os.path.join(out, "disp.0.*.float64")))
     table = os.path.join(sim, "..", "fp70_membrane_pressure.csv")
     t_p = np.loadtxt(table, delimiter=",", comments="#") if os.path.isfile(table) else None
-    charts = None if panels else Charts(sim, t_p, panel, opts.get("history", os.path.join(sim, "history.csv")))
+    # The valves' tabulated loads (LDP24A), times the case's factor, --load-factor.
+    factor = float(opts.get("load-factor", "1"))
+    loads = {}
+    for name, key, color in (("pressure", "pv", "tab:red"), ("suction", "sv", "tab:blue")):
+        path = os.path.join(sim, "..", key + "_load.csv")
+        if os.path.isfile(path):
+            table_k = np.loadtxt(path, delimiter=",", comments="#")
+            loads[name] = (np.column_stack([table_k[:, 0], factor * table_k[:, 1]]), color)
+    charts = None if panels else Charts(sim, t_p, loads, panel, opts.get("history", os.path.join(sim, "history.csv")))
 
     frames_all = steps[::every]
     count = int(opts.get("count", str(len(frames_all))))
@@ -347,6 +374,8 @@ def main(argv):
             i = min(max(bisect.bisect_left(t_p[:, 0], t), 1), len(t_p) - 1)
             (t0, p0), (t1, p1) = t_p[i - 1], t_p[i]
             text += "    chamber %+6.1f kPa" % ((p0 + (p1 - p0) * (t - t0) / (t1 - t0)) / 1e3)
+        for name, (table_k, _) in loads.items():
+            text += "    %s %+6.1f kPa" % (name[:1].upper() + "V", np.interp(t, table_k[:, 0], table_k[:, 1]) / 1e3)
         # Placed again for every frame, and in panels mode a frame is rendered once before it is
         # saved: a still of a frame far from the last one rendered could otherwise show the
         # cameras reset to the data (seen on the refined mesh).
