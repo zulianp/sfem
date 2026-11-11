@@ -56,14 +56,20 @@ obstacle:
   backend: node_sdf
   # Every skin node, against the fluid's boundary with the seats' holes carved in (carve_bore_sdf.py).
   nodes: skin
-  sdf: {file: ../db/sdf_valves}
+  # Its edges rounded by 0.1 mm (prepare.sbatch, sdf_round).
+  sdf: {file: ../db/sdf_valves_r100}
   shift: 1e-5
   cutoff: 1e-4
   curvature: true
   gap_tol: 1e-9
-  qp: {max_it: 15000, rtol: 1e-3}
+  # TET10's QP takes up to 40,517 iterations here (the Jacobi-scaled MPRGP on the quasi-static
+  # tangent, no inertia): at 15,000 every Newton step fell back to a shifted tangent, and Newton,
+  # linear on it, did not converge. TET4's take fewer than 15,000: the limit leaves them unchanged.
+  qp: {max_it: 60000, rtol: 1e-3}
   release: {type: linear_ramp, start_time: 0, end_time: 1e5, start_value: 0, end_value: 1}
 regime: quasi_static
 time: {dt: 6.25e3, t_end: 1e5, max_cutbacks: 8}
-solver: {newton: {max_it: 40, verbose: true}}
+# The tangent projected when the contact QP meets negative curvature (as the strokes): without it
+# TET4 stops at t = 8100 s on the rounded seats, every step size's line search failing.
+solver: {newton: {max_it: 40, verbose: true, tangent_projection: on_failure}}
 output: {fields: [gap, contact_force], probes: [{type: contact}]}

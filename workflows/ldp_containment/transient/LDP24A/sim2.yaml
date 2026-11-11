@@ -47,13 +47,17 @@ loads:
 obstacle:
   backend: node_sdf
   nodes: skin
-  sdf: {file: ../db/sdf_valves}
+  # Its edges rounded by 0.1 mm (prepare.sbatch, sdf_round).
+  sdf: {file: ../db/sdf_valves_r100}
   shift: 1e-5
   cutoff: 1e-4
   curvature: true
   # Penetration resolved to 1 nm, 1e-4 of the shift.
   gap_tol: 1e-9
   # The QP to 1e-3 of the outer merit (inexact Newton), as the containment.
+  # TET10 takes up to 60,000 iterations (tangent9_valves.sbatch): its QPs at the first impact stop
+  # short of their tolerance at 15,000 and Newton falls back to a shifted tangent (40 iterations, a
+  # cut-back). TET4's QPs that reach 15,000 diverge: more iterations only delay the shift.
   qp: {max_it: 15000, rtol: 1e-3}
 regime: dynamic
 # EPDM's density: solid only, the fluid enters by its pressure alone (the FSI's 150 = EPDM less water
