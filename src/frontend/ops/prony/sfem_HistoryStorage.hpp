@@ -94,7 +94,8 @@ namespace sfem {
 
     namespace prony {
         /// A uniform number in [0, 1) from a write's seed and a value's position: splitmix64.
-        inline real_t uniform(const uint64_t seed, const uint64_t k) {
+        /// One definition for the host and the device loops, so both draw the same numbers.
+        SFEM_DEVICE_INLINE real_t uniform(const uint64_t seed, const uint64_t k) {
             uint64_t z = seed + (k + 1) * 0x9e3779b97f4a7c15ull;
             z          = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
             z          = (z ^ (z >> 27)) * 0x94d049bb133111ebull;

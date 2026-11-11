@@ -34,6 +34,7 @@ namespace sfem {
             using storage_t                      = T;
             static constexpr bool scaled         = false;
             static constexpr bool mean_deviation = false;
+            static constexpr bool integer        = false;
             __device__ static real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
             __device__ static T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
         };
@@ -42,6 +43,7 @@ namespace sfem {
             using storage_t                      = __half;
             static constexpr bool scaled         = false;
             static constexpr bool mean_deviation = false;
+            static constexpr bool integer        = false;
             __device__ static real_t    decode(const __half s, const real_t) { return __half2float(s); }
             __device__ static __half    encode(const real_t v, const real_t) { return to_half(v); }
         };
@@ -50,6 +52,7 @@ namespace sfem {
             using storage_t                      = __half;
             static constexpr bool scaled         = true;
             static constexpr bool mean_deviation = false;
+            static constexpr bool integer        = false;
             __device__ static real_t decode(const __half s, const real_t scale) { return __half2float(s) * scale; }
             __device__ static __half encode(const real_t v, const real_t inv_scale) { return to_half(v * inv_scale); }
             __device__ static scaling_t scale_for(const real_t max_abs) {
@@ -63,10 +66,15 @@ namespace sfem {
             using storage_t                      = T;
             static constexpr bool scaled         = true;
             static constexpr bool mean_deviation = false;
+            static constexpr bool integer        = true;
             __device__ static real_t decode(const T s, const real_t scale) { return static_cast<real_t>(s) * scale; }
-            __device__ static T      encode(const real_t v, const real_t inv_scale) {
-                real_t code = nearbyint(v * inv_scale);
-                code        = code > LARGEST_CODE ? LARGEST_CODE : (code < -LARGEST_CODE ? -LARGEST_CODE : code);
+            __device__ static T      encode(const real_t v, const real_t inv_scale) { return clamp(nearbyint(v * inv_scale)); }
+            /// Rounded up with the probability of the remainder, u uniform in [0, 1), as on the host.
+            __device__ static T encode(const real_t v, const real_t inv_scale, const real_t u) {
+                return clamp(floor(v * inv_scale + u));
+            }
+            __device__ static T clamp(real_t code) {
+                code = code > LARGEST_CODE ? LARGEST_CODE : (code < -LARGEST_CODE ? -LARGEST_CODE : code);
                 return static_cast<T>(code);
             }
             __device__ static scaling_t scale_for(const real_t max_abs) {
@@ -81,6 +89,20 @@ namespace sfem {
         struct DeviceMeanDeviation : Base {
             static constexpr bool mean_deviation = true;
         };
+
+        /// The code of v, rounded stochastically when asked and the codec is integer: the host's
+        /// prony::detail::encode_rounded, with the same numbers (prony::uniform).
+        template <class Codec>
+        __device__ inline typename Codec::storage_t encode_rounded(const real_t    v,
+                                                                   const real_t    inv,
+                                                                   const bool      stochastic,
+                                                                   const uint64_t  seed,
+                                                                   const ptrdiff_t k) {
+            if constexpr (Codec::integer) {
+                if (stochastic) return Codec::encode(v, inv, prony::uniform(seed, static_cast<uint64_t>(k)));
+            }
+            return Codec::encode(v, inv);
+        }
 
     }  // namespace device_codecs
 }  // namespace sfem

@@ -76,11 +76,8 @@ namespace sfem {
             SFEM_ERROR("PronyRelaxation: stochastic rounding needs an integer history storage, not %s\n",
                        to_string(options_.history_storage));
         }
-        if (options_.execution_space != EXECUTION_SPACE_HOST &&
-            (is_grid(options_.history_storage) || options_.history_rounding == HistoryRounding::STOCHASTIC)) {
-            SFEM_ERROR("PronyRelaxation: %s with %s rounding is host only for now\n",
-                       to_string(options_.history_storage),
-                       to_string(options_.history_rounding));
+        if (options_.execution_space != EXECUTION_SPACE_HOST && is_grid(options_.history_storage)) {
+            SFEM_ERROR("PronyRelaxation: %s is host only for now\n", to_string(options_.history_storage));
         }
         zero_history();
     }
@@ -174,6 +171,8 @@ namespace sfem {
                                  means,
                                  beta,
                                  R,
+                                 options_.history_rounding == HistoryRounding::STOCHASTIC,
+                                 seed,
                                  options_.stream) != SFEM_SUCCESS) {
                 SFEM_ERROR("PronyRelaxation: updating the history failed on the device\n");
             }

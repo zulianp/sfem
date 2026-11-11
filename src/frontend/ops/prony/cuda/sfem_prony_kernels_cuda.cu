@@ -129,7 +129,9 @@ namespace sfem {
                                                       typename Codec::storage_t *const               H,
                                                       scaling_t *const                               H_scales,
                                                       const prony::Means                              m,
-                                                      const S_t *const SFEM_RESTRICT                 ref) {
+                                                      const S_t *const SFEM_RESTRICT                 ref,
+                                                      const bool                                      stochastic,
+                                                      const uint64_t                                  seed) {
             __shared__ real_t         sum[MD_MAX_COMPONENTS][MD_BLOCK];
             __shared__ history_mean_t group_mean[MD_MAX_COMPONENTS][MD_BLOCK];
 
@@ -183,7 +185,8 @@ namespace sfem {
                         const real_t inv = 1 / static_cast<real_t>(scale);
                         for (ptrdiff_t r = 0; r < rows; r++) {
                             const real_t v = z(r);
-                            h[r * n + e]   = Codec::encode(v - static_cast<real_t>(group_mean[r / m.n_qp][gl]), inv);
+                            h[r * n + e]   = device_codecs::encode_rounded<Codec>(
+                                    v - static_cast<real_t>(group_mean[r / m.n_qp][gl]), inv, stochastic, seed, (i * rows + r) * n + e);
                         }
                     }
                     __syncthreads();
@@ -210,7 +213,9 @@ namespace sfem {
                                        const S_t *const SFEM_RESTRICT                 S_new,
                                        typename Codec::storage_t *const SFEM_RESTRICT H,
                                        scaling_t *const SFEM_RESTRICT                 H_scales,
-                                       const S_t *const SFEM_RESTRICT                 ref) {
+                                       const S_t *const SFEM_RESTRICT                 ref,
+                                       const bool                                     stochastic,
+                                       const uint64_t                                 seed) {
             for (ptrdiff_t e = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; e < n;
                  e += (ptrdiff_t)blockDim.x * gridDim.x) {
                 for (int i = 0; i < n_terms; i++) {
@@ -234,7 +239,7 @@ namespace sfem {
                     for (ptrdiff_t r = 0; r < rows; r++) {
                         const ptrdiff_t k = r * n + e;
                         const real_t    v = a * Codec::decode(h[k], old_scale) + increment(w, i, S_n, S_new, ref, k);
-                        h[k]              = Codec::encode(v, inv);
+                        h[k]              = device_codecs::encode_rounded<Codec>(v, inv, stochastic, seed, (i * rows + r) * n + e);
                     }
                 }
             }
@@ -393,6 +398,8 @@ namespace sfem {
                          const prony::Means  &means,
                          const real_t *const  beta,
                          const void *const    ref,
+                         const int            stochastic,
+                         const uint64_t       seed,
                          void *const          stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
         SFEM_DEBUG_SYNCHRONIZE(stream);
@@ -406,10 +413,10 @@ namespace sfem {
                 if constexpr (Codec::mean_deviation) {
                     if (rows / means.n_qp > MD_MAX_COMPONENTS) return SFEM_FAILURE;
                     advance_mean_deviation_kernel<Codec, S_t><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
-                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, means, R);
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, means, R, stochastic != 0, seed);
                 } else {
                     advance_kernel<Codec, S_t><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
-                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, R);
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, R, stochastic != 0, seed);
                 }
                 return launched();
             });

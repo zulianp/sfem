@@ -39,7 +39,8 @@ namespace sfem {
                                 void *const          stream);
 
     /// H_i <- alpha_i H_i + b_i (S_new - S_n), re-encoding H_i with a fresh scale; with `beta`
-    /// and `ref`, the remainder form of `prony::advance`.
+    /// and `ref`, the remainder form of `prony::advance`; with `stochastic`, an integer format's
+    /// codes rounded stochastically from `seed` (HistoryRounding), as on the host.
     int cu_prony_advance(const HistoryStorage storage,
                          const int            n_terms,
                          const ptrdiff_t      rows,
@@ -54,6 +55,8 @@ namespace sfem {
                          const prony::Means  &means,
                          const real_t *const  beta,
                          const void *const    ref,
+                         const int            stochastic,
+                         const uint64_t       seed,
                          void *const          stream);
 
     /// Per term, prony::squared_norms into the host array `out` (n_terms), through the device

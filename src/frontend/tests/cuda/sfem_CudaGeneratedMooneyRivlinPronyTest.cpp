@@ -78,8 +78,9 @@ namespace {
     void configure(OpType                      &op,
                    const std::shared_ptr<Mesh> &mesh,
                    const HistoryStorage         storage,
-                   const HistoryStorage         stress  = HistoryStorage::FULL,
-                   const real_t                 horizon = 0) {
+                   const HistoryStorage         stress   = HistoryStorage::FULL,
+                   const real_t                 horizon  = 0,
+                   const HistoryRounding        rounding = HistoryRounding::NEAREST) {
         for (const auto &block : mesh->blocks()) {
             op.set_value_in_block(block->name(), "C10", test_C10);
             op.set_value_in_block(block->name(), "C01", test_C01);
@@ -89,14 +90,16 @@ namespace {
         options.history_storage = storage;
         options.stress_storage    = stress;
         options.remainder_horizon = horizon;
+        options.history_rounding  = rounding;
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
     int host_vs_device(const HistoryStorage  storage,
                        const real_t          tolerance,
                        const smesh::ElemType element = smesh::HEX8,
-                       const HistoryStorage  stress  = HistoryStorage::FULL,
-                       const real_t          horizon = 0) {
+                       const HistoryStorage  stress   = HistoryStorage::FULL,
+                       const real_t          horizon  = 0,
+                       const HistoryRounding rounding = HistoryRounding::NEAREST) {
         const int n = 6;
         std::shared_ptr<Mesh> mesh;
         if (element == smesh::HEX8) {
@@ -115,8 +118,8 @@ namespace {
                 create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_DEVICE));
         SFEM_TEST_ASSERT(host_op != nullptr);
         SFEM_TEST_ASSERT(device_op != nullptr);
-        configure(*host_op, mesh, storage, stress, horizon);
-        configure(*device_op, mesh, storage, stress, horizon);
+        configure(*host_op, mesh, storage, stress, horizon, rounding);
+        configure(*device_op, mesh, storage, stress, horizon, rounding);
 
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
@@ -230,6 +233,22 @@ int test_device_matches_host_remainder_form() {
     for (const auto element : elements) {
         if (host_vs_device(HistoryStorage::INT16_SCALED, real_t(1e-6), element, HistoryStorage::FULL, 5) != SFEM_TEST_SUCCESS ||
             host_vs_device(HistoryStorage::FLOAT16_MD, real_t(1e-4), element, HistoryStorage::FLOAT32, 5) != SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// Stochastic rounding draws the same numbers on both sides (prony::uniform of the write and the
+// value's position), so the codes agree but where the arithmetic before the rounding differs in
+// its last bit: within the format's own tolerance, for the scaled and the mean-deviation loops.
+int test_device_matches_host_stochastic_rounding() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT16_SCALED, real_t(1e-6), element, HistoryStorage::FULL, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::INT8_MD, real_t(5e-3), element, HistoryStorage::FLOAT32, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS) {
             return SFEM_TEST_FAILURE;
         }
     }
@@ -354,6 +373,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_RUN_TEST(test_device_matches_host_remainder_form);
+    SFEM_RUN_TEST(test_device_matches_host_stochastic_rounding);
     SFEM_RUN_TEST(test_device_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
