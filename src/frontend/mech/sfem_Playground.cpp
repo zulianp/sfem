@@ -1,4 +1,5 @@
 #include "sfem_Playground.hpp"
+#include "sfem_log.hpp"
 
 #include <map>
 
@@ -88,6 +89,34 @@ namespace sfem {
         /// missing key and then indexing below it is undefined in ryml.
         ryml::ConstNodeRef child(const ryml::ConstNodeRef &parent, const char *key) {
             return has(parent, key) ? parent[ryml::to_csubstr(key)] : ryml::ConstNodeRef();
+        }
+
+        /// The case's `log` block: `level` for every component, then each component's own
+        /// (sfem_log.hpp): `log: {level: normal, solid: verbose, contact: debug}`.
+        int read_log_levels(const ryml::ConstNodeRef &root) {
+            const auto node = child(root, "log");
+            if (!node.readable()) return SFEM_SUCCESS;
+            if (has(node, "level")) {
+                const auto name  = read_string(node, "level", "normal");
+                const int  level = log_level_from_name(name.c_str());
+                if (level < 0) {
+                    fprintf(stderr, "Playground: unknown log.level \"%s\" (quiet, normal, verbose, debug)\n", name.c_str());
+                    return SFEM_FAILURE;
+                }
+                set_log_levels(level);
+            }
+            for (int c = 0; c < LOG_COMPONENTS; c++) {
+                const char *key = log_component_name(c);
+                if (!has(node, key)) continue;
+                const auto name  = read_string(node, key, "normal");
+                const int  level = log_level_from_name(name.c_str());
+                if (level < 0) {
+                    fprintf(stderr, "Playground: unknown log.%s \"%s\" (quiet, normal, verbose, debug)\n", key, name.c_str());
+                    return SFEM_FAILURE;
+                }
+                set_log_level(c, level);
+            }
+            return SFEM_SUCCESS;
         }
 
         /// The active strain of a spherical inclusion, per element: diag(a11, 1, 1) / det inside the
@@ -616,7 +645,9 @@ namespace sfem {
             if (auto history = std::dynamic_pointer_cast<HistoryDependent>(material)) {
                 if (history->read_history(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
             }
-            if (mesh->comm()->rank() == 0) printf("Playground: restarted from %s\n", dir.c_str());
+            if (mesh->comm()->rank() == 0 && log_enabled(LOG_SETUP, LOG_NORMAL)) {
+                log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Playground: restarted from %s", dir.c_str());
+            }
             return SFEM_SUCCESS;
         }
 
@@ -847,7 +878,9 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
                 ssmgc_contact->set_gap(gap == "nodal" ? ContactConditions::Gap::NODAL : ContactConditions::Gap::DUAL_WEIGHTED);
-                printf("Contact: %td nodes (ssmgc)\n", ssmgc_contact->n_constrained_dofs());
+                if (log_enabled(LOG_SETUP, LOG_NORMAL)) {
+                    log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Contact: %td nodes (ssmgc)", ssmgc_contact->n_constrained_dofs());
+                }
                 return SFEM_SUCCESS;
             }
 
@@ -896,7 +929,9 @@ namespace sfem {
                     return SFEM_SUCCESS;
                 });
             }
-            if (m->comm()->rank() == 0) printf("Contact: %td nodes\n", n_contact);
+            if (m->comm()->rank() == 0 && log_enabled(LOG_SETUP, LOG_NORMAL)) {
+                log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Contact: %td nodes", n_contact);
+            }
             return SFEM_SUCCESS;
         }
 
@@ -1126,21 +1161,33 @@ namespace sfem {
             if (torque_controlled) {
                 nonlinear = std::make_shared<TorqueControl>(f, newton, torque_controlled, material, torque_control);
             }
-            if (verbose && mesh->comm()->rank() == 0) {
-                newton->add_monitor([](const NewtonIteration &it) {
+            // Newton's iterations: with solver.newton.verbose (the default) at the solid's normal
+            // level, without it at verbose.
+            if (mesh->comm()->rank() == 0) {
+                const bool listed = verbose;
+                newton->add_monitor([listed](const NewtonIteration &it) {
+                    if (!((listed && log_enabled(LOG_SOLID, LOG_NORMAL)) || log_enabled(LOG_SOLID, LOG_VERBOSE))) return;
                     if (it.iteration == 0) {
-                        printf("  Newton %2d: |r| = %.6e (tol %.3e)\n", it.iteration, (double)it.measure.value, (double)it.tolerance);
+                        log_printf(LOG_SOLID,
+                                   LOG_VERBOSE,
+                                   LOG_PROGRESS,
+                                   "  Newton %2d: |r| = %.6e (tol %.3e)",
+                                   it.iteration,
+                                   (double)it.measure.value,
+                                   (double)it.tolerance);
                     } else {
-                        printf("  Newton %2d: |r| = %.6e, %d linear%s%s, alpha = %g (%s)\n",
-                               it.iteration,
-                               (double)it.measure.value,
-                               it.linear_iterations,
-                               it.linear_capped ? " (max iterations)" : "",
-                               it.projected ? " projected" : "",
-                               (double)it.line_search.alpha,
-                               to_string(it.line_search.status));
+                        log_printf(LOG_SOLID,
+                                   LOG_VERBOSE,
+                                   LOG_PROGRESS,
+                                   "  Newton %2d: |r| = %.6e, %d linear%s%s, alpha = %g (%s)",
+                                   it.iteration,
+                                   (double)it.measure.value,
+                                   it.linear_iterations,
+                                   it.linear_capped ? " (max iterations)" : "",
+                                   it.projected ? " projected" : "",
+                                   (double)it.line_search.alpha,
+                                   to_string(it.line_search.status));
                     }
-                    fflush(stdout);
                 });
             }
             return SFEM_SUCCESS;
@@ -1397,6 +1444,7 @@ namespace sfem {
         std::unique_ptr<Playground> ret(new Playground());
         auto                       &impl = *ret->impl_;
         auto                        root = config.root();
+        if (read_log_levels(root) != SFEM_SUCCESS) return nullptr;
 
         const auto es = read_string(root, "execution_space", "host");
         if (es == "host") {
@@ -1453,15 +1501,18 @@ namespace sfem {
             n_elements = comm->sum(impl.mesh->distributed()->n_elements_owned());
             n_dofs     = comm->sum(impl.fs->n_dofs_owned());
         }
-        if (comm->rank() == 0) {
-            printf("Playground: %s, %s, %td elements, %td dofs, %d steps of %g%s\n",
-                   regime.c_str(),
-                   impl.material->name(),
-                   n_elements,
-                   n_dofs,
-                   impl.stepper->options().steps,
-                   (double)impl.stepper->options().dt,
-                   comm->size() > 1 ? (", " + std::to_string(comm->size()) + " ranks").c_str() : "");
+        if (comm->rank() == 0 && log_enabled(LOG_SETUP, LOG_NORMAL)) {
+            log_printf(LOG_SETUP,
+                          LOG_NORMAL,
+                          LOG_SUMMARY,
+                          "Playground: %s, %s, %td elements, %td dofs, %d steps of %g%s",
+                          regime.c_str(),
+                          impl.material->name(),
+                          n_elements,
+                          n_dofs,
+                          impl.stepper->options().steps,
+                          (double)impl.stepper->options().dt,
+                          comm->size() > 1 ? (", " + std::to_string(comm->size()) + " ranks").c_str() : "");
         }
         return ret;
     }

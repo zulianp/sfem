@@ -1,4 +1,5 @@
 #include "sfem_NodeObstacleStep.hpp"
+#include "sfem_log.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -118,6 +119,8 @@ namespace sfem {
         int solve_qp(const real_t *const r) {
             SFEM_TRACE_SCOPE("NodeObstacleStep::solve_qp");
             if (update_scaling() != SFEM_SUCCESS) return SFEM_FAILURE;
+            // The QP's iterations are the contact's debug output.
+            qp->verbose = log_enabled(LOG_CONTACT, LOG_DEBUG);
             // Gershgorin's bound for S K S where the tangent has its rows: the scale is one per
             // contact node, so it commutes with the node's frame, and S Q^T K Q S = Q^T (S K S) Q has
             // the same eigenvalues.
@@ -352,6 +355,14 @@ namespace sfem {
             // reactions and the curvature term can make the tangent indefinite: solve again with
             // it capped.
             const int capped = impl.tangent_projected ? NODE_OBSTACLE_CURVATURE_PSD : NODE_OBSTACLE_CURVATURE_CAPPED;
+            if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
+                log_printf(LOG_CONTACT,
+                           LOG_VERBOSE,
+                           LOG_EVENT,
+                           "contact QP failed%s: again with the curvature %s",
+                           impl.negative_curvature ? " on negative curvature" : "",
+                           impl.tangent_projected ? "projected" : "capped");
+            }
             if (impl.options.curvature && tangent.set_curvature(x, r, impl.k_ref->data(), capped) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             // The material's tangent can be indefinite too (a hyperelastic block under
@@ -361,14 +372,18 @@ namespace sfem {
             real_t shift = 0;
             while ((status = impl.solve_qp(r)) != SFEM_SUCCESS) {
                 if (shift >= 100) {
-                    printf("  contact QP did not reach its tolerance\n");
+                    if (log_enabled(LOG_CONTACT, LOG_NORMAL)) {
+                        log_printf(LOG_CONTACT, LOG_NORMAL, LOG_EVENT, "contact QP did not reach its tolerance");
+                    }
                     break;
                 }
                 if (shift == 0) tangent.diagonal(impl.diag->data());
                 const real_t next = shift == 0 ? real_t(1e-2) : 10 * shift;
                 tangent.shift_diagonal(next - shift, impl.diag->data());
                 shift = next;
-                printf("  tangent shifted by %g of its diagonal\n", (double)shift);
+                if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
+                    log_printf(LOG_CONTACT, LOG_VERBOSE, LOG_EVENT, "contact QP: tangent shifted by %g of its diagonal", (double)shift);
+                }
             }
         }
 

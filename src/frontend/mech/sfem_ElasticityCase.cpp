@@ -140,6 +140,10 @@ namespace sfem {
                 "output.probes[].at",
                 "output.probes[].rates",
                 "output.probes[].constraint",
+                "log.level",
+                "log.setup",
+                "log.solid",
+                "log.contact",
         };
 
         bool starts_with(const std::string &s, const std::string &prefix) { return s.compare(0, prefix.size(), prefix) == 0; }

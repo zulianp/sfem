@@ -54,6 +54,11 @@ namespace sfem {
         virtual int committed(const StepRecord &) { return SFEM_SUCCESS; }
         /// A step that could not be solved, after its last attempt.
         virtual int failed(const StepRecord &) { return SFEM_SUCCESS; }
+        /// A step's solution, before `converged`: true solves the same step again (its length,
+        /// from the same start), with what the observer changed in between. A partitioned coupling
+        /// iterates the step with it (ldp_fsi's coupling iterations: the fluid's drag on the solid,
+        /// recomputed from the velocity the solid just reached).
+        virtual bool resolve(const StepRecord &) { return false; }
     };
 
     /// The one place the step sequence of a time-dependent elasticity problem is written:

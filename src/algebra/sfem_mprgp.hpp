@@ -18,6 +18,7 @@
 
 #include "sfem_BLAS_openmp.hpp"
 #include "sfem_mprgp_control.hpp"
+#include "sfem_log.hpp"
 #include "sfem_MPRGPKernels_openmp.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
@@ -434,10 +435,12 @@ namespace sfem {
                             curvature(p, Ap, MPRGPDecision::CG);
                             if (c.move == T(MPRGPMove::UNBOUNDED)) {
                                 unbounded = true;
-                                if (team.leader())
-                                    fprintf(stderr,
-                                            "[Warning][MPRGP] Negative curvature, or none and no bound, along the search direction (%g)\n",
-                                            (double)c.dAd);
+                                if (team.leader() && log_enabled(LOG_CONTACT, LOG_VERBOSE))
+                                    log_printf(LOG_CONTACT,
+                                               LOG_VERBOSE,
+                                               LOG_EVENT,
+                                               "MPRGP: negative curvature, or none and no bound, along the search direction (%g)",
+                                               (double)c.dAd);
                                 break;
                             }
                             if (c.move == T(MPRGPMove::STEP)) {
@@ -474,8 +477,11 @@ namespace sfem {
                             step(gf, Ap, p, false);
                             if (c.move == T(MPRGPMove::UNBOUNDED)) {
                                 unbounded = true;
-                                if (team.leader())
-                                    fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the chopped gradient\n");
+                                if (team.leader() && log_enabled(LOG_CONTACT, LOG_VERBOSE))
+                                    log_printf(LOG_CONTACT,
+                                               LOG_VERBOSE,
+                                               LOG_EVENT,
+                                               "MPRGP: negative curvature, or none and no bound, along the chopped gradient");
                                 break;
                             }
                             n_proportioning++;
@@ -487,9 +493,12 @@ namespace sfem {
                         if (team.leader()) monitor(it, gr.norm_gp, rel_norm_gp);
                         if (!done && mprgp_diverging(gr.norm_gp, least_norm_gp, divergence_growth)) {
                             diverging = true;
-                            if (team.leader())
-                                fprintf(stderr, "[Warning][MPRGP] Projected gradient %g times its least: the energy falls without end\n",
-                                        (double)(gr.norm_gp / least_norm_gp));
+                            if (team.leader() && log_enabled(LOG_CONTACT, LOG_VERBOSE))
+                                log_printf(LOG_CONTACT,
+                                           LOG_VERBOSE,
+                                           LOG_EVENT,
+                                           "MPRGP: projected gradient %g times its least, the energy falls without end",
+                                           (double)(gr.norm_gp / least_norm_gp));
                             break;
                         }
                         least_norm_gp = std::min(least_norm_gp, gr.norm_gp);
@@ -559,10 +568,18 @@ namespace sfem {
             return true;
         }
 
+        // The iterations' progress, when `verbose` (an obstacle step sets it from the contact's
+        // log level: debug).
         void monitor(const int iter, const T residual, const T rel_residual) {
-            if (iter == max_it || iter % check_each == 0 || residual < atol ||
-                rel_residual < rtol) {
-                std::cout << iter << ": " << residual << " " << rel_residual << "\n";
+            if (!verbose) return;
+            if (iter == max_it || iter % check_each == 0 || residual < atol || rel_residual < rtol) {
+                log_printf(LOG_CONTACT,
+                           LOG_DEBUG,
+                           LOG_PROGRESS,
+                           "MPRGP %5d: |g_P| = %.3e, rel %.3e",
+                           iter,
+                           (double)residual,
+                           (double)rel_residual);
             }
         }
 
@@ -662,7 +679,13 @@ namespace sfem {
                     // it: the expansion step, at the bound. A free body's rigid motions are such
                     // directions, held only by the bounds.
                     if (c.move == T(MPRGPMove::UNBOUNDED)) {
-                        fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the search direction (%g)\n", (double)c.dAd);
+                        if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
+                            log_printf(LOG_CONTACT,
+                                       LOG_VERBOSE,
+                                       LOG_EVENT,
+                                       "MPRGP: negative curvature, or none and no bound, along the search direction (%g)",
+                                       (double)c.dAd);
+                        }
                         negative_curvature_ = true;
                         break;
                     }
@@ -680,7 +703,12 @@ namespace sfem {
                     SFEM_TRACE_SCOPE("MPRGP::proportioning_step");
                     // apply_op inside!
                     if (!this->proportioning_step(p, Ap_or_Ag, g, gf_or_gc, x, work, &grads)) {
-                        fprintf(stderr, "[Warning][MPRGP] Negative curvature, or none and no bound, along the chopped gradient\n");
+                        if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
+                            log_printf(LOG_CONTACT,
+                                       LOG_VERBOSE,
+                                       LOG_EVENT,
+                                       "MPRGP: negative curvature, or none and no bound, along the chopped gradient");
+                        }
                         negative_curvature_ = true;
                         break;
                     }
@@ -695,8 +723,13 @@ namespace sfem {
 
                 monitor(iterations_, norm_gp, rel_norm_gp);
                 if (!converged && mprgp_diverging(norm_gp, least_norm_gp, divergence_growth)) {
-                    fprintf(stderr, "[Warning][MPRGP] Projected gradient %g times its least: the energy falls without end\n",
-                            (double)(norm_gp / least_norm_gp));
+                    if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
+                        log_printf(LOG_CONTACT,
+                                   LOG_VERBOSE,
+                                   LOG_EVENT,
+                                   "MPRGP: projected gradient %g times its least, the energy falls without end",
+                                   (double)(norm_gp / least_norm_gp));
+                    }
                     diverged_ = true;
                     break;
                 }
@@ -707,9 +740,14 @@ namespace sfem {
             }
 
             if (verbose) {
-                printf("#cg_steps\t\t%d\n", count_cg_steps);
-                printf("#expansion_steps\t%d\n", count_expansion_steps);
-                printf("#proportioning_steps\t%d\n", count_proportioning_steps);
+                log_printf(LOG_CONTACT,
+                           LOG_DEBUG,
+                           LOG_PROGRESS,
+                           "MPRGP: %d iterations: %d cg, %d expansion, %d proportioning steps",
+                           iterations_,
+                           count_cg_steps,
+                           count_expansion_steps,
+                           count_proportioning_steps);
             }
 
             run_state_.reset();

@@ -1,4 +1,5 @@
 #include "sfem_Observers.hpp"
+#include "sfem_log.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -586,8 +587,15 @@ namespace sfem {
                         }
                     }
                     for (int k = 0; k < series.n_terms(); ++k) {
-                        if (comm->rank() == 0) {
-                            printf("Prony probe: %s_H%d is the term g = %g, tau = %g\n", d.group.c_str(), k, (double)series.g(k), (double)series.tau(k));
+                        if (comm->rank() == 0 && log_enabled(LOG_SETUP, LOG_VERBOSE)) {
+                            log_printf(LOG_SETUP,
+                                       LOG_VERBOSE,
+                                       LOG_SUMMARY,
+                                       "Prony probe: %s_H%d is the term g = %g, tau = %g",
+                                       d.group.c_str(),
+                                       k,
+                                       (double)series.g(k),
+                                       (double)series.tau(k));
                         }
                     }
                 }
@@ -818,16 +826,18 @@ namespace sfem {
 
         int row(const StepRecord &record, const char *status) {
             SFEM_TRACE_SCOPE("StepHistory::row");
-            if (verbose) {
-                printf("step %d t=%g dt=%g: %s, %d Newton iterations, %d linear, |r|/|r0| = %.3e\n",
-                       record.step,
-                       (double)record.t,
-                       (double)record.dt,
-                       status,
-                       record.report.iterations,
-                       record.report.linear_iterations,
-                       record.report.reference > 0 ? (double)(record.report.final_measure / record.report.reference) : 0.0);
-                fflush(stdout);
+            if (verbose && log_enabled(LOG_SOLID, LOG_NORMAL)) {
+                log_printf(LOG_SOLID,
+                           LOG_NORMAL,
+                           LOG_SUMMARY,
+                           "step %d t=%g dt=%g: %s, %d Newton iterations, %d linear, |r|/|r0| = %.3e",
+                           record.step,
+                           (double)record.t,
+                           (double)record.dt,
+                           status,
+                           record.report.iterations,
+                           record.report.linear_iterations,
+                           record.report.reference > 0 ? (double)(record.report.final_measure / record.report.reference) : 0.0);
             }
             // Every rank samples (a probe may reduce over the ranks); the one with the file writes.
             std::vector<real_t> sampled;
@@ -902,14 +912,18 @@ namespace sfem {
     int StepHistory::committed(const StepRecord &record) { return impl_->row(record, to_string(record.report.status)); }
 
     int StepHistory::failed(const StepRecord &record) {
-        if (!impl_->verbose) return SFEM_SUCCESS;
-        printf("step %d t=%g dt=%g: attempt failed, %s after %d Newton iterations\n",
-               record.step,
-               (double)record.t,
-               (double)record.dt,
-               to_string(record.report.status),
-               record.report.iterations);
-        fflush(stdout);
+        if (!impl_->verbose || !log_enabled(LOG_SOLID, LOG_NORMAL)) return SFEM_SUCCESS;
+        log_printf(LOG_SOLID,
+                   LOG_NORMAL,
+                   LOG_EVENT,
+                   "step %d t=%g dt=%g: attempt failed, %s after %d Newton iterations, |r| = %.3e (reference %.3e)",
+                   record.step,
+                   (double)record.t,
+                   (double)record.dt,
+                   to_string(record.report.status),
+                   record.report.iterations,
+                   (double)record.report.final_measure,
+                   (double)record.report.reference);
         return SFEM_SUCCESS;
     }
 
