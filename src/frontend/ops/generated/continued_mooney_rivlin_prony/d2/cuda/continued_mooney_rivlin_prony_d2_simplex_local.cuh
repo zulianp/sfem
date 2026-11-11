@@ -1,0 +1,859 @@
+#ifndef CONTINUED_MOONEY_RIVLIN_PRONY_D2_SIMPLEX_LOCAL_CUH
+#define CONTINUED_MOONEY_RIVLIN_PRONY_D2_SIMPLEX_LOCAL_CUH
+#include <math.h>
+#include <stddef.h>
+#if defined(__has_include)
+#if __has_include("sfem_base.hpp")
+#include "sfem_base.hpp"
+#define SFEM_GENERATED_SCALAR_T
+#endif
+#endif
+#include "kernel_math.cuh"
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
+#ifndef SFEM_GENERATED_SCALAR_T
+#define SFEM_GENERATED_SCALAR_T
+typedef double real_t;
+typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
+typedef double geom_t;
+#endif
+namespace sfem {
+namespace codegen {
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_objective_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
+        s_t *const RSTR value
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+    for (int q = 0; q < NQ; ++q) {
+      const s_t qw = q_weight[q];
+      const s_t *const RSTR iso_history_q = iso_history + q * qp_stride;
+      s_t gu_ref0_values;
+      s_t grad_h_ref0_values;
+      s_t gu_ref1_values;
+      s_t grad_h_ref1_values;
+      s_t gu_ref2_values;
+      s_t grad_h_ref2_values;
+      s_t gu_ref3_values;
+      s_t grad_h_ref3_values;
+      {
+        gu_ref0_values = s_t(0);
+        grad_h_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
+        grad_h_ref1_values = s_t(0);
+        gu_ref2_values = s_t(0);
+        grad_h_ref2_values = s_t(0);
+        gu_ref3_values = s_t(0);
+        grad_h_ref3_values = s_t(0);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[2 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[2 * shape + 1];
+        const s_t *const RSTR h_shape0 = h_streams[2 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[2 * shape + 1];
+        {
+          gu_ref0_values += u_shape0[0] * gref0;
+          grad_h_ref0_values += h_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
+          grad_h_ref1_values += h_shape0[0] * gref1;
+          gu_ref2_values += u_shape1[0] * gref0;
+          grad_h_ref2_values += h_shape1[0] * gref0;
+          gu_ref3_values += u_shape1[0] * gref1;
+          grad_h_ref3_values += h_shape1[0] * gref1;
+        }
+      }
+      s_t gu_base_v[4];
+      s_t trial_grad_v[4];
+      {
+      const ptrdiff_t goff = q * geometry_stride + 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t grad_h_ref0 = grad_h_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
+      const s_t grad_h_ref1 = grad_h_ref1_values;
+      const s_t gu_ref2 = gu_ref2_values;
+      const s_t grad_h_ref2 = grad_h_ref2_values;
+      const s_t gu_ref3 = gu_ref3_values;
+      const s_t grad_h_ref3 = grad_h_ref3_values;
+    const s_t idet = s_t(1) / det_value0;
+    gu_base_v[0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    trial_grad_v[0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+    gu_base_v[1] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    trial_grad_v[1] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+    gu_base_v[2] = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+    trial_grad_v[2] = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+    gu_base_v[3] = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    trial_grad_v[3] = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        {
+          const ptrdiff_t goff = q * geometry_stride + 0;
+          const s_t det_value0 = det0[goff];
+          const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * NQ * qp_stride + 0], iso_history_q[2 * NQ * qp_stride + 0]};
+          const s_t gu0 = gu_base_v[0] + alpha * trial_grad_v[0];
+          const s_t gu1 = gu_base_v[1] + alpha * trial_grad_v[1];
+          const s_t gu2 = gu_base_v[2] + alpha * trial_grad_v[2];
+          const s_t gu3 = gu_base_v[3] + alpha * trial_grad_v[3];
+    const s_t weak_obj_tmp0 = pow_2(gu2);
+    const s_t weak_obj_tmp1 = pow_2(gu1);
+    const s_t weak_obj_tmp2 = gu0 + s_t(1);
+    const s_t weak_obj_tmp3 = gu3 + s_t(1);
+    const s_t weak_obj_tmp4 = gu1*weak_obj_tmp2 + gu2*weak_obj_tmp3;
+    const s_t weak_obj_tmp5 = gu1*gu2;
+    const s_t weak_obj_tmp6 = weak_obj_tmp2*weak_obj_tmp3 - weak_obj_tmp5;
+    const s_t weak_obj_tmp7 = weak_obj_tmp1 + pow_2(weak_obj_tmp3);
+    const s_t weak_obj_tmp8 = weak_obj_tmp0 + pow_2(weak_obj_tmp2);
+    const s_t weak_obj_tmp9 = weak_obj_tmp7 + weak_obj_tmp8;
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*K*pow_2(gu0*gu3 + gu0 + gu3 - weak_obj_tmp5) + ((s_t(1) / s_t(2)))*iso_history_qp[0]*(pow_2(gu0) + s_t(2)*gu0 + weak_obj_tmp0) + ((s_t(1) / s_t(2)))*iso_history_qp[1]*(pow_2(gu3) + s_t(2)*gu3 + weak_obj_tmp1) + iso_history_qp[2]*weak_obj_tmp4 + iso_relaxation_gamma*(C01*((-pow_2(weak_obj_tmp4) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9)*sfem_continued_power<s_t>(weak_obj_tmp6, (s_t(4) / s_t(3)), Jc, Jmin) + s_t(-3)) + C10*((weak_obj_tmp9 + s_t(1))*sfem_continued_power<s_t>(weak_obj_tmp6, (s_t(2) / s_t(3)), Jc, Jmin) + s_t(-3))));
+        }
+      }
+    }
+}
+
+template <typename s_t, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_tri3_objective_block(
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
+        s_t *const RSTR value
+) {
+    {
+      const s_t qw = (s_t(1) / s_t(2));
+      const s_t *const RSTR iso_history_q = iso_history;
+      s_t gu_base_v[4];
+      s_t trial_grad_v[4];
+      {
+      const ptrdiff_t goff = 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t gu_ref0 = -(u_streams[0][0]) + u_streams[2][0];
+      const s_t grad_h_ref0 = -(h_streams[0][0]) + h_streams[2][0];
+      const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[4][0];
+      const s_t grad_h_ref1 = -(h_streams[0][0]) + h_streams[4][0];
+      const s_t gu_ref2 = -(u_streams[1][0]) + u_streams[3][0];
+      const s_t grad_h_ref2 = -(h_streams[1][0]) + h_streams[3][0];
+      const s_t gu_ref3 = -(u_streams[1][0]) + u_streams[5][0];
+      const s_t grad_h_ref3 = -(h_streams[1][0]) + h_streams[5][0];
+      const s_t idet = s_t(1) / det_value0;
+      gu_base_v[0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      trial_grad_v[0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+      gu_base_v[1] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      trial_grad_v[1] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+      gu_base_v[2] = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+      trial_grad_v[2] = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+      gu_base_v[3] = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+      trial_grad_v[3] = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        {
+          const ptrdiff_t goff = 0;
+          const s_t det_value0 = det0[goff];
+          const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * qp_stride + 0], iso_history_q[2 * qp_stride + 0]};
+          const s_t gu0 = gu_base_v[0] + alpha * trial_grad_v[0];
+          const s_t gu1 = gu_base_v[1] + alpha * trial_grad_v[1];
+          const s_t gu2 = gu_base_v[2] + alpha * trial_grad_v[2];
+          const s_t gu3 = gu_base_v[3] + alpha * trial_grad_v[3];
+    const s_t weak_obj_tmp0 = pow_2(gu2);
+    const s_t weak_obj_tmp1 = pow_2(gu1);
+    const s_t weak_obj_tmp2 = gu0 + s_t(1);
+    const s_t weak_obj_tmp3 = gu3 + s_t(1);
+    const s_t weak_obj_tmp4 = gu1*weak_obj_tmp2 + gu2*weak_obj_tmp3;
+    const s_t weak_obj_tmp5 = gu1*gu2;
+    const s_t weak_obj_tmp6 = weak_obj_tmp2*weak_obj_tmp3 - weak_obj_tmp5;
+    const s_t weak_obj_tmp7 = weak_obj_tmp1 + pow_2(weak_obj_tmp3);
+    const s_t weak_obj_tmp8 = weak_obj_tmp0 + pow_2(weak_obj_tmp2);
+    const s_t weak_obj_tmp9 = weak_obj_tmp7 + weak_obj_tmp8;
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*K*pow_2(gu0*gu3 + gu0 + gu3 - weak_obj_tmp5) + ((s_t(1) / s_t(2)))*iso_history_qp[0]*(pow_2(gu0) + s_t(2)*gu0 + weak_obj_tmp0) + ((s_t(1) / s_t(2)))*iso_history_qp[1]*(pow_2(gu3) + s_t(2)*gu3 + weak_obj_tmp1) + iso_history_qp[2]*weak_obj_tmp4 + iso_relaxation_gamma*(C01*((-pow_2(weak_obj_tmp4) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9)*sfem_continued_power<s_t>(weak_obj_tmp6, (s_t(4) / s_t(3)), Jc, Jmin) + s_t(-3)) + C10*((weak_obj_tmp9 + s_t(1))*sfem_continued_power<s_t>(weak_obj_tmp6, (s_t(2) / s_t(3)), Jc, Jmin) + s_t(-3))));
+        }
+      }
+    }
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_gradient_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+    for (int q = 0; q < NQ; ++q) {
+      const s_t qw = q_weight[q];
+      const s_t *const RSTR iso_history_q = iso_history + q * qp_stride;
+      s_t gu_ref0_values;
+      s_t gu_ref1_values;
+      s_t gu_ref2_values;
+      s_t gu_ref3_values;
+      s_t loperand0_values;
+      s_t loperand1_values;
+      s_t loperand2_values;
+      s_t loperand3_values;
+      {
+        gu_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
+        gu_ref2_values = s_t(0);
+        gu_ref3_values = s_t(0);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[2 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[2 * shape + 1];
+        {
+          gu_ref0_values += u_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
+          gu_ref2_values += u_shape1[0] * gref0;
+          gu_ref3_values += u_shape1[0] * gref1;
+        }
+      }
+      {
+      const ptrdiff_t goff = q * geometry_stride + 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * NQ * qp_stride + 0], iso_history_q[2 * NQ * qp_stride + 0]};
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
+      const s_t gu_ref2 = gu_ref2_values;
+      const s_t gu_ref3 = gu_ref3_values;
+    const s_t idet = s_t(1) / det_value0;
+    const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+    const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = gu0 + s_t(1);
+    const s_t weak_mat_tmp1 = gu3 + s_t(1);
+    const s_t weak_mat_tmp2 = gu1*gu2;
+    const s_t weak_mat_tmp3 = K*(gu0*gu3 + gu0 + gu3 - weak_mat_tmp2);
+    const s_t weak_mat_tmp4 = weak_mat_tmp0*weak_mat_tmp1 - weak_mat_tmp2;
+    const s_t weak_mat_tmp5 = sfem_continued_power<s_t>(weak_mat_tmp4, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp6 = s_t(2)*weak_mat_tmp0;
+    const s_t weak_mat_tmp7 = pow_2(gu2) + pow_2(weak_mat_tmp0);
+    const s_t weak_mat_tmp8 = pow_2(gu1) + pow_2(weak_mat_tmp1);
+    const s_t weak_mat_tmp9 = weak_mat_tmp7 + weak_mat_tmp8;
+    const s_t weak_mat_tmp10 = (weak_mat_tmp9 + s_t(1))*sfem_continued_power_d1<s_t>(weak_mat_tmp4, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp11 = sfem_continued_power<s_t>(weak_mat_tmp4, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp12 = gu1*weak_mat_tmp0 + gu2*weak_mat_tmp1;
+    const s_t weak_mat_tmp13 = s_t(2)*gu1;
+    const s_t weak_mat_tmp14 = (-pow_2(weak_mat_tmp12) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_mat_tmp9) + weak_mat_tmp9)*sfem_continued_power_d1<s_t>(weak_mat_tmp4, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp15 = s_t(2)*gu2;
+    const s_t weak_mat_tmp16 = s_t(2)*weak_mat_tmp1;
+    const s_t material0 = gu1*iso_history_qp[2] + iso_history_qp[0]*weak_mat_tmp0 + iso_relaxation_gamma*(C01*(weak_mat_tmp1*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu0 - weak_mat_tmp12*weak_mat_tmp13 - weak_mat_tmp6*weak_mat_tmp7 + weak_mat_tmp6*weak_mat_tmp9 + s_t(2))) + C10*(weak_mat_tmp1*weak_mat_tmp10 + weak_mat_tmp5*weak_mat_tmp6)) + weak_mat_tmp1*weak_mat_tmp3;
+    const s_t material1 = gu1*iso_history_qp[1] - gu2*weak_mat_tmp3 + iso_history_qp[2]*weak_mat_tmp0 + iso_relaxation_gamma*(C01*(-gu2*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu1*weak_mat_tmp9 + s_t(2)*gu1 - weak_mat_tmp12*weak_mat_tmp6 - weak_mat_tmp13*weak_mat_tmp8)) + C10*(-gu2*weak_mat_tmp10 + weak_mat_tmp13*weak_mat_tmp5));
+    const s_t material2 = -gu1*weak_mat_tmp3 + gu2*iso_history_qp[0] + iso_history_qp[2]*weak_mat_tmp1 + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu2*weak_mat_tmp9 + s_t(2)*gu2 - weak_mat_tmp12*weak_mat_tmp16 - weak_mat_tmp15*weak_mat_tmp7)) + C10*(-gu1*weak_mat_tmp10 + s_t(2)*gu2*weak_mat_tmp5));
+    const s_t material3 = gu2*iso_history_qp[2] + iso_history_qp[1]*weak_mat_tmp1 + iso_relaxation_gamma*(C01*(weak_mat_tmp0*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu3 - weak_mat_tmp12*weak_mat_tmp15 - weak_mat_tmp16*weak_mat_tmp8 + weak_mat_tmp16*weak_mat_tmp9 + s_t(2))) + C10*(weak_mat_tmp0*weak_mat_tmp10 + weak_mat_tmp16*weak_mat_tmp5)) + weak_mat_tmp0*weak_mat_tmp3;
+      loperand0_values = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1_values = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2_values = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3_values = qw * (material2 * adj_value2 + material3 * adj_value3);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[2 * shape];
+        s_t *const RSTR out_shape1 = out_streams[2 * shape + 1];
+        {
+          out_shape0[0] += loperand0_values * tref0 + loperand1_values * tref1;
+          out_shape1[0] += loperand2_values * tref0 + loperand3_values * tref1;
+        }
+      }
+    }
+}
+
+template <typename s_t, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_tri3_gradient_block(
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+    {
+      const s_t qw = (s_t(1) / s_t(2));
+      const s_t *const RSTR iso_history_q = iso_history;
+      {
+      const ptrdiff_t goff = 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * qp_stride + 0], iso_history_q[2 * qp_stride + 0]};
+      const s_t gu_ref0 = -(u_streams[0][0]) + u_streams[2][0];
+      const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[4][0];
+      const s_t gu_ref2 = -(u_streams[1][0]) + u_streams[3][0];
+      const s_t gu_ref3 = -(u_streams[1][0]) + u_streams[5][0];
+      const s_t idet = s_t(1) / det_value0;
+      const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+      const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = gu0 + s_t(1);
+    const s_t weak_mat_tmp1 = gu3 + s_t(1);
+    const s_t weak_mat_tmp2 = gu1*gu2;
+    const s_t weak_mat_tmp3 = K*(gu0*gu3 + gu0 + gu3 - weak_mat_tmp2);
+    const s_t weak_mat_tmp4 = weak_mat_tmp0*weak_mat_tmp1 - weak_mat_tmp2;
+    const s_t weak_mat_tmp5 = sfem_continued_power<s_t>(weak_mat_tmp4, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp6 = s_t(2)*weak_mat_tmp0;
+    const s_t weak_mat_tmp7 = pow_2(gu2) + pow_2(weak_mat_tmp0);
+    const s_t weak_mat_tmp8 = pow_2(gu1) + pow_2(weak_mat_tmp1);
+    const s_t weak_mat_tmp9 = weak_mat_tmp7 + weak_mat_tmp8;
+    const s_t weak_mat_tmp10 = (weak_mat_tmp9 + s_t(1))*sfem_continued_power_d1<s_t>(weak_mat_tmp4, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp11 = sfem_continued_power<s_t>(weak_mat_tmp4, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp12 = gu1*weak_mat_tmp0 + gu2*weak_mat_tmp1;
+    const s_t weak_mat_tmp13 = s_t(2)*gu1;
+    const s_t weak_mat_tmp14 = (-pow_2(weak_mat_tmp12) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_mat_tmp9) + weak_mat_tmp9)*sfem_continued_power_d1<s_t>(weak_mat_tmp4, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp15 = s_t(2)*gu2;
+    const s_t weak_mat_tmp16 = s_t(2)*weak_mat_tmp1;
+    const s_t material0 = gu1*iso_history_qp[2] + iso_history_qp[0]*weak_mat_tmp0 + iso_relaxation_gamma*(C01*(weak_mat_tmp1*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu0 - weak_mat_tmp12*weak_mat_tmp13 - weak_mat_tmp6*weak_mat_tmp7 + weak_mat_tmp6*weak_mat_tmp9 + s_t(2))) + C10*(weak_mat_tmp1*weak_mat_tmp10 + weak_mat_tmp5*weak_mat_tmp6)) + weak_mat_tmp1*weak_mat_tmp3;
+    const s_t material1 = gu1*iso_history_qp[1] - gu2*weak_mat_tmp3 + iso_history_qp[2]*weak_mat_tmp0 + iso_relaxation_gamma*(C01*(-gu2*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu1*weak_mat_tmp9 + s_t(2)*gu1 - weak_mat_tmp12*weak_mat_tmp6 - weak_mat_tmp13*weak_mat_tmp8)) + C10*(-gu2*weak_mat_tmp10 + weak_mat_tmp13*weak_mat_tmp5));
+    const s_t material2 = -gu1*weak_mat_tmp3 + gu2*iso_history_qp[0] + iso_history_qp[2]*weak_mat_tmp1 + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu2*weak_mat_tmp9 + s_t(2)*gu2 - weak_mat_tmp12*weak_mat_tmp16 - weak_mat_tmp15*weak_mat_tmp7)) + C10*(-gu1*weak_mat_tmp10 + s_t(2)*gu2*weak_mat_tmp5));
+    const s_t material3 = gu2*iso_history_qp[2] + iso_history_qp[1]*weak_mat_tmp1 + iso_relaxation_gamma*(C01*(weak_mat_tmp0*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu3 - weak_mat_tmp12*weak_mat_tmp15 - weak_mat_tmp16*weak_mat_tmp8 + weak_mat_tmp16*weak_mat_tmp9 + s_t(2))) + C10*(weak_mat_tmp0*weak_mat_tmp10 + weak_mat_tmp16*weak_mat_tmp5)) + weak_mat_tmp0*weak_mat_tmp3;
+    const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
+    const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
+    const s_t loperand2 = qw * (material2 * adj_value0 + material3 * adj_value1);
+    const s_t loperand3 = qw * (material2 * adj_value2 + material3 * adj_value3);
+      out_streams[0][0] += -(loperand0) - loperand1;
+      out_streams[1][0] += -(loperand2) - loperand3;
+      out_streams[2][0] += loperand0;
+      out_streams[3][0] += loperand2;
+      out_streams[4][0] += loperand1;
+      out_streams[5][0] += loperand3;
+      }
+    }
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_apply_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t *const RSTR q_weight,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+    for (int q = 0; q < NQ; ++q) {
+      const s_t qw = q_weight[q];
+      const s_t *const RSTR iso_history_q = iso_history + q * qp_stride;
+      s_t gu_ref0_values;
+      s_t grad_h_ref0_values;
+      s_t gu_ref1_values;
+      s_t grad_h_ref1_values;
+      s_t gu_ref2_values;
+      s_t grad_h_ref2_values;
+      s_t gu_ref3_values;
+      s_t grad_h_ref3_values;
+      s_t loperand0_values;
+      s_t loperand1_values;
+      s_t loperand2_values;
+      s_t loperand3_values;
+      {
+        gu_ref0_values = s_t(0);
+        grad_h_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
+        grad_h_ref1_values = s_t(0);
+        gu_ref2_values = s_t(0);
+        grad_h_ref2_values = s_t(0);
+        gu_ref3_values = s_t(0);
+        grad_h_ref3_values = s_t(0);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[2 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[2 * shape + 1];
+        const s_t *const RSTR h_shape0 = h_streams[2 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[2 * shape + 1];
+        {
+          gu_ref0_values += u_shape0[0] * gref0;
+          grad_h_ref0_values += h_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
+          grad_h_ref1_values += h_shape0[0] * gref1;
+          gu_ref2_values += u_shape1[0] * gref0;
+          grad_h_ref2_values += h_shape1[0] * gref0;
+          gu_ref3_values += u_shape1[0] * gref1;
+          grad_h_ref3_values += h_shape1[0] * gref1;
+        }
+      }
+      {
+      const ptrdiff_t goff = q * geometry_stride + 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * NQ * qp_stride + 0], iso_history_q[2 * NQ * qp_stride + 0]};
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t grad_h_ref0 = grad_h_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
+      const s_t grad_h_ref1 = grad_h_ref1_values;
+      const s_t gu_ref2 = gu_ref2_values;
+      const s_t grad_h_ref2 = grad_h_ref2_values;
+      const s_t gu_ref3 = gu_ref3_values;
+      const s_t grad_h_ref3 = grad_h_ref3_values;
+    const s_t idet = s_t(1) / det_value0;
+    const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    const s_t trial_grad0 = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+    const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    const s_t trial_grad1 = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+    const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+    const s_t trial_grad2 = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+    const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    const s_t trial_grad3 = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = gu3 + s_t(1);
+    const s_t weak_mat_tmp1 = pow_2(weak_mat_tmp0);
+    const s_t weak_mat_tmp2 = pow_2(gu1);
+    const s_t weak_mat_tmp3 = weak_mat_tmp1 + weak_mat_tmp2;
+    const s_t weak_mat_tmp4 = pow_2(gu2);
+    const s_t weak_mat_tmp5 = gu0 + s_t(1);
+    const s_t weak_mat_tmp6 = pow_2(weak_mat_tmp5);
+    const s_t weak_mat_tmp7 = weak_mat_tmp4 + weak_mat_tmp6;
+    const s_t weak_mat_tmp8 = weak_mat_tmp3 + weak_mat_tmp7;
+    const s_t weak_mat_tmp9 = weak_mat_tmp8 + s_t(1);
+    const s_t weak_mat_tmp10 = gu1*gu2;
+    const s_t weak_mat_tmp11 = weak_mat_tmp0*weak_mat_tmp5 - weak_mat_tmp10;
+    const s_t weak_mat_tmp12 = sfem_continued_power_d2<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp13 = weak_mat_tmp12*weak_mat_tmp9;
+    const s_t weak_mat_tmp14 = s_t(2)*sfem_continued_power<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp15 = sfem_continued_power_d1<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp16 = weak_mat_tmp0*weak_mat_tmp5;
+    const s_t weak_mat_tmp17 = weak_mat_tmp14 + s_t(4)*weak_mat_tmp15*weak_mat_tmp16;
+    const s_t weak_mat_tmp18 = s_t(2)*weak_mat_tmp1;
+    const s_t weak_mat_tmp19 = sfem_continued_power<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp20 = gu1*weak_mat_tmp5;
+    const s_t weak_mat_tmp21 = gu2*weak_mat_tmp0;
+    const s_t weak_mat_tmp22 = weak_mat_tmp20 + weak_mat_tmp21;
+    const s_t weak_mat_tmp23 = s_t(2)*gu1;
+    const s_t weak_mat_tmp24 = s_t(2)*weak_mat_tmp5;
+    const s_t weak_mat_tmp25 = s_t(2)*gu0 - weak_mat_tmp22*weak_mat_tmp23 - weak_mat_tmp24*weak_mat_tmp7 + weak_mat_tmp24*weak_mat_tmp8 + s_t(2);
+    const s_t weak_mat_tmp26 = sfem_continued_power_d1<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp27 = weak_mat_tmp0*weak_mat_tmp26;
+    const s_t weak_mat_tmp28 = -pow_2(weak_mat_tmp22) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp3) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp7) + ((s_t(1) / s_t(2)))*pow_2(weak_mat_tmp8) + weak_mat_tmp8;
+    const s_t weak_mat_tmp29 = sfem_continued_power_d2<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp30 = weak_mat_tmp28*weak_mat_tmp29;
+    const s_t weak_mat_tmp31 = gu1*weak_mat_tmp0;
+    const s_t weak_mat_tmp32 = s_t(2)*weak_mat_tmp20;
+    const s_t weak_mat_tmp33 = weak_mat_tmp15*weak_mat_tmp32;
+    const s_t weak_mat_tmp34 = s_t(2)*weak_mat_tmp21;
+    const s_t weak_mat_tmp35 = weak_mat_tmp15*weak_mat_tmp34;
+    const s_t weak_mat_tmp36 = weak_mat_tmp0*weak_mat_tmp23;
+    const s_t weak_mat_tmp37 = weak_mat_tmp25*weak_mat_tmp26;
+    const s_t weak_mat_tmp38 = s_t(2)*gu2;
+    const s_t weak_mat_tmp39 = s_t(2)*weak_mat_tmp0;
+    const s_t weak_mat_tmp40 = s_t(2)*gu2*weak_mat_tmp8 + s_t(2)*gu2 - weak_mat_tmp22*weak_mat_tmp39 - weak_mat_tmp38*weak_mat_tmp7;
+    const s_t weak_mat_tmp41 = -K*weak_mat_tmp31 + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp37 + weak_mat_tmp0*weak_mat_tmp26*weak_mat_tmp40 - weak_mat_tmp19*weak_mat_tmp36 - weak_mat_tmp30*weak_mat_tmp31) + C10*(-weak_mat_tmp13*weak_mat_tmp31 - weak_mat_tmp33 + weak_mat_tmp35));
+    const s_t weak_mat_tmp42 = weak_mat_tmp15*weak_mat_tmp36;
+    const s_t weak_mat_tmp43 = weak_mat_tmp38*weak_mat_tmp5;
+    const s_t weak_mat_tmp44 = weak_mat_tmp15*weak_mat_tmp43;
+    const s_t weak_mat_tmp45 = s_t(2)*gu1*weak_mat_tmp8 + s_t(2)*gu1 - weak_mat_tmp22*weak_mat_tmp24 - weak_mat_tmp23*weak_mat_tmp3;
+    const s_t weak_mat_tmp46 = -K*weak_mat_tmp21 + iso_history_qp[2] + iso_relaxation_gamma*(C01*(-gu2*weak_mat_tmp37 + weak_mat_tmp0*weak_mat_tmp26*weak_mat_tmp45 - weak_mat_tmp19*weak_mat_tmp34 - weak_mat_tmp21*weak_mat_tmp30) + C10*(-weak_mat_tmp13*weak_mat_tmp21 + weak_mat_tmp42 - weak_mat_tmp44));
+    const s_t weak_mat_tmp47 = K*(gu0*gu3 + gu0 + gu3 - weak_mat_tmp10);
+    const s_t weak_mat_tmp48 = s_t(2)*weak_mat_tmp6;
+    const s_t weak_mat_tmp49 = weak_mat_tmp15*weak_mat_tmp9;
+    const s_t weak_mat_tmp50 = s_t(2)*gu3 - weak_mat_tmp22*weak_mat_tmp38 - weak_mat_tmp3*weak_mat_tmp39 + weak_mat_tmp39*weak_mat_tmp8 + s_t(2);
+    const s_t weak_mat_tmp51 = weak_mat_tmp26*weak_mat_tmp28;
+    const s_t weak_mat_tmp52 = K*weak_mat_tmp16 + iso_relaxation_gamma*(C01*(weak_mat_tmp16*weak_mat_tmp30 + weak_mat_tmp19*(s_t(4)*weak_mat_tmp0*weak_mat_tmp5 - s_t(2)*weak_mat_tmp10) + weak_mat_tmp27*weak_mat_tmp50 + weak_mat_tmp37*weak_mat_tmp5 + weak_mat_tmp51) + C10*(weak_mat_tmp13*weak_mat_tmp16 + weak_mat_tmp15*weak_mat_tmp18 + weak_mat_tmp15*weak_mat_tmp48 + weak_mat_tmp49)) + weak_mat_tmp47;
+    const s_t weak_mat_tmp53 = s_t(4)*weak_mat_tmp10;
+    const s_t weak_mat_tmp54 = weak_mat_tmp14 - weak_mat_tmp15*weak_mat_tmp53;
+    const s_t weak_mat_tmp55 = s_t(2)*weak_mat_tmp4;
+    const s_t weak_mat_tmp56 = weak_mat_tmp26*weak_mat_tmp45;
+    const s_t weak_mat_tmp57 = gu2*weak_mat_tmp5;
+    const s_t weak_mat_tmp58 = gu2*weak_mat_tmp26;
+    const s_t weak_mat_tmp59 = -K*weak_mat_tmp57 + iso_relaxation_gamma*(C01*(-weak_mat_tmp19*weak_mat_tmp43 + weak_mat_tmp26*weak_mat_tmp45*weak_mat_tmp5 - weak_mat_tmp30*weak_mat_tmp57 - weak_mat_tmp50*weak_mat_tmp58) + C10*(-weak_mat_tmp13*weak_mat_tmp57 + weak_mat_tmp33 - weak_mat_tmp35));
+    const s_t weak_mat_tmp60 = s_t(2)*weak_mat_tmp2;
+    const s_t weak_mat_tmp61 = K*weak_mat_tmp10 + iso_relaxation_gamma*(C01*(gu1*gu2*weak_mat_tmp28*weak_mat_tmp29 - gu1*weak_mat_tmp56 + weak_mat_tmp19*(-s_t(2)*weak_mat_tmp16 + weak_mat_tmp53) - weak_mat_tmp40*weak_mat_tmp58 - weak_mat_tmp51) + C10*(gu1*gu2*weak_mat_tmp12*weak_mat_tmp9 - weak_mat_tmp15*weak_mat_tmp55 - weak_mat_tmp15*weak_mat_tmp60 - weak_mat_tmp49)) - weak_mat_tmp47;
+    const s_t weak_mat_tmp62 = weak_mat_tmp26*weak_mat_tmp50;
+    const s_t weak_mat_tmp63 = -K*weak_mat_tmp20 + iso_history_qp[2] + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp62 - weak_mat_tmp19*weak_mat_tmp32 - weak_mat_tmp20*weak_mat_tmp30 + weak_mat_tmp26*weak_mat_tmp40*weak_mat_tmp5) + C10*(-weak_mat_tmp13*weak_mat_tmp20 - weak_mat_tmp42 + weak_mat_tmp44));
+    const s_t material0 = trial_grad0*(K*weak_mat_tmp1 + iso_history_qp[0] + iso_relaxation_gamma*(C01*(weak_mat_tmp1*weak_mat_tmp30 + weak_mat_tmp19*(weak_mat_tmp18 + s_t(2)) + s_t(2)*weak_mat_tmp25*weak_mat_tmp27) + C10*(weak_mat_tmp1*weak_mat_tmp13 + weak_mat_tmp17))) + trial_grad1*weak_mat_tmp46 + trial_grad2*weak_mat_tmp41 + trial_grad3*weak_mat_tmp52;
+    const s_t material1 = trial_grad0*weak_mat_tmp46 + trial_grad1*(K*weak_mat_tmp4 + iso_history_qp[1] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp55 + s_t(2)) + weak_mat_tmp30*weak_mat_tmp4 - weak_mat_tmp38*weak_mat_tmp56) + C10*(weak_mat_tmp13*weak_mat_tmp4 + weak_mat_tmp54))) + trial_grad2*weak_mat_tmp61 + trial_grad3*weak_mat_tmp59;
+    const s_t material2 = trial_grad0*weak_mat_tmp41 + trial_grad1*weak_mat_tmp61 + trial_grad2*(K*weak_mat_tmp2 + iso_history_qp[0] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp60 + s_t(2)) + weak_mat_tmp2*weak_mat_tmp30 - weak_mat_tmp23*weak_mat_tmp26*weak_mat_tmp40) + C10*(weak_mat_tmp13*weak_mat_tmp2 + weak_mat_tmp54))) + trial_grad3*weak_mat_tmp63;
+    const s_t material3 = trial_grad0*weak_mat_tmp52 + trial_grad1*weak_mat_tmp59 + trial_grad2*weak_mat_tmp63 + trial_grad3*(K*weak_mat_tmp6 + iso_history_qp[1] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp48 + s_t(2)) + weak_mat_tmp24*weak_mat_tmp62 + weak_mat_tmp30*weak_mat_tmp6) + C10*(weak_mat_tmp13*weak_mat_tmp6 + weak_mat_tmp17)));
+      loperand0_values = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1_values = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2_values = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3_values = qw * (material2 * adj_value2 + material3 * adj_value3);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[2 * shape];
+        s_t *const RSTR out_shape1 = out_streams[2 * shape + 1];
+        {
+          out_shape0[0] += loperand0_values * tref0 + loperand1_values * tref1;
+          out_shape1[0] += loperand2_values * tref0 + loperand3_values * tref1;
+        }
+      }
+    }
+}
+
+template <typename s_t, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_tri3_apply_block(
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        const s_t K,
+        const s_t iso_relaxation_gamma,
+        const s_t *const RSTR iso_history,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        s_t *const RSTR out_streams[NS * 2]
+) {
+    {
+      const s_t qw = (s_t(1) / s_t(2));
+      const s_t *const RSTR iso_history_q = iso_history;
+      {
+      const ptrdiff_t goff = 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t iso_history_qp[3] = {iso_history_q[0], iso_history_q[1 * qp_stride + 0], iso_history_q[2 * qp_stride + 0]};
+      const s_t gu_ref0 = -(u_streams[0][0]) + u_streams[2][0];
+      const s_t grad_h_ref0 = -(h_streams[0][0]) + h_streams[2][0];
+      const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[4][0];
+      const s_t grad_h_ref1 = -(h_streams[0][0]) + h_streams[4][0];
+      const s_t gu_ref2 = -(u_streams[1][0]) + u_streams[3][0];
+      const s_t grad_h_ref2 = -(h_streams[1][0]) + h_streams[3][0];
+      const s_t gu_ref3 = -(u_streams[1][0]) + u_streams[5][0];
+      const s_t grad_h_ref3 = -(h_streams[1][0]) + h_streams[5][0];
+      const s_t idet = s_t(1) / det_value0;
+      const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      const s_t trial_grad0 = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+      const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      const s_t trial_grad1 = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+      const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+      const s_t trial_grad2 = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+      const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+      const s_t trial_grad3 = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+    const s_t weak_mat_tmp0 = gu3 + s_t(1);
+    const s_t weak_mat_tmp1 = pow_2(weak_mat_tmp0);
+    const s_t weak_mat_tmp2 = pow_2(gu1);
+    const s_t weak_mat_tmp3 = weak_mat_tmp1 + weak_mat_tmp2;
+    const s_t weak_mat_tmp4 = pow_2(gu2);
+    const s_t weak_mat_tmp5 = gu0 + s_t(1);
+    const s_t weak_mat_tmp6 = pow_2(weak_mat_tmp5);
+    const s_t weak_mat_tmp7 = weak_mat_tmp4 + weak_mat_tmp6;
+    const s_t weak_mat_tmp8 = weak_mat_tmp3 + weak_mat_tmp7;
+    const s_t weak_mat_tmp9 = weak_mat_tmp8 + s_t(1);
+    const s_t weak_mat_tmp10 = gu1*gu2;
+    const s_t weak_mat_tmp11 = weak_mat_tmp0*weak_mat_tmp5 - weak_mat_tmp10;
+    const s_t weak_mat_tmp12 = sfem_continued_power_d2<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp13 = weak_mat_tmp12*weak_mat_tmp9;
+    const s_t weak_mat_tmp14 = s_t(2)*sfem_continued_power<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp15 = sfem_continued_power_d1<s_t>(weak_mat_tmp11, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp16 = weak_mat_tmp0*weak_mat_tmp5;
+    const s_t weak_mat_tmp17 = weak_mat_tmp14 + s_t(4)*weak_mat_tmp15*weak_mat_tmp16;
+    const s_t weak_mat_tmp18 = s_t(2)*weak_mat_tmp1;
+    const s_t weak_mat_tmp19 = sfem_continued_power<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp20 = gu1*weak_mat_tmp5;
+    const s_t weak_mat_tmp21 = gu2*weak_mat_tmp0;
+    const s_t weak_mat_tmp22 = weak_mat_tmp20 + weak_mat_tmp21;
+    const s_t weak_mat_tmp23 = s_t(2)*gu1;
+    const s_t weak_mat_tmp24 = s_t(2)*weak_mat_tmp5;
+    const s_t weak_mat_tmp25 = s_t(2)*gu0 - weak_mat_tmp22*weak_mat_tmp23 - weak_mat_tmp24*weak_mat_tmp7 + weak_mat_tmp24*weak_mat_tmp8 + s_t(2);
+    const s_t weak_mat_tmp26 = sfem_continued_power_d1<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp27 = weak_mat_tmp0*weak_mat_tmp26;
+    const s_t weak_mat_tmp28 = -pow_2(weak_mat_tmp22) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp3) - (s_t(1) / s_t(2))*pow_2(weak_mat_tmp7) + ((s_t(1) / s_t(2)))*pow_2(weak_mat_tmp8) + weak_mat_tmp8;
+    const s_t weak_mat_tmp29 = sfem_continued_power_d2<s_t>(weak_mat_tmp11, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t weak_mat_tmp30 = weak_mat_tmp28*weak_mat_tmp29;
+    const s_t weak_mat_tmp31 = gu1*weak_mat_tmp0;
+    const s_t weak_mat_tmp32 = s_t(2)*weak_mat_tmp20;
+    const s_t weak_mat_tmp33 = weak_mat_tmp15*weak_mat_tmp32;
+    const s_t weak_mat_tmp34 = s_t(2)*weak_mat_tmp21;
+    const s_t weak_mat_tmp35 = weak_mat_tmp15*weak_mat_tmp34;
+    const s_t weak_mat_tmp36 = weak_mat_tmp0*weak_mat_tmp23;
+    const s_t weak_mat_tmp37 = weak_mat_tmp25*weak_mat_tmp26;
+    const s_t weak_mat_tmp38 = s_t(2)*gu2;
+    const s_t weak_mat_tmp39 = s_t(2)*weak_mat_tmp0;
+    const s_t weak_mat_tmp40 = s_t(2)*gu2*weak_mat_tmp8 + s_t(2)*gu2 - weak_mat_tmp22*weak_mat_tmp39 - weak_mat_tmp38*weak_mat_tmp7;
+    const s_t weak_mat_tmp41 = -K*weak_mat_tmp31 + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp37 + weak_mat_tmp0*weak_mat_tmp26*weak_mat_tmp40 - weak_mat_tmp19*weak_mat_tmp36 - weak_mat_tmp30*weak_mat_tmp31) + C10*(-weak_mat_tmp13*weak_mat_tmp31 - weak_mat_tmp33 + weak_mat_tmp35));
+    const s_t weak_mat_tmp42 = weak_mat_tmp15*weak_mat_tmp36;
+    const s_t weak_mat_tmp43 = weak_mat_tmp38*weak_mat_tmp5;
+    const s_t weak_mat_tmp44 = weak_mat_tmp15*weak_mat_tmp43;
+    const s_t weak_mat_tmp45 = s_t(2)*gu1*weak_mat_tmp8 + s_t(2)*gu1 - weak_mat_tmp22*weak_mat_tmp24 - weak_mat_tmp23*weak_mat_tmp3;
+    const s_t weak_mat_tmp46 = -K*weak_mat_tmp21 + iso_history_qp[2] + iso_relaxation_gamma*(C01*(-gu2*weak_mat_tmp37 + weak_mat_tmp0*weak_mat_tmp26*weak_mat_tmp45 - weak_mat_tmp19*weak_mat_tmp34 - weak_mat_tmp21*weak_mat_tmp30) + C10*(-weak_mat_tmp13*weak_mat_tmp21 + weak_mat_tmp42 - weak_mat_tmp44));
+    const s_t weak_mat_tmp47 = K*(gu0*gu3 + gu0 + gu3 - weak_mat_tmp10);
+    const s_t weak_mat_tmp48 = s_t(2)*weak_mat_tmp6;
+    const s_t weak_mat_tmp49 = weak_mat_tmp15*weak_mat_tmp9;
+    const s_t weak_mat_tmp50 = s_t(2)*gu3 - weak_mat_tmp22*weak_mat_tmp38 - weak_mat_tmp3*weak_mat_tmp39 + weak_mat_tmp39*weak_mat_tmp8 + s_t(2);
+    const s_t weak_mat_tmp51 = weak_mat_tmp26*weak_mat_tmp28;
+    const s_t weak_mat_tmp52 = K*weak_mat_tmp16 + iso_relaxation_gamma*(C01*(weak_mat_tmp16*weak_mat_tmp30 + weak_mat_tmp19*(s_t(4)*weak_mat_tmp0*weak_mat_tmp5 - s_t(2)*weak_mat_tmp10) + weak_mat_tmp27*weak_mat_tmp50 + weak_mat_tmp37*weak_mat_tmp5 + weak_mat_tmp51) + C10*(weak_mat_tmp13*weak_mat_tmp16 + weak_mat_tmp15*weak_mat_tmp18 + weak_mat_tmp15*weak_mat_tmp48 + weak_mat_tmp49)) + weak_mat_tmp47;
+    const s_t weak_mat_tmp53 = s_t(4)*weak_mat_tmp10;
+    const s_t weak_mat_tmp54 = weak_mat_tmp14 - weak_mat_tmp15*weak_mat_tmp53;
+    const s_t weak_mat_tmp55 = s_t(2)*weak_mat_tmp4;
+    const s_t weak_mat_tmp56 = weak_mat_tmp26*weak_mat_tmp45;
+    const s_t weak_mat_tmp57 = gu2*weak_mat_tmp5;
+    const s_t weak_mat_tmp58 = gu2*weak_mat_tmp26;
+    const s_t weak_mat_tmp59 = -K*weak_mat_tmp57 + iso_relaxation_gamma*(C01*(-weak_mat_tmp19*weak_mat_tmp43 + weak_mat_tmp26*weak_mat_tmp45*weak_mat_tmp5 - weak_mat_tmp30*weak_mat_tmp57 - weak_mat_tmp50*weak_mat_tmp58) + C10*(-weak_mat_tmp13*weak_mat_tmp57 + weak_mat_tmp33 - weak_mat_tmp35));
+    const s_t weak_mat_tmp60 = s_t(2)*weak_mat_tmp2;
+    const s_t weak_mat_tmp61 = K*weak_mat_tmp10 + iso_relaxation_gamma*(C01*(gu1*gu2*weak_mat_tmp28*weak_mat_tmp29 - gu1*weak_mat_tmp56 + weak_mat_tmp19*(-s_t(2)*weak_mat_tmp16 + weak_mat_tmp53) - weak_mat_tmp40*weak_mat_tmp58 - weak_mat_tmp51) + C10*(gu1*gu2*weak_mat_tmp12*weak_mat_tmp9 - weak_mat_tmp15*weak_mat_tmp55 - weak_mat_tmp15*weak_mat_tmp60 - weak_mat_tmp49)) - weak_mat_tmp47;
+    const s_t weak_mat_tmp62 = weak_mat_tmp26*weak_mat_tmp50;
+    const s_t weak_mat_tmp63 = -K*weak_mat_tmp20 + iso_history_qp[2] + iso_relaxation_gamma*(C01*(-gu1*weak_mat_tmp62 - weak_mat_tmp19*weak_mat_tmp32 - weak_mat_tmp20*weak_mat_tmp30 + weak_mat_tmp26*weak_mat_tmp40*weak_mat_tmp5) + C10*(-weak_mat_tmp13*weak_mat_tmp20 - weak_mat_tmp42 + weak_mat_tmp44));
+    const s_t material0 = trial_grad0*(K*weak_mat_tmp1 + iso_history_qp[0] + iso_relaxation_gamma*(C01*(weak_mat_tmp1*weak_mat_tmp30 + weak_mat_tmp19*(weak_mat_tmp18 + s_t(2)) + s_t(2)*weak_mat_tmp25*weak_mat_tmp27) + C10*(weak_mat_tmp1*weak_mat_tmp13 + weak_mat_tmp17))) + trial_grad1*weak_mat_tmp46 + trial_grad2*weak_mat_tmp41 + trial_grad3*weak_mat_tmp52;
+    const s_t material1 = trial_grad0*weak_mat_tmp46 + trial_grad1*(K*weak_mat_tmp4 + iso_history_qp[1] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp55 + s_t(2)) + weak_mat_tmp30*weak_mat_tmp4 - weak_mat_tmp38*weak_mat_tmp56) + C10*(weak_mat_tmp13*weak_mat_tmp4 + weak_mat_tmp54))) + trial_grad2*weak_mat_tmp61 + trial_grad3*weak_mat_tmp59;
+    const s_t material2 = trial_grad0*weak_mat_tmp41 + trial_grad1*weak_mat_tmp61 + trial_grad2*(K*weak_mat_tmp2 + iso_history_qp[0] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp60 + s_t(2)) + weak_mat_tmp2*weak_mat_tmp30 - weak_mat_tmp23*weak_mat_tmp26*weak_mat_tmp40) + C10*(weak_mat_tmp13*weak_mat_tmp2 + weak_mat_tmp54))) + trial_grad3*weak_mat_tmp63;
+    const s_t material3 = trial_grad0*weak_mat_tmp52 + trial_grad1*weak_mat_tmp59 + trial_grad2*weak_mat_tmp63 + trial_grad3*(K*weak_mat_tmp6 + iso_history_qp[1] + iso_relaxation_gamma*(C01*(weak_mat_tmp19*(weak_mat_tmp48 + s_t(2)) + weak_mat_tmp24*weak_mat_tmp62 + weak_mat_tmp30*weak_mat_tmp6) + C10*(weak_mat_tmp13*weak_mat_tmp6 + weak_mat_tmp17)));
+    const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
+    const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
+    const s_t loperand2 = qw * (material2 * adj_value0 + material3 * adj_value1);
+    const s_t loperand3 = qw * (material2 * adj_value2 + material3 * adj_value3);
+      out_streams[0][0] += -(loperand0) - loperand1;
+      out_streams[1][0] += -(loperand2) - loperand3;
+      out_streams[2][0] += loperand0;
+      out_streams[3][0] += loperand2;
+      out_streams[4][0] += loperand1;
+      out_streams[5][0] += loperand3;
+      }
+    }
+}
+
+template <typename s_t, int NQ, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_quadrature_output_block(
+        const ptrdiff_t geometry_stride,
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t *const RSTR grad_ref_x,
+        const s_t *const RSTR grad_ref_y,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        s_t *const RSTR iso_stress,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2]
+) {
+  static_assert(NQ > 0, "NQ must be positive");
+    for (int q = 0; q < NQ; ++q) {
+      s_t *const RSTR iso_stress_q = iso_stress + q * qp_stride;
+      s_t gu_ref0_values;
+      s_t gu_ref1_values;
+      s_t gu_ref2_values;
+      s_t gu_ref3_values;
+      {
+        gu_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
+        gu_ref2_values = s_t(0);
+        gu_ref3_values = s_t(0);
+      }
+      for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[2 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[2 * shape + 1];
+        {
+          gu_ref0_values += u_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
+          gu_ref2_values += u_shape1[0] * gref0;
+          gu_ref3_values += u_shape1[0] * gref1;
+        }
+      }
+      {
+      const ptrdiff_t goff = q * geometry_stride + 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
+      const s_t gu_ref2 = gu_ref2_values;
+      const s_t gu_ref3 = gu_ref3_values;
+    const s_t idet = s_t(1) / det_value0;
+    const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+    const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    const s_t qp_out_tmp0 = gu0 + s_t(1);
+    const s_t qp_out_tmp1 = gu3 + s_t(1);
+    const s_t qp_out_tmp2 = -gu1*gu2 + qp_out_tmp0*qp_out_tmp1;
+    const s_t qp_out_tmp3 = pow_m1(qp_out_tmp2);
+    const s_t qp_out_tmp4 = sfem_continued_power<s_t>(qp_out_tmp2, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp5 = pow_2(gu2) + pow_2(qp_out_tmp0);
+    const s_t qp_out_tmp6 = pow_2(gu1) + pow_2(qp_out_tmp1);
+    const s_t qp_out_tmp7 = qp_out_tmp5 + qp_out_tmp6;
+    const s_t qp_out_tmp8 = (qp_out_tmp7 + s_t(1))*sfem_continued_power_d1<s_t>(qp_out_tmp2, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp9 = sfem_continued_power<s_t>(qp_out_tmp2, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp10 = s_t(2)*gu2;
+    const s_t qp_out_tmp11 = gu1*qp_out_tmp0 + gu2*qp_out_tmp1;
+    const s_t qp_out_tmp12 = s_t(2)*qp_out_tmp1;
+    const s_t qp_out_tmp13 = (-pow_2(qp_out_tmp11) - (s_t(1) / s_t(2))*pow_2(qp_out_tmp5) - (s_t(1) / s_t(2))*pow_2(qp_out_tmp6) + ((s_t(1) / s_t(2)))*pow_2(qp_out_tmp7) + qp_out_tmp7)*sfem_continued_power_d1<s_t>(qp_out_tmp2, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp14 = s_t(2)*qp_out_tmp0;
+    const s_t qp_out_tmp15 = s_t(2)*gu1;
+    const s_t qp_out_tmp16 = C01*(-gu2*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu1*qp_out_tmp7 + s_t(2)*gu1 - qp_out_tmp11*qp_out_tmp14 - qp_out_tmp15*qp_out_tmp6)) + C10*(-gu2*qp_out_tmp8 + qp_out_tmp15*qp_out_tmp4);
+    const s_t qp_out_tmp17 = C01*(qp_out_tmp0*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu3 - qp_out_tmp10*qp_out_tmp11 - qp_out_tmp12*qp_out_tmp6 + qp_out_tmp12*qp_out_tmp7 + s_t(2))) + C10*(qp_out_tmp0*qp_out_tmp8 + qp_out_tmp12*qp_out_tmp4);
+    iso_stress_q[0] = qp_out_tmp3*(-gu1*(C01*(-gu1*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu2*qp_out_tmp7 + s_t(2)*gu2 - qp_out_tmp10*qp_out_tmp5 - qp_out_tmp11*qp_out_tmp12)) + C10*(-gu1*qp_out_tmp8 + s_t(2)*gu2*qp_out_tmp4)) + qp_out_tmp1*(C01*(qp_out_tmp1*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu0 - qp_out_tmp11*qp_out_tmp15 - qp_out_tmp14*qp_out_tmp5 + qp_out_tmp14*qp_out_tmp7 + s_t(2))) + C10*(qp_out_tmp1*qp_out_tmp8 + qp_out_tmp14*qp_out_tmp4)));
+    iso_stress_q[1 * NQ * qp_stride + 0] = qp_out_tmp3*(-gu2*qp_out_tmp16 + qp_out_tmp0*qp_out_tmp17);
+    iso_stress_q[2 * NQ * qp_stride + 0] = qp_out_tmp3*(-gu1*qp_out_tmp17 + qp_out_tmp1*qp_out_tmp16);
+      }
+    }
+}
+
+template <typename s_t, int NS>
+static __host__ __device__ __forceinline__ void continued_mooney_rivlin_prony_d2_simplex_tri3_quadrature_output_block(
+        const s_t *const RSTR adj0,
+        const s_t *const RSTR adj1,
+        const s_t *const RSTR adj2,
+        const s_t *const RSTR adj3,
+        const s_t *const RSTR det0,
+        const s_t C01,
+        const s_t C10,
+        const s_t Jc,
+        const s_t Jmin,
+        s_t *const RSTR iso_stress,
+        const ptrdiff_t qp_stride,
+        const s_t *const RSTR u_streams[NS * 2]
+) {
+    {
+      s_t *const RSTR iso_stress_q = iso_stress;
+      {
+      const ptrdiff_t goff = 0;
+      const s_t adj_value0 = adj0[goff];
+      const s_t adj_value1 = adj1[goff];
+      const s_t adj_value2 = adj2[goff];
+      const s_t adj_value3 = adj3[goff];
+      const s_t det_value0 = det0[goff];
+      const s_t gu_ref0 = -(u_streams[0][0]) + u_streams[2][0];
+      const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[4][0];
+      const s_t gu_ref2 = -(u_streams[1][0]) + u_streams[3][0];
+      const s_t gu_ref3 = -(u_streams[1][0]) + u_streams[5][0];
+      const s_t idet = s_t(1) / det_value0;
+      const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+      const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    const s_t qp_out_tmp0 = gu0 + s_t(1);
+    const s_t qp_out_tmp1 = gu3 + s_t(1);
+    const s_t qp_out_tmp2 = -gu1*gu2 + qp_out_tmp0*qp_out_tmp1;
+    const s_t qp_out_tmp3 = pow_m1(qp_out_tmp2);
+    const s_t qp_out_tmp4 = sfem_continued_power<s_t>(qp_out_tmp2, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp5 = pow_2(gu2) + pow_2(qp_out_tmp0);
+    const s_t qp_out_tmp6 = pow_2(gu1) + pow_2(qp_out_tmp1);
+    const s_t qp_out_tmp7 = qp_out_tmp5 + qp_out_tmp6;
+    const s_t qp_out_tmp8 = (qp_out_tmp7 + s_t(1))*sfem_continued_power_d1<s_t>(qp_out_tmp2, (s_t(2) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp9 = sfem_continued_power<s_t>(qp_out_tmp2, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp10 = s_t(2)*gu2;
+    const s_t qp_out_tmp11 = gu1*qp_out_tmp0 + gu2*qp_out_tmp1;
+    const s_t qp_out_tmp12 = s_t(2)*qp_out_tmp1;
+    const s_t qp_out_tmp13 = (-pow_2(qp_out_tmp11) - (s_t(1) / s_t(2))*pow_2(qp_out_tmp5) - (s_t(1) / s_t(2))*pow_2(qp_out_tmp6) + ((s_t(1) / s_t(2)))*pow_2(qp_out_tmp7) + qp_out_tmp7)*sfem_continued_power_d1<s_t>(qp_out_tmp2, (s_t(4) / s_t(3)), Jc, Jmin);
+    const s_t qp_out_tmp14 = s_t(2)*qp_out_tmp0;
+    const s_t qp_out_tmp15 = s_t(2)*gu1;
+    const s_t qp_out_tmp16 = C01*(-gu2*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu1*qp_out_tmp7 + s_t(2)*gu1 - qp_out_tmp11*qp_out_tmp14 - qp_out_tmp15*qp_out_tmp6)) + C10*(-gu2*qp_out_tmp8 + qp_out_tmp15*qp_out_tmp4);
+    const s_t qp_out_tmp17 = C01*(qp_out_tmp0*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu3 - qp_out_tmp10*qp_out_tmp11 - qp_out_tmp12*qp_out_tmp6 + qp_out_tmp12*qp_out_tmp7 + s_t(2))) + C10*(qp_out_tmp0*qp_out_tmp8 + qp_out_tmp12*qp_out_tmp4);
+    iso_stress_q[0] = qp_out_tmp3*(-gu1*(C01*(-gu1*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu2*qp_out_tmp7 + s_t(2)*gu2 - qp_out_tmp10*qp_out_tmp5 - qp_out_tmp11*qp_out_tmp12)) + C10*(-gu1*qp_out_tmp8 + s_t(2)*gu2*qp_out_tmp4)) + qp_out_tmp1*(C01*(qp_out_tmp1*qp_out_tmp13 + qp_out_tmp9*(s_t(2)*gu0 - qp_out_tmp11*qp_out_tmp15 - qp_out_tmp14*qp_out_tmp5 + qp_out_tmp14*qp_out_tmp7 + s_t(2))) + C10*(qp_out_tmp1*qp_out_tmp8 + qp_out_tmp14*qp_out_tmp4)));
+    iso_stress_q[1 * qp_stride + 0] = qp_out_tmp3*(-gu2*qp_out_tmp16 + qp_out_tmp0*qp_out_tmp17);
+    iso_stress_q[2 * qp_stride + 0] = qp_out_tmp3*(-gu1*qp_out_tmp17 + qp_out_tmp1*qp_out_tmp16);
+      }
+    }
+}
+
+} // namespace codegen
+} // namespace sfem
+
+#endif

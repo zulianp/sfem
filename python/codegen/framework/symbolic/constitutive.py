@@ -28,6 +28,90 @@ def isochoric_invariants(F, dim):
     return I1, I2, J
 
 
+def continued_power_piecewise(J, m, Jc, Jmin):
+    """h_m(J) written out: the definition the kernel math header implements.
+
+    J^(-m) for J >= Jc.  For Jmin < J < Jc the quartic in z = (J - Jc) / (Jc - Jmin)
+    whose value, slope and curvature match J^(-m) at Jc (a0, a1, a2) and whose
+    slope and curvature vanish at z = -1 (a3, a4).  Constant for J <= Jmin.
+    """
+    delta = Jc - Jmin
+    hc = Jc ** -m
+    a1 = -m * delta * hc / Jc
+    a2 = m * (m + 1) * delta**2 * hc / (2 * Jc**2)
+    a3 = sp.Rational(4, 3) * a2 - a1
+    a4 = (a2 - a1) / 2
+    z = (J - Jc) / delta
+    quartic = hc + a1 * z + a2 * z**2 + a3 * z**3 + a4 * z**4
+    return sp.Piecewise((J**-m, J >= Jc), (quartic, J > Jmin), (quartic.subs(J, Jmin), True))
+
+
+class _ContinuedPowerDerivative(sp.Function):
+    """d^k h_m/dJ^k with arguments (J, m, Jc, Jmin); k is the class's `order`.
+
+    Kept opaque so the generated expressions call the header's function rather
+    than carrying the pieces; differentiated through `fdiff` and evaluated
+    numerically from `continued_power_piecewise`, which the generator's numeric
+    checks (the tangent's symmetry) need.
+    """
+
+    nargs = 4
+    order = 0
+    derivative = None
+
+    def fdiff(self, argindex=1):
+        if argindex != 1 or self.derivative is None:
+            raise sp.ArgumentIndexError(self, argindex)
+        return self.derivative(*self.args)
+
+    def _eval_evalf(self, prec):
+        if not all(argument.is_number for argument in self.args):
+            return None
+        J, m, Jc, Jmin = self.args
+        x = sp.Dummy("J")
+        value = sp.diff(continued_power_piecewise(x, m, Jc, Jmin), x, self.order).subs(x, J)
+        return value.evalf(prec)
+
+
+class sfem_continued_power_d2(_ContinuedPowerDerivative):
+    """d2h_m/dJ2; the header has no third derivative."""
+
+    order = 2
+
+
+class sfem_continued_power_d1(_ContinuedPowerDerivative):
+    """dh_m/dJ."""
+
+    order = 1
+    derivative = sfem_continued_power_d2
+
+
+class sfem_continued_power(_ContinuedPowerDerivative):
+    """h_m(J): J^(-m) for J >= Jc, continued below Jc so that it stays finite.
+
+    An energy written in h_m(J) instead of J^(-m) is C2 through J = 0, so a
+    Newton trial may pass through an inverted element.  The definition is
+    `continued_power_piecewise`; the kernel math header implements it
+    (`emitters/cprinter.py`).
+    """
+
+    order = 0
+    derivative = sfem_continued_power_d1
+
+
+#: The kernel math header's function for each, by the name the printer prints.
+CONTINUED_POWER_FUNCTIONS = (
+    "sfem_continued_power",
+    "sfem_continued_power_d1",
+    "sfem_continued_power_d2",
+)
+
+
+def continued_power(J, m, Jc, Jmin):
+    """h_m(J), the continuation of J^(-m) below Jc (`sfem_continued_power`)."""
+    return sfem_continued_power(J, sp.sympify(m), Jc, Jmin)
+
+
 def _dataclass_value_tuple(instance):
     return tuple(getattr(instance, field.name) for field in fields(instance))
 

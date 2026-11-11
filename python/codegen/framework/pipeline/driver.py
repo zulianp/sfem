@@ -84,6 +84,7 @@ from codegen.framework.symbolic.boundary_forms import (
 )
 from codegen.framework.symbolic.constitutive import (
     TwoPhaseFlowConstitutiveModel,
+    continued_power,
     isochoric_invariants,
 )
 from codegen.framework.symbolic.relaxation import (
@@ -3155,6 +3156,7 @@ __all__ = [
     "grad",
     "inner",
     "inv",
+    "continued_power",
     "isochoric_invariants",
     "material_parameter",
     "matrix_format_plan_from_request",
