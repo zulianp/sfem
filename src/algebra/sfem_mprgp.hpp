@@ -53,6 +53,13 @@ namespace sfem {
         /// The last solve stopped at a direction of no positive curvature that no bound limits.
         bool negative_curvature_{false};
         bool met_negative_curvature() const { return negative_curvature_; }
+        /// The solve stops where the projected gradient rises past divergence_growth times its least
+        /// value (mprgp_diverging); 0: no test. On the LDP valves' contact QPs the convex ones rise
+        /// by at most 13 times, an indefinite one by thousands.
+        T    divergence_growth{100};
+        /// The last solve stopped there.
+        bool diverged_{false};
+        bool met_divergence() const { return diverged_; }
 
         /// Bytes of the workspace kept between solves (4 vectors, the passes' work, the control
         /// block), in the BLAS's memory space; 0 before the first solve.
@@ -359,7 +366,8 @@ namespace sfem {
         /// product zeroes the thread's rows unless the operator overwrites them and waits for every
         /// thread's input (one barrier); the updates of x, g, p are each thread's own rows, with the
         /// expressions of the pass-by-pass kernels. The record, the gradients and the counts are
-        /// written back by the leader. False on a direction with no curvature that no bound stops.
+        /// written back by the leader. False on a direction with no curvature that no bound stops;
+        /// diverged where the projected gradient rose past its bound (mprgp_diverging).
         bool team_solve(const T* const b,
                         T* const       x,
                         T* const       g,
@@ -370,7 +378,8 @@ namespace sfem {
                         const T        norm_gp0,
                         Gradients*     grads,
                         int*           counts,
-                        bool*          converged) {
+                        bool*          converged,
+                        bool*          diverged) {
             using Pass                = OpenMPMPRGPKernels<T>;
             const T* const w          = norm_weight_ ? norm_weight_->data() : nullptr;
             const T        no_curv[4] = {0, 0, 0, infty};
@@ -384,7 +393,8 @@ namespace sfem {
                 Gradients           gr   = *grads;
                 int                 it   = iterations_;
                 int                 n_cg = counts[0], n_expansion = counts[1], n_proportioning = counts[2];
-                bool                done = false, unbounded = false;
+                bool                done = false, unbounded = false, diverging = false;
+                T                   least_norm_gp = norm_gp0;
                 const ptrdiff_t     i0 = team.begin, i1 = team.end;
                 with_mprgp_bounds(lb(), ub(), [&](const auto bounds) {
                     auto product = [&](const T* const in, T* const out) {
@@ -475,6 +485,14 @@ namespace sfem {
                         const T rel_norm_gp = gr.norm_gp / norm_gp0;
                         done                = gr.norm_gp < atol || rel_norm_gp < rtol;
                         if (team.leader()) monitor(it, gr.norm_gp, rel_norm_gp);
+                        if (!done && mprgp_diverging(gr.norm_gp, least_norm_gp, divergence_growth)) {
+                            diverging = true;
+                            if (team.leader())
+                                fprintf(stderr, "[Warning][MPRGP] Projected gradient %g times its least: the energy falls without end\n",
+                                        (double)(gr.norm_gp / least_norm_gp));
+                            break;
+                        }
+                        least_norm_gp = std::min(least_norm_gp, gr.norm_gp);
                         if (++it >= max_it || done) break;
                     }
                 });
@@ -486,6 +504,7 @@ namespace sfem {
                     counts[1]   = n_expansion;
                     counts[2]   = n_proportioning;
                     *converged  = done;
+                    *diverged   = diverging;
                     bounded     = !unbounded;
                 }
             }
@@ -611,11 +630,13 @@ namespace sfem {
 
             iterations_         = 0;
             negative_curvature_ = false;
+            diverged_           = false;
+            T least_norm_gp     = norm_gp0;
 
             if (team_op_) {
                 // The whole iteration in one region.
                 int counts[3] = {0, 0, 0};
-                negative_curvature_ = !team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged);
+                negative_curvature_ = !team_solve(b, x, g, p, Ap_or_Ag, gf_or_gc, work, norm_gp0, &grads, counts, &converged, &diverged_);
                 count_cg_steps            = counts[0];
                 count_expansion_steps     = counts[1];
                 count_proportioning_steps = counts[2];
@@ -673,6 +694,13 @@ namespace sfem {
                 converged = norm_gp < atol || rel_norm_gp < rtol;
 
                 monitor(iterations_, norm_gp, rel_norm_gp);
+                if (!converged && mprgp_diverging(norm_gp, least_norm_gp, divergence_growth)) {
+                    fprintf(stderr, "[Warning][MPRGP] Projected gradient %g times its least: the energy falls without end\n",
+                            (double)(norm_gp / least_norm_gp));
+                    diverged_ = true;
+                    break;
+                }
+                least_norm_gp = std::min(least_norm_gp, norm_gp);
                 if (++iterations_ >= max_it) {
                     break;
                 }
