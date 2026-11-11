@@ -104,6 +104,12 @@ namespace sfem {
     ///                                        # storage_bytes: 4 stores the BSR tangent in single
     ///                                        # precision, node_sdf's too (8 by default; 2, half,
     ///                                        # for an unconstrained step on the host)
+    /// log: {level: normal, solid: verbose}   # runtime messages (sfem_log.hpp): quiet | normal |
+    ///                                        # verbose | debug, for every component (level) and per
+    ///                                        # component: setup (sizes, choices), solid (a line per
+    ///                                        # step and the failed attempts; Newton's iterations at
+    ///                                        # verbose), contact (QP fallbacks at verbose, MPRGP's
+    ///                                        # iterations at debug)
     /// output:
     ///   path: output
     ///   export_freq: 1

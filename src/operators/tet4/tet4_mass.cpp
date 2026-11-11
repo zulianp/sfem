@@ -1,4 +1,5 @@
 #include "tet4_mass.hpp"
+#include "sfem_log.hpp"
 #include "smesh_base.hpp"
 
 #include <assert.h>
@@ -215,7 +216,9 @@ void tet4_assemble_mass(const ptrdiff_t                    nelements,  //
 
     double tock = smesh::time_seconds();
 #if SFEM_LOG_LEVEL >= 5
-    printf("tet4_mass.c: assemble_mass\t%g seconds\n", tock - tick);
+    if (sfem::log_enabled(sfem::LOG_SETUP, sfem::LOG_DEBUG)) {
+        sfem::log_printf(sfem::LOG_SETUP, sfem::LOG_DEBUG, sfem::LOG_SUMMARY, "tet4_mass: assemble_mass %g seconds", tock - tick);
+    }
 #endif
 }
 
@@ -278,7 +281,9 @@ tet4_assemble_lumped_mass(const ptrdiff_t              nelements,  //
     }
 
     double tock = smesh::time_seconds();
-    printf("tet4_mass.c: tet4_assemble_lumped_mass\t%g seconds\n", tock - tick);
+    if (sfem::log_enabled(sfem::LOG_SETUP, sfem::LOG_DEBUG)) {
+        sfem::log_printf(sfem::LOG_SETUP, sfem::LOG_DEBUG, sfem::LOG_SUMMARY, "tet4_mass: tet4_assemble_lumped_mass %g seconds", tock - tick);
+    }
 }
 
 void tet4_apply_inv_lumped_mass(const ptrdiff_t nelements, const ptrdiff_t nnodes, idx_t **const SFEM_RESTRICT elems,
