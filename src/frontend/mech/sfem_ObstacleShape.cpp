@@ -1,4 +1,5 @@
 #include "sfem_ObstacleShape.hpp"
+#include "sfem_log.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -68,7 +69,7 @@ namespace sfem {
             real_t                                                          lowest = plane;
             switch (shape.type) {
                 case Type::PLANE: {
-                    printf("Obstacle: plane at %g along axis %d\n", (double)plane, dir);
+                    if (log_enabled(LOG_SETUP, LOG_NORMAL)) log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Obstacle: plane at %g along axis %d", (double)plane, dir);
                     sdf = [=](const real_t x, const real_t y, const real_t z) -> real_t {
                         const real_t p[3] = {x, y, z};
                         return plane - p[dir];
@@ -78,7 +79,7 @@ namespace sfem {
                 case Type::SLOPE: {
                     const real_t slope = shape.slope;
                     const real_t top   = slope > 0 ? max_c[s] : min_c[s];
-                    printf("Obstacle: plane sloping by %g along axis %d, at %g along axis %d where %g\n",
+                    if (log_enabled(LOG_SETUP, LOG_NORMAL)) log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Obstacle: plane sloping by %g along axis %d, at %g along axis %d where %g",
                            (double)slope,
                            s,
                            (double)plane,
@@ -97,7 +98,7 @@ namespace sfem {
                     const real_t drop  = shape.step_drop;
                     const real_t start = min_c[s];
                     const int    steps = (int)std::ceil((max_c[s] - min_c[s]) / width) + 1;
-                    printf("Obstacle: %d steps descending along axis %d from %g, %g wide, %g apart, fillet %g\n",
+                    if (log_enabled(LOG_SETUP, LOG_NORMAL)) log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Obstacle: %d steps descending along axis %d from %g, %g wide, %g apart, fillet %g",
                            steps,
                            s,
                            (double)plane,
@@ -123,7 +124,7 @@ namespace sfem {
                 case Type::HEMISPHERE: {
                     const real_t c[3] = {center[0], center[1], center[2]};
                     const real_t r    = radius;
-                    printf("Obstacle: hemisphere centre (%g, %g, %g), radius %g, on a floor at %g along axis %d, fillet %g\n",
+                    if (log_enabled(LOG_SETUP, LOG_NORMAL)) log_printf(LOG_SETUP, LOG_NORMAL, LOG_SUMMARY, "Obstacle: hemisphere centre (%g, %g, %g), radius %g, on a floor at %g along axis %d, fillet %g",
                            (double)c[0],
                            (double)c[1],
                            (double)c[2],
