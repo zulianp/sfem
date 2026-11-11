@@ -3921,7 +3921,8 @@ namespace sfem {
         # The merit and the linear work both use std::vector, so either brings
         # the header.
         "merit_include": (
-            "\n#include <vector>" if emits_merit or emits_linear_work else ""
+            ("\n#include <vector>" if emits_merit or emits_linear_work else "")
+            + (_linear_work_includes(_runs_on_device()) if emits_linear_work and not emits_merit else "")
         ),
         "merit_methods": (
             _residual_merit_methods(_op_class_name(material))
@@ -4511,6 +4512,60 @@ def _wrapper_reads(text, name):
     return re.search(r"\b%s\b" % re.escape(name), code) is not None
 
 
+def _linear_work_dots(device):
+    """The dots a linear work's value needs, `g . x` and `g . h`, `g` the operator's own gradient.
+
+    On the device `x`, `h` and the gradient are device memory: the work vector is a device
+    buffer and the dots are the device BLAS's (a host loop over them read device pointers and
+    crashed the first line search that asked a GPU body force for its energy). On the host the
+    code is what it always was.
+    """
+    if not device:
+        return {"steps_dots": """    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t gx = 0;
+    real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      gx += work[i] * x[i];
+      gh += work[i] * h[i];
+    }
+""", "value_dots": """    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      acc += work[i] * x[i];
+    }
+"""}
+    head = """    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    auto blas = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
+    auto work = create_buffer<real_t>(ndofs, EXECUTION_SPACE_DEVICE);
+    blas->zeros(ndofs, work->data());
+    if (gradient(x, work->data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+"""
+    return {
+        "steps_dots": head + """    const real_t gx = blas->dot(ndofs, work->data(), x);
+    const real_t gh = blas->dot(ndofs, work->data(), h);
+""",
+        "value_dots": head + """    const real_t acc = blas->dot(ndofs, work->data(), x);
+""",
+    }
+
+
+def _linear_work_includes(device):
+    """The headers `_linear_work_dots` needs on the device (as `_element_scratch_include`)."""
+    return "\n#include \"sfem_blas_factory.hpp\"\n#include \"sfem_BLAS_cuda.hpp\"" if device else ""
+
+
 def _linear_work_value_method(op_name):
     """A volume forcing operator's 0-form, by the same identity as a traction's.
 
@@ -4541,19 +4596,7 @@ def _linear_work_value_method(op_name):
     SFEM_TRACE_SCOPE("%(op)s::value_steps");
     // The work is linear in the state, so `g` is the same at every step and one
     // gradient serves all of them.
-    const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
-      return SFEM_FAILURE;
-    }
-    real_t gx = 0;
-    real_t gh = 0;
-#pragma omp parallel for reduction(+ : gx, gh)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      gx += work[i] * x[i];
-      gh += work[i] * h[i];
-    }
-    for (int step = 0; step < nsteps; ++step) {
+%(steps_dots)s    for (int step = 0; step < nsteps; ++step) {
       out[step] += gx + steps[step] * gh;
     }
     return SFEM_SUCCESS;
@@ -4563,20 +4606,10 @@ def _linear_work_value_method(op_name):
     SFEM_TRACE_SCOPE("%(op)s::value");
     // `-rho * g . u`, from the load vector this operator's own gradient
     // assembles.  Linear in the state, so the identity is exact.
-    const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
-      return SFEM_FAILURE;
-    }
-    real_t acc = 0;
-#pragma omp parallel for reduction(+ : acc)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      acc += work[i] * x[i];
-    }
-    *out += acc;
+%(value_dots)s    *out += acc;
     return SFEM_SUCCESS;
   }
-""" % {"op": op_name}
+""" % {"op": op_name, **_linear_work_dots(_runs_on_device())}
 
 
 def _boundary_value_method(op_name, linear_work):
@@ -4607,17 +4640,7 @@ def _boundary_value_method(op_name, linear_work):
   int %(op)s::value(const real_t *x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value");
     // `-t . u`, from the `g = -t` this operator's own gradient assembles.
-    const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
-      return SFEM_FAILURE;
-    }
-    real_t acc = 0;
-#pragma omp parallel for reduction(+ : acc)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      acc += work[i] * x[i];
-    }
-    *out += acc;
+%(value_dots)s    *out += acc;
     return SFEM_SUCCESS;
   }
 
@@ -4632,24 +4655,12 @@ def _boundary_value_method(op_name, linear_work):
     }
     // The work is linear in the state, so `g` is the same at every step and one
     // gradient serves all of them: `g . (x + alpha * h)` splits exactly.
-    const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
-      return SFEM_FAILURE;
-    }
-    real_t gx = 0;
-    real_t gh = 0;
-#pragma omp parallel for reduction(+ : gx, gh)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      gx += work[i] * x[i];
-      gh += work[i] * h[i];
-    }
-    for (int step = 0; step < nsteps; ++step) {
+%(steps_dots)s    for (int step = 0; step < nsteps; ++step) {
       out[step] += gx + steps[step] * gh;
     }
     return SFEM_SUCCESS;
   }
-""" % {"op": op_name}
+""" % {"op": op_name, **_linear_work_dots(_runs_on_device())}
 
 
 def _boundary_potential_is_linear_work(form_collections):
@@ -4777,7 +4788,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_mesh.hpp"
-#include "smesh_sideset.hpp"
+#include "smesh_sideset.hpp"%(value_include)s
 
 #include <cstring>
 #include <memory>
@@ -5160,6 +5171,7 @@ namespace sfem {
         "boundary_value_method": _boundary_value_method(
             _op_class_name(material), linear_work
         ),
+        "value_include": _linear_work_includes(_runs_on_device()) if linear_work else "",
     }
     return _boundary_header(material, linear_work), source
 

@@ -13,6 +13,8 @@
 
 #include <cstring>
 #include <vector>
+#include "sfem_blas_factory.hpp"
+#include "sfem_BLAS_cuda.hpp"
 
 
 
@@ -803,17 +805,14 @@ namespace sfem {
     // The work is linear in the state, so `g` is the same at every step and one
     // gradient serves all of them.
     const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+    auto blas = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
+    auto work = create_buffer<real_t>(ndofs, EXECUTION_SPACE_DEVICE);
+    blas->zeros(ndofs, work->data());
+    if (gradient(x, work->data()) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-    real_t gx = 0;
-    real_t gh = 0;
-#pragma omp parallel for reduction(+ : gx, gh)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      gx += work[i] * x[i];
-      gh += work[i] * h[i];
-    }
+    const real_t gx = blas->dot(ndofs, work->data(), x);
+    const real_t gh = blas->dot(ndofs, work->data(), h);
     for (int step = 0; step < nsteps; ++step) {
       out[step] += gx + steps[step] * gh;
     }
@@ -825,15 +824,13 @@ namespace sfem {
     // `-rho * g . u`, from the load vector this operator's own gradient
     // assembles.  Linear in the state, so the identity is exact.
     const ptrdiff_t ndofs = impl_->space->n_dofs();
-    std::vector<real_t> work(ndofs, 0);
-    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+    auto blas = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
+    auto work = create_buffer<real_t>(ndofs, EXECUTION_SPACE_DEVICE);
+    blas->zeros(ndofs, work->data());
+    if (gradient(x, work->data()) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-    real_t acc = 0;
-#pragma omp parallel for reduction(+ : acc)
-    for (ptrdiff_t i = 0; i < ndofs; ++i) {
-      acc += work[i] * x[i];
-    }
+    const real_t acc = blas->dot(ndofs, work->data(), x);
     *out += acc;
     return SFEM_SUCCESS;
   }
