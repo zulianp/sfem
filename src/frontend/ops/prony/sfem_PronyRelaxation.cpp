@@ -72,6 +72,16 @@ namespace sfem {
             SFEM_ERROR("PronyRelaxation: %d terms, the device loops take at most %d\n", series_.n_terms(), cu_prony_max_terms());
         }
 #endif
+        if (options_.history_rounding == HistoryRounding::STOCHASTIC && !is_integer(options_.history_storage)) {
+            SFEM_ERROR("PronyRelaxation: stochastic rounding needs an integer history storage, not %s\n",
+                       to_string(options_.history_storage));
+        }
+        if (options_.execution_space != EXECUTION_SPACE_HOST &&
+            (is_grid(options_.history_storage) || options_.history_rounding == HistoryRounding::STOCHASTIC)) {
+            SFEM_ERROR("PronyRelaxation: %s with %s rounding is host only for now\n",
+                       to_string(options_.history_storage),
+                       to_string(options_.history_rounding));
+        }
         zero_history();
     }
 
@@ -92,7 +102,8 @@ namespace sfem {
                 n_elements_,
                 options_.history_storage,
                 options_.execution_space,
-                options_.history_elements_per_mean);
+                options_.history_elements_per_mean,
+                options_.history_tolerance);
         for (int s = 0; s < n_live_; s++) grown->copy_tensor(*H_, s, s, options_.stream);
         H_ = grown;
     }
@@ -142,7 +153,10 @@ namespace sfem {
         const S_t *const R     = reference<S_t>();
         prony::Means     means = H_->means_view();
         if (means.data) means.data = means.tensor(first, rows);
-        scaling_t *const scales = H_->scales() ? H_->scales() + first * n_elements_ : nullptr;
+        scaling_t *const scales =
+                H_->scales() ? H_->scales() + (is_grid(options_.history_storage) ? 2 * first : first * n_elements_) : nullptr;
+        // Every write draws its own stochastic rounding.
+        const uint64_t seed = 0x5851f42d4c957f2dull * ++writes_;
         uint8_t *const   data   = static_cast<uint8_t *>(H_->raw()) + first * rows * n_elements_ * bytes_per_value(options_.history_storage);
 #ifdef SFEM_ENABLE_CUDA
         if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
@@ -179,7 +193,10 @@ namespace sfem {
                                    scales,
                                    means,
                                    beta,
-                                   R);
+                                   R,
+                                   options_.history_tolerance,
+                                   options_.history_rounding,
+                                   seed);
             return 0;
         });
     }
@@ -509,6 +526,8 @@ namespace sfem {
 
     std::size_t PronyRelaxation::history_bytes() const { return H_ ? H_->bytes() : 0; }
 
+    std::size_t PronyRelaxation::history_packed_bytes() const { return H_ ? H_->packed_bytes() : 0; }
+
     std::size_t PronyRelaxation::reference_bytes() const {
         return reference_full_ ? reference_full_->size() * sizeof(real_t)
                                : reference_narrow_ ? reference_narrow_->size() * sizeof(float) : 0;
@@ -532,7 +551,8 @@ namespace sfem {
                 {"n_live", (double)n_live_},
                 {"n_tensors", (double)(H_ ? H_->n_tensors() : 0)},
                 {"reference_full", reference_full_ ? 1.0 : 0.0},
-                {"reference_narrow", reference_narrow_ ? 1.0 : 0.0}};
+                {"reference_narrow", reference_narrow_ ? 1.0 : 0.0},
+                {"writes", (double)writes_}};
         for (int i = 0; i < n_terms; i++) {
             numbers.push_back({"slot_" + std::to_string(i), (double)slot_[i]});
             numbers.push_back({"coefficient_" + std::to_string(i), (double)coefficient_[i]});
@@ -582,6 +602,10 @@ namespace sfem {
         }
         temperature_ = (real_t)temperature;
         n_live_      = (int)n_live;
+        // The stochastic rounding's seed goes on from where it was; states saved before it had none.
+        double writes = 0;
+        if (numbers.count("writes")) get("writes", &writes);
+        writes_ = (uint64_t)writes;
         if ((int)n_tensors > 0) {
             // A store of exactly the saved shape, its bytes read as they were written.
             H_ = std::make_shared<QuadratureState>((int)n_tensors,
@@ -590,7 +614,8 @@ namespace sfem {
                                                    n_elements_,
                                                    options_.history_storage,
                                                    options_.execution_space,
-                                                   options_.history_elements_per_mean);
+                                                   options_.history_elements_per_mean,
+                                                   options_.history_tolerance);
             if (H_->read_state(prefix + "_H")) return SFEM_FAILURE;
         }
         const ptrdiff_t n = static_cast<ptrdiff_t>(n_components_) * n_qp_ * n_elements_;

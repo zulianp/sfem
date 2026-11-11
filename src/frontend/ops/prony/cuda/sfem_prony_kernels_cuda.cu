@@ -70,6 +70,9 @@ namespace sfem {
                     return f(device_codecs::DeviceMeanDeviation<device_codecs::DeviceScaledHalf>{});
                 case HistoryStorage::INT8_MD:
                     return f(device_codecs::DeviceMeanDeviation<device_codecs::DeviceScaledInteger<int8_t, 127>>{});
+                case HistoryStorage::QUANT_GRID:
+                    // Host only for now: PronyRelaxation refuses it on the device.
+                    return SFEM_FAILURE;
             }
             return SFEM_FAILURE;
         }

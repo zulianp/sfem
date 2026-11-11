@@ -98,6 +98,9 @@ material:
       integrator: linear            # or midpoint
       history_storage: full         # full | float32 | float16 | float16_scaled | int16_scaled | int8_scaled
                                     # | float16_md | int8_md (a float mean per group, the deviations coded)
+                                    # | quant_grid (int32 codes on one power-of-two grid per stored term)
+      history_tolerance: 1e-5       # quant_grid: rounding error at most this times each term's running max
+      history_rounding: nearest     # integer formats: nearest | stochastic (unbiased; hashed, repeatable)
       history_elements_per_mean: 16 # *_md on one-point elements: the elements a mean is taken over (power of two, <= 64)
       stress_storage: full          # the two relaxed-stress slots kept between steps: full | float32
       remainder_horizon: 0.18       # reduced history_storage: the terms with tau a_T above it (s) are stored
@@ -336,7 +339,7 @@ Probes, each with a `type` and an optional `name` that prefixes its columns:
 | `control_point` | `at: [x, y, z]` (the nearest node), `rates` (default `true` in `dynamic`) | `ux, uy, uz`, and `vx..vz, ax..az` with rates |
 | `torque` | `constraint` (index into `constraints`, default 0) | `angle, released, torque` |
 | `contact` | | `reaction_x, reaction_y, reaction_z, touched` (with an obstacle) |
-| `prony` | | `<group>_gamma`, `<group>_H<k>`, `<group>_stored` (terms holding a tensor), `bytes_history, bytes_increment, bytes_frozen, bytes_stress` (persistent bytes over all ranks; with a Prony material); `updates, updates_lost` when built with `SFEM_ENABLE_PRONY_DIAGNOSTICS` (history values `advance` meant to change, and those the storage format rounded away; cumulative, host only) |
+| `prony` | | `<group>_gamma`, `<group>_H<k>`, `<group>_stored` (terms holding a tensor), `bytes_history, bytes_reference, bytes_frozen, bytes_stress` (persistent bytes over all ranks; with a Prony material), `bytes_history_packed` (what the history's integer codes would take packed by frame of reference in blocks of 128 elements; host stores, else 0); `updates, updates_lost` when built with `SFEM_ENABLE_PRONY_DIAGNOSTICS` (history values `advance` meant to change, and those the storage format rounded away; cumulative, host only) |
 | `memory` | | `host_peak_rss, device_used_peak, device_used_now` (bytes over all ranks; the device's total minus free, at step ends), `device_pool_peak` (the stream-ordered pool's high-water mark: buffers an update holds only while it runs), and what the solve keeps between steps by category, `bytes_<category>` on the host and `bytes_<category>_device`: `mesh, geometry, graph, tangent_values, tangent_structure, tangent_work, step, contact, obstacle_grid, scheme, newton` (the Prony state is the `prony` probe's) |
 
 See [outputs](outputs.md) for the files.

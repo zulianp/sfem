@@ -32,6 +32,10 @@ namespace sfem {
     /// curve.  `elements_per_mean` 0 picks one element for several points and
     /// DEFAULT_ELEMENTS_PER_MEAN for one.
     ///
+    /// A grid store (`is_grid(storage)`) codes each tensor on one power-of-two grid
+    /// whose step follows `tolerance` times the tensor's running maximum; its
+    /// "scales" are those two numbers per tensor (`scales()`).
+    ///
     /// The store lives in `es`, where the kernels that read and write it run.
     /// `encode` and `decode` are host conveniences for setting and inspecting a
     /// host store; the device loops go through the codecs directly.
@@ -43,7 +47,8 @@ namespace sfem {
                         const ptrdiff_t      n_elements,
                         const HistoryStorage storage           = HistoryStorage::FULL,
                         const ExecutionSpace es                = EXECUTION_SPACE_HOST,
-                        const int            elements_per_mean = 0);
+                        const int            elements_per_mean = 0,
+                        const real_t         tolerance         = 0);
 
         static constexpr int DEFAULT_ELEMENTS_PER_MEAN = 16;
 
@@ -64,6 +69,17 @@ namespace sfem {
 
         /// Bytes held, scales and means included.
         std::size_t bytes() const;
+
+        /// The bytes the integer codes would take packed by frame of reference in blocks of
+        /// PACK_BLOCK consecutive elements of a row (a 6-byte header, the codes' offsets from the
+        /// block's least at the width of the largest), scales and means included: what a packed
+        /// store of the same codes would hold.  A host store of an integer format only; 0
+        /// otherwise.
+        std::size_t packed_bytes() const;
+        static constexpr ptrdiff_t PACK_BLOCK = 128;
+
+        /// The grid format's tolerance, relative to each tensor's running maximum.
+        real_t tolerance() const { return tolerance_; }
 
         /// Zero every value; scales go to one.  On the device, in `stream`.
         void zero(void *const stream = nullptr);
@@ -101,7 +117,8 @@ namespace sfem {
         const void *raw() const { return data_->data(); }
 
         /// One scale per (tensor, element): scale(t, e) = scales[t * n_elements + e].
-        /// Present for the scaled formats (`is_scaled(storage)`) only; null for the others.
+        /// Present for the scaled formats (`is_scaled(storage)`); for a grid store the step and
+        /// running maximum of tensor t at [2 t] and [2 t + 1]; null for the others.
         scaling_t       *scales() { return scales_ ? scales_->data() : nullptr; }
         const scaling_t *scales() const { return scales_ ? scales_->data() : nullptr; }
 
@@ -121,6 +138,7 @@ namespace sfem {
         //! Empty unless scaled.
         std::shared_ptr<Buffer<scaling_t>> scales_;
         int                               elements_per_mean_{1};
+        real_t                            tolerance_{0};
         ptrdiff_t                         n_groups_{0};
         //! [tensor][component][group], empty unless mean-deviation.
         std::shared_ptr<Buffer<history_mean_t>> means_;

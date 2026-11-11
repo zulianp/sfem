@@ -92,6 +92,11 @@ namespace sfem {
             //! stored as remainders when `history_storage` is not FULL. 0: none; negative: not
             //! set (none here; `RelaxationGroups::set_default_remainder_horizon` sets it).
             real_t remainder_horizon{-1};
+            //! The grid format's tolerance (`HistoryStorage::QUANT_GRID`): its rounding error is at
+            //! most this times each stored term's running maximum.
+            real_t history_tolerance{1e-5};
+            //! How integer codes are rounded when H_i is written (`HistoryRounding`).
+            HistoryRounding history_rounding{HistoryRounding::NEAREST};
             ExecutionSpace                        execution_space{EXECUTION_SPACE_HOST};  ///< where the state lives
             void                                 *stream{nullptr};  ///< the device loops' stream
         };
@@ -204,6 +209,9 @@ namespace sfem {
 
         /// The stored terms H_i, scales included.
         std::size_t history_bytes() const;
+        /// What H_i's integer codes would take packed (`QuadratureState::packed_bytes`); 0 for a
+        /// format that is not integer, or on the device.
+        std::size_t history_packed_bytes() const;
         /// The remainder form's reference stress R.
         std::size_t reference_bytes() const;
         /// The frozen history the kernels read.
@@ -277,6 +285,8 @@ namespace sfem {
         std::vector<real_t>              b_;
         real_t                           gamma_{1};
         bool                             step_open_{false};
+        //! Writes of H_i so far: the seed of stochastic rounding, saved with the state.
+        uint64_t                         writes_{0};
     };
 
 }  // namespace sfem

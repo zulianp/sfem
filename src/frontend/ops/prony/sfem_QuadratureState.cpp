@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "sfem_prony_kernels.hpp"
+#include "smesh_codec_bits.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include <cuda_runtime_api.h>
@@ -21,13 +22,15 @@ namespace sfem {
                                      const ptrdiff_t      n_elements,
                                      const HistoryStorage storage,
                                      const ExecutionSpace es,
-                                     const int            elements_per_mean)
+                                     const int            elements_per_mean,
+                                     const real_t         tolerance)
         : n_tensors_(n_tensors),
           n_components_(n_components),
           n_qp_(n_qp),
           n_elements_(n_elements),
           storage_(storage),
-          es_(es) {
+          es_(es),
+          tolerance_(tolerance) {
         if (n_tensors < 0 || n_components <= 0 || n_qp <= 0 || n_elements < 0) {
             SFEM_ERROR("QuadratureState: invalid shape (%d tensors, %d components, %d points, %ld elements)\n",
                        n_tensors,
@@ -39,6 +42,11 @@ namespace sfem {
         const ptrdiff_t n_values = n_tensors * values_per_tensor() * n_elements;
         data_ = create_buffer<uint8_t>(n_values * bytes_per_value(storage), es);
         if (is_scaled(storage)) scales_ = create_buffer<scaling_t>(n_tensors * n_elements, es);
+        if (is_grid(storage)) {
+            if (es != EXECUTION_SPACE_HOST) SFEM_ERROR("QuadratureState: %s is host only for now\n", to_string(storage));
+            if (!(tolerance > 0)) SFEM_ERROR("QuadratureState: %s needs a positive tolerance\n", to_string(storage));
+            scales_ = create_buffer<scaling_t>(2 * n_tensors, es);
+        }
 
         if (is_mean_deviation(storage)) {
             if (n_components > 9) {
@@ -85,13 +93,26 @@ namespace sfem {
 #endif
         // Zero is the all-zero bit pattern in every storage format.
         std::memset(data_->data(), 0, data_->size());
-        if (scales_) std::fill(scales_->data(), scales_->data() + scales_->size(), scaling_t(1));
+        if (scales_ && is_grid(storage_)) {
+            for (int t = 0; t < n_tensors_; t++) {
+                scales_->data()[2 * t]     = 1;
+                scales_->data()[2 * t + 1] = 0;
+            }
+        } else if (scales_) {
+            std::fill(scales_->data(), scales_->data() + scales_->size(), scaling_t(1));
+        }
         if (means_) std::memset(means_->data(), 0, means_->size() * sizeof(history_mean_t));
     }
 
     void QuadratureState::zero_tensor(const int t, void *const stream) {
         const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         uint8_t *const   data        = data_->data() + t * tensor_bytes;
+        if (is_grid(storage_)) {
+            std::memset(data, 0, tensor_bytes);
+            scales_->data()[2 * t]     = 1;
+            scales_->data()[2 * t + 1] = 0;
+            return;
+        }
         scaling_t *const s           = scales_ ? scales_->data() + t * n_elements_ : nullptr;
 #ifndef SFEM_ENABLE_CUDA
         (void)stream;
@@ -121,6 +142,12 @@ namespace sfem {
         const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         const uint8_t  *src_data     = src.data_->data() + from * tensor_bytes;
         uint8_t        *dst_data     = data_->data() + to * tensor_bytes;
+        if (is_grid(storage_)) {
+            std::memmove(dst_data, src_data, tensor_bytes);
+            scales_->data()[2 * to]     = src.scales_->data()[2 * from];
+            scales_->data()[2 * to + 1] = src.scales_->data()[2 * from + 1];
+            return;
+        }
         const scaling_t *src_scales  = src.scales_ ? src.scales_->data() + from * n_elements_ : nullptr;
         scaling_t       *dst_scales  = scales_ ? scales_->data() + to * n_elements_ : nullptr;
 #ifndef SFEM_ENABLE_CUDA
@@ -160,8 +187,9 @@ namespace sfem {
                                  n_elements_,
                                  values,
                                  &data<Codec>()[t * values_per_tensor() * n_elements_],
-                                 scales_ ? &scales()[t * n_elements_] : nullptr,
-                                 m);
+                                 scales_ ? &scales()[Codec::grid ? 2 * t : t * n_elements_] : nullptr,
+                                 m,
+                                 tolerance_);
             return 0;
         });
     }
@@ -169,7 +197,7 @@ namespace sfem {
     void QuadratureState::decode(const int t, real_t *const values) const {
         const ptrdiff_t  tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
         const uint8_t   *data         = data_->data() + t * tensor_bytes;
-        const scaling_t *s            = scales_ ? scales_->data() + t * n_elements_ : nullptr;
+        const scaling_t *s            = scales_ ? scales_->data() + (is_grid(storage_) ? 2 * t : t * n_elements_) : nullptr;
         // On the device the encoded tensor and its scales come to the host, which decodes them
         // as it does its own.
         prony::Means m = means_view();
@@ -205,6 +233,37 @@ namespace sfem {
                     values_per_tensor(), n_elements_, reinterpret_cast<const typename Codec::storage_t *>(data), s, values, m);
             return 0;
         });
+    }
+
+    std::size_t QuadratureState::packed_bytes() const {
+        if (es_ != EXECUTION_SPACE_HOST || !is_integer(storage_)) return 0;
+        const std::size_t side = (scales_ ? scales_->size() * sizeof(scaling_t) : 0) +
+                                 (means_ ? means_->size() * sizeof(history_mean_t) : 0);
+        const ptrdiff_t rows = static_cast<ptrdiff_t>(n_tensors_) * values_per_tensor();
+        const ptrdiff_t n    = n_elements_;
+        std::size_t     codes = 0;
+        dispatch_history_codec(storage_, [&](auto codec) {
+            using Codec = decltype(codec);
+            if constexpr (Codec::integer) {
+                const auto *const h = data<Codec>();
+#pragma omp parallel for reduction(+ : codes)
+                for (ptrdiff_t r = 0; r < rows; r++) {
+                    for (ptrdiff_t e0 = 0; e0 < n; e0 += PACK_BLOCK) {
+                        const ptrdiff_t nb = std::min(PACK_BLOCK, n - e0);
+                        int64_t         lo = h[r * n + e0], hi = lo;
+                        for (ptrdiff_t l = 1; l < nb; l++) {
+                            const int64_t v = h[r * n + e0 + l];
+                            lo              = std::min(lo, v);
+                            hi              = std::max(hi, v);
+                        }
+                        const int w = smesh::compression::bit_width(static_cast<uint64_t>(hi - lo));
+                        codes += 6 + (static_cast<std::size_t>(nb) * w + 7) / 8;
+                    }
+                }
+            }
+            return 0;
+        });
+        return codes + side;
     }
 
     int QuadratureState::write_state(const std::string &prefix) const {

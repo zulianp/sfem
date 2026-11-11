@@ -61,8 +61,10 @@ namespace sfem {
     ///         wlf: {C1: 8.86, C2: 101.6, T_ref: 0}
     ///         temperature: 10
     ///         history_storage: full      # full, float32, float16, float16_scaled,
-    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md
+    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md, quant_grid
     ///         history_elements_per_mean: 16  # *_md on one-point elements (QuadratureState)
+    ///         history_tolerance: 1e-5    # quant_grid: relative to each term's running maximum
+    ///         history_rounding: nearest  # integer formats: nearest or stochastic
     ///         stress_storage: full       # the relaxed-stress slots: full or float32
     ///
     /// An entry overrides only the keys it names, so a block can change the
@@ -161,6 +163,8 @@ namespace sfem {
             std::size_t reference{0};  ///< the remainder form's reference stress R
             std::size_t frozen{0};     ///< the frozen history the kernels read
             std::size_t stress{0};     ///< the two relaxed-stress slots
+            //! What the history's integer codes would take packed (not held; 0 if not integer).
+            std::size_t history_packed{0};
             std::size_t total() const { return history + reference + frozen + stress; }
         };
         Bytes bytes_breakdown() const;

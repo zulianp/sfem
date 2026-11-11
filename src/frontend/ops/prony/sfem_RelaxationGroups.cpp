@@ -366,6 +366,7 @@ namespace sfem {
         for (const auto &entry : blocks_) {
             for (const auto &group : entry.second.groups) {
                 ret.history += group->history_bytes();
+                ret.history_packed += group->history_packed_bytes();
                 ret.reference += group->reference_bytes();
                 ret.frozen += group->frozen_bytes();
             }
@@ -400,7 +401,7 @@ namespace sfem {
 
         static const char *const keys[] = {
                 "prony", "integrator", "wlf", "temperature", "history_storage", "history_elements_per_mean", "stress_storage",
-                "remainder_horizon"};
+                "remainder_horizon", "history_tolerance", "history_rounding"};
 
         for (auto group_node : node["relaxation"].children()) {
             const auto        key   = group_node.key();
@@ -414,7 +415,8 @@ namespace sfem {
                 for (const char *const allowed : keys) known = known || name == allowed;
                 if (!known) {
                     SFEM_ERROR("relaxation.%s: unknown key \"%s\" (expected prony, integrator, wlf, temperature, "
-                               "history_storage, history_elements_per_mean, stress_storage, remainder_horizon)\n",
+                               "history_storage, history_elements_per_mean, stress_storage, remainder_horizon, "
+                               "history_tolerance, history_rounding)\n",
                                group.c_str(),
                                name.c_str());
                 }
@@ -460,6 +462,12 @@ namespace sfem {
                 }
                 if (group_node.has_child("remainder_horizon")) {
                     options.remainder_horizon = read_real(group_node, "remainder_horizon");
+                }
+                if (group_node.has_child("history_tolerance")) {
+                    options.history_tolerance = read_real(group_node, "history_tolerance");
+                }
+                if (group_node.has_child("history_rounding")) {
+                    options.history_rounding = history_rounding_from_string(read_string(group_node["history_rounding"]));
                 }
                 if (group_node.has_child("history_elements_per_mean")) {
                     options.history_elements_per_mean = static_cast<int>(read_real(group_node, "history_elements_per_mean"));

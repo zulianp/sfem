@@ -610,7 +610,11 @@ namespace sfem {
                     names.push_back(d.group + "_stored");
                 }
                 // Persistent bytes over every rank, by what holds them (RelaxationGroups::Bytes).
-                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"}) names.push_back(what);
+                // bytes_history_packed: what the history's integer codes would take packed by frame
+                // of reference (QuadratureState::packed_bytes), host stores only.
+                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "bytes_history_packed"}) {
+                    names.push_back(what);
+                }
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
                 // Cumulative over the run, host loops only (sfem_prony_diagnostics.hpp).
                 names.push_back("updates");
@@ -644,9 +648,13 @@ namespace sfem {
                     values[c++] = relaxations_.relaxation(blocks_[0], d.group).n_stored_terms();
                 }
                 const auto bytes   = relaxations_.bytes_breakdown();
-                real_t     held[4] = {real_t(bytes.history), real_t(bytes.reference), real_t(bytes.frozen), real_t(bytes.stress)};
-                if (comm_->size() > 1) comm_->sum(held, 4, smesh::TypeToEnum<real_t>::value());
-                for (int k = 0; k < 4; ++k) values[c++] = held[k];
+                real_t     held[5] = {real_t(bytes.history),
+                                      real_t(bytes.reference),
+                                      real_t(bytes.frozen),
+                                      real_t(bytes.stress),
+                                      real_t(bytes.history_packed)};
+                if (comm_->size() > 1) comm_->sum(held, 5, smesh::TypeToEnum<real_t>::value());
+                for (int k = 0; k < 5; ++k) values[c++] = held[k];
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
                 real_t counts[2] = {real_t(prony::update_counts().updated), real_t(prony::update_counts().lost)};
                 if (comm_->size() > 1) comm_->sum(counts, 2, smesh::TypeToEnum<real_t>::value());
