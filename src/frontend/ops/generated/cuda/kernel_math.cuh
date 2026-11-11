@@ -77,6 +77,59 @@ static __host__ __device__ __forceinline__ T sfem_log1p(const T x) {
 }
 SFEM_PRECISE_FP_END
 
+// The continuation of J^(-m) below Jc for a Mooney-Rivlin energy that stays
+// finite through J = 0: J^(-m) for J >= Jc; for Jmin < J < Jc the quartic in
+// z = (J - Jc) / (Jc - Jmin) that matches it in value, slope and curvature at
+// Jc and has zero slope and curvature at Jmin; constant below Jmin.  The
+// quartic's coefficients a_k follow from those conditions.
+template <typename T>
+static __host__ __device__ __forceinline__ T sfem_continued_power(const T J, const T m, const T Jc, const T Jmin) {
+  const T delta = Jc - Jmin;
+  const T hc = pow(Jc, -m);
+  const T a1 = -m * delta * hc / Jc;
+  const T a2 = T(0.5) * m * (m + T(1)) * delta * delta * hc / (Jc * Jc);
+  const T a3 = T(4) / T(3) * a2 - a1;
+  const T a4 = T(0.5) * (a2 - a1);
+  const T zr = (J - Jc) / delta;
+  const T z = zr > T(-1) ? zr : T(-1);
+  const T Jp = J > Jc ? J : Jc;
+  const T hp = pow(Jp, -m);
+  const T quartic = hc + z * (a1 + z * (a2 + z * (a3 + z * a4)));
+  return J >= Jc ? hp : quartic;
+}
+
+template <typename T>
+static __host__ __device__ __forceinline__ T sfem_continued_power_d1(const T J, const T m, const T Jc, const T Jmin) {
+  const T delta = Jc - Jmin;
+  const T hc = pow(Jc, -m);
+  const T a1 = -m * delta * hc / Jc;
+  const T a2 = T(0.5) * m * (m + T(1)) * delta * delta * hc / (Jc * Jc);
+  const T a3 = T(4) / T(3) * a2 - a1;
+  const T a4 = T(0.5) * (a2 - a1);
+  const T zr = (J - Jc) / delta;
+  const T z = zr > T(-1) ? zr : T(-1);
+  const T Jp = J > Jc ? J : Jc;
+  const T hp = pow(Jp, -m);
+  const T quartic = (a1 + z * (T(2) * a2 + z * (T(3) * a3 + z * T(4) * a4))) / delta;
+  return J >= Jc ? -m * hp / Jp : (J > Jmin ? quartic : T(0));
+}
+
+template <typename T>
+static __host__ __device__ __forceinline__ T sfem_continued_power_d2(const T J, const T m, const T Jc, const T Jmin) {
+  const T delta = Jc - Jmin;
+  const T hc = pow(Jc, -m);
+  const T a1 = -m * delta * hc / Jc;
+  const T a2 = T(0.5) * m * (m + T(1)) * delta * delta * hc / (Jc * Jc);
+  const T a3 = T(4) / T(3) * a2 - a1;
+  const T a4 = T(0.5) * (a2 - a1);
+  const T zr = (J - Jc) / delta;
+  const T z = zr > T(-1) ? zr : T(-1);
+  const T Jp = J > Jc ? J : Jc;
+  const T hp = pow(Jp, -m);
+  const T quartic = (T(2) * a2 + z * (T(6) * a3 + z * T(12) * a4)) / (delta * delta);
+  return J >= Jc ? m * (m + T(1)) * hp / (Jp * Jp) : (J > Jmin ? quartic : T(0));
+}
+
 template <typename T>
 static __host__ __device__ __forceinline__ T pow_2(const T x) {
   return x * x;

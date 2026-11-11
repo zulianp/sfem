@@ -71,6 +71,7 @@ MATERIALS = (
     "saint_venant_kirchhoff",
     "modified_mooney_rivlin",
     "mooney_rivlin_prony",
+    "continued_mooney_rivlin_prony",
 )
 
 # Byte-for-byte comparison would otherwise trip over editor and interpreter

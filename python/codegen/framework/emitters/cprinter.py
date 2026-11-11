@@ -10,6 +10,7 @@ import re
 
 import sympy as sp
 from codegen.framework.plans.conventions import restrict_prelude
+from codegen.framework.symbolic.constitutive import CONTINUED_POWER_FUNCTIONS
 from sympy.printing.c import C99CodePrinter
 
 
@@ -29,6 +30,14 @@ class _SfemCCodePrinter(C99CodePrinter):
         # keeps the small part of `x` and still vectorizes.
         self.known_functions = dict(self.known_functions)
         self.known_functions["sfem_log1p"] = "sfem_log1p" 
+
+    def _print_Function(self, expr):
+        # The continued powers take the scalar type explicitly: their arguments
+        # mix the state with material parameters, whose types need not agree.
+        name = expr.func.__name__
+        if name in CONTINUED_POWER_FUNCTIONS:
+            return "%s<%s>(%s)" % (name, self._scalar_type, ", ".join(self._print(a) for a in expr.args))
+        return super()._print_Function(expr)
 
     def _scalar_literal(self, value):
         return "%s(%s)" % (self._scalar_type, value)
@@ -136,6 +145,7 @@ def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
         "SFEM_PRECISE_FP_END",
         "",
     ]
+    lines.extend(_sfem_continued_power_lines(inline_qualifier))
     for exponent in range(2, _SFEM_SPECIALIZED_POW_MAX_EXPONENT + 1):
         lines.extend(
             [
@@ -161,6 +171,57 @@ def _sfem_math_function_lines(inline_qualifier="SFEM_INLINE"):
             ]
         )
     return lines
+
+
+def _sfem_continued_power_lines(inline_qualifier):
+    """h_m(J) and its first two derivatives (`symbolic/constitutive.py`).
+
+    Branch-free, so a lane loop that calls them still vectorizes: both pieces
+    are evaluated and one is selected, and the physical piece takes its power
+    of max(J, Jc), so the unselected lane never forms a power of a negative
+    number.
+    """
+    q = inline_qualifier
+    common = [
+        "  const T delta = Jc - Jmin;",
+        "  const T hc = pow(Jc, -m);",
+        "  const T a1 = -m * delta * hc / Jc;",
+        "  const T a2 = T(0.5) * m * (m + T(1)) * delta * delta * hc / (Jc * Jc);",
+        "  const T a3 = T(4) / T(3) * a2 - a1;",
+        "  const T a4 = T(0.5) * (a2 - a1);",
+        "  const T zr = (J - Jc) / delta;",
+        "  const T z = zr > T(-1) ? zr : T(-1);",
+        "  const T Jp = J > Jc ? J : Jc;",
+        "  const T hp = pow(Jp, -m);",
+    ]
+    return [
+        "// The continuation of J^(-m) below Jc for a Mooney-Rivlin energy that stays",
+        "// finite through J = 0: J^(-m) for J >= Jc; for Jmin < J < Jc the quartic in",
+        "// z = (J - Jc) / (Jc - Jmin) that matches it in value, slope and curvature at",
+        "// Jc and has zero slope and curvature at Jmin; constant below Jmin.  The",
+        "// quartic's coefficients a_k follow from those conditions.",
+        "template <typename T>",
+        "static %s T sfem_continued_power(const T J, const T m, const T Jc, const T Jmin) {" % q,
+        *common,
+        "  const T quartic = hc + z * (a1 + z * (a2 + z * (a3 + z * a4)));",
+        "  return J >= Jc ? hp : quartic;",
+        "}",
+        "",
+        "template <typename T>",
+        "static %s T sfem_continued_power_d1(const T J, const T m, const T Jc, const T Jmin) {" % q,
+        *common,
+        "  const T quartic = (a1 + z * (T(2) * a2 + z * (T(3) * a3 + z * T(4) * a4))) / delta;",
+        "  return J >= Jc ? -m * hp / Jp : (J > Jmin ? quartic : T(0));",
+        "}",
+        "",
+        "template <typename T>",
+        "static %s T sfem_continued_power_d2(const T J, const T m, const T Jc, const T Jmin) {" % q,
+        *common,
+        "  const T quartic = (T(2) * a2 + z * (T(6) * a3 + z * T(12) * a4)) / (delta * delta);",
+        "  return J >= Jc ? m * (m + T(1)) * hp / (Jp * Jp) : (J > Jmin ? quartic : T(0));",
+        "}",
+        "",
+    ]
 
 
 #: The status codes and the one macro every generated kernel body uses.

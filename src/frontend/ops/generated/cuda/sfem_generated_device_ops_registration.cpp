@@ -2,6 +2,7 @@
 
 namespace sfem {
   void register_GeneratedBodyForce_cuda_generated_op();
+  void register_GeneratedContinuedMooneyRivlinProny_cuda_generated_op();
   void register_GeneratedLaplace_cuda_generated_op();
   void register_GeneratedLinearElasticity_cuda_generated_op();
   void register_GeneratedLinearKelvinVoigt_cuda_generated_op();
@@ -18,6 +19,7 @@ namespace sfem {
 
   void register_generated_device_ops() {
     register_GeneratedBodyForce_cuda_generated_op();
+    register_GeneratedContinuedMooneyRivlinProny_cuda_generated_op();
     register_GeneratedLaplace_cuda_generated_op();
     register_GeneratedLinearElasticity_cuda_generated_op();
     register_GeneratedLinearKelvinVoigt_cuda_generated_op();

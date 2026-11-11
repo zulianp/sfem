@@ -26,9 +26,14 @@ element = gen.VectorElement("Lagrange", degree=1)
 V = gen.FunctionSpace(element)
 
 
-def isochoric_energy(F, dim):
+def power(J, m):
+    """J^(-m), the law's own; `continued_mooney_rivlin_prony` swaps in its continuation."""
+    return J ** -m
+
+
+def isochoric_energy(F, dim, power=power):
     I1, I2, J = gen.isochoric_invariants(F, dim)
-    return C10 * (J ** sp.Rational(-2, 3) * I1 - 3) + C01 * (J ** sp.Rational(-4, 3) * I2 - 3)
+    return C10 * (power(J, sp.Rational(2, 3)) * I1 - 3) + C01 * (power(J, sp.Rational(4, 3)) * I2 - 3)
 
 
 def volumetric_energy(F, dim):
@@ -36,7 +41,7 @@ def volumetric_energy(F, dim):
     return K * (J - 1) ** 2 / 2
 
 
-def _build_system(dim):
+def build_system(dim, power=power):
     system = gen.EquationSystemBuilder(dim)
     with gen.geometric_dimension_context(dim):
         u = gen.Function(V, "u", qualifier=gen.DISPLACEMENT)
@@ -46,40 +51,46 @@ def _build_system(dim):
             qualifier=gen.DEFORMATION_GRADIENT,
         )
         iso = gen.PronyRelaxation("iso")
-        psi = volumetric_energy(F, dim) + iso.relax(isochoric_energy(F, dim), F)
+        psi = volumetric_energy(F, dim) + iso.relax(isochoric_energy(F, dim, power), F)
         system.add_energy("", psi, fields=(u,), variables=(F,), relaxations=(iso,))
     return system.build()
 
 
-systems = gen.EquationSystems()
-for dim in (2, 3):
-    systems.add(_build_system(dim))
-
-
-material = gen.CodeGenerator(
-    "mooney_rivlin_prony",
-    systems,
-    elements=gen.sfem_default_element_types() + ("HEX27",),
-    # The history lives at one rule's points, and TET10's affine and
-    # isoparametric routes integrate with different rules: pinned to the
-    # isoparametric one, the more accurate.  HEX27 and its semi-structured
-    # form likewise (64 points, not 27).
-    quadrature_settings=(("TET10", 4), ("HEX27", 4), ("PROTEUS_HEX27", 4)),
-    op_name="GeneratedMooneyRivlinProny",
-    parameter_defaults=(
-        ("C01", 0.0),
-        ("C10", 1.0),
-        ("K", 1.0),
-    ),
-    matrix_formats=("bsr",),
-    # The stored tangent reads the relaxation's step weight and its history at the same points
-    # the history lives at, which are the rule's.
-    inexact_apply=True,
-    # Newton can retry an iteration on the tangent projected to positive semidefinite per
-    # quadrature point (solver.newton.tangent_projection): the rubber's tangent is indefinite
-    # where elements are strongly compressed, as after the torsion bar's release.
-    tangent_projection=True,
+PARAMETER_DEFAULTS = (
+    ("C01", 0.0),
+    ("C10", 1.0),
+    ("K", 1.0),
 )
+
+
+def code_generator(name, op_name, power=power, parameter_defaults=PARAMETER_DEFAULTS):
+    """The generator of this law, or of a variant that changes only its powers of J."""
+    systems = gen.EquationSystems()
+    for dim in (2, 3):
+        systems.add(build_system(dim, power))
+    return gen.CodeGenerator(
+        name,
+        systems,
+        elements=gen.sfem_default_element_types() + ("HEX27",),
+        # The history lives at one rule's points, and TET10's affine and
+        # isoparametric routes integrate with different rules: pinned to the
+        # isoparametric one, the more accurate.  HEX27 and its semi-structured
+        # form likewise (64 points, not 27).
+        quadrature_settings=(("TET10", 4), ("HEX27", 4), ("PROTEUS_HEX27", 4)),
+        op_name=op_name,
+        parameter_defaults=parameter_defaults,
+        matrix_formats=("bsr",),
+        # The stored tangent reads the relaxation's step weight and its history at the same points
+        # the history lives at, which are the rule's.
+        inexact_apply=True,
+        # Newton can retry an iteration on the tangent projected to positive semidefinite per
+        # quadrature point (solver.newton.tangent_projection): the rubber's tangent is indefinite
+        # where elements are strongly compressed, as after the torsion bar's release.
+        tangent_projection=True,
+    )
+
+
+material = code_generator("mooney_rivlin_prony", "GeneratedMooneyRivlinProny")
 
 
 if __name__ == "__main__":
