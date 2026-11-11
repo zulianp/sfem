@@ -337,7 +337,9 @@ namespace sfem {
 
         int        status = impl.solve_qp(r);
         const bool capped = status != SFEM_SUCCESS && impl.qp->iterations() >= impl.options.qp_max_it;
-        impl.negative_curvature = impl.qp->met_negative_curvature();
+        // A QP whose projected gradient rose far past its least has an energy that falls without
+        // end: negative curvature that no conjugate direction met.
+        impl.negative_curvature = impl.qp->met_negative_curvature() || impl.qp->met_divergence();
         if (status != SFEM_SUCCESS && impl.negative_curvature && impl.projection_managed && !impl.tangent_projected) {
             // The material's tangent is indefinite here: Newton repeats the iteration on the
             // projected one (tangent_projection: on_failure) rather than on a shifted one.

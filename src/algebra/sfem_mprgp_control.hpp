@@ -69,6 +69,16 @@ namespace sfem {
         return dd > 0 && dAd < -64 * p.epsilon * p.max_eig * dd;
     }
 
+    /// Whether the projected gradient has risen past growth times its least value in the solve.
+    /// MPRGP's energy falls at every step, and on a convex QP the projected gradient falls with it,
+    /// rising after a change of the active set by a small factor. A far larger rise is the energy
+    /// falling without end along negative curvature that the bounds stop step by step, expansion
+    /// after expansion, and that no conjugate direction meets. growth 0: no test.
+    template <typename T>
+    SFEM_DEVICE_INLINE bool mprgp_diverging(const T norm_gp, const T least_norm_gp, const T growth) {
+        return growth > 0 && norm_gp > growth * least_norm_gp;
+    }
+
     /// Whether no bound stops a step of alpha_feas along d (d.d = dd): none limits it (infty), or
     /// only the bounds that stand for none (infty) do.
     template <typename T>
