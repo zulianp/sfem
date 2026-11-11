@@ -116,46 +116,61 @@ namespace sfem {
 
             NonlinearReport report;
             int             attempts = 0;
+            // The step, solved again while an observer asks for it (StepObserver::resolve).
             for (;;) {
-                const real_t t_new = t + dt >= target - tol ? target : t + dt;
-                if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
-                if (impl.scheme) impl.scheme->begin_step(t, dt);
-                for (auto &h : impl.histories) h->begin_step(t_new, dt);
+                for (;;) {
+                    const real_t t_new = t + dt >= target - tol ? target : t + dt;
+                    if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
+                    if (impl.scheme) impl.scheme->begin_step(t, dt);
+                    for (auto &h : impl.histories) h->begin_step(t_new, dt);
 
-                const StepContext context{t, dt, impl.scheme};
+                    const StepContext context{t, dt, impl.scheme};
 
-                // The scheme's start, and the last state if the start cannot be evaluated: right
-                // after an impact the predicted start can invert elements the last state does not.
-                const bool predicted = impl.scheme != nullptr;
-                if (predicted) {
-                    impl.scheme->start(x);
-                } else {
-                    blas->copy(ndofs, x_n->data(), x);
-                }
-                report = impl.solver->solve(context, x);
-                attempts++;
-
-                if (predicted && report.status == NonlinearReport::Status::NON_FINITE && report.iterations == 0) {
-                    blas->copy(ndofs, x_n->data(), x);
+                    // The scheme's start, and the last state if the start cannot be evaluated: right
+                    // after an impact the predicted start can invert elements the last state does not.
+                    const bool predicted = impl.scheme != nullptr;
+                    if (predicted) {
+                        impl.scheme->start(x);
+                    } else {
+                        blas->copy(ndofs, x_n->data(), x);
+                    }
                     report = impl.solver->solve(context, x);
                     attempts++;
+
+                    if (predicted && report.status == NonlinearReport::Status::NON_FINITE && report.iterations == 0) {
+                        blas->copy(ndofs, x_n->data(), x);
+                        report = impl.solver->solve(context, x);
+                        attempts++;
+                    }
+
+                    if (report.accepted()) break;
+
+                    record.step     = step + 1;
+                    record.t        = t_new;
+                    record.dt       = dt;
+                    record.report   = report;
+                    record.attempts = attempts;
+                    impl.notify([&](StepObserver &o) { return o.failed(record); });
+
+                    if (cuts == opts.max_cutbacks) {
+                        blas->copy(ndofs, x_n->data(), x);
+                        return SFEM_FAILURE;
+                    }
+                    cuts++;
+                    dt /= 2;
                 }
-
-                if (report.accepted()) break;
-
                 record.step     = step + 1;
-                record.t        = t_new;
+                record.t        = t + dt >= target - tol ? target : t + dt;
                 record.dt       = dt;
                 record.report   = report;
                 record.attempts = attempts;
-                impl.notify([&](StepObserver &o) { return o.failed(record); });
-
-                if (cuts == opts.max_cutbacks) {
-                    blas->copy(ndofs, x_n->data(), x);
-                    return SFEM_FAILURE;
-                }
-                cuts++;
-                dt /= 2;
+                record.last     = record.t >= t_end - tol;
+                bool again      = false;
+                for (auto &o : impl.observers) again = o->resolve(record) || again;
+                if (!again) break;
+                // A solve asked for again is not a failed attempt: the step's attempts count from
+                // the last one.
+                attempts = 0;
             }
 
             on_grid = t + dt >= target - tol;
