@@ -204,14 +204,12 @@ namespace sfem {
         if (cudaMemcpy(spare_.offset->data(), offset.data(), offset.size() * sizeof(uint32_t), cudaMemcpyHostToDevice) != cudaSuccess) {
             SFEM_ERROR("QuadratureState::write_packed_device: copying the offsets failed\n");
         }
-        auto codes = create_buffer<uint8_t>(static_cast<ptrdiff_t>(at * 8 + smesh::compression::kSlack), es_);
-        zero_bytes(codes->data(), codes->size(), es_);
+        auto codes = cu_prony_packed_codes(at * 8 + smesh::compression::kSlack, stream);
         if (cu_prony_packed_pack(old, u, stress_bytes, S_n, S_new, ref, step, stochastic, seed, k0, spare_.base->data(),
                                  spare_.width->data(), spare_.offset->data(), codes->data(), stream) != SFEM_SUCCESS) {
             SFEM_ERROR("QuadratureState::write_packed_device: packing failed\n");
         }
-        // The old codes go once the kernels that read them have finished.
-        if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess) SFEM_ERROR("QuadratureState::write_packed_device failed\n");
+        // The old codes go back to the pool in `stream`, after the kernels that read them.
         Packed &p = packed_[t];
         p.codes   = codes;
         std::swap(p.base, spare_.base);

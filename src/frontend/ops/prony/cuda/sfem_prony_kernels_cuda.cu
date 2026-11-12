@@ -713,6 +713,16 @@ namespace sfem {
         return ret;
     }
 
+    std::shared_ptr<Buffer<uint8_t>> cu_prony_packed_codes(const std::size_t bytes, void *const stream) {
+        const cudaStream_t s    = (cudaStream_t)stream;
+        uint8_t           *data = nullptr;
+        if (cudaMallocAsync((void **)&data, bytes, s) != cudaSuccess || cudaMemsetAsync(data, 0, bytes, s) != cudaSuccess) {
+            SFEM_ERROR("cu_prony_packed_codes: allocating %zu bytes failed\n", bytes);
+        }
+        return std::make_shared<Buffer<uint8_t>>(
+                bytes, data, [s](void *p) { cudaFreeAsync(p, s); }, MEMORY_SPACE_DEVICE);
+    }
+
     int cu_prony_packed_max(const prony::PackedTensor &old,
                             const PackedUpdate         u,
                             const int                  stress_bytes,
