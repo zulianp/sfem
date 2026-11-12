@@ -255,6 +255,21 @@ int test_device_matches_host_stochastic_rounding() {
     return SFEM_TEST_SUCCESS;
 }
 
+// The packed store: the device plans and packs each write itself, the host sums the offsets.
+// The codes agree but where the arithmetic before the rounding differs in its last bit, by one
+// step, 1e-5 of the term's largest value (history_tolerance's default); nearest and stochastic.
+int test_device_matches_host_packed() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::QUANT_BLOCK, real_t(1e-5), element, HistoryStorage::FULL, 5) != SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::QUANT_BLOCK, real_t(1e-5), element, HistoryStorage::FLOAT32, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // Any generated energy material on HEX8 goes through the same HEX8 -> PROTEUS_HEX8 forwarding
 // as this one, so the existing modified Mooney-Rivlin is checked on the device too: its gradient
 // against the host's.  If this fails as well, a failure above is the forwarding's, not Prony's.
@@ -295,7 +310,8 @@ int device_squared_norms_match(const int n_qp) {
                                       HistoryStorage::INT16_SCALED,
                                       HistoryStorage::INT8_SCALED,
                                       HistoryStorage::FLOAT16_MD,
-                                      HistoryStorage::INT8_MD};
+                                      HistoryStorage::INT8_MD,
+                                      HistoryStorage::QUANT_BLOCK};
     const int            n_components = 6, n_diagonal = 3;
     const ptrdiff_t      n_elements = 3001;
     const ptrdiff_t      n          = n_components * n_qp * n_elements;
@@ -374,6 +390,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_RUN_TEST(test_device_matches_host_remainder_form);
     SFEM_RUN_TEST(test_device_matches_host_stochastic_rounding);
+    SFEM_RUN_TEST(test_device_matches_host_packed);
     SFEM_RUN_TEST(test_device_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

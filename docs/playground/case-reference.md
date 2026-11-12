@@ -99,7 +99,8 @@ material:
       history_storage: full         # full | float32 | float16 | float16_scaled | int16_scaled | int8_scaled
                                     # | float16_md | int8_md (a float mean per group, the deviations coded)
                                     # | quant_grid (int32 codes on one power-of-two grid per stored term)
-      history_tolerance: 1e-5       # quant_grid: rounding error at most this times each term's running max
+                                    # | quant_block (quant_grid's codes packed per block of 128 elements)
+      history_tolerance: 1e-5       # quant_grid, quant_block: rounding error at most this times each term's running max
       history_rounding: nearest     # integer formats: nearest | stochastic (unbiased; hashed, repeatable)
       history_elements_per_mean: 16 # *_md on one-point elements: the elements a mean is taken over (power of two, <= 64)
       stress_storage: full          # the two relaxed-stress slots kept between steps: full | float32

@@ -19,8 +19,10 @@
 #include "sfem_prony_kernels.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <vector>
 
 #ifdef _OPENMP
@@ -526,6 +528,110 @@ int test_packed_bytes_follow_the_spread_of_the_codes() {
     return SFEM_TEST_SUCCESS;
 }
 
+
+// The packed store holds the grid's codes, packed per block of elements: the same values as
+// quant_grid, to the bit, in fewer bytes.
+int test_packed_decodes_as_the_grid() {
+    const auto   a   = amplitudes();
+    const real_t tol = real_t(1e-6);
+    sfem::QuadratureState grid(2, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    sfem::QuadratureState packed(2, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_BLOCK, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    grid.encode(1, a.data());
+    packed.encode(1, a.data());
+    std::vector<real_t> g(N_ENTRIES), p(N_ENTRIES);
+    grid.decode(1, g.data());
+    packed.decode(1, p.data());
+    SFEM_TEST_ASSERT(std::memcmp(g.data(), p.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    packed.decode(0, p.data());
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) SFEM_TEST_ASSERT(p[k] == 0);
+    printf("  quant_block holds %zu bytes, quant_grid %zu, for %td values\n", packed.bytes(), grid.bytes(), 2 * N_ENTRIES);
+    SFEM_TEST_ASSERT(packed.bytes() < grid.bytes());
+
+    // Driven through a run, nearest rounding: the same history as the grid's, to the bit.
+    sfem::PronyRelaxation::Options options;
+    options.history_tolerance = tol;
+    options.history_storage   = sfem::HistoryStorage::QUANT_GRID;
+    sfem::PronyRelaxation on_grid(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    options.history_storage = sfem::HistoryStorage::QUANT_BLOCK;
+    sfem::PronyRelaxation on_blocks(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    const auto grid_times = uniform_grid(5, 17);
+    drive(on_grid, grid_times, real_t(0.9));
+    drive(on_blocks, grid_times, real_t(0.9));
+    const auto S_n = stress_at(grid_times.back(), real_t(0.9)), S_prev = stress_at(grid_times[grid_times.size() - 2], real_t(0.9));
+    for (int i = 0; i < series().n_terms(); i++) {
+        on_grid.decode_history(i, g.data(), S_n.data(), S_prev.data());
+        on_blocks.decode_history(i, p.data(), S_n.data(), S_prev.data());
+        SFEM_TEST_ASSERT(std::memcmp(g.data(), p.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// Values that vary little over neighbouring elements pack to few bits: a smooth field on a fine
+// grid takes a fraction of the 4 bytes the grid's own codes hold.
+int test_packed_bytes_follow_the_variation() {
+    const ptrdiff_t ne = 4096;
+    const int       nc = 6;
+    std::vector<real_t> v(nc * ne);
+    for (int c = 0; c < nc; c++) {
+        for (ptrdiff_t e = 0; e < ne; e++) v[c * ne + e] = (c + 1) * std::sin(real_t(6.283185307179586) * e / ne);
+    }
+    sfem::QuadratureState packed(1, nc, 1, ne, sfem::HistoryStorage::QUANT_BLOCK, sfem::EXECUTION_SPACE_HOST, 0, real_t(1e-6));
+    packed.encode(0, v.data());
+    std::vector<real_t> back(nc * ne);
+    packed.decode(0, back.data());
+    real_t worst = 0;
+    for (ptrdiff_t k = 0; k < nc * ne; k++) worst = std::max(worst, std::abs(back[k] - v[k]));
+    const double per_value = double(packed.bytes()) / double(nc * ne);
+    printf("  a sine over %td elements, tolerance 1e-6: %.3f bytes a value, worst error %.2e of 6\n", ne, per_value, (double)worst);
+    SFEM_TEST_ASSERT(worst <= real_t(6e-6));
+    SFEM_TEST_ASSERT(per_value < 2.5);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A packed store restarts as it was: written, read into a new relaxation, and both driven on
+// with stochastic rounding, the histories agree to the bit.
+int test_packed_restart_continues_the_run() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_packed_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    sfem::PronyRelaxation::Options options;
+    options.history_storage   = sfem::HistoryStorage::QUANT_BLOCK;
+    options.history_tolerance = real_t(1e-6);
+    options.history_rounding  = sfem::HistoryRounding::STOCHASTIC;
+    sfem::PronyRelaxation first(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    const auto            head = uniform_grid(3, 10);
+    drive(first, head, real_t(5));
+    SFEM_TEST_ASSERT(first.write_state(dir + "/prony") == SFEM_SUCCESS);
+    sfem::PronyRelaxation second(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    SFEM_TEST_ASSERT(second.read_state(dir + "/prony") == SFEM_SUCCESS);
+
+    // Both on from t = 3: the same steps, the same stresses.
+    std::vector<real_t> tail{0};
+    for (int k = 1; k <= 10; k++) tail.push_back(real_t(3) + real_t(0.3) * k);
+    const auto a = amplitudes();
+    std::vector<real_t> S_n(N_ENTRIES), S(N_ENTRIES);
+    for (size_t k = 1; k < tail.size(); k++) {
+        const real_t t0 = k == 1 ? real_t(3) : tail[k - 1], t1 = tail[k];
+        for (ptrdiff_t j = 0; j < N_ENTRIES; j++) {
+            S_n[j] = a[j] * ramp(t0, 5);
+            S[j]   = a[j] * ramp(t1, 5);
+        }
+        for (auto *r : {&first, &second}) {
+            r->begin_step(t1, t1 - t0, S_n.data());
+            r->advance(S_n.data(), S.data());
+        }
+    }
+    std::vector<real_t> h0(N_ENTRIES), h1(N_ENTRIES);
+    for (int i = 0; i < series().n_terms(); i++) {
+        first.decode_history(i, h0.data(), S.data(), S_n.data());
+        second.decode_history(i, h1.data(), S.data(), S_n.data());
+        SFEM_TEST_ASSERT(std::memcmp(h0.data(), h1.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    }
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_unscaled_float16_round_trips_below_its_range() {
     // No scale, so the values have to sit inside binary16's range on their own;
     // above 65504 it overflows, which is what the scaled format is for.
@@ -837,7 +943,8 @@ int test_squared_norms_match_the_decoded_history() {
                                             sfem::HistoryStorage::INT8_SCALED,
                                             sfem::HistoryStorage::FLOAT16_MD,
                                             sfem::HistoryStorage::INT8_MD,
-                                            sfem::HistoryStorage::QUANT_GRID};
+                                            sfem::HistoryStorage::QUANT_GRID,
+                                            sfem::HistoryStorage::QUANT_BLOCK};
     const int                  n_diagonal = 3;
     const real_t               prestress  = 2;
     std::vector<real_t>        grid{0};
@@ -888,6 +995,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_an_unchanged_value_keeps_its_code);
     SFEM_RUN_TEST(test_quant_grid_tracks_full_storage);
     SFEM_RUN_TEST(test_packed_bytes_follow_the_spread_of_the_codes);
+    SFEM_RUN_TEST(test_packed_decodes_as_the_grid);
+    SFEM_RUN_TEST(test_packed_bytes_follow_the_variation);
+    SFEM_RUN_TEST(test_packed_restart_continues_the_run);
     SFEM_RUN_TEST(test_reduced_storage_tracks_full_storage);
     SFEM_RUN_TEST(test_mean_deviation_codes_the_variation);
     SFEM_RUN_TEST(test_mean_over_one_point_elements);

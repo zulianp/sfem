@@ -48,7 +48,8 @@ namespace sfem {
         INT8_SCALED,     ///< symmetric 8-bit quantisation, one scale per tensor and element
         FLOAT16_MD,      ///< a mean per group, the deviations as FLOAT16_SCALED
         INT8_MD,         ///< a mean per group, the deviations as INT8_SCALED
-        QUANT_GRID       ///< int32 codes on one power-of-two grid per tensor (history_tolerance)
+        QUANT_GRID,      ///< int32 codes on one power-of-two grid per tensor (history_tolerance)
+        QUANT_BLOCK      ///< QUANT_GRID's codes packed per block of elements (sfem_PackedHistory.hpp)
     };
 
     /// How an integer code is rounded when the history is written: to the
@@ -91,6 +92,9 @@ namespace sfem {
     bool           is_mean_deviation(const HistoryStorage storage);
     bool           is_grid(const HistoryStorage storage);
     bool           is_integer(const HistoryStorage storage);
+    /// Whether the store packs its codes (QUANT_BLOCK): its tensors are not arrays of a codec's
+    /// storage_t, so the pointwise loops and `dispatch_history_codec` do not apply to it.
+    bool           is_packed(const HistoryStorage storage);
 
     namespace prony {
         /// A uniform number in [0, 1) from a write's seed and a value's position: splitmix64.
@@ -225,6 +229,8 @@ namespace sfem {
                 return f(Int8MeanDeviationCodec{});
             case HistoryStorage::QUANT_GRID:
                 return f(GridCodec{});
+            case HistoryStorage::QUANT_BLOCK:
+                break;
         }
 
         SFEM_ERROR("dispatch_history_codec: unknown storage %d\n", static_cast<int>(storage));

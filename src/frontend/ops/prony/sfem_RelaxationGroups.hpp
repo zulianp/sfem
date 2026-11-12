@@ -61,9 +61,10 @@ namespace sfem {
     ///         wlf: {C1: 8.86, C2: 101.6, T_ref: 0}
     ///         temperature: 10
     ///         history_storage: full      # full, float32, float16, float16_scaled,
-    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md, quant_grid
+    ///                                    # int16_scaled, int8_scaled, float16_md, int8_md, quant_grid,
+    ///                                    # quant_block
     ///         history_elements_per_mean: 16  # *_md on one-point elements (QuadratureState)
-    ///         history_tolerance: 1e-5    # quant_grid: relative to each term's running maximum
+    ///         history_tolerance: 1e-5    # quant_grid, quant_block: relative to each term's running maximum
     ///         history_rounding: nearest  # integer formats: nearest or stochastic
     ///         stress_storage: full       # the relaxed-stress slots: full or float32
     ///

@@ -115,7 +115,8 @@ int main(int argc, char *argv[]) {
                                             sfem::HistoryStorage::INT16_SCALED,
                                             sfem::HistoryStorage::INT8_SCALED,
                                             sfem::HistoryStorage::FLOAT16_MD,
-                                            sfem::HistoryStorage::INT8_MD};
+                                            sfem::HistoryStorage::INT8_MD,
+                                            sfem::HistoryStorage::QUANT_BLOCK};
 
     printf("format,space,elements,n_qp,threads,elements_per_mean,remainder_horizon,stored,bytes_history,bytes_reference,"
            "bytes_frozen,begin_step_us,advance_us,advance_ns_per_value,frozen_rel_diff\n");
@@ -126,6 +127,8 @@ int main(int argc, char *argv[]) {
         options.execution_space           = es;
         options.history_elements_per_mean = per_mean;
         options.remainder_horizon         = horizon;
+        // quant_block's tolerance: SFEM_HISTORY_TOLERANCE, else the library's.
+        if (const char *tol = getenv("SFEM_HISTORY_TOLERANCE")) options.history_tolerance = (real_t)atof(tol);
         sfem::PronyRelaxation relaxation(epdm(), nc, nq, ne, options);
 
         double                     t_begin = 0, t_advance = 0;

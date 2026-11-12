@@ -13,6 +13,7 @@
 #   full_a, full_b             double, twice (the floor)
 #   int16, int8                today's per-element scales (int16_scaled, int8_scaled)
 #   grid5, grid6, grid7        one power-of-two grid per stored term, tolerance 1e-5, 1e-6, 1e-7
+#   block5, block6, block7     the same grid, codes packed per block of 128 elements (quant_block)
 #   <run>_sr                   the same with stochastic rounding
 #   <run>_plain                without the remainder form (remainder_horizon 0)
 # Reduced formats keep the remainder form otherwise, and double stress slots. One Grace chip
@@ -39,6 +40,9 @@ options() {  # <run>: the history options of a run name
     grid5) a="$a $G.history_storage=quant_grid $G.history_tolerance=1e-5" ;;
     grid6) a="$a $G.history_storage=quant_grid $G.history_tolerance=1e-6" ;;
     grid7) a="$a $G.history_storage=quant_grid $G.history_tolerance=1e-7" ;;
+    block5) a="$a $G.history_storage=quant_block $G.history_tolerance=1e-5" ;;
+    block6) a="$a $G.history_storage=quant_block $G.history_tolerance=1e-6" ;;
+    block7) a="$a $G.history_storage=quant_block $G.history_tolerance=1e-7" ;;
     *) return 1 ;;
   esac
   echo "$a"

@@ -76,8 +76,9 @@ namespace sfem {
             SFEM_ERROR("PronyRelaxation: stochastic rounding needs an integer history storage, not %s\n",
                        to_string(options_.history_storage));
         }
-        if (options_.execution_space != EXECUTION_SPACE_HOST && is_grid(options_.history_storage)) {
-            SFEM_ERROR("PronyRelaxation: %s is host only for now\n", to_string(options_.history_storage));
+        if (options_.execution_space != EXECUTION_SPACE_HOST && is_grid(options_.history_storage) &&
+            !is_packed(options_.history_storage)) {
+            SFEM_ERROR("PronyRelaxation: %s is host only; quant_block runs on the device\n", to_string(options_.history_storage));
         }
         zero_history();
     }
@@ -147,6 +148,36 @@ namespace sfem {
                                        const S_t *const    S_new) {
         if (count == 0 || n_elements_ == 0) return;
         const ptrdiff_t rows  = static_cast<ptrdiff_t>(n_components_) * n_qp_;
+        if (is_packed(options_.history_storage)) {
+            // Each slot written anew: its old codes are read while its new ones are packed.
+            const S_t *const R = reference<S_t>();
+            const ptrdiff_t  n = n_elements_;
+            for (int j = 0; j < count; j++) {
+                const int                 s  = first + j;
+                const prony::PackedTensor H  = H_->packed(s);
+                const real_t              a  = alpha[j], bj = b[j], be = beta ? beta[j] : real_t(0);
+                const uint64_t            sd = 0x5851f42d4c957f2dull * ++writes_;
+                if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
+                    H_->write_packed_device(s, a, bj, be, (int)sizeof(S_t), S_n, S_new, R, options_.history_rounding, sd,
+                                            static_cast<uint64_t>(s) * rows * n, options_.stream);
+                    continue;
+                }
+                H_->write_packed(
+                        s,
+                        [&](const ptrdiff_t r, const ptrdiff_t e) {
+                            const ptrdiff_t k  = r * n + e;
+                            const real_t    sp = static_cast<real_t>(S_n[k]), sn = static_cast<real_t>(S_new[k]);
+                            const real_t    inc =
+                                    be == 0 ? bj * (sn - sp)
+                                            : (a * be - bj) * (sp - static_cast<real_t>(R[k])) + (bj - be) * (sn - static_cast<real_t>(R[k]));
+                            return a * H.value(r, e) + inc;
+                        },
+                        options_.history_rounding,
+                        sd,
+                        static_cast<uint64_t>(s) * rows * n);
+            }
+            return;
+        }
         const S_t *const R     = reference<S_t>();
         prony::Means     means = H_->means_view();
         if (means.data) means.data = means.tensor(first, rows);
@@ -321,7 +352,36 @@ namespace sfem {
             slot_b_[s]     = b_[i];
         }
 
-        if (series_.n_terms() == 0 || n_elements_ == 0) {
+        if (series_.n_terms() > 0 && n_elements_ > 0 && is_packed(options_.history_storage)) {
+            std::vector<prony::PackedTensor> H(n_live_);
+            for (int s = 0; s < n_live_; s++) H[s] = H_->packed(s);
+#ifdef SFEM_ENABLE_CUDA
+            if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
+                if (cu_prony_packed_frozen_history(static_cast<ptrdiff_t>(n_components_) * n_qp_,
+                                                   n_elements_,
+                                                   n_live_,
+                                                   H.data(),
+                                                   slot_alpha_.data(),
+                                                   b_sum,
+                                                   slot_beta_.data(),
+                                                   (int)sizeof(S_t),
+                                                   relaxed_stress_n,
+                                                   reference<S_t>(),
+                                                   history_->data(),
+                                                   options_.stream) != SFEM_SUCCESS) {
+                    SFEM_ERROR("PronyRelaxation::begin_step failed on the device\n");
+                }
+            } else
+#endif
+            if (n_live_ == 0) {
+                // No stored term: S_hist = -b_sum S_n alone.
+                const ptrdiff_t n = static_cast<ptrdiff_t>(n_components_) * n_qp_ * n_elements_;
+                for (ptrdiff_t k = 0; k < n; k++) history_->data()[k] = -b_sum * static_cast<real_t>(relaxed_stress_n[k]);
+            } else {
+                prony::frozen_history_packed(
+                        n_live_, H.data(), slot_alpha_.data(), b_sum, relaxed_stress_n, history_->data(), slot_beta_.data(), reference<S_t>());
+            }
+        } else if (series_.n_terms() == 0 || n_elements_ == 0) {
             // Nothing relaxes, or nothing is here: the frozen history stays the zero it was made.
 #ifdef SFEM_ENABLE_CUDA
         } else if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
@@ -459,7 +519,23 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
         if (options_.execution_space == EXECUTION_SPACE_DEVICE) {
             if (!norm_scratch_) norm_scratch_ = create_buffer<real_t>(cu_prony_max_terms(), options_.execution_space);
-            if ((n_live_ > 0 && cu_prony_squared_norms(options_.history_storage,
+            std::vector<prony::PackedTensor> packed;
+            if (is_packed(options_.history_storage)) {
+                for (int s = 0; s < n_live_; s++) packed.push_back(H_->packed(s));
+            }
+            if ((n_live_ > 0 && is_packed(options_.history_storage) &&
+                 cu_prony_packed_squared_norms(n_live_,
+                                               packed.data(),
+                                               n_qp_,
+                                               n_diagonal,
+                                               slot_beta_.data(),
+                                               (int)sizeof(S_t),
+                                               relaxed_stress_n,
+                                               reference<S_t>(),
+                                               norm_scratch_->data(),
+                                               slots,
+                                               options_.stream) != SFEM_SUCCESS) ||
+                (n_live_ > 0 && !is_packed(options_.history_storage) && cu_prony_squared_norms(options_.history_storage,
                                                        n_live_,
                                                        rows,
                                                        n_elements_,
@@ -490,7 +566,13 @@ namespace sfem {
         } else
 #endif
         {
-            if (n_live_ > 0) {
+            if (n_live_ > 0 && is_packed(options_.history_storage)) {
+                // Host only here: a device store goes through the device branch above.
+                std::vector<prony::PackedTensor> H(n_live_);
+                for (int s = 0; s < n_live_; s++) H[s] = H_->packed(s);
+                prony::squared_norms_packed(
+                        n_live_, H.data(), n_qp_, n_diagonal, slot_beta_.data(), relaxed_stress_n, reference<S_t>(), slots);
+            } else if (n_live_ > 0) {
                 dispatch_history_codec(options_.history_storage, [&](auto h_codec) {
                     using HCodec = decltype(h_codec);
                     prony::squared_norms<HCodec>(n_live_,
