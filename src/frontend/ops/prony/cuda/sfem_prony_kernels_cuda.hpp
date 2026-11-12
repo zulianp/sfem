@@ -64,21 +64,25 @@ namespace sfem {
 
     // The packed store (HistoryStorage::QUANT_BLOCK, sfem_PackedHistory.hpp) on the device.  A
     // write of one tensor is H <- alpha H + increment, the increment b (S_new - S_n), or its
-    // remainder form with beta and R; it takes three steps, because the new code area's size is
+    // remainder form with beta and R; it takes two steps, because the new code area's size is
     // known only once every block's width is:
-    //   cu_prony_packed_max    the largest |new value|, to the host (the grid's step follows it)
-    //   cu_prony_packed_plan   every block's least code and width into base and width, and its
-    //                          size, in 8-byte units, into `sizes`
-    //   cu_prony_packed_pack   the codes, as the plan rounded them, into a zeroed code area at
-    //                          the offsets the host summed from the sizes
-    // `old` is the tensor before the write, read by all three; its codes and headers stay until
-    // the caller swaps in the new ones.  Stochastic rounding (`stochastic`, `seed`, the values
+    //   cu_prony_packed_plan   on the device: the largest |new value|, the running maximum and
+    //                          the grid's step from it, every block's least code and width into
+    //                          base and width, and the blocks' offsets in 8-byte units (an
+    //                          exclusive sum of their sizes) into `offset`; then the step, the
+    //                          maximum and the code area's size to the host, the write's one wait
+    //   cu_prony_packed_pack   the codes, as the plan rounded them, into a zeroed code area of
+    //                          that size
+    // `old` is the tensor before the write, read by both; its codes and headers stay until the
+    // caller swaps in the new ones.  Stochastic rounding (`stochastic`, `seed`, the values
     // numbered from k0) draws prony::uniform's numbers, as the host's write does.
 
-    /// A zeroed code area of `bytes` bytes, from the stream-ordered pool and returned to it in
-    /// `stream` when released: a write makes one every step, and cudaMalloc/cudaFree would
-    /// synchronise the device each time.
-    std::shared_ptr<Buffer<uint8_t>> cu_prony_packed_codes(const std::size_t bytes, void *const stream);
+    /// What a plan returns to the host.
+    struct PackedPlan {
+        real_t   max_abs{0};  ///< the running maximum after this write
+        real_t   step{1};     ///< the grid's step for this write
+        uint64_t units{0};    ///< the code area, in 8-byte units, kSlack not included
+    };
 
     /// The weights of one tensor's write.
     struct PackedUpdate {
@@ -87,29 +91,21 @@ namespace sfem {
         real_t beta{0};
     };
 
-    int cu_prony_packed_max(const prony::PackedTensor &old,
-                            const PackedUpdate         u,
-                            const int                  stress_bytes,
-                            const void *const          S_n,
-                            const void *const          S_new,
-                            const void *const          ref,
-                            real_t *const              scratch,
-                            real_t *const              host_max,
-                            void *const                stream);
-
     int cu_prony_packed_plan(const prony::PackedTensor &old,
                              const PackedUpdate         u,
                              const int                  stress_bytes,
                              const void *const          S_n,
                              const void *const          S_new,
                              const void *const          ref,
-                             const real_t               step,
+                             const real_t               running_max,
+                             const real_t               tolerance,
                              const int                  stochastic,
                              const uint64_t             seed,
                              const uint64_t             k0,
                              int32_t *const             base,
                              uint8_t *const             width,
-                             uint32_t *const            sizes,
+                             uint32_t *const            offset,
+                             PackedPlan *const          plan,
                              void *const                stream);
 
     int cu_prony_packed_pack(const prony::PackedTensor &old,

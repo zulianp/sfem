@@ -171,7 +171,9 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
     if (!op) return TestResult{};
 
     // Every commit below is one step of length dt, as the material was validated with.
-    op->begin_step(dt, dt);
+    // The displacement each step starts from: the last committed one.
+    auto x_n = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    op->begin_step(dt, dt, x_n->data());
     printf("  C10=%.3f MPa, C01=%.3f MPa, K=%.1f MPa\n", MARC_C10, MARC_C01, MARC_K);
     printf("  WLF: C1=%.4f, C2=%.4f°C, Tref=%.2f°C, T=%.1f°C\n", WLF_C1, WLF_C2, WLF_TREF, temperature);
     printf("  Prony terms: %d, Gamma: %.6f\n", NUM_PRONY, sfem::test::prony_gamma(*op, fs));
@@ -230,8 +232,9 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
             
             apply_displacement(mode, strain_interp, n_nodes, pts, x_buf->data());
             blas->zeros(ndofs, rhs_buf->data());
-            op->begin_step(t + dt, dt);
-            op->advance(x_buf->data());
+            op->begin_step(t + dt, dt, x_n->data());
+            op->advance(x_n->data(), x_buf->data());
+            blas->copy(ndofs, x_buf->data(), x_n->data());
             
             t += dt;
         }
@@ -239,7 +242,7 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
         // At reference point: the step ending here is open while its stress is read.
         apply_displacement(mode, target_strain, n_nodes, pts, x_buf->data());
         blas->zeros(ndofs, rhs_buf->data());
-        op->begin_step(target_time, dt);
+        op->begin_step(target_time, dt, x_n->data());
         op->gradient(x_buf->data(), rhs_buf->data());
         
         // Sum reaction forces on right face
@@ -278,7 +281,8 @@ TestResult run_visco_test(TestMode mode, const RefData& ref, double dt, double t
                    target_time, target_strain, stress_sfem, marc_stress, error);
         }
         
-        op->advance(x_buf->data());
+        op->advance(x_n->data(), x_buf->data());
+        blas->copy(ndofs, x_buf->data(), x_n->data());
         t = target_time;
         ref_idx++;
     }

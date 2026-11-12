@@ -24,6 +24,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <algorithm>
+#include <chrono>
+#include <filesystem>
 #include <memory>
 #include <vector>
 
@@ -168,17 +170,19 @@ namespace {
         fill_pseudo_random(s.ndofs, element == smesh::TET10 || element == smesh::HEX27 ? 0.025 : 0.05, s.u->data());
 
         auto   blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+        auto   u_n  = sfem::create_host_buffer<real_t>(s.ndofs);
         real_t t    = 0;
         for (int i = 0; i < n_history_steps; ++i) {
+            blas->copy(s.ndofs, s.u->data(), u_n->data());
             blas->scal(s.ndofs, real_t(1.1), s.u->data());
             t += dt;
-            s.generated->begin_step(t, dt);
-            s.generated->advance(s.u->data());
+            s.generated->begin_step(t, dt, u_n->data());
+            s.generated->advance(u_n->data(), s.u->data());
             if (s.reference) s.reference->update_history(s.u->data());
         }
 
         // The step the comparison is made in.
-        s.generated->begin_step(t + dt, dt);
+        s.generated->begin_step(t + dt, dt, s.u->data());
         return s;
     }
 
@@ -416,12 +420,13 @@ namespace {
         const int                         dim  = mesh.spatial_dimension();
         std::vector<real_t>               gradient(fs.n_dofs());
         std::vector<std::vector<real_t>>  forces;
+        // The first step starts from the reference configuration, every later one from u.
         for (int n = 1; n <= n_steps; ++n) {
-            op.begin_step(n * dt, dt);
+            op.begin_step(n * dt, dt, u);
             std::fill(gradient.begin(), gradient.end(), real_t(0));
             if (op.gradient(u, gradient.data()) != SFEM_SUCCESS) return {};
             forces.push_back(face_force(mesh, dim, gradient.data()));
-            op.advance(u);
+            op.advance(u, u);
         }
         return forces;
     }
@@ -534,7 +539,7 @@ int test_evaluation_is_pure() {
     fill_pseudo_random(s.ndofs, 0.2, other->data(), 12345);
     SFEM_TEST_ASSERT(s.generated->gradient(other->data(), scrap->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(s.generated->apply(other->data(), s.u->data(), scrap->data()) == SFEM_SUCCESS);
-    s.generated->begin_step(1, test_dt);
+    s.generated->begin_step(1, test_dt, s.u->data());
 
     blas->zeros(s.ndofs, after->data());
     SFEM_TEST_ASSERT(s.generated->gradient(s.u->data(), after->data()) == SFEM_SUCCESS);
@@ -651,8 +656,8 @@ int test_reset_forgets_the_history() {
     fill_pseudo_random(s.ndofs, 0.03, x0->data(), 31337);
     s.generated->reset_history(x0->data());
     fresh->reset_history(x0->data());
-    s.generated->begin_step(1, test_dt);
-    fresh->begin_step(1, test_dt);
+    s.generated->begin_step(1, test_dt, x0->data());
+    fresh->begin_step(1, test_dt, x0->data());
 
     auto g0 = sfem::create_host_buffer<real_t>(s.ndofs);
     auto g1 = sfem::create_host_buffer<real_t>(s.ndofs);
@@ -661,6 +666,72 @@ int test_reset_forgets_the_history() {
     SFEM_TEST_ASSERT(s.generated->gradient(s.u->data(), g0->data()) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(fresh->gradient(s.u->data(), g1->data()) == SFEM_SUCCESS);
     for (ptrdiff_t i = 0; i < s.ndofs; i++) SFEM_TEST_ASSERT(g0->data()[i] == g1->data()[i]);
+    return SFEM_TEST_SUCCESS;
+}
+
+/// A term that relaxes completely in a step is held as a coefficient on that step's increment,
+/// S_r(x_n) - S_r(x_{n-1}), and a shorter step (a cut-back) brings it back.  x_n is the caller's;
+/// x_{n-1} the relaxation holds while such a term exists, and a restart (write_history,
+/// read_history into a new operator) carries it, so the restarted cut-back step is the same to
+/// the bit.
+int test_a_returning_term_survives_a_restart() {
+    sfem::test::SerialScope serial;
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_returning_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    // tau_0 = dt / 50: exp(-50) is below half a unit of precision, so term 0 relaxes completely in
+    // every step of dt; a step of dt / 64 brings it back.
+    const Material material{test_C10, test_C01, test_K, test_dt, {0.30, 0.20}, {test_dt / 50, 10 * test_dt}};
+    Setup          a = make_setup(3, 0, 0.15, 0, smesh::HEX8, &material);
+    Setup          b = make_setup(3, 0, 0.15, 0, smesh::HEX8, &material);
+    const auto     block = a.mesh->blocks()[0]->name();
+
+    auto x0 = sfem::create_host_buffer<real_t>(a.ndofs);
+    auto x1 = sfem::create_host_buffer<real_t>(a.ndofs);
+    auto x2 = sfem::create_host_buffer<real_t>(a.ndofs);
+    auto x3 = sfem::create_host_buffer<real_t>(a.ndofs);
+    for (ptrdiff_t i = 0; i < a.ndofs; i++) {
+        x1->data()[i] = a.u->data()[i];
+        x2->data()[i] = real_t(1.1) * a.u->data()[i];
+        x3->data()[i] = real_t(1.12) * a.u->data()[i];
+    }
+    for (auto *op : {a.generated.get(), b.generated.get()}) {
+        op->begin_step(test_dt, test_dt, x0->data());
+        op->advance(x0->data(), x1->data());
+        op->begin_step(2 * test_dt, test_dt, x1->data());
+        op->advance(x1->data(), x2->data());
+    }
+    // Term 0 is held on the increment from x1 to x2, which needs x1.
+    auto &groups = a.generated->relaxation_groups();
+    SFEM_TEST_ASSERT(!groups.relaxation(block, "iso").stored(0));
+    SFEM_TEST_ASSERT(groups.bytes_breakdown().previous == a.ndofs * sizeof(real_t));
+    const auto         &iso = groups.relaxation(block, "iso");
+    std::vector<real_t> held(static_cast<size_t>(iso.n_components()) * iso.n_qp() * iso.n_elements());
+    groups.decode_history(block, "iso", 0, x2->data(), held.data());
+    real_t held_norm = 0;
+    for (const real_t v : held) held_norm = std::max(held_norm, std::abs(v));
+    SFEM_TEST_ASSERT(held_norm > 0);
+
+    SFEM_TEST_ASSERT(b.generated->write_history(dir) == SFEM_SUCCESS);
+    Setup restarted = make_setup(3, 0, 0.15, 0, smesh::HEX8, &material);
+    SFEM_TEST_ASSERT(restarted.generated->read_history(dir) == SFEM_SUCCESS);
+
+    // The cut-back step brings term 0 back in both.
+    const real_t short_dt = test_dt / 64;
+    a.generated->begin_step(2 * test_dt + short_dt, short_dt, x2->data());
+    restarted.generated->begin_step(2 * test_dt + short_dt, short_dt, x2->data());
+    SFEM_TEST_ASSERT(groups.relaxation(block, "iso").stored(0));
+    auto g0 = sfem::create_host_buffer<real_t>(a.ndofs);
+    auto g1 = sfem::create_host_buffer<real_t>(a.ndofs);
+    SFEM_TEST_ASSERT(a.generated->gradient(x3->data(), g0->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(restarted.generated->gradient(x3->data(), g1->data()) == SFEM_SUCCESS);
+    for (ptrdiff_t i = 0; i < a.ndofs; i++) SFEM_TEST_ASSERT(g0->data()[i] == g1->data()[i]);
+
+    // Committed as a stored term, nothing is held on an increment: x_{n-1} is released.
+    a.generated->advance(x2->data(), x3->data());
+    SFEM_TEST_ASSERT(groups.bytes_breakdown().previous == 0);
+    std::filesystem::remove_all(dir);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -707,18 +778,20 @@ int test_yaml_block_entry_overrides_only_what_it_names() {
     auto            u     = sfem::create_host_buffer<real_t>(ndofs);
     auto            g0    = sfem::create_host_buffer<real_t>(ndofs);
     auto            g1    = sfem::create_host_buffer<real_t>(ndofs);
+    auto            u_n   = sfem::create_host_buffer<real_t>(ndofs);
     fill_pseudo_random(ndofs, 0.05, u->data(), 99);
     for (int step = 1; step <= 3; step++) {
+        std::copy(u->data(), u->data() + ndofs, u_n->data());
         for (ptrdiff_t i = 0; i < ndofs; i++) u->data()[i] *= real_t(1.1);
-        from_yaml->begin_step(step * test_dt, test_dt);
-        by_hand->begin_step(step * test_dt, test_dt);
+        from_yaml->begin_step(step * test_dt, test_dt, u_n->data());
+        by_hand->begin_step(step * test_dt, test_dt, u_n->data());
         std::fill(g0->data(), g0->data() + ndofs, real_t(0));
         std::fill(g1->data(), g1->data() + ndofs, real_t(0));
         SFEM_TEST_ASSERT(from_yaml->gradient(u->data(), g0->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(by_hand->gradient(u->data(), g1->data()) == SFEM_SUCCESS);
         for (ptrdiff_t i = 0; i < ndofs; i++) SFEM_TEST_ASSERT(g0->data()[i] == g1->data()[i]);
-        from_yaml->advance(u->data());
-        by_hand->advance(u->data());
+        from_yaml->advance(u_n->data(), u->data());
+        by_hand->advance(u_n->data(), u->data());
     }
     return SFEM_TEST_SUCCESS;
 }
@@ -737,21 +810,23 @@ real_t affine_vs_isoparametric(const int n_terms) {
 
     auto   g0    = sfem::create_host_buffer<real_t>(iso.ndofs);
     auto   g1    = sfem::create_host_buffer<real_t>(iso.ndofs);
+    auto   u_n   = sfem::create_host_buffer<real_t>(iso.ndofs);
     real_t worst = 0;
     for (int step = 1; step <= 4; step++) {
+        std::copy(iso.u->data(), iso.u->data() + iso.ndofs, u_n->data());
         for (ptrdiff_t i = 0; i < iso.ndofs; i++) {
             iso.u->data()[i] *= real_t(1.1);
             affine.u->data()[i] = iso.u->data()[i];
         }
-        iso.generated->begin_step(step * test_dt, test_dt);
-        affine.generated->begin_step(step * test_dt, test_dt);
+        iso.generated->begin_step(step * test_dt, test_dt, u_n->data());
+        affine.generated->begin_step(step * test_dt, test_dt, u_n->data());
         std::fill(g0->data(), g0->data() + iso.ndofs, real_t(0));
         std::fill(g1->data(), g1->data() + iso.ndofs, real_t(0));
         if (iso.generated->gradient(iso.u->data(), g0->data()) != SFEM_SUCCESS) return 1e30;
         if (affine.generated->gradient(affine.u->data(), g1->data()) != SFEM_SUCCESS) return 1e30;
         worst = std::max(worst, relative_difference(iso.ndofs, g1->data(), g0->data()));
-        iso.generated->advance(iso.u->data());
-        affine.generated->advance(affine.u->data());
+        iso.generated->advance(u_n->data(), iso.u->data());
+        affine.generated->advance(u_n->data(), affine.u->data());
     }
     return worst;
 }
@@ -790,6 +865,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_evaluation_is_pure);
     SFEM_RUN_TEST(test_relaxation_composes_with_every_time_scheme);
     SFEM_RUN_TEST(test_reset_forgets_the_history);
+    SFEM_RUN_TEST(test_a_returning_term_survives_a_restart);
 #ifdef SFEM_ENABLE_RYAML
     SFEM_RUN_TEST(test_yaml_block_entry_overrides_only_what_it_names);
 #endif

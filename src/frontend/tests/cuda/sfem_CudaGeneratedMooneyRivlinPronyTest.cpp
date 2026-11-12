@@ -124,6 +124,7 @@ namespace {
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
         auto            d_h   = create_host_buffer<real_t>(ndofs);
+        auto            un_h  = create_host_buffer<real_t>(ndofs);
         // Random nodal noise grown by 1.15 a step: the six tetrahedra of each cube, and TET10's
         // midside nodes, invert where a hexahedron does not, so the simplices take a fifth of it.
         // TET10 a tenth: at a fifth one of its elements turns inside out at step 6 (host value NaN).
@@ -140,12 +141,15 @@ namespace {
         real_t worst = 0;
         real_t t     = 0;
         for (int step = 1; step <= 6; step++) {
+            // The step starts from the last committed displacement.
+            std::copy(u_h->data(), u_h->data() + ndofs, un_h->data());
             for (ptrdiff_t i = 0; i < ndofs; i++) u_h->data()[i] *= real_t(1.15);
-            auto u_d = smesh::to_device(u_h);
+            auto u_d  = smesh::to_device(u_h);
+            auto un_d = smesh::to_device(un_h);
             t += test_dt;
 
-            host_op->begin_step(t, test_dt);
-            device_op->begin_step(t, test_dt);
+            host_op->begin_step(t, test_dt, un_h->data());
+            device_op->begin_step(t, test_dt, un_d->data());
 
             real_t v_h = 0, v_d = 0;
             SFEM_TEST_ASSERT(host_op->value(u_h->data(), &v_h) == SFEM_SUCCESS);
@@ -176,8 +180,8 @@ namespace {
                    (double)apply_error);
             worst = std::max({worst, value_error, gradient_error, apply_error});
 
-            host_op->advance(u_h->data());
-            device_op->advance(u_d->data());
+            host_op->advance(un_h->data(), u_h->data());
+            device_op->advance(un_d->data(), u_d->data());
         }
 
         SFEM_TEST_ASSERT(worst < tolerance);

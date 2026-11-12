@@ -266,6 +266,26 @@ namespace sfem {
         slot_beta_.resize(n_live_);
     }
 
+    bool PronyRelaxation::holds_coefficients() const {
+        for (int i = 0; i < series_.n_terms(); i++) {
+            if (slot_[i] < 0 && coefficient_[i] != 0) return true;
+        }
+        return false;
+    }
+
+    bool PronyRelaxation::needs_previous_stress(const real_t dt) const {
+        if (!holds_coefficients() || !(dt > 0)) return false;
+        // begin_step's weights and its test for a term that relaxes completely.
+        const int           n = series_.n_terms();
+        std::vector<real_t> alpha(n), b(n);
+        options_.integrator->weights(series_, dt / options_.shift->factor(temperature_), alpha.data(), b.data());
+        const real_t complete = std::numeric_limits<real_t>::epsilon() / 2;
+        for (int i = 0; i < n; i++) {
+            if (coefficient_[i] != 0 && slot_[i] < 0 && alpha[i] > complete) return true;
+        }
+        return false;
+    }
+
     void PronyRelaxation::begin_step(const real_t,
                                      const real_t        dt,
                                      const real_t *const relaxed_stress_n,

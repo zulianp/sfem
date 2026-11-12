@@ -77,6 +77,7 @@ namespace {
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
         auto            d_h   = create_host_buffer<real_t>(ndofs);
+        auto            un_h  = create_host_buffer<real_t>(ndofs);
         fill_pseudo_random(ndofs, noise, u_h->data(), 12345);
         fill_pseudo_random(ndofs, real_t(1), d_h->data(), 777);
         auto d_d = smesh::to_device(d_h);
@@ -89,11 +90,14 @@ namespace {
         real_t worst = 0;
         real_t t     = 0;
         for (int step = 1; step <= 4; step++) {
+            // The step starts from the last committed displacement.
+            std::copy(u_h->data(), u_h->data() + ndofs, un_h->data());
             for (ptrdiff_t i = 0; i < ndofs; i++) u_h->data()[i] *= real_t(1.1);
-            auto u_d = smesh::to_device(u_h);
+            auto u_d  = smesh::to_device(u_h);
+            auto un_d = smesh::to_device(un_h);
             t += test_dt;
-            host_op->begin_step(t, test_dt);
-            device_op->begin_step(t, test_dt);
+            host_op->begin_step(t, test_dt, un_h->data());
+            device_op->begin_step(t, test_dt, un_d->data());
 
             real_t v_h = 0, v_d = 0;
             SFEM_TEST_ASSERT(host_op->value(u_h->data(), &v_h) == SFEM_SUCCESS);
@@ -124,8 +128,8 @@ namespace {
                    (double)apply_error);
             worst = std::max({worst, value_error, gradient_error, apply_error});
 
-            host_op->advance(u_h->data());
-            device_op->advance(u_d->data());
+            host_op->advance(un_h->data(), u_h->data());
+            device_op->advance(un_d->data(), u_d->data());
         }
 
         SFEM_TEST_ASSERT(worst < 1e-10);

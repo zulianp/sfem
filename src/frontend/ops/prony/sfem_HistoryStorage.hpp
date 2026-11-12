@@ -110,7 +110,7 @@ namespace sfem {
         /// The step of a grid store: the largest power of two 2^L with 2^(L-1) <= tolerance *
         /// max_abs (smesh's level_for_bound), so the rounding error is at most that; one while
         /// the tensor is zero.
-        inline real_t grid_step(const real_t max_abs, const real_t tolerance) {
+        SFEM_DEVICE_INLINE real_t grid_step(const real_t max_abs, const real_t tolerance) {
             const int L = smesh::compression::level_for_bound(static_cast<double>(tolerance) * static_cast<double>(max_abs));
             if (L == INT32_MIN) return 1;
             return static_cast<real_t>(smesh::compression::pow2i(L));

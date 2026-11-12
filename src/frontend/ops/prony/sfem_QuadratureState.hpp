@@ -181,11 +181,7 @@ namespace sfem {
             std::shared_ptr<Buffer<uint32_t>> offset;
         };
         std::vector<Packed> packed_;
-        //! A device write's new headers (swapped in), block sizes and largest value.
-        Packed                            spare_;
-        std::shared_ptr<Buffer<uint32_t>> sizes_;
-        std::shared_ptr<Buffer<real_t>>   max_scratch_;
-        void                              reset_packed(const int t);
+        void                reset_packed(const int t);
     };
 
     template <class Z>

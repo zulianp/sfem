@@ -1,4 +1,5 @@
 #include "sfem_QuadratureState.hpp"
+#include "sfem_prony_buffers.hpp"
 #include "sfem_StateFiles.hpp"
 
 #include <algorithm>
@@ -59,12 +60,9 @@ namespace sfem {
                 p.width  = create_buffer<uint8_t>(headers, es);
                 p.offset = create_buffer<uint32_t>(headers, es);
             }
-            if (es != EXECUTION_SPACE_HOST) {
-                spare_.base   = create_buffer<int32_t>(headers, es);
-                spare_.width  = create_buffer<uint8_t>(headers, es);
-                spare_.offset = create_buffer<uint32_t>(headers, es);
-                sizes_        = create_buffer<uint32_t>(headers, es);
-                max_scratch_  = create_buffer<real_t>(1, es);
+            // A block's offset is in 8-byte units of 32 bits: at most 4 bytes a code bounds them.
+            if (static_cast<double>(values_per_tensor()) * static_cast<double>(n_elements) * 4 / 8 + headers >= 4294967296.0) {
+                SFEM_ERROR("QuadratureState: a packed tensor of %td values is beyond the offsets' 32 bits\n", values_per_tensor() * n_elements);
             }
         }
 
@@ -179,44 +177,33 @@ namespace sfem {
                                               const uint64_t        k0,
                                               void *const           stream) {
 #ifdef SFEM_ENABLE_CUDA
-        const prony::PackedTensor old = packed(t);
+        const prony::PackedTensor old     = packed(t);
         const PackedUpdate        u{alpha, b, beta};
-        const int                 stochastic = rounding == HistoryRounding::STOCHASTIC;
-        real_t                    max_abs    = 0;
-        if (cu_prony_packed_max(old, u, stress_bytes, S_n, S_new, ref, max_scratch_->data(), &max_abs, stream) != SFEM_SUCCESS) {
-            SFEM_ERROR("QuadratureState::write_packed_device: the largest value failed\n");
-        }
-        max_abs           = std::max(max_abs, static_cast<real_t>(scales_->data()[2 * t + 1]));
-        const real_t step = prony::grid_step(max_abs, tolerance_);
-        if (cu_prony_packed_plan(old, u, stress_bytes, S_n, S_new, ref, step, stochastic, seed, k0, spare_.base->data(),
-                                 spare_.width->data(), sizes_->data(), stream) != SFEM_SUCCESS) {
+        const ptrdiff_t           headers = old.rows * old.n_blocks();
+        // The new headers are written while the old ones are read, and replace them after; the
+        // codes and headers are held until the next write.
+        auto       base   = prony::transient_buffer<int32_t>(headers, es_, stream, true);
+        auto       width  = prony::transient_buffer<uint8_t>(headers, es_, stream, true);
+        auto       offset = prony::transient_buffer<uint32_t>(headers, es_, stream, true);
+        PackedPlan plan;
+        if (cu_prony_packed_plan(old, u, stress_bytes, S_n, S_new, ref, static_cast<real_t>(scales_->data()[2 * t + 1]), tolerance_,
+                                 rounding == HistoryRounding::STOCHASTIC, seed, k0, base->data(), width->data(), offset->data(), &plan,
+                                 stream) != SFEM_SUCCESS) {
             SFEM_ERROR("QuadratureState::write_packed_device: the plan failed\n");
         }
-        // The offsets, summed on the host: the sizes are the blocks', a few per thousand values.
-        std::vector<uint32_t> sizes = host_copy(sizes_, es_);
-        std::vector<uint32_t> offset(sizes.size());
-        uint64_t              at = 0;
-        for (std::size_t h = 0; h < sizes.size(); h++) {
-            if (at > UINT32_MAX) SFEM_ERROR("QuadratureState::write_packed_device: a tensor's codes exceed 32 GB\n");
-            offset[h] = static_cast<uint32_t>(at);
-            at += sizes[h];
-        }
-        if (cudaMemcpy(spare_.offset->data(), offset.data(), offset.size() * sizeof(uint32_t), cudaMemcpyHostToDevice) != cudaSuccess) {
-            SFEM_ERROR("QuadratureState::write_packed_device: copying the offsets failed\n");
-        }
-        auto codes = cu_prony_packed_codes(at * 8 + smesh::compression::kSlack, stream);
-        if (cu_prony_packed_pack(old, u, stress_bytes, S_n, S_new, ref, step, stochastic, seed, k0, spare_.base->data(),
-                                 spare_.width->data(), spare_.offset->data(), codes->data(), stream) != SFEM_SUCCESS) {
+        auto codes = prony::transient_buffer<uint8_t>(static_cast<ptrdiff_t>(plan.units * 8 + smesh::compression::kSlack), es_, stream, true);
+        if (cu_prony_packed_pack(old, u, stress_bytes, S_n, S_new, ref, plan.step, rounding == HistoryRounding::STOCHASTIC, seed, k0,
+                                 base->data(), width->data(), offset->data(), codes->data(), stream) != SFEM_SUCCESS) {
             SFEM_ERROR("QuadratureState::write_packed_device: packing failed\n");
         }
-        // The old codes go back to the pool in `stream`, after the kernels that read them.
-        Packed &p = packed_[t];
-        p.codes   = codes;
-        std::swap(p.base, spare_.base);
-        std::swap(p.width, spare_.width);
-        std::swap(p.offset, spare_.offset);
-        scales_->data()[2 * t]     = static_cast<scaling_t>(step);
-        scales_->data()[2 * t + 1] = static_cast<scaling_t>(max_abs);
+        // The old codes and headers go back to the pool in `stream`, after the kernels that read them.
+        Packed &p                  = packed_[t];
+        p.codes                    = codes;
+        p.base                     = base;
+        p.width                    = width;
+        p.offset                   = offset;
+        scales_->data()[2 * t]     = static_cast<scaling_t>(plan.step);
+        scales_->data()[2 * t + 1] = static_cast<scaling_t>(plan.max_abs);
 #else
         (void)t, (void)alpha, (void)b, (void)beta, (void)stress_bytes, (void)S_n, (void)S_new, (void)ref, (void)rounding, (void)seed,
                 (void)k0, (void)stream;

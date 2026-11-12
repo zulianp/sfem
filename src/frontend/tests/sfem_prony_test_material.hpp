@@ -8,8 +8,9 @@
 // operator's configuration again.  The WLF convention is the one those programs were written
 // against and the one `WLFShift` uses: tau_i(T) = a_T(T) tau_i, log10 a_T = -C1 dT / (C2 + dT).
 //
-// Stepping is the operator's own `HistoryDependent` protocol: `begin_step(t, dt)` before a
-// step's solve, `advance(x)` at its converged state.
+// Stepping is the operator's own `HistoryDependent` protocol: `begin_step(t, dt, x_n)` before a
+// step's solve, `advance(x_n, x)` at its converged state, x_n the displacement the step starts
+// from, which the caller holds.
 
 #include <memory>
 #include <string>

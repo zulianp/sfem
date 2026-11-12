@@ -122,7 +122,7 @@ namespace sfem {
                     const real_t t_new = t + dt >= target - tol ? target : t + dt;
                     if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
                     if (impl.scheme) impl.scheme->begin_step(t, dt);
-                    for (auto &h : impl.histories) h->begin_step(t_new, dt);
+                    for (auto &h : impl.histories) h->begin_step(t_new, dt, x_n->data());
 
                     const StepContext context{t, dt, impl.scheme};
 
@@ -188,7 +188,7 @@ namespace sfem {
             if (impl.notify([&](StepObserver &o) { return o.converged(record); }) != SFEM_SUCCESS) return SFEM_FAILURE;
 
             if (impl.solver->commit(x) != SFEM_SUCCESS) return SFEM_FAILURE;
-            for (auto &h : impl.histories) h->advance(x);
+            for (auto &h : impl.histories) h->advance(x_n->data(), x);
             if (impl.scheme) impl.scheme->advance(x);
             blas->copy(ndofs, x, x_n->data());
 

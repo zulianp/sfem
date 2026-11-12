@@ -39,8 +39,8 @@ namespace {
     class RecordingHistory final : public sfem::HistoryDependent {
     public:
         explicit RecordingHistory(Log &log) : log_(log) {}
-        void begin_step(const real_t t, const real_t dt) override { log_.push_back(fmt("history.begin", t, dt)); }
-        void advance(const real_t *const) override { log_.push_back("history.advance"); }
+        void begin_step(const real_t t, const real_t dt, const real_t *const) override { log_.push_back(fmt("history.begin", t, dt)); }
+        void advance(const real_t *const, const real_t *const) override { log_.push_back("history.advance"); }
         void reset_history(const real_t *const) override {}
 
     private:

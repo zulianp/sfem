@@ -687,6 +687,8 @@ namespace sfem {
                                    entry.second.block->n_elements(),
                                    quadrature_points(entry.second.element_type));
     }
+    impl_->relaxation->set_stress_evaluation(
+        [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
     impl_->element_values.reset(new real_t[impl_->element_capacity]);
         impl_->use_packed_two_pass = smesh::Env::read("SFEM_PACKED_TWO_PASS", false);
     if (impl_->space->has_packed_mesh()) {
@@ -728,25 +730,22 @@ namespace sfem {
     return *impl_->relaxation;
   }
 
-  // The relaxed stress the step starts from is the one the last `advance`
-  // evaluated at the converged state, kept by the relaxation: each stress is
-  // evaluated once, and with no spectrum anywhere not at all.
-  void GeneratedContinuedMooneyRivlinProny::begin_step(const real_t t, const real_t dt) {
+  // The relaxed stresses are evaluated by the relaxation, from the displacements
+  // the caller holds, through `quadrature_output` (set at `initialize`): with no
+  // spectrum anywhere not at all.
+  void GeneratedContinuedMooneyRivlinProny::begin_step(const real_t t, const real_t dt, const real_t *const x_n) {
     SFEM_TRACE_SCOPE("GeneratedContinuedMooneyRivlinProny::begin_step");
-    relaxation_groups().begin_step(
-        t, dt, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().begin_step(t, dt, x_n);
   }
 
-  void GeneratedContinuedMooneyRivlinProny::advance(const real_t *const x) {
+  void GeneratedContinuedMooneyRivlinProny::advance(const real_t *const x_n, const real_t *const x) {
     SFEM_TRACE_SCOPE("GeneratedContinuedMooneyRivlinProny::advance");
-    relaxation_groups().advance(
-        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().advance(x_n, x);
   }
 
   void GeneratedContinuedMooneyRivlinProny::reset_history(const real_t *const x) {
     SFEM_TRACE_SCOPE("GeneratedContinuedMooneyRivlinProny::reset_history");
-    relaxation_groups().reset(
-        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().reset(x);
   }
 
   int GeneratedContinuedMooneyRivlinProny::quadrature_output(const real_t *const x, const int slot) {

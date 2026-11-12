@@ -234,7 +234,9 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
     if (!op) return 1;
 
     // Every step has length dt, so gamma is the same in all of them.
-    op->begin_step(dt, dt);
+    // The displacement each step starts from: the last committed one.
+    auto x_n = sfem::create_buffer<real_t>(ndofs, es);
+    op->begin_step(dt, dt, x_n->data());
     printf("  C10 = %.4f, C01 = %.4f MPa\n", PAPER_C10, PAPER_C01);
     printf("  Prony terms: %d, Gamma: %.6f\n", (int)material.g.size(), sfem::test::prony_gamma(*op, fs));
     
@@ -292,7 +294,7 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
         
         // Compute internal forces, in the step that ends at t
         blas->zeros(ndofs, rhs_buf->data());
-        op->begin_step(t, dt);
+        op->begin_step(t, dt, x_n->data());
         op->gradient(x_buf->data(), rhs_buf->data());
         
         // Extract stress: sum of reaction forces on loaded face / area
@@ -324,7 +326,8 @@ int run_strain_rate_test(double strain_rate, double max_strain, const char* labe
         }
         
         // Update history
-        op->advance(x_buf->data());
+        op->advance(x_n->data(), x_buf->data());
+        blas->copy(ndofs, x_buf->data(), x_n->data());
         
         t += dt;
         step++;
