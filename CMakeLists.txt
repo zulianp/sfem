@@ -336,6 +336,9 @@ if(SFEM_ENABLE_HIP)
     target_compile_options(sfem PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-fno-gpu-flush-denormals-to-zero>)
     # nvcc includes cuda_runtime.h into every .cu before its first line; base/hip/compat's does here.
     target_compile_options(sfem PRIVATE "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:HIP_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:HIP>:-fgpu-default-stream=per-thread>>)
 elseif(SFEM_ENABLE_CUDA)
     # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
     target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:CUDA_API_PER_THREAD_DEFAULT_STREAM>)

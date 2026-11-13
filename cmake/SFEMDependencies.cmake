@@ -24,11 +24,15 @@ if(SFEM_ENABLE_HIP)
     # Executables made of C++ sources are linked by the C++ compiler, as smesh's and SCCD's are.
     set(CMAKE_HIP_LINKER_PREFERENCE_PROPAGATES OFF)
 
-    # No per-thread null stream, unlike CUDA below: HIP's (HIP_API_PER_THREAD_DEFAULT_STREAM,
-    # -fgpu-default-stream=per-thread) renames hipMemcpyToSymbol to an overload that does not take
-    # the symbol (HIP 6.4). SFEM launches on the context's stream, cudaStreamPerThread, which is a
-    # stream handle either way; what is issued without a stream goes to the null stream, which
-    # waits for it.
+    # The null stream is the calling thread's default stream (hipStreamPerThread), as in the CUDA
+    # build below: what is issued without a stream (a device operator's null stream) joins the
+    # context's work, and a graph capturing that stream takes it (MPRGP's run). On the legacy null
+    # stream HIP neither orders such work with the capture nor refuses it, so a captured product
+    # would be missing from the graph. The compiler takes the flag, host compilers the definition;
+    # set before smesh is added. The symbol copies then take the symbol's address
+    # (cudaMemcpyToSymbol in base/hip/sfem_gpu_runtime.hpp and SCCD's runtime header).
+    string(APPEND CMAKE_HIP_FLAGS " -fgpu-default-stream=per-thread")
+    add_compile_definitions(HIP_API_PER_THREAD_DEFAULT_STREAM)
 elseif(SFEM_ENABLE_CUDA)
     if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
         set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
