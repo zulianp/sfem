@@ -62,5 +62,26 @@ kernels are measured without it (step 0).
 6. **Final check on GH200.** Each AMD path from steps 1-5 built for CUDA and timed on GH200
    (MaMAL 136 M and 0.7 M, `bench_op_apply`); report and propose adoption where it wins.
 
+## Progress
+
+| step | change | MaMAL 136 M (GH200 19.0 s) | MaMAL 0.7 M (GH200 1.4 s) |
+|---|---|---|---|
+| start | hip-port | 69.4 s | 20.7 s |
+| 2a | HIP default level-8 kernel: gather (5) | 35.0 s | 2.2 s |
+
+- Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
+  hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
+  build without it (HEX8: 97.0 against 98.0 us); the compiler already takes the hardware atomics
+  for these kernels. Not kept.
+- Step 2a: of the level-8 kernels HIP can build, the gather kernel (5) applies 44^3 macro elements
+  (44 M nodes) in 15.3 ms on MI300A against 54.1 (0, the former default), 49.6 (2) and 49.5 ms (3);
+  GH200 takes 9.6 ms with its tensor-product kernel (4) and 11.0 ms with the gather one. The
+  0.7 M case drops more than the kernel time explains (20.7 to 2.2 s); kernel 0's per-thread stack
+  is the likely cost of each launch on AMD (scratch set-up), to be confirmed by step 0's timings.
+  Same iterations and cycles; ctest 119/119 on MI300A.
+- Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
+  (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
+  per SM) and returns zeros without an error; it is not the default on CUDA.
+
 Out of scope: the host-side set-up (`to_semistructured`, `SPMG::init_solver`, 1.3-2.5x), which runs
 on the APU's 24 cores against Grace's 72.

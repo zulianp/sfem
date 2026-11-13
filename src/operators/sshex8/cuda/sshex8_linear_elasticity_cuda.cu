@@ -1708,8 +1708,10 @@ static int cu_sshex8_linear_elasticity_level8_kernel() {
 
     if (kernel < 0) {
 #if defined(SFEM_ENABLE_HIP)
-        // The TP kernels (4, 6) multiply on NVIDIA's double-precision tensor cores (mma PTX).
-        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 0;
+        // The TP kernels (4, 6) multiply on NVIDIA's double-precision tensor cores (mma PTX). Of the
+        // others the gather kernel is the fastest on MI300A: 44^3 macro elements (44 M nodes),
+        // 15.3 ms against 54.1 (0), 49.6 (2) and 49.5 ms (3).
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 5;
 #else
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 4;
 #endif
