@@ -21,6 +21,8 @@ option(SFEM_ENABLE_MINIMAL "Build only the SFEM library (no drivers, no tests)" 
 option(SFEM_ENABLE_MPI "Enable MPI support" ON)
 option(SFEM_ENABLE_NCCL "NCCL for device communication within a node, in builds with MPI and CUDA (off when not found)" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
+option(SFEM_ENABLE_ZSTD "zstd stage for compressed mesh/field files (smesh .smz; off when not found)" ON)
+option(SFEM_ENABLE_LZ4 "lz4 stage for compressed mesh/field files (smesh .smz; off when not found)" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
