@@ -11,6 +11,11 @@ option(SFEM_ENABLE_AVX512_SORT "Enable AVX512 sort" OFF)
 option(SFEM_ENABLE_BLAS "Enable BLAS" OFF)
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_CUDA_LINEINFO "Enable cuda line info for profiling" OFF)
+# With SFEM_ENABLE_CUDA=ON, which turns the device path on, SFEM_ENABLE_HIP=ON compiles the same
+# device sources with HIP instead of CUDA, for AMD GPUs (base/hip/sfem_gpu_runtime.hpp). gfx942 is
+# MI300A. smesh, SCCD, SSDF and sresample follow.
+option(SFEM_ENABLE_HIP "Build the device path with HIP, for AMD GPUs" OFF)
+set(SFEM_HIP_ARCHITECTURES "gfx942" CACHE STRING "HIP (AMD GPU) architectures to build for")
 option(SFEM_ENABLE_DEV_MODE "Add additional flags for more strict compilation" OFF)
 option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
 option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)

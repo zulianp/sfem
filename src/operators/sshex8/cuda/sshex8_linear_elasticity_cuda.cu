@@ -599,6 +599,7 @@ static __device__ __forceinline__ int cu_sshex8_hex_vertex_from_offsets(const in
     return x + (3 - 2 * x) * y + (z << 2);
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 static __device__ __forceinline__ void cu_sshex8_mma_m8n8k4_f64(const double A, const double B, double &C0, double &C1) {
     asm volatile(
             "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
@@ -606,6 +607,7 @@ static __device__ __forceinline__ void cu_sshex8_mma_m8n8k4_f64(const double A, 
             : "=d"(C0), "=d"(C1)
             : "d"(A), "d"(B), "d"(C0), "d"(C1));
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T>
 static __device__ __forceinline__ void cu_sshex8_tp_ref_grad(const int q, const int node, T *const SFEM_RESTRICT g) {
@@ -803,6 +805,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
     }
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_kernel(
         const ptrdiff_t                          nelements,
@@ -1003,6 +1006,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_k
         __syncthreads();
     }
 }
+#endif  // !SFEM_ENABLE_HIP
 
 // Build 24x24 micro-element matrix into shared emat. __noinline__ so apply-phase
 // register pressure does not inherit matrix_block / quadrature temporaries.
@@ -1052,6 +1056,7 @@ __device__ __noinline__ void cu_sshex8_tp_build_emat_24x24(const int            
 
 // Optimized TP path (LEVEL8_KERNEL=6): launch_bounds + noinline emat build + padded shared.
 // KERNEL=4 baseline is left unchanged for A/B.
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ __launch_bounds__(128, 4) void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel(
         const ptrdiff_t                          nelements,
@@ -1235,6 +1240,7 @@ __global__ __launch_bounds__(128, 4) void cu_affine_sshex8_linear_elasticity_app
         __syncthreads();
     }
 }
+#endif  // !SFEM_ENABLE_HIP
 
 #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel
 // #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel
@@ -1383,6 +1389,7 @@ int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(const ptrd
     return SFEM_SUCCESS;
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t                          nelements,
                                                                 idx_t **const SFEM_RESTRICT              elements,
@@ -1426,7 +1433,9 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
         const ptrdiff_t                          nelements,
@@ -1477,6 +1486,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t                          nelements,
@@ -1544,10 +1554,11 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdi
                                                                      T *const SFEM_RESTRICT       g_outx,
                                                                      T *const SFEM_RESTRICT       g_outy,
                                                                      T *const SFEM_RESTRICT       g_outz) {
+    // A thread per micro element of a z-layer, the layers zi, zi + blockDim.z, ... (one when the
+    // block holds all LEVEL^3: a block has at most 1024 threads).
     const auto xi         = threadIdx.x;
     const auto yi         = threadIdx.y;
-    const auto zi         = threadIdx.z;
-    const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+    const bool is_element = xi < LEVEL && yi < LEVEL && threadIdx.z < LEVEL;
 
     static const int n_qp  = 2;
     static const T   qx[2] = {0.2113248654, 0.7886751346};
@@ -1561,7 +1572,8 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdi
         T sub_adjugate[9];
         T sub_determinant;
 
-        for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x)
+        for (int zi = threadIdx.z; zi < LEVEL; zi += blockDim.z) {
             idx_t ev[8];
             ev[0] = cu_sshex8_lidx(LEVEL, xi, yi, zi);
             ev[1] = cu_sshex8_lidx(LEVEL, xi + 1, yi, zi);
@@ -1652,8 +1664,12 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
                                                       void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
-    dim3 block_size(LEVEL, LEVEL, LEVEL);
-    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+    // A thread per micro element up to LEVEL 8 (512 threads); from LEVEL 16 on a block of one z-layer
+    // whose threads loop over the layers (LEVEL^3 = 4096 is beyond a block, and 1024 beyond the
+    // registers for this kernel).
+    static constexpr int Z_LAYERS = LEVEL * LEVEL * LEVEL <= 512 ? LEVEL : 1;
+    dim3                 block_size(LEVEL, LEVEL, Z_LAYERS);
+    dim3                 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     cu_affine_sshex8_linear_elasticity_apply_warp_kernel<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
@@ -1677,7 +1693,6 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 }
 
 #define my_kernel cu_affine_sshex8_linear_elasticity_apply_warp_tpl
-// #define my_kernel_large cu_affine_sshex8_linear_elasticity_apply_warp_tpl
 // #define my_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_segmented cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl
@@ -1692,7 +1707,12 @@ static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
     if (kernel < 0) {
+#if defined(SFEM_ENABLE_HIP)
+        // The TP kernels (4, 6) multiply on NVIDIA's double-precision tensor cores (mma PTX).
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 0;
+#else
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 4;
+#endif
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL, atoi);
         kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL;
     }
@@ -1815,6 +1835,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                    (real_t *)outz,
                                                                    stream);
                 }
+#if !defined(SFEM_ENABLE_HIP)
                 case 4: {
                     return my_kernel_tensor_product<real_t, 8>(nelements,
                                                                elements,
@@ -1833,6 +1854,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                (real_t *)outz,
                                                                stream);
                 }
+#endif
                 case 5: {
                     return my_kernel_level8_gather<real_t, 8>(nelements,
                                                               elements,
@@ -1851,6 +1873,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                               (real_t *)outz,
                                                               stream);
                 }
+#if !defined(SFEM_ENABLE_HIP)
                 case 6: {
                     return my_kernel_tensor_product_opt<real_t, 8>(nelements,
                                                                    elements,
@@ -1869,6 +1892,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                    (real_t *)outz,
                                                                    stream);
                 }
+#endif
                 default: {
                     return my_kernel_segmented<real_t, 8>(nelements,
                                                           elements,
@@ -1890,7 +1914,10 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
             }
         }
         case 16: {
-            return my_kernel_large<real_t, 16>(nelements,
+            // The warp kernel, a block per z-layer: the local-memory one holds the 17^3 macro element per
+            // thread, 45 times slower on an H100 (8^3 elements, 2.1 M nodes: 0.60 against 27 ms), and
+            // beyond an AMD GPU's 128 KB of stack.
+            return my_kernel<real_t, 16>(nelements,
                                                elements,
                                                jacobian_stride,
                                                (cu_jacobian_t *)jacobian_adjugate,

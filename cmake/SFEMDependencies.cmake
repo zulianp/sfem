@@ -2,10 +2,34 @@
 
 set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
 
+if(SFEM_ENABLE_HIP AND NOT SFEM_ENABLE_CUDA)
+    message(FATAL_ERROR "SFEM_ENABLE_HIP=ON selects the backend of the device path, "
+                        "which SFEM_ENABLE_CUDA=ON turns on: set both.")
+endif()
+
 # CUDA must be enabled before add_subdirectory(smesh): otherwise CMake does not
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
 # are never compiled into libsmesh.
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
+    # enable_language.
+    if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+        set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures")
+    endif()
+    enable_language(HIP)
+    if(NOT DEFINED CMAKE_HIP_STANDARD)
+        set(CMAKE_HIP_STANDARD 17)
+        set(CMAKE_HIP_STANDARD_REQUIRED ON)
+    endif()
+    # Executables made of C++ sources are linked by the C++ compiler, as smesh's and SCCD's are.
+    set(CMAKE_HIP_LINKER_PREFERENCE_PROPAGATES OFF)
+
+    # No per-thread null stream, unlike CUDA below: HIP's (HIP_API_PER_THREAD_DEFAULT_STREAM,
+    # -fgpu-default-stream=per-thread) renames hipMemcpyToSymbol to an overload that does not take
+    # the symbol (HIP 6.4). SFEM launches on the context's stream, cudaStreamPerThread, which is a
+    # stream handle either way; what is issued without a stream goes to the null stream, which
+    # waits for it.
+elseif(SFEM_ENABLE_CUDA)
     if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
         set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
     endif()
@@ -35,6 +59,8 @@ if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
     set(SMESH_ENABLE_BLAS ${SFEM_ENABLE_BLAS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_CUDA_LINEINFO ${SFEM_ENABLE_CUDA_LINEINFO} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SMESH_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SMESH_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
@@ -181,7 +207,23 @@ endif()
 
 # ##############################################################################
 
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    # hip::host carries the runtime and the platform define that host code including the
+    # base/hip/compat headers needs. SFEM_ENABLE_CUSPARSE and SFEM_ENABLE_CUBLAS take hipSPARSE and
+    # hipBLAS (base/hip/compat/cusparse.h, cublas_v2.h); NVTX has no counterpart.
+    if(NOT TARGET hip::host)
+        find_package(hip REQUIRED)
+    endif()
+    list(APPEND SFEM_DEP_LIBRARIES hip::host)
+    if(SFEM_ENABLE_CUSPARSE)
+        find_package(hipsparse REQUIRED)
+        list(APPEND SFEM_DEP_LIBRARIES roc::hipsparse)
+    endif()
+    if(SFEM_ENABLE_CUBLAS)
+        find_package(hipblas REQUIRED)
+        list(APPEND SFEM_DEP_LIBRARIES roc::hipblas)
+    endif()
+elseif(SFEM_ENABLE_CUDA)
     enable_language(CUDA)
 
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
@@ -269,9 +311,6 @@ endif()
 
 # ##############################################################################
 
-# if(SFEM_ENABLE_HIP)
-# # TODO
-# endif()
 
 if(SFEM_ENABLE_AVX512_SORT)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
@@ -282,6 +321,8 @@ if(SFEM_ENABLE_SCCD)
     set(SCCD_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SCCD_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SCCD_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SCCD_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SCCD_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SCCD_ENABLE_SMESH ON CACHE BOOL "" FORCE)
     set(SCCD_BUILD_SHARED_LIBS ${SFEM_SCCD_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
     if(SFEM_ENABLE_MINIMAL)
@@ -311,9 +352,12 @@ if(SFEM_ENABLE_SSDF)
     set(SSDF_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SSDF_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SSDF_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SSDF_ENABLE_CUBIQL ${SFEM_ENABLE_CUBIQL} CACHE BOOL "" FORCE)
-    # cuBQL enables CUDA whenever it finds nvcc; a build without CUDA tells it not to.
-    if(SFEM_ENABLE_CUDA)
+    # cuBQL enables CUDA whenever it finds nvcc; a build without CUDA tells it not to, and so does
+    # a HIP build, where ssdf compiles cuBQL's GPU builder as HIP.
+    if(SFEM_ENABLE_CUDA AND NOT SFEM_ENABLE_HIP)
         set(CUBQL_DISABLE_CUDA OFF CACHE BOOL "" FORCE)
     else()
         set(CUBQL_DISABLE_CUDA ON CACHE BOOL "" FORCE)
@@ -338,6 +382,8 @@ if(SFEM_ENABLE_SRESAMPLE)
     set(SRESAMPLE_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SRESAMPLE_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SRESAMPLE_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SRESAMPLE_ENABLE_TESTING ${SFEM_ENABLE_TESTING} CACHE BOOL "" FORCE)
     set(SRESAMPLE_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
     # sresample is ours: sfem's DEV_MODE judges it too, through its own option.
@@ -366,7 +412,14 @@ endif()
 
 # After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
 # created here first (a subdirectory sees its parent's imported targets).
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    # rocThrust (amg/cuda) and the rocPRIM under it are header-only and used by the .cu files only;
+    # CMakeLists.txt adds their include directories to the HIP sources. Their targets are not
+    # linked, because through rocPRIM they bring hip::device, which compiles every C++ source as HIP.
+    if(NOT TARGET roc::rocthrust)
+        find_package(rocthrust REQUIRED)
+    endif()
+elseif(SFEM_ENABLE_CUDA)
     # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
     # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
     # -lThrust, which does not exist and breaks downstream links.
