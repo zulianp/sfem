@@ -674,7 +674,8 @@ namespace sfem {
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            err = cu_obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out, nullptr);
+            const idx_t *const d_idx = impl_->contact_surface->node_mapping_device()->data();
+            err = cu_obstacle_distribute_contact_forces(dim, n, d_idx, normals, m, f, out, nullptr);
         } else
 #endif
         {
