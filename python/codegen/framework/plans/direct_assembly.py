@@ -32,6 +32,8 @@ print whatever comes back.
 
 import sympy as sp
 
+from codegen.framework.plans.form_emission import form_n_field_components, form_reads_current
+from codegen.framework.plans.quadrature_fields import quadrature_field_streams
 from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
     evaluation_strategy,
@@ -254,3 +256,42 @@ def sum_factorized_assembly_admits(*, tensor_product, dependencies, **shared):
     if not tensor_product:
         return False
     return substituted_assembly_admits(dependencies=dependencies, **shared)
+
+
+# ----------------------------------------------------------------------------- a block per element
+
+#: The element matrix, in double, a device thread holds in its stack. PROTEUS_HEX64's (192 x 192,
+#: 295 KB) is beyond what an AMD GPU gives a thread (128 KB) and what an H100 reserves for a launch;
+#: its device assembly takes a block of threads per element (`block_assembly_admits`).
+PER_THREAD_ELEMENT_MATRIX_BYTES = 96 * 1024
+
+
+def tensor_product_point_tangent_admits(form, dim, *, on_device, tensor_product):
+    """Whether a device tensor-product element's tangent at one point is published for the assembly
+    a block per element: a 3D vector energy reading the state, without integration-point fields.
+    Every element of the family shares the header that holds it, so the element's size is not asked."""
+    return bool(
+        on_device
+        and tensor_product
+        and dim == 3
+        and form_n_field_components(form, dim) == 3
+        and form_reads_current(form, default=True)
+        and not quadrature_field_streams(form)
+    )
+
+
+def block_assembly_admits(
+    form, dim, n_nodes, n_qp, formats, *, on_device, tensor_product, tensor_product_geometry, affine, projected
+):
+    """Whether the device assembles the element's BSR a block of threads per element, a thread per
+    point (at most 128), rather than a thread per element holding the element matrix: where that
+    matrix is beyond `PER_THREAD_ELEMENT_MATRIX_BYTES`."""
+    return bool(
+        tensor_product_point_tangent_admits(form, dim, on_device=on_device, tensor_product=tensor_product)
+        and tensor_product_geometry
+        and not affine
+        and not projected
+        and tuple(formats) == ("bsr",)
+        and n_qp <= 128
+        and (form_n_field_components(form, dim) * n_nodes) ** 2 * 8 > PER_THREAD_ELEMENT_MATRIX_BYTES
+    )

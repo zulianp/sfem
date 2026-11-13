@@ -1,3 +1,4 @@
+import collections
 import contextlib
 from dataclasses import dataclass
 import functools
@@ -176,6 +177,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     reference_include_lines,
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
+    quadrature_reference_owner,
 )
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.reference_data import validate_reference_data_plan
@@ -184,6 +186,8 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.direct_assembly import (
     assembles_in_closed_form,
+    block_assembly_admits,
+    tensor_product_point_tangent_admits,
 )
 from codegen.framework.plans.scheduling import build_expression_graph
 
@@ -1187,8 +1191,17 @@ def _sfem_soa_hessian_header(
         and not use_tensor_product_reference
         and use_reference_gradient_vectors
     )
-    if cooperative:
+    # A device tensor-product element carries its point tangent for the assembly a block per element.
+    point_tangents = [
+        tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        for form in forms
+    ]
+    if cooperative or any(point_tangents):
         lines.insert(lines.index(tensor_include) + 1, '#include "%s"' % COOPERATIVE_ASSEMBLY_HEADER)
+    if any(point_tangents):
+        lines.insert(lines.index(tensor_include) + 2, '#include "%s"' % TENSOR_PRODUCT_BSR_HESSIAN_HEADER)
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     emitted = set()
@@ -1228,6 +1241,16 @@ def _sfem_soa_hessian_header(
                     reference_inputs,
                     source_builder,
                     project=tangent_projection,
+                )
+            )
+            lines.append("")
+        point_tangent = tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        if point_tangent:
+            lines.extend(
+                _sfem_soa_tensor_product_point_tangent_struct(
+                    form, _sfem_soa_tensor_product_point_tangent_name(prefix), dim
                 )
             )
             lines.append("")
@@ -1423,6 +1446,70 @@ def _sfem_soa_direct_hessian_point_tangent_name(local_prefix):
 
 #: The device library of the cooperative assembly (`pullback_symmetric`, `pair_blocks_bsr`, ...).
 COOPERATIVE_ASSEMBLY_HEADER = "sfem_cuda_CooperativeAssembly.cuh"
+
+#: The device library of a tensor-product element's BSR assembly a block of threads per element
+#: (`sfem::tensor_product::cuda::bsr_hessian`), for elements whose matrix a thread cannot hold
+#: (`plans.direct_assembly.block_assembly_admits`).
+TENSOR_PRODUCT_BSR_HESSIAN_HEADER = "sfem_cuda_TensorProductBSRHessian.cuh"
+
+def _sfem_soa_tensor_product_point_tangent_name(local_prefix):
+    return "%s_point_tangent" % local_prefix
+
+
+#: What an entry point needs to launch `sfem::tensor_product::cuda::bsr_hessian`: the point tangent
+#: (`_sfem_soa_tensor_product_point_tangent_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes.
+TensorProductBSRLaunch = collections.namedtuple("TensorProductBSRLaunch", "point ref quad nq1 ns1")
+
+
+def _tensor_product_bsr_launch_lines(launch, scalar_type, values_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's assembly a block per element, on the caller's stream."""
+    parameters = ", ".join("(%s)%s" % (scalar_type, parameter) for parameter in material_parameter_names)
+    state = ", ".join("(const %s *)u%s" % (scalar_type, _component_name(d)) for d in range(dim))
+    return (
+        "%sreturn sfem::tensor_product::cuda::bsr_hessian<sfem::codegen::%s, %s<%s>, %s<%s>, %s, %s, geom_t, %d, %d>("
+        % (indent, launch.point, launch.ref, scalar_type, launch.quad, scalar_type, scalar_type, values_type, launch.nq1, launch.ns1),
+        "%s    nelements, elements, points, {{%s}}, u_stride, %s, rowptr, colidx, (%s *)values, stream);"
+        % (indent, parameters, state, values_type),
+    )
+
+
+def _sfem_soa_tensor_product_point_tangent_struct(form, name, dim):
+    """The tangent at one point, from the state's reference gradient there, pulled back to the
+    reference cell and weighted, packed: `T[(i, m), (j, n)] = (w / det) sum_{d, e} adj[m][d]
+    D[(i, d), (j, e)] adj[n][e]`, what `sfem::tensor_product::cuda::bsr_hessian` reads per point. D is
+    the element-matrix kernel's own (`_sfem_soa_direct_hessian_tangent_lines`)."""
+    material = _sfem_soa_direct_hessian_material(form, dim)
+    parameters = form_material_parameter_names(form)
+    adj_names = [current_target().work_item_name("adj", component) for component in range(dim * dim)]
+    det_name = current_target().work_item_name("det", 0)
+    at = "    "
+    n_components = form_n_field_components(form, dim)
+    return [
+        "// %s: the tangent at one point, pulled back to the reference cell and weighted, packed" % name,
+        "// (`sfem::cooperative::packed`); the device's assembly a block per element reads it",
+        "// (`%s`)." % TENSOR_PRODUCT_BSR_HESSIAN_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t w,",
+        "                                               s_t *const RSTR T) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t gu_ref%d = gu_ref[%d];" % (at, k, k) for k in range(n_components * dim)),
+        *("%sconst s_t %s = adj[%d];" % (at, adj_name, component) for component, adj_name in enumerate(adj_names)),
+        "%sconst s_t %s = det;" % (at, det_name),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, det_name),
+        *_sfem_soa_direct_hessian_push_forward_lines(form.weak_form, dim, at),
+        *_sfem_soa_direct_hessian_tangent_lines(material, dim, at),
+        "%ssfem::cooperative::pullback_symmetric<s_t, %d, %d>(adj, w * idet, D, T);" % (at, n_components, dim),
+        "  }",
+        "};",
+    ]
 
 
 def _sfem_soa_direct_hessian_point_tangent_function(form, name, dim, reference_inputs, source_builder, project=False):
@@ -9375,6 +9462,40 @@ def _holding_one_element_hessian_matrix_assembly_function(
         quadrature_rule,
         geometry_mode,
     )
+    block_assembly = block_assembly_admits(
+        form,
+        dim,
+        n_nodes,
+        n_qp,
+        formats,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        tensor_product_geometry=use_tensor_product_geometry,
+        affine=is_affine_assembly,
+        projected=projected,
+    )
+    if block_assembly:
+        # A block of threads per element (`TENSOR_PRODUCT_BSR_HESSIAN_HEADER`, included by the hessian
+        # header with the point tangent): no kernel here, so no namespace to close either; the entry
+        # points launch the library's.
+        return [
+            *_sfem_soa_hessian_matrix_public_wrappers(
+                function_base,
+                None,
+                dim,
+                formats,
+                material_parameter_names,
+                uses_current,
+                geometry_mode=geometry_mode,
+                tensor_product_launch=TensorProductBSRLaunch(
+                    _sfem_soa_tensor_product_point_tangent_name(local_prefix),
+                    quadrature_reference_owner(quadrature_rule, "shape_1d"),
+                    quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+                    quadrature_rule.tensor_product_n_qp_1d,
+                    quadrature_rule.tensor_product_n_shape_1d,
+                ),
+            ),
+        ]
     implementation_name = "%s_assemble_impl" % function_base
     reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
@@ -10531,6 +10652,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
+    tensor_product_launch=None,
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -10556,6 +10678,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     geometry_mode=geometry_mode,
                     quadrature_streams=quadrature_streams,
                     cooperative_points=cooperative_points,
+                    tensor_product_launch=tensor_product_launch,
                 )
             )
     if projected:
@@ -10695,6 +10818,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
+    tensor_product_launch=None,
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -10722,7 +10846,11 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         # A cooperative kernel (`cooperative_points`, its points per element) is launched a block per
         # `sfem::cooperative::ELEMENTS` elements.
         lambda scalar_type, _positional, values_type=None: list(
-            (
+            _tensor_product_bsr_launch_lines(
+                tensor_product_launch, scalar_type, values_type or scalar_type, material_parameter_names, dim
+            )
+            if tensor_product_launch is not None
+            else (
                 current_target().mesh_launch_lines
                 if cooperative_points is None
                 else functools.partial(current_target().cooperative_mesh_launch_lines, n_qp=cooperative_points)

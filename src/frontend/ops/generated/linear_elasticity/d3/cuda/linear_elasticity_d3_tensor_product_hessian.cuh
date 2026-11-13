@@ -10,6 +10,8 @@
 #endif
 #include "kernel_math.cuh"
 #include "tensor_product_kernels.cuh"
+#include "sfem_cuda_CooperativeAssembly.cuh"
+#include "sfem_cuda_TensorProductBSRHessian.cuh"
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif
