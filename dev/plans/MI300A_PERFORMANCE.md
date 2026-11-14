@@ -70,6 +70,7 @@ kernels are measured without it (step 0).
 | 2a | HIP default level-8 kernel: gather (5) | 35.0 s | 2.2 s |
 | 4a, 4b | dot grid cap; the coarse CG's loop on the device, captured | 31.4 s (34.0 without: three runs each) | 1.98 s (2.1-2.4) |
 | 2b | level-8 apply on the FP64 matrix cores (kernel 7) | 25.7 s (31.7 with kernel 5, same node) | 1.6-1.8 s |
+| 5a | level-4 apply on the FP64 matrix cores | 25.5-25.6 s (28.6-29.1 with the warp kernel, same node) | 1.8-1.9 s (1.7-2.1) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -219,6 +220,17 @@ kernels are measured without it (step 0).
     Mooney-Rivlin applies give NaN on both paths (an inadmissible state at those points); at
     u = 0 and 1e-6 x (7^3 elements) the generated kernel, the matrix cores and the host agree to
     15-16 digits for every material and geometry.
+- Step 5a, the level-4 apply on the FP64 matrix cores (`..._apply_level4_mfma_kernel`, HIP only,
+  the HIP default; `SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL=2` the warp kernel): a wavefront per
+  macro element, whose 64 micro elements are four 16-row tiles of Y = U K^T and whose 64 lanes are
+  K's vertex pairs, so each wave builds its own K^T in LDS. 44^3 macro elements: 1.39-1.42 ms
+  (two waves a block; 1.47-1.49 with four, 1.40-1.47 with eight) against 6.75-6.86 ms for the warp
+  kernel and GH200's 1.5 ms. The two differ by ~2e-11 relative: the warp kernel's 2-point rule is
+  written to 10 digits, this one uses the exact reference gradients. MaMAL 136 M alternated three
+  times on one node: 25.51, 25.52, 25.60 s against 29.11, 28.55, 28.73 s; ctest 119/119.
+  - Kernel table after it (136 M, GPU time): level-8 apply 7.07 s (8.8 ms a call), HEX8 coarse
+    apply 2.22 s (87 us; GH200 26 us), `taxpby` 2.06 s (as GH200), `sbv3_apply` 1.19 s (44 us;
+    GH200 41 us), level-4 apply 0.76 s (1.5 ms, as GH200), `tdot` 0.62 s, level-2 apply 0.51 s.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
