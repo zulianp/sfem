@@ -9,6 +9,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
@@ -478,6 +479,34 @@ namespace sfem {
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
                 x_r(e, n, alpha, p, Ap, x, r, false);
+            }
+
+            if constexpr (std::is_same_v<E, BlasExec<T>>) {
+                // The backend's run of the loop below (HIP builds): where nothing reads an iteration
+                // on the host (no monitor, interceptor or curvature stop) and the sums are this rank's.
+                if (impl.run_precond && !verbose && !interceptor && !stop_on_negative_curvature && !e.across_ranks()) {
+                    CGDeviceRun<T> run;
+                    run.n            = n;
+                    run.x            = x;
+                    run.r            = r;
+                    run.z            = z;
+                    run.p            = p;
+                    run.Ap           = Ap;
+                    run.rtz          = rtz;
+                    run.rtz0         = rtz0;
+                    run.atol         = atol;
+                    run.rtol         = rtol;
+                    run.max_it       = max_it;
+                    run.precondition = [&](const T* const in, T* const out) { e.apply(M, in, out, apply_overwrites_output); };
+                    run.product      = [&](const T* const in, T* const out) { e.apply(A, in, out, apply_overwrites_output); };
+                    run.dot          = [&](const T* const a, const T* const b, T* const result) { blas->dot(n, a, b, result); };
+                    run.stream       = blas->context().stream();
+                    const CGDeviceRunResult ran = impl.run_precond(run);
+                    if (ran.ran) {
+                        iterations_ = ran.iterations;
+                        return ran.converged ? SFEM_SUCCESS : SFEM_FAILURE;
+                    }
+                }
             }
 
             int info = SFEM_FAILURE;

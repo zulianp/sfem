@@ -68,6 +68,7 @@ kernels are measured without it (step 0).
 |---|---|---|---|
 | start | hip-port | 69.4 s | 20.7 s |
 | 2a | HIP default level-8 kernel: gather (5) | 35.0 s | 2.2 s |
+| 4a, 4b | dot grid cap; the coarse CG's loop on the device, captured | 31.4 s (34.0 without: three runs each) | 1.98 s (2.1-2.4) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -102,6 +103,20 @@ kernels are measured without it (step 0).
   eight kernels. The 0.7 M case is unchanged (2.11-2.37 s over three runs).
 - Next, by the time they leave on the critical path: the coarse CG's host round trips (step 4,
   ~11 s on MI300A), then the level-8 apply (step 2b), the level-4 apply and the coarse apply.
+- Step 4b, the preconditioned CG's loop on the device: `ConjugateGradientKernels::
+  run_precond`, set by HIP builds only. The scalars stay in a device array, each iteration's x and r
+  update is skipped once stopped, and the host waits once per 16 iterations; the iterations and the
+  relative residuals are the host loop's (16/32 and 12/24, 3.92097e-08 and 3.55533e-08).
+  - Captured as one graph per 16 iterations: 136 M 32.5 s (was 35.0), 0.7 M 1.94 s (was 2.1-2.4);
+    the coarse CG's loop takes 175 ms a solve (~165 us an iteration, was ~646). But HIP 6.4 crashes
+    capturing a product that allocates on the stream, as the generated operators do (their permuted
+    HEX8 connectivity, `cudaMallocAsync` in each apply): sfem_PlaygroundContactTest's ssmgc runs.
+  - Launched without the graph: 34.3 s and 2.5 s, no gain; the launches, not the waits, are the cost.
+  - So the gain needs allocation-free products. Under HIP the generated launchers now keep their
+    permuted connectivity in a table per host thread and stream (`permuted_connectivity_table`),
+    rewritten in stream order before each kernel; the CUDA branch of the generated code is the
+    former one. Captured again: ctest 119/119 on MI300A; three runs of the 136 M case 31.37, 31.53
+    and 31.37 s against 33.17, 33.32 and 35.44 s without steps 4a and 4b; 0.7 M 1.98 s.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

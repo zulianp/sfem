@@ -14,6 +14,31 @@
 namespace sfem {
 
     /// Backend strategy for fused CG vector updates (OpenMP / CUDA).
+    /// A preconditioned CG's iterations in the execution space (ConjugateGradientKernels::run_precond):
+    /// ConjugateGradient::run_precond's loop, from its first z = M r on, with the scalars (r.z, p.Ap,
+    /// alpha, beta) kept where the vectors are, so the host does not wait for each dot. The same
+    /// operations in the same order: x is the loop's, bit for bit.
+    template <typename T>
+    struct CGDeviceRun {
+        ptrdiff_t n{0};
+        T        *x{nullptr}, *r{nullptr}, *z{nullptr}, *p{nullptr}, *Ap{nullptr};
+        T         rtz{0}, rtz0{0}, atol{0}, rtol{0};
+        int       max_it{0};
+        /// z = M r and Ap = A p, as the loop applies them (an accumulating operator's output zeroed).
+        std::function<void(const T *const, T *const)> precondition, product;
+        /// a . b into the word `result` where the vectors are, as the loop's dots compute it.
+        std::function<void(const T *const, const T *const, T *const)> dot;
+        /// The solver's stream: the run is ordered on it.
+        void *stream{nullptr};
+    };
+
+    /// How a run ended. `ran` false: it could not be taken there, and nothing was done.
+    struct CGDeviceRunResult {
+        bool ran{false};
+        int  iterations{0};
+        bool converged{false};
+    };
+
     template <typename T>
     struct ConjugateGradientKernels {
         /// x ← x + alpha p;  r ← r − alpha Ap;  return (r, r)
@@ -36,6 +61,9 @@ namespace sfem {
 
         /// p ← z + beta p
         std::function<void(const ptrdiff_t n, const T beta, const T* const z, T* const p)> update_p;
+
+        /// A backend's own run of the preconditioned loop (CGDeviceRun); empty where it has none.
+        std::function<CGDeviceRunResult(const CGDeviceRun<T>& run)> run_precond;
 
         bool good() const {
             assert(update_x_r_and_rtr);
