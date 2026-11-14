@@ -156,7 +156,7 @@ extern int cu_affine_hex8_elemental_matrix_apply(const ptrdiff_t                
 ////////////////////////
 
 template <typename T>
-__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel(const int                    level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_elemental_matrix_apply_kernel(const int                    level,
                                                                const ptrdiff_t              nelements,
                                                                idx_t **const SFEM_RESTRICT  elements,
                                                                T **const SFEM_RESTRICT      elemental_matrix,

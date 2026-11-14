@@ -71,6 +71,7 @@ kernels are measured without it (step 0).
 | 4a, 4b | dot grid cap; the coarse CG's loop on the device, captured | 31.4 s (34.0 without: three runs each) | 1.98 s (2.1-2.4) |
 | 2b | level-8 apply on the FP64 matrix cores (kernel 7) | 25.7 s (31.7 with kernel 5, same node) | 1.6-1.8 s |
 | 5a | level-4 apply on the FP64 matrix cores | 25.5-25.6 s (28.6-29.1 with the warp kernel, same node) | 1.8-1.9 s (1.7-2.1) |
+| 3a | HIP launch bounds on 17 hand-written kernels (coarse HEX8 apply, level-2 apply, ...) | 26.3 s (another node) | |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -231,6 +232,16 @@ kernels are measured without it (step 0).
   - Kernel table after it (136 M, GPU time): level-8 apply 7.07 s (8.8 ms a call), HEX8 coarse
     apply 2.22 s (87 us; GH200 26 us), `taxpby` 2.06 s (as GH200), `sbv3_apply` 1.19 s (44 us;
     GH200 41 us), level-4 apply 0.76 s (1.5 ms, as GH200), `tdot` 0.62 s, level-2 apply 0.51 s.
+- Step 3a, HIP's register cap: a HIP kernel without launch bounds is compiled for blocks of 1024
+  threads, which caps a thread at 128 VGPRs (CUDA allows 255), so kernels that fit on NVIDIA spill
+  to scratch on AMD. A survey of the HIP build (each source compiled device-only with the register
+  report; 174 of 251 sources before the time limit) found 908 of 1812 kernels spilling, almost all
+  at exactly 128 VGPRs (generated: 812 of 873, median 276 spilled VGPRs). `SFEM_HIP_LAUNCH_BOUNDS(n)`
+  (`sfem_cuda_base.hpp`, empty under CUDA) now gives 17 spilling hand-written kernels their block
+  size (128, or the warp kernel's LEVEL^2 / LEVEL^3 threads); their spills are gone but for four cold
+  ones. Kernel table (136 M): the HEX8 coarse apply 86.9 -> 39.2 us a call (2.22 -> 1.00 s; GH200
+  26 us), the level-2 apply 1009 -> 413 us; ctest 119/119. On CUDA the same kernels do not spill (the
+  build's ptxas report), so the bounds are HIP-only.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

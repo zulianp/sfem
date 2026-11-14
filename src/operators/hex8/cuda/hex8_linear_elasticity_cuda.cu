@@ -7,8 +7,9 @@
 
 #include <stdio.h>
 
+// Launched with blocks of 128 threads.
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
                                                               idx_t **const SFEM_RESTRICT              elements,
                                                               const ptrdiff_t                          jacobian_stride,
                                                               const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -243,7 +244,7 @@ extern int cu_affine_hex8_linear_elasticity_apply(const ptrdiff_t               
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_bsr_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_bsr_kernel(const ptrdiff_t                          nelements,
                                                             idx_t **const SFEM_RESTRICT              elements,
                                                             const ptrdiff_t                          jacobian_stride,
                                                             const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -419,7 +420,7 @@ extern int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                 
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_block_diag_sym_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_block_diag_sym_kernel(const ptrdiff_t                          nelements,
                                                                        idx_t **const SFEM_RESTRICT              elements,
                                                                        const ptrdiff_t                          jacobian_stride,
                                                                        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
@@ -617,7 +618,7 @@ extern int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t      
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
                                                              idx_t **const SFEM_RESTRICT              elements,
                                                              const ptrdiff_t                          jacobian_stride,
                                                              const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,

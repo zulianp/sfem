@@ -10,7 +10,7 @@
 #include "sshex8_inline_cuda.hpp"
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -238,7 +238,7 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
 #endif
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -434,7 +434,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
 }
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -640,7 +640,7 @@ static __device__ __forceinline__ int cu_sshex8_level8_padded_lidx(const int x, 
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -2018,7 +2018,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
 }
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS((LEVEL * LEVEL * LEVEL <= 512 ? LEVEL * LEVEL * LEVEL : LEVEL * LEVEL)) cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdiff_t                          nelements,
                                                                      idx_t **const SFEM_RESTRICT              elements,
                                                                      const ptrdiff_t                          jacobian_stride,
                                                                      const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -2558,7 +2558,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_diag_kernel(const int                                level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_diag_kernel(const int                                level,
                                                                const ptrdiff_t                          nelements,
                                                                idx_t **const SFEM_RESTRICT              elements,
                                                                const ptrdiff_t                          jacobian_stride,
@@ -2732,7 +2732,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
         const int                                level,
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
@@ -3016,7 +3016,7 @@ static __device__ void cu_sshex8_micro_nodes(const int                         l
 }
 
 template <typename T>
-__global__ void cu_sshex8_linear_elasticity_apply_kernel(const int                         level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_sshex8_linear_elasticity_apply_kernel(const int                         level,
                                                          const ptrdiff_t                   nelements,
                                                          idx_t **const SFEM_RESTRICT       elements,
                                                          const ptrdiff_t                   corners_stride,
@@ -3094,7 +3094,7 @@ __global__ void cu_sshex8_linear_elasticity_apply_kernel(const int              
 // The diagonal blocks, packed 00 01 02 11 12 22, into out[0..5]; with `diag_only` only the
 // diagonal, the packed entries 0, 3 and 5, into out[0..2].
 template <typename T>
-__global__ void cu_sshex8_linear_elasticity_block_diag_sym_kernel(const int                         level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_sshex8_linear_elasticity_block_diag_sym_kernel(const int                         level,
                                                                   const ptrdiff_t                   nelements,
                                                                   idx_t **const SFEM_RESTRICT       elements,
                                                                   const ptrdiff_t                   corners_stride,
