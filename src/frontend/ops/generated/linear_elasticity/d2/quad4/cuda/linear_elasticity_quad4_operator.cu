@@ -86,6 +86,10 @@ extern "C" const sfem::codegen::KernelDiagnostics * cu_linear_elasticity_proteus
         void
 );
 
+#if defined(SFEM_ENABLE_HIP)
+#include <unordered_map>
+#endif
+
 namespace {
   //! Reorder a device table of connectivity rows on the device.
   template <int N>
@@ -100,6 +104,20 @@ namespace {
     const int k = threadIdx.x;
     if (k < N) permuted[k] = elements[order.source[k]];
   }
+
+#if defined(SFEM_ENABLE_HIP)
+  //! The permuted table's storage under HIP: one per host thread and stream, kept for the
+  //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does
+  //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the
+  //! products of a captured solver run (the coarse CG's) allocate nothing this way.
+  template <typename T, int N>
+  T **permuted_connectivity_table(const cudaStream_t stream) {
+    static thread_local std::unordered_map<cudaStream_t, T **> tables;
+    T **&table = tables[stream];
+    if (!table && cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;
+    return table;
+  }
+#endif
 }  // namespace
 
 extern "C" int cu_linear_elasticity_quad4_apply_i_msoa(
@@ -118,12 +136,19 @@ extern "C" int cu_linear_elasticity_quad4_apply_i_msoa(
         void *const RSTR outy,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 4>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
     permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_quad4_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, h_stride, hx, hy, out_stride, outx, outy, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
@@ -143,12 +168,19 @@ extern "C" int cu_linear_elasticity_quad4_gradient_i_msoa(
         void *const RSTR outy,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 4>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
     permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_quad4_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, out_stride, outx, outy, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
@@ -163,12 +195,19 @@ extern "C" int cu_linear_elasticity_quad4_hessian_block_diag_sym_i_msoa(
         void *const RSTR values,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 4>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
     permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, values, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
@@ -186,12 +225,19 @@ extern "C" int cu_linear_elasticity_quad4_hessian_bsr_i_msoa(
         void *const RSTR values,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 4>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
     permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, rowptr, colidx, values, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
@@ -214,12 +260,19 @@ extern "C" int cu_linear_elasticity_quad4_objective_steps_i_msoa(
         void *const RSTR value,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 4>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 4 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<4> proteus_elements_order{{0, 1, 3, 2}};
     permute_connectivity<idx_t, 4><<<1, 4, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 

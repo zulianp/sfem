@@ -1089,6 +1089,10 @@ class CUDATarget(TargetPlatform):
 
     def permuted_connectivity_preamble(self):
         return (
+            "#if defined(SFEM_ENABLE_HIP)",
+            "#include <unordered_map>",
+            "#endif",
+            "",
             "namespace {",
             "  //! Reorder a device table of connectivity rows on the device.",
             "  template <int N>",
@@ -1103,6 +1107,20 @@ class CUDATarget(TargetPlatform):
             "    const int k = threadIdx.x;",
             "    if (k < N) permuted[k] = elements[order.source[k]];",
             "  }",
+            "",
+            "#if defined(SFEM_ENABLE_HIP)",
+            "  //! The permuted table's storage under HIP: one per host thread and stream, kept for the",
+            "  //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does",
+            "  //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the",
+            "  //! products of a captured solver run (the coarse CG's) allocate nothing this way.",
+            "  template <typename T, int N>",
+            "  T **permuted_connectivity_table(const cudaStream_t stream) {",
+            "    static thread_local std::unordered_map<cudaStream_t, T **> tables;",
+            "    T **&table = tables[stream];",
+            "    if (!table && cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;",
+            "    return table;",
+            "  }",
+            "#endif",
             "}  // namespace",
             "",
         )
@@ -1113,18 +1131,29 @@ class CUDATarget(TargetPlatform):
         #: them: that read was a segmentation fault on every HEX8 device kernel.
         #: The reordered table is built on the device instead, in stream order
         #: around the call, so nothing synchronises and nothing outlives it.
+        #: Under HIP the table is the thread's and stream's (permuted_connectivity_table), so a
+        #: captured product allocates nothing; the CUDA build allocates it around the call.
         n = len(shape_order)
         stream = "(cudaStream_t)stream"
         before = (
+            "#if defined(SFEM_ENABLE_HIP)",
+            "    %s **%s = permuted_connectivity_table<%s, %d>(%s);" % (pointer_type, name, pointer_type, n, stream),
+            "    if (!%s) return SFEM_FAILURE;" % name,
+            "#else",
             "    %s **%s = nullptr;" % (pointer_type, name),
             "    if (cudaMallocAsync((void **)&%s, %d * sizeof(%s *), %s) != cudaSuccess) return SFEM_FAILURE;"
             % (name, n, pointer_type, stream),
+            "#endif",
             "    const ConnectivityOrder<%d> %s_order{{%s}};"
             % (n, name, ", ".join(str(index) for index in shape_order)),
             "    permute_connectivity<%s, %d><<<1, %d, 0, %s>>>(elements, %s_order, %s);"
             % (pointer_type, n, n, stream, name, name),
         )
-        after = ("    cudaFreeAsync(%s, %s);" % (name, stream),)
+        after = (
+            "#if !defined(SFEM_ENABLE_HIP)",
+            "    cudaFreeAsync(%s, %s);" % (name, stream),
+            "#endif",
+        )
         return before, after
 
     def op_stream_arguments(self):
