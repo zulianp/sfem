@@ -32,7 +32,12 @@ print whatever comes back.
 
 import sympy as sp
 
-from codegen.framework.plans.form_emission import form_n_field_components, form_reads_current
+from codegen.framework.plans.form_emission import (
+    form_n_field_components,
+    form_reads_current,
+    form_reads_direction,
+    writes_per_shape,
+)
 from codegen.framework.plans.quadrature_fields import quadrature_field_streams
 from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
@@ -277,6 +282,49 @@ def tensor_product_point_tangent_admits(form, dim, *, on_device, tensor_product)
         and form_n_field_components(form, dim) == 3
         and form_reads_current(form, default=True)
         and not quadrature_field_streams(form)
+    )
+
+
+def matrix_core_apply_admits(form, dim, *, on_device, tensor_product):
+    """Whether HIP builds apply a device tensor-product element on AMD's FP64 matrix cores
+    (`sfem::tensor_product::hip::matrix_core_apply`, a wavefront per 16 elements), reading the material
+    at a point through the published `<prefix>_apply_point`: the operator action (the form `apply`,
+    which reads a direction and writes per shape) of a 3D scalar or vector form without
+    integration-point fields. Every element of the family shares the header that holds the point,
+    so the element's size is not asked."""
+    return bool(
+        on_device
+        and tensor_product
+        and dim == 3
+        and form.name == "apply"
+        and form_n_field_components(form, dim) in (1, 3)
+        and form_reads_direction(form, default=True)
+        and writes_per_shape(form)
+        and not quadrature_field_streams(form)
+    )
+
+
+#: The orders the matrix-core apply is launched for (nodes a direction). At order 1 half of each
+#: 16-point tile is padding and the element (8 nodes) a quarter of a 16-row output tile. At order 3
+#: (64 nodes, four output tiles) a nonlinear material's kernel spills 500-600 VGPRs at 512 registers
+#: a lane, and Saint Venant-Kirchhoff's isoparametric one fails in the compiler's register
+#: allocator; it needs the k-steps rolled. Order 2 is measured (MI300A, 1 M elements of linear
+#: elasticity: affine 7.5 -> 2.3 ms, isoparametric 25.2 -> 4.5 ms).
+MATRIX_CORE_APPLY_SHAPE_1D = (3,)
+
+
+def matrix_core_apply_launch_admits(
+    form, dim, quadrature_rule, *, on_device, tensor_product, isoparametric, tensor_product_geometry
+):
+    """Whether an entry point of the apply launches the matrix-core kernel under HIP (double only):
+    `matrix_core_apply_admits`, an element of `MATRIX_CORE_APPLY_SHAPE_1D` nodes a
+    direction (`quadrature_rule`, a tensor-product rule), and, isoparametric, a geometry interpolated
+    by the field's own tensor-product basis (the kernel differentiates the coordinates with the same
+    reference gradient matrix)."""
+    return bool(
+        matrix_core_apply_admits(form, dim, on_device=on_device, tensor_product=tensor_product)
+        and quadrature_rule.tensor_product_n_shape_1d in MATRIX_CORE_APPLY_SHAPE_1D
+        and (tensor_product_geometry or not isoparametric)
     )
 
 

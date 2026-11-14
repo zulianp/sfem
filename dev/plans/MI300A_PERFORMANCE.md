@@ -141,6 +141,74 @@ kernels are measured without it (step 0).
     element per macro element, and its stored element matrices differ per element (memory-bound).
     A matrix-core path there would be a different kernel (the high-order sum factorisation's 1D
     contractions, 9x9 padded to 16 at order 8).
+- Step 2c, the generated high-order applies (one Qp element per macro element) on the FP64 matrix
+  cores: hand-written prototype first, then the generator. `bench_op_apply` with `SFEM_OP` (a yaml
+  op) and `SFEM_HIGH_ORDER=1`, x = sin(0.37 i), best of 10-20 applies; `|y|` and x^T y checked.
+  - Baseline, generated kernels (a thread per element, 256 per block):
+
+    | op (dofs) | MI300A | GH200 |
+    |---|---|---|
+    | elasticity Q2, isoparametric (24.4 M) | 25.4 ms | 18.7 ms |
+    | elasticity Q2, affine (`apply_assume_affine: 1`) | 7.54 ms | 2.85 ms |
+    | Neo-Hookean Ogden Q2, isoparametric (x is not admissible: `|y|` NaN) | 40.9 ms | 24.7 ms |
+    | Saint Venant-Kirchhoff Q3, isoparametric (17.8 M) | 35.6 ms | 18.3 ms |
+    | hand-written micro HEX8 level 2, same mesh | 11.2 ms | 2.03 ms |
+
+    On MI300A the generated kernels spill: 1098 VGPRs (5.3 KB scratch a lane) for the affine Q2
+    apply, 2936 (21 KB) for the isoparametric one, at 128 VGPRs (256 threads a block).
+  - The prototype (`..._apply_{a,i}_mfma_impl` in the emitted
+    `linear_elasticity_proteus_hex27_operator.cu`, HIP only, `SFEM_PROTEUS_HEX27_MFMA`; not
+    committed): a wavefront takes 16 elements, one per column. With G[r][s] the reference gradient
+    matrix (r = NQ k + q, s the node), the reference gradients of each component are the GEMM
+    G U_c (16x16x4 FP64 MFMA, G in LDS); lane l then holds the three directions of element l % 16
+    at four quadrature points, so the Jacobian (isoparametric: the same GEMM on the coordinates),
+    the stress and the flux are formed in registers, and the flux tiles are already the B operand
+    of the test contraction G^T F_c. The output rows are the nodes the lane gathered. Quadrature
+    points are taken a tile row at a time to bound the live accumulators (two waves per SIMD).
+  - MI300A, 1 M elements (24.4 M dofs), alternated on one node:
+
+    | apply | generated | MFMA prototype | |
+    |---|---|---|---|
+    | affine | 7.48-7.57 ms | 2.32-2.34 ms (8 waves, 2 per SIMD, no spills) | 3.2x |
+    | isoparametric | 25.2 ms | 4.87-4.90 ms (8 waves, 54 spilled VGPRs) | 5.2x |
+
+    `|y|` agrees to 15-16 digits, x^T y to rounding (413092.2668479641 affine, 413092.288488787
+    isoparametric). The affine prototype's time is half global atomics (plain stores: 1.22 ms;
+    no gather: 2.20 ms); the matrix instructions alone are ~0.3 ms at peak.
+  - In the library and the generator (HIP builds only; the CUDA build's code is unchanged):
+    - `src/frontend/ops/cuda/sfem_cuda_TensorProductMatrixCoreApply.cuh`
+      (`sfem::tensor_product::hip::matrix_core_apply`): the prototype's shape for any tensor-product
+      element, component count, geometry and material, the material at a point through a functor.
+      G is tabulated in LDS when it fits (Q2; formed from the 1D tables it cost registers: 138
+      spilled VGPRs against 45), else formed from the 1D tables. Blocks of 8 waves (256 registers
+      a lane) for a linear material whose accumulators fit, else 4 (512). `SFEM_MATRIX_CORE_APPLY=0`
+      turns it off: the generated kernel then runs.
+    - The generator publishes `<prefix>_apply_point` in each device tensor-product local header
+      (the apply block's point section as a functor; `plans.direct_assembly.matrix_core_apply_admits`)
+      and, in the apply's double entry points, a guarded launch of the library's kernel
+      (`matrix_core_apply_launch_admits`: Q2 only for now). Linear elasticity, Neo-Hookean Ogden,
+      Saint Venant-Kirchhoff and modified Mooney-Rivlin on PROTEUS_HEX27 (HEX27 forwards to it);
+      the Mooney-Rivlin Prony variants carry point history and keep the generated kernel.
+    - Q3 not yet: a nonlinear material's kernel spills 500-600 VGPRs at 512 registers a lane, and
+      Saint Venant-Kirchhoff's isoparametric one fails in the compiler's allocator; it needs the
+      k-steps rolled. (The generated SVK Q3 kernel itself fails the same way when the regenerated
+      `line_p3_q5`/`quad_line_q5` tables differ from the committed ones in their last digits.)
+  - MI300A, 1 M elements (24.4 M dofs), best of 10, generated (`SFEM_MATRIX_CORE_APPLY=0`) against
+    the matrix cores, alternated on one node, state 1e-3 x; ctest 119/119:
+
+    | apply (Q2) | generated | matrix cores | |
+    |---|---|---|---|
+    | linear elasticity, affine | 7.92 ms | 2.37 ms | 3.3x |
+    | linear elasticity, isoparametric | 27.2 ms | 4.69 ms | 5.8x |
+    | Neo-Hookean Ogden, affine | 14.7 ms | 4.04 ms | 3.6x |
+    | Neo-Hookean Ogden, isoparametric | 45.7 ms | 13.2 ms | 3.5x |
+    | Saint Venant-Kirchhoff, isoparametric | 42.6 ms | 12.0 ms | 3.5x |
+    | modified Mooney-Rivlin, isoparametric | 170 ms | 39.0 ms | 4.4x |
+
+    `|y|` and x^T y agree to rounding where finite. At 1e-3 x the isoparametric Neo-Hookean and
+    Mooney-Rivlin applies give NaN on both paths (an inadmissible state at those points); at
+    u = 0 and 1e-6 x (7^3 elements) the generated kernel, the matrix cores and the host agree to
+    15-16 digits for every material and geometry.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

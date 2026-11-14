@@ -24,6 +24,9 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
+#if defined(SFEM_ENABLE_HIP)
+#include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+#endif
 namespace sfem {
 namespace codegen {
 
@@ -267,6 +270,47 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_apply_
   }
   tensor_test_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
+
+#if defined(SFEM_ENABLE_HIP)
+// laplace_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
+// matrix cores reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+struct laplace_d3_tensor_product_apply_point {
+  static constexpr int n_parameters = 1;
+  static constexpr bool reads_current = false;
+
+  template <typename s_t>
+  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,
+                                               const s_t *const RSTR grad_h_ref,
+                                               const s_t *const RSTR gu_ref,
+                                               const s_t *const RSTR adj,
+                                               const s_t det,
+                                               const s_t qw,
+                                               s_t *const RSTR loperand) {
+    const s_t kappa = parameters[0];
+    const s_t adj_value0 = adj[0];
+    const s_t adj_value1 = adj[1];
+    const s_t adj_value2 = adj[2];
+    const s_t adj_value3 = adj[3];
+    const s_t adj_value4 = adj[4];
+    const s_t adj_value5 = adj[5];
+    const s_t adj_value6 = adj[6];
+    const s_t adj_value7 = adj[7];
+    const s_t adj_value8 = adj[8];
+    const s_t det_value0 = det;
+    const s_t idet = s_t(1) / det_value0;
+    s_t trial_grad[3];
+    trial_grad[0] = (grad_h_ref[0] * adj_value0 + grad_h_ref[1] * adj_value3 + grad_h_ref[2] * adj_value6) * idet;
+    trial_grad[1] = (grad_h_ref[0] * adj_value1 + grad_h_ref[1] * adj_value4 + grad_h_ref[2] * adj_value7) * idet;
+    trial_grad[2] = (grad_h_ref[0] * adj_value2 + grad_h_ref[1] * adj_value5 + grad_h_ref[2] * adj_value8) * idet;
+    const s_t material0 = kappa*trial_grad[0];
+    const s_t material1 = kappa*trial_grad[1];
+    const s_t material2 = kappa*trial_grad[2];
+    loperand[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+    loperand[1] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+    loperand[2] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
+  }
+};
+#endif
 
 } // namespace codegen
 } // namespace sfem

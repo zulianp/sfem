@@ -24,6 +24,9 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
+#if defined(SFEM_ENABLE_HIP)
+#include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+#endif
 namespace sfem {
 namespace codegen {
 
@@ -512,6 +515,162 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[3 * NQ], out_streams, 1);
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
+
+#if defined(SFEM_ENABLE_HIP)
+// saint_venant_kirchhoff_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
+// matrix cores reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+struct saint_venant_kirchhoff_d3_tensor_product_apply_point {
+  static constexpr int n_parameters = 2;
+  static constexpr bool reads_current = true;
+
+  template <typename s_t>
+  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,
+                                               const s_t *const RSTR grad_h_ref,
+                                               const s_t *const RSTR gu_ref,
+                                               const s_t *const RSTR adj,
+                                               const s_t det,
+                                               const s_t qw,
+                                               s_t *const RSTR loperand) {
+    const s_t lmbda = parameters[0];
+    const s_t mu = parameters[1];
+    const s_t adj_value0 = adj[0];
+    const s_t adj_value1 = adj[1];
+    const s_t adj_value2 = adj[2];
+    const s_t adj_value3 = adj[3];
+    const s_t adj_value4 = adj[4];
+    const s_t adj_value5 = adj[5];
+    const s_t adj_value6 = adj[6];
+    const s_t adj_value7 = adj[7];
+    const s_t adj_value8 = adj[8];
+    const s_t det_value0 = det;
+    const s_t idet = s_t(1) / det_value0;
+    s_t gu[9];
+    s_t trial_grad[9];
+    gu[0] = (gu_ref[0] * adj_value0 + gu_ref[1] * adj_value3 + gu_ref[2] * adj_value6) * idet;
+    trial_grad[0] = (grad_h_ref[0] * adj_value0 + grad_h_ref[1] * adj_value3 + grad_h_ref[2] * adj_value6) * idet;
+    gu[1] = (gu_ref[0] * adj_value1 + gu_ref[1] * adj_value4 + gu_ref[2] * adj_value7) * idet;
+    trial_grad[1] = (grad_h_ref[0] * adj_value1 + grad_h_ref[1] * adj_value4 + grad_h_ref[2] * adj_value7) * idet;
+    gu[2] = (gu_ref[0] * adj_value2 + gu_ref[1] * adj_value5 + gu_ref[2] * adj_value8) * idet;
+    trial_grad[2] = (grad_h_ref[0] * adj_value2 + grad_h_ref[1] * adj_value5 + grad_h_ref[2] * adj_value8) * idet;
+    gu[3] = (gu_ref[3] * adj_value0 + gu_ref[4] * adj_value3 + gu_ref[5] * adj_value6) * idet;
+    trial_grad[3] = (grad_h_ref[3] * adj_value0 + grad_h_ref[4] * adj_value3 + grad_h_ref[5] * adj_value6) * idet;
+    gu[4] = (gu_ref[3] * adj_value1 + gu_ref[4] * adj_value4 + gu_ref[5] * adj_value7) * idet;
+    trial_grad[4] = (grad_h_ref[3] * adj_value1 + grad_h_ref[4] * adj_value4 + grad_h_ref[5] * adj_value7) * idet;
+    gu[5] = (gu_ref[3] * adj_value2 + gu_ref[4] * adj_value5 + gu_ref[5] * adj_value8) * idet;
+    trial_grad[5] = (grad_h_ref[3] * adj_value2 + grad_h_ref[4] * adj_value5 + grad_h_ref[5] * adj_value8) * idet;
+    gu[6] = (gu_ref[6] * adj_value0 + gu_ref[7] * adj_value3 + gu_ref[8] * adj_value6) * idet;
+    trial_grad[6] = (grad_h_ref[6] * adj_value0 + grad_h_ref[7] * adj_value3 + grad_h_ref[8] * adj_value6) * idet;
+    gu[7] = (gu_ref[6] * adj_value1 + gu_ref[7] * adj_value4 + gu_ref[8] * adj_value7) * idet;
+    trial_grad[7] = (grad_h_ref[6] * adj_value1 + grad_h_ref[7] * adj_value4 + grad_h_ref[8] * adj_value7) * idet;
+    gu[8] = (gu_ref[6] * adj_value2 + gu_ref[7] * adj_value5 + gu_ref[8] * adj_value8) * idet;
+    trial_grad[8] = (grad_h_ref[6] * adj_value2 + grad_h_ref[7] * adj_value5 + grad_h_ref[8] * adj_value8) * idet;
+    const s_t weak_mat_tmp0 = gu[3]*mu;
+    const s_t weak_mat_tmp1 = gu[0] + s_t(1);
+    const s_t weak_mat_tmp2 = lmbda*weak_mat_tmp1;
+    const s_t weak_mat_tmp3 = gu[2]*weak_mat_tmp0 + gu[5]*weak_mat_tmp2;
+    const s_t weak_mat_tmp4 = gu[6]*mu;
+    const s_t weak_mat_tmp5 = gu[1]*weak_mat_tmp4 + gu[7]*weak_mat_tmp2;
+    const s_t weak_mat_tmp6 = gu[4] + s_t(1);
+    const s_t weak_mat_tmp7 = gu[1]*weak_mat_tmp0 + weak_mat_tmp2*weak_mat_tmp6;
+    const s_t weak_mat_tmp8 = gu[8] + s_t(1);
+    const s_t weak_mat_tmp9 = gu[2]*weak_mat_tmp4 + weak_mat_tmp2*weak_mat_tmp8;
+    const s_t weak_mat_tmp10 = gu[1]*weak_mat_tmp1;
+    const s_t weak_mat_tmp11 = gu[6]*gu[7];
+    const s_t weak_mat_tmp12 = gu[3]*weak_mat_tmp6;
+    const s_t weak_mat_tmp13 = lmbda*weak_mat_tmp10 + mu*(s_t(2)*weak_mat_tmp10 + weak_mat_tmp11 + weak_mat_tmp12);
+    const s_t weak_mat_tmp14 = gu[2]*weak_mat_tmp1;
+    const s_t weak_mat_tmp15 = gu[3]*gu[5];
+    const s_t weak_mat_tmp16 = gu[6]*weak_mat_tmp8;
+    const s_t weak_mat_tmp17 = lmbda*weak_mat_tmp14 + mu*(s_t(2)*weak_mat_tmp14 + weak_mat_tmp15 + weak_mat_tmp16);
+    const s_t weak_mat_tmp18 = gu[3]*weak_mat_tmp1;
+    const s_t weak_mat_tmp19 = gu[2]*gu[5];
+    const s_t weak_mat_tmp20 = gu[1]*weak_mat_tmp6;
+    const s_t weak_mat_tmp21 = lmbda*weak_mat_tmp18 + mu*(s_t(2)*weak_mat_tmp18 + weak_mat_tmp19 + weak_mat_tmp20);
+    const s_t weak_mat_tmp22 = gu[6]*weak_mat_tmp1;
+    const s_t weak_mat_tmp23 = gu[1]*gu[7];
+    const s_t weak_mat_tmp24 = gu[2]*weak_mat_tmp8;
+    const s_t weak_mat_tmp25 = lmbda*weak_mat_tmp22 + mu*(s_t(2)*weak_mat_tmp22 + weak_mat_tmp23 + weak_mat_tmp24);
+    const s_t weak_mat_tmp26 = pow_2(weak_mat_tmp1);
+    const s_t weak_mat_tmp27 = pow_2(gu[1]);
+    const s_t weak_mat_tmp28 = pow_2(gu[3]);
+    const s_t weak_mat_tmp29 = weak_mat_tmp27 + weak_mat_tmp28;
+    const s_t weak_mat_tmp30 = pow_2(gu[6]);
+    const s_t weak_mat_tmp31 = pow_2(gu[2]);
+    const s_t weak_mat_tmp32 = weak_mat_tmp31 + s_t(-1);
+    const s_t weak_mat_tmp33 = weak_mat_tmp30 + weak_mat_tmp32;
+    const s_t weak_mat_tmp34 = pow_2(gu[5]);
+    const s_t weak_mat_tmp35 = pow_2(gu[7]);
+    const s_t weak_mat_tmp36 = lmbda*(((s_t(1) / s_t(2)))*pow_2(gu[0]) + gu[0] + ((s_t(1) / s_t(2)))*pow_2(gu[4]) + gu[4] + ((s_t(1) / s_t(2)))*pow_2(gu[8]) + gu[8] + ((s_t(1) / s_t(2)))*weak_mat_tmp27 + ((s_t(1) / s_t(2)))*weak_mat_tmp28 + ((s_t(1) / s_t(2)))*weak_mat_tmp30 + ((s_t(1) / s_t(2)))*weak_mat_tmp31 + ((s_t(1) / s_t(2)))*weak_mat_tmp34 + ((s_t(1) / s_t(2)))*weak_mat_tmp35);
+    const s_t weak_mat_tmp37 = gu[1]*lmbda;
+    const s_t weak_mat_tmp38 = mu*weak_mat_tmp6;
+    const s_t weak_mat_tmp39 = gu[2]*weak_mat_tmp38 + gu[5]*weak_mat_tmp37;
+    const s_t weak_mat_tmp40 = gu[7]*mu;
+    const s_t weak_mat_tmp41 = gu[6]*weak_mat_tmp37 + weak_mat_tmp1*weak_mat_tmp40;
+    const s_t weak_mat_tmp42 = gu[2]*weak_mat_tmp40 + weak_mat_tmp37*weak_mat_tmp8;
+    const s_t weak_mat_tmp43 = gu[3]*weak_mat_tmp37 + weak_mat_tmp1*weak_mat_tmp38;
+    const s_t weak_mat_tmp44 = gu[1]*gu[2];
+    const s_t weak_mat_tmp45 = gu[5]*weak_mat_tmp6;
+    const s_t weak_mat_tmp46 = gu[7]*weak_mat_tmp8;
+    const s_t weak_mat_tmp47 = lmbda*weak_mat_tmp44 + mu*(s_t(2)*weak_mat_tmp44 + weak_mat_tmp45 + weak_mat_tmp46);
+    const s_t weak_mat_tmp48 = lmbda*weak_mat_tmp23 + mu*(weak_mat_tmp22 + s_t(2)*weak_mat_tmp23 + weak_mat_tmp24);
+    const s_t weak_mat_tmp49 = lmbda*weak_mat_tmp20 + mu*(weak_mat_tmp18 + weak_mat_tmp19 + s_t(2)*weak_mat_tmp20);
+    const s_t weak_mat_tmp50 = pow_2(weak_mat_tmp6);
+    const s_t weak_mat_tmp51 = weak_mat_tmp26 + weak_mat_tmp50;
+    const s_t weak_mat_tmp52 = gu[2]*lmbda;
+    const s_t weak_mat_tmp53 = gu[5]*mu;
+    const s_t weak_mat_tmp54 = gu[3]*weak_mat_tmp52 + weak_mat_tmp1*weak_mat_tmp53;
+    const s_t weak_mat_tmp55 = gu[1]*weak_mat_tmp53 + weak_mat_tmp52*weak_mat_tmp6;
+    const s_t weak_mat_tmp56 = mu*weak_mat_tmp8;
+    const s_t weak_mat_tmp57 = gu[1]*weak_mat_tmp56 + gu[7]*weak_mat_tmp52;
+    const s_t weak_mat_tmp58 = gu[6]*weak_mat_tmp52 + weak_mat_tmp1*weak_mat_tmp56;
+    const s_t weak_mat_tmp59 = lmbda*weak_mat_tmp19 + mu*(weak_mat_tmp18 + s_t(2)*weak_mat_tmp19 + weak_mat_tmp20);
+    const s_t weak_mat_tmp60 = lmbda*weak_mat_tmp24 + mu*(weak_mat_tmp22 + weak_mat_tmp23 + s_t(2)*weak_mat_tmp24);
+    const s_t weak_mat_tmp61 = weak_mat_tmp34 + s_t(-1);
+    const s_t weak_mat_tmp62 = pow_2(weak_mat_tmp8);
+    const s_t weak_mat_tmp63 = weak_mat_tmp26 + weak_mat_tmp62;
+    const s_t weak_mat_tmp64 = gu[3]*lmbda;
+    const s_t weak_mat_tmp65 = gu[7]*weak_mat_tmp64 + weak_mat_tmp4*weak_mat_tmp6;
+    const s_t weak_mat_tmp66 = gu[5]*weak_mat_tmp4 + weak_mat_tmp64*weak_mat_tmp8;
+    const s_t weak_mat_tmp67 = lmbda*weak_mat_tmp15 + mu*(weak_mat_tmp14 + s_t(2)*weak_mat_tmp15 + weak_mat_tmp16);
+    const s_t weak_mat_tmp68 = gu[3]*gu[6];
+    const s_t weak_mat_tmp69 = gu[5]*weak_mat_tmp8;
+    const s_t weak_mat_tmp70 = gu[7]*weak_mat_tmp6;
+    const s_t weak_mat_tmp71 = lmbda*weak_mat_tmp68 + mu*(s_t(2)*weak_mat_tmp68 + weak_mat_tmp69 + weak_mat_tmp70);
+    const s_t weak_mat_tmp72 = lmbda*weak_mat_tmp12 + mu*(weak_mat_tmp10 + weak_mat_tmp11 + s_t(2)*weak_mat_tmp12);
+    const s_t weak_mat_tmp73 = lmbda*weak_mat_tmp6;
+    const s_t weak_mat_tmp74 = gu[6]*weak_mat_tmp73 + gu[7]*weak_mat_tmp0;
+    const s_t weak_mat_tmp75 = gu[5]*weak_mat_tmp40 + weak_mat_tmp73*weak_mat_tmp8;
+    const s_t weak_mat_tmp76 = lmbda*weak_mat_tmp45 + mu*(weak_mat_tmp44 + s_t(2)*weak_mat_tmp45 + weak_mat_tmp46);
+    const s_t weak_mat_tmp77 = lmbda*weak_mat_tmp70 + mu*(weak_mat_tmp68 + weak_mat_tmp69 + s_t(2)*weak_mat_tmp70);
+    const s_t weak_mat_tmp78 = gu[5]*lmbda;
+    const s_t weak_mat_tmp79 = gu[6]*weak_mat_tmp78 + weak_mat_tmp0*weak_mat_tmp8;
+    const s_t weak_mat_tmp80 = gu[7]*weak_mat_tmp78 + weak_mat_tmp38*weak_mat_tmp8;
+    const s_t weak_mat_tmp81 = lmbda*weak_mat_tmp69 + mu*(weak_mat_tmp68 + s_t(2)*weak_mat_tmp69 + weak_mat_tmp70);
+    const s_t weak_mat_tmp82 = weak_mat_tmp50 + weak_mat_tmp62;
+    const s_t weak_mat_tmp83 = lmbda*weak_mat_tmp11 + mu*(weak_mat_tmp10 + s_t(2)*weak_mat_tmp11 + weak_mat_tmp12);
+    const s_t weak_mat_tmp84 = lmbda*weak_mat_tmp16 + mu*(weak_mat_tmp14 + weak_mat_tmp15 + s_t(2)*weak_mat_tmp16);
+    const s_t weak_mat_tmp85 = lmbda*weak_mat_tmp46 + mu*(weak_mat_tmp44 + weak_mat_tmp45 + s_t(2)*weak_mat_tmp46);
+    const s_t material0 = trial_grad[0]*(lmbda*weak_mat_tmp26 + mu*(s_t(3)*weak_mat_tmp26 + weak_mat_tmp29 + weak_mat_tmp33) + weak_mat_tmp36) + trial_grad[1]*weak_mat_tmp13 + trial_grad[2]*weak_mat_tmp17 + trial_grad[3]*weak_mat_tmp21 + trial_grad[4]*weak_mat_tmp7 + trial_grad[5]*weak_mat_tmp3 + trial_grad[6]*weak_mat_tmp25 + trial_grad[7]*weak_mat_tmp5 + trial_grad[8]*weak_mat_tmp9;
+    const s_t material1 = trial_grad[0]*weak_mat_tmp13 + trial_grad[1]*(lmbda*weak_mat_tmp27 + mu*(s_t(3)*weak_mat_tmp27 + weak_mat_tmp32 + weak_mat_tmp35 + weak_mat_tmp51) + weak_mat_tmp36) + trial_grad[2]*weak_mat_tmp47 + trial_grad[3]*weak_mat_tmp43 + trial_grad[4]*weak_mat_tmp49 + trial_grad[5]*weak_mat_tmp39 + trial_grad[6]*weak_mat_tmp41 + trial_grad[7]*weak_mat_tmp48 + trial_grad[8]*weak_mat_tmp42;
+    const s_t material2 = trial_grad[0]*weak_mat_tmp17 + trial_grad[1]*weak_mat_tmp47 + trial_grad[2]*(lmbda*weak_mat_tmp31 + mu*(weak_mat_tmp27 + s_t(3)*weak_mat_tmp31 + weak_mat_tmp61 + weak_mat_tmp63) + weak_mat_tmp36) + trial_grad[3]*weak_mat_tmp54 + trial_grad[4]*weak_mat_tmp55 + trial_grad[5]*weak_mat_tmp59 + trial_grad[6]*weak_mat_tmp58 + trial_grad[7]*weak_mat_tmp57 + trial_grad[8]*weak_mat_tmp60;
+    const s_t material3 = trial_grad[0]*weak_mat_tmp21 + trial_grad[1]*weak_mat_tmp43 + trial_grad[2]*weak_mat_tmp54 + trial_grad[3]*(lmbda*weak_mat_tmp28 + mu*(s_t(3)*weak_mat_tmp28 + weak_mat_tmp30 + weak_mat_tmp51 + weak_mat_tmp61) + weak_mat_tmp36) + trial_grad[4]*weak_mat_tmp72 + trial_grad[5]*weak_mat_tmp67 + trial_grad[6]*weak_mat_tmp71 + trial_grad[7]*weak_mat_tmp65 + trial_grad[8]*weak_mat_tmp66;
+    const s_t material4 = trial_grad[0]*weak_mat_tmp7 + trial_grad[1]*weak_mat_tmp49 + trial_grad[2]*weak_mat_tmp55 + trial_grad[3]*weak_mat_tmp72 + trial_grad[4]*(lmbda*weak_mat_tmp50 + mu*(weak_mat_tmp29 + weak_mat_tmp35 + s_t(3)*weak_mat_tmp50 + weak_mat_tmp61) + weak_mat_tmp36) + trial_grad[5]*weak_mat_tmp76 + trial_grad[6]*weak_mat_tmp74 + trial_grad[7]*weak_mat_tmp77 + trial_grad[8]*weak_mat_tmp75;
+    const s_t material5 = trial_grad[0]*weak_mat_tmp3 + trial_grad[1]*weak_mat_tmp39 + trial_grad[2]*weak_mat_tmp59 + trial_grad[3]*weak_mat_tmp67 + trial_grad[4]*weak_mat_tmp76 + trial_grad[5]*(lmbda*weak_mat_tmp34 + mu*(weak_mat_tmp28 + weak_mat_tmp32 + s_t(3)*weak_mat_tmp34 + weak_mat_tmp82) + weak_mat_tmp36) + trial_grad[6]*weak_mat_tmp79 + trial_grad[7]*weak_mat_tmp80 + trial_grad[8]*weak_mat_tmp81;
+    const s_t material6 = trial_grad[0]*weak_mat_tmp25 + trial_grad[1]*weak_mat_tmp41 + trial_grad[2]*weak_mat_tmp58 + trial_grad[3]*weak_mat_tmp71 + trial_grad[4]*weak_mat_tmp74 + trial_grad[5]*weak_mat_tmp79 + trial_grad[6]*(lmbda*weak_mat_tmp30 + mu*(weak_mat_tmp28 + s_t(3)*weak_mat_tmp30 + weak_mat_tmp35 + weak_mat_tmp63 + s_t(-1)) + weak_mat_tmp36) + trial_grad[7]*weak_mat_tmp83 + trial_grad[8]*weak_mat_tmp84;
+    const s_t material7 = trial_grad[0]*weak_mat_tmp5 + trial_grad[1]*weak_mat_tmp48 + trial_grad[2]*weak_mat_tmp57 + trial_grad[3]*weak_mat_tmp65 + trial_grad[4]*weak_mat_tmp77 + trial_grad[5]*weak_mat_tmp80 + trial_grad[6]*weak_mat_tmp83 + trial_grad[7]*(lmbda*weak_mat_tmp35 + mu*(weak_mat_tmp27 + weak_mat_tmp30 + s_t(3)*weak_mat_tmp35 + weak_mat_tmp82 + s_t(-1)) + weak_mat_tmp36) + trial_grad[8]*weak_mat_tmp85;
+    const s_t material8 = trial_grad[0]*weak_mat_tmp9 + trial_grad[1]*weak_mat_tmp42 + trial_grad[2]*weak_mat_tmp60 + trial_grad[3]*weak_mat_tmp66 + trial_grad[4]*weak_mat_tmp75 + trial_grad[5]*weak_mat_tmp81 + trial_grad[6]*weak_mat_tmp84 + trial_grad[7]*weak_mat_tmp85 + trial_grad[8]*(lmbda*weak_mat_tmp62 + mu*(weak_mat_tmp33 + weak_mat_tmp34 + weak_mat_tmp35 + s_t(3)*weak_mat_tmp62) + weak_mat_tmp36);
+    loperand[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+    loperand[1] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+    loperand[2] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
+    loperand[3] = qw * (material3 * adj_value0 + material4 * adj_value1 + material5 * adj_value2);
+    loperand[4] = qw * (material3 * adj_value3 + material4 * adj_value4 + material5 * adj_value5);
+    loperand[5] = qw * (material3 * adj_value6 + material4 * adj_value7 + material5 * adj_value8);
+    loperand[6] = qw * (material6 * adj_value0 + material7 * adj_value1 + material8 * adj_value2);
+    loperand[7] = qw * (material6 * adj_value3 + material7 * adj_value4 + material8 * adj_value5);
+    loperand[8] = qw * (material6 * adj_value6 + material7 * adj_value7 + material8 * adj_value8);
+  }
+};
+#endif
 
 } // namespace codegen
 } // namespace sfem

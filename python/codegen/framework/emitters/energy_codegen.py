@@ -187,6 +187,8 @@ from codegen.framework.plans.form_transformations import (
 from codegen.framework.plans.direct_assembly import (
     assembles_in_closed_form,
     block_assembly_admits,
+    matrix_core_apply_admits,
+    matrix_core_apply_launch_admits,
     tensor_product_point_tangent_admits,
 )
 from codegen.framework.plans.scheduling import build_expression_graph
@@ -987,6 +989,22 @@ def _sfem_soa_local_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
+    # A device tensor-product element publishes the apply at one point for the apply on the matrix
+    # cores (HIP builds; the header and the struct are guarded there).
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        _sfem_soa_reference_inputs(array_inputs),
+        basis_family,
+    )
+    apply_points = [
+        form
+        for form in forms
+        if matrix_core_apply_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+    ]
+    for _ in apply_points[:1]:
+        lines.extend(["#if defined(SFEM_ENABLE_HIP)", '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     for form in forms:
@@ -1004,6 +1022,13 @@ def _sfem_soa_local_header(
             )
         )
         lines.append("")
+        for point_form in [candidate for candidate in apply_points if candidate is form]:
+            lines.extend(
+                _sfem_soa_tensor_product_apply_point_struct(
+                    point_form, _sfem_soa_tensor_product_apply_point_name(prefix, point_form), dim
+                )
+            )
+            lines.append("")
         specialized = _constant_p1_specialized_local(
             prefix,
             quadrature_rule,
@@ -1510,6 +1535,153 @@ def _sfem_soa_tensor_product_point_tangent_struct(form, name, dim):
         "  }",
         "};",
     ]
+
+
+#: The device library of the apply on AMD's FP64 matrix cores (`sfem::tensor_product::hip::matrix_core_apply`,
+#: HIP builds only), for the elements `plans.direct_assembly.matrix_core_apply_launch_admits` admits.
+TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER = "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+
+
+def _sfem_soa_tensor_product_apply_point_name(local_prefix, form):
+    return "%s_%s_point" % (local_prefix, form.name)
+
+
+#: What an entry point needs to launch `sfem::tensor_product::hip::matrix_core_apply`: the point
+#: (`_sfem_soa_tensor_product_apply_point_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes, the field's components, the geometry and whether the state is read.
+TensorProductMatrixCoreLaunch = collections.namedtuple(
+    "TensorProductMatrixCoreLaunch", "point ref quad nq1 ns1 n_components isoparametric reads_current"
+)
+
+
+def _matrix_core_field_lines(declaration, name, cast, n_components, indent):
+    """The kernel's view of a field's component arrays: a pointer per component, an array of them
+    for a vector field and the one pointer for a scalar (handed on by address)."""
+    components = ["(%s)%s%s" % (cast, name, _component_name(d)) for d in range(n_components)]
+    return {
+        True: ["%s%s %s[%d] = {%s};" % (indent, declaration, name, n_components, ", ".join(components))],
+        False: ["%s%s %s = %s;" % (indent, declaration, name, components[0])],
+    }[n_components > 1]
+
+
+def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's apply on the matrix cores, under HIP and in double
+    only: it returns unless turned off (`SFEM_MATRIX_CORE_APPLY=0`), so the generated kernel's launch
+    after it is the CUDA build's, float's and the fallback."""
+    if launch is None or scalar_type != "double":
+        return []
+    at = indent + "  "
+    by_address = {True: "%s", False: "&%s"}[launch.n_components > 1]
+    affine = (
+        "{}"
+        if launch.isoparametric
+        else "{{%s}}" % ", ".join(["g_adj%d" % i for i in range(dim * dim)] + ["g_det0"])
+    )
+    parameters = ", ".join("(double)%s" % parameter for parameter in material_parameter_names)
+    state = (
+        _matrix_core_field_lines("const double *const", "u", "const double *", launch.n_components, at)
+        if launch.reads_current
+        else []
+    )
+    return [
+        "#if defined(SFEM_ENABLE_HIP)",
+        "%s{" % indent,
+        "%s// AMD's FP64 matrix cores (`%s`)." % (at, TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER),
+        "%sconst sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = %s;" % (at, affine),
+        *state,
+        *_matrix_core_field_lines("const double *const", "h", "const double *", launch.n_components, at),
+        *_matrix_core_field_lines("double *const", "out", "double *", launch.n_components, at),
+        "%sconst int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<%s<double>, %s<double>, %d, %d, %d, %s, sfem::codegen::%s, geom_t>("
+        % (
+            at,
+            launch.ref,
+            launch.quad,
+            launch.ns1,
+            launch.nq1,
+            launch.n_components,
+            "true" if launch.isoparametric else "false",
+            launch.point,
+        ),
+        "%s    nelements, elements, affine, %s, {{%s}}, %s, %s, h_stride, %s, out_stride, %s, (cudaStream_t)stream);"
+        % (
+            at,
+            "points" if launch.isoparametric else "nullptr",
+            parameters,
+            "u_stride" if launch.reads_current else "0",
+            (by_address % "u") if launch.reads_current else "nullptr",
+            by_address % "h",
+            by_address % "out",
+        ),
+        "%sif (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;" % at,
+        "%s}" % indent,
+        "#endif",
+    ]
+
+
+def _sfem_soa_tensor_product_apply_point_struct(form, name, dim):
+    """The apply at one point: the reference flux `loperand` (index 3 c + k) from the direction's and,
+    when the material reads it, the state's reference gradients there, the adjugate, determinant and
+    weight. The apply block's point section (`_append_sfem_soa_tensor_weak_form_lines`) as a functor,
+    which `sfem::tensor_product::hip::matrix_core_apply` reads per point."""
+    weak_form = form.weak_form
+    parameters = form_material_parameter_names(form)
+    n_components = form_n_field_components(form, dim)
+    uses_current = form_reads_current(form, default=True)
+    target = current_target()
+
+    def geometry_value(geometry_name, component):
+        return target.work_item_name(geometry_name, component)
+
+    at = "    "
+    lines = [
+        "#if defined(SFEM_ENABLE_HIP)",
+        "// %s: the apply at one point, the apply block's point section; the device's apply on the" % name,
+        "// matrix cores reads it (`%s`)." % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "  static constexpr bool reads_current = %s;" % ("true" if uses_current else "false"),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR grad_h_ref,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t qw,",
+        "                                               s_t *const RSTR loperand) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t %s = adj[%d];" % (at, geometry_value("adj", component), component) for component in range(dim * dim)),
+        "%sconst s_t %s = det;" % (at, geometry_value("det", 0)),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, geometry_value("det", 0)),
+        *(["%ss_t gu[%d];" % (at, n_components * dim)] if uses_current else []),
+        "%ss_t trial_grad[%d];" % (at, n_components * dim),
+    ]
+    mapped = [("gu_ref", "gu")] * uses_current + [("grad_h_ref", "trial_grad")]
+    for row in range(n_components):
+        for col in range(dim):
+            for source, target_name in mapped:
+                terms = " + ".join(
+                    "%s[%d] * %s" % (source, row * dim + k, geometry_value("adj", k * dim + col)) for k in range(dim)
+                )
+                lines.append("%s%s[%d] = (%s) * idet;" % (at, target_name, row * dim + col, terms))
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(weak_form, "gu"),
+        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(weak_form.n_field_components * dim)),
+    )
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+        scalar_temporaries=True,
+        destination=lambda index: "loperand[%d] =" % index,
+        indent=at,
+    )
+    lines.extend(["  }", "};", "#endif"])
+    return lines
 
 
 def _sfem_soa_direct_hessian_point_tangent_function(form, name, dim, reference_inputs, source_builder, project=False):
@@ -6413,16 +6585,47 @@ def _sfem_soa_mesh_operator_function(
 
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    # Under HIP the apply of a tensor-product element of the orders the plan admits runs on the matrix cores
+    # (`TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER`), in double; the generated kernel stays the CUDA
+    # build's and float's.
+    matrix_core_admitted = matrix_core_apply_launch_admits(
+        form,
+        dim,
+        quadrature_rule,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        isoparametric=geometry_mode == "isoparametric",
+        tensor_product_geometry=use_tensor_product_geometry,
+    )
+    matrix_core_launch = (
+        TensorProductMatrixCoreLaunch(
+            _sfem_soa_tensor_product_apply_point_name(local_prefix, form),
+            quadrature_reference_owner(quadrature_rule, "shape_1d"),
+            quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+            quadrature_rule.tensor_product_n_qp_1d,
+            quadrature_rule.tensor_product_n_shape_1d,
+            n_field_components,
+            geometry_mode == "isoparametric",
+            uses_current,
+        )
+        if matrix_core_admitted
+        else None
+    )
+    if matrix_core_launch is not None and metric is not None:
+        raise ValueError("the matrix-core apply reads the adjugate, not a cached metric")
     lines.extend(
         runtime_typed_entry_point_lines(
             function_name,
             wrapper_params,
-            lambda scalar_type, _positional: source_builder.wrapper_call_lines(
-                implementation_name,
-                scalar_type,
-                _mesh_template_arguments(effective_vector_size),
-                cast_arguments(wrapper_params, wrapper_args, scalar_type),
-            ),
+            lambda scalar_type, _positional: [
+                *_matrix_core_apply_launch_lines(matrix_core_launch, scalar_type, material_parameter_names, dim),
+                *source_builder.wrapper_call_lines(
+                    implementation_name,
+                    scalar_type,
+                    _mesh_template_arguments(effective_vector_size),
+                    cast_arguments(wrapper_params, wrapper_args, scalar_type),
+                ),
+            ],
             parameter_lines=parameter_list_lines,
         )
     )
