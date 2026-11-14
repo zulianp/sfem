@@ -296,6 +296,18 @@ public:
     static void dot(const ptrdiff_t n, const T *const l, const T *const r, T *const result, cudaStream_t stream) {
         int       kernel_block_size = 128;
         ptrdiff_t n_blocks          = std::max(ptrdiff_t(1), (n + kernel_block_size - 1) / kernel_block_size);
+#if defined(SFEM_ENABLE_HIP)
+        // Each block adds its sum to the one word: on MI300A the blocks' atomics on one address
+        // serialise (2400 blocks for the coarse level's 307 k dofs: 42 us against GH200's 9.4). A few
+        // blocks per compute unit, the kernel's loop striding over the rest.
+        static const ptrdiff_t max_blocks = [] {
+            int device = 0, units = 0;
+            cudaGetDevice(&device);
+            cudaDeviceGetAttribute(&units, cudaDevAttrMultiProcessorCount, device);
+            return ptrdiff_t(4) * std::max(1, units);
+        }();
+        n_blocks = std::min(n_blocks, max_blocks);
+#endif
 
         CHECK_CUDA(cudaMemsetAsync(result, 0, sizeof(T), stream));
         tdot<<<n_blocks, kernel_block_size, 0, stream>>>(n, l, r, result);

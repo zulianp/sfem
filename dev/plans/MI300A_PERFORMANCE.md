@@ -79,6 +79,29 @@ kernels are measured without it (step 0).
   0.7 M case drops more than the kernel time explains (20.7 to 2.2 s); kernel 0's per-thread stack
   is the likely cost of each launch on AMD (scratch set-up), to be confirmed by step 0's timings.
   Same iterations and cycles; ctest 119/119 on MI300A.
+- Step 0: roctracer's tool library records kernel activity (`HSA_TOOLS_LIB=libroctracer_tool.so`,
+  `ROCTRACER_DOMAIN=hip`, lines `start:end device:queue name:id:pid`); copies' times there include
+  their wait in the queue (they sum past the wall time), so only kernels are compared. 136 M case,
+  GPU kernel time, after step 2a:
+
+  | kernel | MI300A | GH200 (nsys) | per call |
+  |---|---|---|---|
+  | level-8 apply (MI300A gather, GH200 FP64 tensor-core TP) | 13.5 s | 7.8 s | 16.8 / 9.7 ms |
+  | level-4 apply, warp kernel `<double, 4>` | 3.4 s | 0.74 s | 6.7 / 1.5 ms |
+  | `sbv3_apply` (smoother's block Jacobi) | 2.3 s | 1.1 s | 86 / 41 us |
+  | HEX8 coarse apply | 2.2 s | 0.65 s | 88 / 26 us |
+  | `tdot` (coarse CG) | 2.2 s | 0.48 s | 42 / 9.4 us |
+  | `taxpby` | 2.1 s | 2.1 s | 623 / 619 us |
+  | all kernels | 27.9 s | 14.1 s | |
+
+- Step 4a, the dot's grid on HIP: `tdot` launched a block per 128 entries, each adding into the one
+  word; capped at four blocks per compute unit it takes 12.2 us (was 42.5), all kernels 24.7 s.
+  The wall time does not move (35.0 s): the coarse CG is bound by the host. Its ~25 000 iterations
+  take 646 us each on MI300A and 337 us on GH200 (cycle(3), 24 calls: 16.4 against 8.4 s), against
+  ~130 and ~55 us of kernels; each iteration waits twice for a dot on the host and launches about
+  eight kernels. The 0.7 M case is unchanged (2.11-2.37 s over three runs).
+- Next, by the time they leave on the critical path: the coarse CG's host round trips (step 4,
+  ~11 s on MI300A), then the level-8 apply (step 2b), the level-4 apply and the coarse apply.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

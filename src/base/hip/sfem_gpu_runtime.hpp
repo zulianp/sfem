@@ -92,6 +92,7 @@ typedef unsigned int       cuuint32_t;
 #define cudaGetDeviceCount hipGetDeviceCount
 #define cudaDeviceGetAttribute hipDeviceGetAttribute
 #define cudaDevAttrMaxGridDimX hipDeviceAttributeMaxGridDimX
+#define cudaDevAttrMultiProcessorCount hipDeviceAttributeMultiprocessorCount
 #define cudaDevAttrMaxSharedMemoryPerBlock hipDeviceAttributeMaxSharedMemoryPerBlock
 #define cudaDevAttrMaxSharedMemoryPerBlockOptin hipDeviceAttributeSharedMemPerBlockOptin
 #define cudaOccupancyMaxActiveBlocksPerMultiprocessor hipOccupancyMaxActiveBlocksPerMultiprocessor
