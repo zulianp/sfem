@@ -69,6 +69,7 @@ kernels are measured without it (step 0).
 | start | hip-port | 69.4 s | 20.7 s |
 | 2a | HIP default level-8 kernel: gather (5) | 35.0 s | 2.2 s |
 | 4a, 4b | dot grid cap; the coarse CG's loop on the device, captured | 31.4 s (34.0 without: three runs each) | 1.98 s (2.1-2.4) |
+| 2b | level-8 apply on the FP64 matrix cores (kernel 7) | 25.7 s (31.7 with kernel 5, same node) | 1.6-1.8 s |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -117,6 +118,29 @@ kernels are measured without it (step 0).
     rewritten in stream order before each kernel; the CUDA branch of the generated code is the
     former one. Captured again: ctest 119/119 on MI300A; three runs of the 136 M case 31.37, 31.53
     and 31.37 s against 33.17, 33.32 and 35.44 s without steps 4a and 4b; 0.7 M 1.98 s.
+- Step 2b, the level-8 apply on AMD's FP64 matrix cores (`..._apply_level8_mfma_kernel`, HIP only,
+  the HIP default): the element matrix shared by the macro element's 512 micro elements turns the
+  apply into the GEMM Y = U K^T (512 x 24 x 24), done with `v_mfma_f64_16x16x4f64` (lane layout
+  measured on gfx942: D(i, j) in slot i / 4 of lane j + 16 (i % 4)), K^T in registers, U from LDS,
+  the results scattered through the same LDS. 44^3 macro elements: 7.66 ms (8 wavefronts, 244
+  VGPRs, two waves per SIMD; 8.08 with 4, 16.3 with 16 spilling) against 15.3 ms for the gather
+  kernel and GH200's 9.6 ms (its FP64 tensor-core kernel); `|y|` the gather kernel's to 1e-16.
+  MaMAL 136 M, alternated on one node: 25.82, 25.58, 25.71 s against 31.85, 31.70, 31.68 s;
+  the same iterations and residuals; ctest 119/119.
+  - Where its time goes (one phase skipped at a time, 8.3 ms then): the global atomics of the
+    node values 2.6 ms, the global gather 2.0, the matrix instructions 1.0, the LDS scatter 1.0,
+    the element matrix 0.8; the kernel's frame (zeroing, barriers, 85 k blocks) 1.2. So the
+    connectivity is read once (LDS) and the 7^3 interior nodes, the macro element's alone, are
+    added without atomics (8.12 to 7.66 ms). The rest is the gather and scatter every level-8
+    kernel pays, on both vendors.
+  - Literature (survey 2026-11-14): FP64 matrix units pay where LDS traffic, not HBM, bounds the
+    kernel (MFEM sum factorisation on GH200's DMMA 35-59% a kernel, Tu et al. 2026; CEED's MI250X
+    report); memory-bound kernels gain at most ~1.33x. Here one 24x24 matrix per macro element is
+    ~17 FLOP/B, compute-bound for the vector units.
+  - The code generator has no counterpart: it reads a semi-structured mesh as one order-L Lagrange
+    element per macro element, and its stored element matrices differ per element (memory-bound).
+    A matrix-core path there would be a different kernel (the high-order sum factorisation's 1D
+    contractions, 9x9 padded to 16 at order 8).
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
