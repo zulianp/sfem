@@ -186,13 +186,16 @@ kernels are measured without it (step 0).
     - The generator publishes `<prefix>_apply_point` in each device tensor-product local header
       (the apply block's point section as a functor; `plans.direct_assembly.matrix_core_apply_admits`)
       and, in the apply's double entry points, a guarded launch of the library's kernel
-      (`matrix_core_apply_launch_admits`: Q2 only for now). Linear elasticity, Neo-Hookean Ogden,
-      Saint Venant-Kirchhoff and modified Mooney-Rivlin on PROTEUS_HEX27 (HEX27 forwards to it);
-      the Mooney-Rivlin Prony variants carry point history and keep the generated kernel.
-    - Q3 not yet: a nonlinear material's kernel spills 500-600 VGPRs at 512 registers a lane, and
-      Saint Venant-Kirchhoff's isoparametric one fails in the compiler's allocator; it needs the
-      k-steps rolled. (The generated SVK Q3 kernel itself fails the same way when the regenerated
-      `line_p3_q5`/`quad_line_q5` tables differ from the committed ones in their last digits.)
+      (`matrix_core_apply_launch_admits`: Q2 and Q3). Linear elasticity, Neo-Hookean Ogden,
+      Saint Venant-Kirchhoff and modified Mooney-Rivlin on PROTEUS_HEX27 (HEX27 forwards to it),
+      the last two also on PROTEUS_HEX64; the Mooney-Rivlin Prony variants carry point history and
+      keep the generated kernel.
+    - Q3: with the 16 k-steps of the gradient GEMM unrolled and the nodes held, the entries of G
+      and the indices overflowed the registers (SVK 319/303 spilled VGPRs at 512 a lane, MMR
+      500-600). Beyond Q2 the k-steps are rolled and the nodes read again (SVK 64/75, MMR
+      334/299 spilled: its point is the heaviest). (The generated SVK Q3 kernel fails in the
+      compiler's allocator when the regenerated `line_p3_q5`/`quad_line_q5` tables differ from the
+      committed ones in their last digits; the committed ones are kept.)
   - MI300A, 1 M elements (24.4 M dofs), best of 10, generated (`SFEM_MATRIX_CORE_APPLY=0`) against
     the matrix cores, alternated on one node, state 1e-3 x; ctest 119/119:
 
@@ -204,6 +207,13 @@ kernels are measured without it (step 0).
     | Neo-Hookean Ogden, isoparametric | 45.7 ms | 13.2 ms | 3.5x |
     | Saint Venant-Kirchhoff, isoparametric | 42.6 ms | 12.0 ms | 3.5x |
     | modified Mooney-Rivlin, isoparametric | 170 ms | 39.0 ms | 4.4x |
+
+    | apply (Q3, 216 k elements, 17.8 M dofs, state 1e-5 x) | generated | matrix cores | |
+    |---|---|---|---|
+    | Saint Venant-Kirchhoff, affine | 11.5 ms | 3.35 ms | 3.4x |
+    | Saint Venant-Kirchhoff, isoparametric | 37.0 ms | 9.89 ms | 3.7x |
+    | modified Mooney-Rivlin, affine | 39.2 ms | 7.24 ms | 5.4x |
+    | modified Mooney-Rivlin, isoparametric | 93.5 ms | 15.9 ms | 5.9x |
 
     `|y|` and x^T y agree to rounding where finite. At 1e-3 x the isoparametric Neo-Hookean and
     Mooney-Rivlin applies give NaN on both paths (an inadmissible state at those points); at

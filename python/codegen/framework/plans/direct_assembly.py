@@ -305,12 +305,11 @@ def matrix_core_apply_admits(form, dim, *, on_device, tensor_product):
 
 
 #: The orders the matrix-core apply is launched for (nodes a direction). At order 1 half of each
-#: 16-point tile is padding and the element (8 nodes) a quarter of a 16-row output tile. At order 3
-#: (64 nodes, four output tiles) a nonlinear material's kernel spills 500-600 VGPRs at 512 registers
-#: a lane, and Saint Venant-Kirchhoff's isoparametric one fails in the compiler's register
-#: allocator; it needs the k-steps rolled. Order 2 is measured (MI300A, 1 M elements of linear
-#: elasticity: affine 7.5 -> 2.3 ms, isoparametric 25.2 -> 4.5 ms).
-MATRIX_CORE_APPLY_SHAPE_1D = (3,)
+#: 16-point tile is padding and the element (8 nodes) a quarter of a 16-row output tile, so it is not
+#: launched there. Measured on MI300A against the generated kernel: order 2 (1 M elements) linear
+#: elasticity 3.3x affine and 5.8x isoparametric, the nonlinear materials 3.5-4.4x; order 3 (216 k
+#: elements) Saint Venant-Kirchhoff 3.4x / 3.7x, modified Mooney-Rivlin 5.4x / 5.9x.
+MATRIX_CORE_APPLY_SHAPE_1D = (3, 4)
 
 
 def matrix_core_apply_launch_admits(

@@ -1028,6 +1028,18 @@ extern "C" int cu_saint_venant_kirchhoff_proteus_hex64_apply_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+      #if defined(SFEM_ENABLE_HIP)
+        {
+          // AMD's FP64 matrix cores (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+          const sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = {{g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0}};
+          const double *const u[3] = {(const double *)ux, (const double *)uy, (const double *)uz};
+          const double *const h[3] = {(const double *)hx, (const double *)hy, (const double *)hz};
+          double *const out[3] = {(double *)outx, (double *)outy, (double *)outz};
+          const int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<sfem::codegen::ref_line_p3_q4<double>, sfem::codegen::quad_line_q4<double>, 4, 4, 3, false, sfem::codegen::saint_venant_kirchhoff_d3_tensor_product_apply_point, geom_t>(
+              nelements, elements, affine, nullptr, {{(double)lmbda, (double)mu}}, u_stride, u, h_stride, h, out_stride, out, (cudaStream_t)stream);
+          if (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;
+        }
+      #endif
         if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
@@ -1205,6 +1217,18 @@ extern "C" int cu_saint_venant_kirchhoff_proteus_hex64_apply_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
+      #if defined(SFEM_ENABLE_HIP)
+        {
+          // AMD's FP64 matrix cores (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+          const sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = {};
+          const double *const u[3] = {(const double *)ux, (const double *)uy, (const double *)uz};
+          const double *const h[3] = {(const double *)hx, (const double *)hy, (const double *)hz};
+          double *const out[3] = {(double *)outx, (double *)outy, (double *)outz};
+          const int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<sfem::codegen::ref_line_p3_q5<double>, sfem::codegen::quad_line_q5<double>, 4, 5, 3, true, sfem::codegen::saint_venant_kirchhoff_d3_tensor_product_apply_point, geom_t>(
+              nelements, elements, affine, points, {{(double)lmbda, (double)mu}}, u_stride, u, h_stride, h, out_stride, out, (cudaStream_t)stream);
+          if (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;
+        }
+      #endif
         if (nelements <= 0) return SFEM_SUCCESS;
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);

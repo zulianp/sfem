@@ -135,6 +135,10 @@ namespace sfem {
                 static constexpr int  NQP     = 16 * TR;  // points, padded to whole tiles
                 static constexpr int  NSP     = 4 * KS;   // nodes, padded to whole k-steps
                 static constexpr bool TABLE   = 3 * NQP * (NSP + 1) * sizeof(double) <= 46 * 1024;
+                // The gradient GEMM's k-steps are unrolled, the nodes held, up to Q2 (7 k-steps); beyond,
+                // the unrolled steps' entries of G and the held nodes overflow the registers.
+                static constexpr bool ROLL           = KS > 8;
+                static constexpr int  FORWARD_UNROLL = ROLL ? 1 : KS;
                 static_assert(NC == 1 || NC == 3, "NC must be 1 or 3");
 
                 __shared__ double b[NQ1 * NS1], g[NQ1 * NS1], w[NQ1];
@@ -184,12 +188,24 @@ namespace sfem {
                     const ptrdiff_t e     = base + col;
                     const bool      valid = e < nelements;
 
+                    // The nodes the lane gathers (node 4 ks + grp), held when the k-steps are unrolled and
+                    // read again when they are rolled.
                     idx_t idx[KS];
+                    if constexpr (!ROLL) {
 #pragma unroll
-                    for (int ks = 0; ks < KS; ++ks) {
-                        const int s = 4 * ks + grp;
-                        idx[ks]     = (valid && s < NS) ? elements[s][e] : idx_t(-1);
+                        for (int ks = 0; ks < KS; ++ks) {
+                            const int s = 4 * ks + grp;
+                            idx[ks]     = (valid && s < NS) ? elements[s][e] : idx_t(-1);
+                        }
                     }
+                    auto node = [&](const int ks) -> idx_t {
+                        if constexpr (ROLL) {
+                            const int s = 4 * ks + grp;
+                            return (valid && s < NS) ? elements[s][e] : idx_t(-1);
+                        } else {
+                            return idx[ks];
+                        }
+                    };
 
                     double adj_e[9] = {0}, det_e = 1;
                     if (!ISOPARAMETRIC && valid) {
@@ -214,23 +230,24 @@ namespace sfem {
 
                         // Reference gradients at the tile row's points (A: row 16 h + col, column node 4 ks + grp).
                         const int qa = 16 * h + col;
-#pragma unroll
+#pragma unroll(FORWARD_UNROLL)
                         for (int ks = 0; ks < KS; ++ks) {
                             const int s = 4 * ks + grp;
                             double    G[3];
                             entries(qa, s, G);
 
-                            double v[NF];
-                            const bool has = idx[ks] >= 0;
+                            double      v[NF];
+                            const idx_t id  = node(ks);
+                            const bool  has = id >= 0;
 #pragma unroll
-                            for (int c = 0; c < NC; ++c) v[c] = has ? h_fields[c][idx[ks] * h_stride] : 0.0;
+                            for (int c = 0; c < NC; ++c) v[c] = has ? h_fields[c][id * h_stride] : 0.0;
                             if constexpr (ISOPARAMETRIC) {
 #pragma unroll
-                                for (int d = 0; d < 3; ++d) v[F_GEO + d] = has ? (double)points[d][idx[ks]] : 0.0;
+                                for (int d = 0; d < 3; ++d) v[F_GEO + d] = has ? (double)points[d][id] : 0.0;
                             }
                             if constexpr (CURRENT) {
 #pragma unroll
-                                for (int c = 0; c < NC; ++c) v[F_CUR + c] = has ? u_fields[c][idx[ks] * u_stride] : 0.0;
+                                for (int c = 0; c < NC; ++c) v[F_CUR + c] = has ? u_fields[c][id * u_stride] : 0.0;
                             }
 #pragma unroll
                             for (int k = 0; k < 3; ++k)
@@ -312,9 +329,12 @@ namespace sfem {
 #pragma unroll
                         for (int i = 0; i < 4; ++i) {
                             const int ks = 4 * to + i;
-                            if (ks < KS && idx[ks] >= 0) {
+                            if (ks < KS) {
+                                const idx_t id = node(ks);
+                                if (id >= 0) {
 #pragma unroll
-                                for (int c = 0; c < NC; ++c) atomicAdd(&out_fields[c][idx[ks] * out_stride], out[c][to][i]);
+                                    for (int c = 0; c < NC; ++c) atomicAdd(&out_fields[c][id * out_stride], out[c][to][i]);
+                                }
                             }
                         }
                     }
