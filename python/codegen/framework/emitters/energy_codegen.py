@@ -989,8 +989,8 @@ def _sfem_soa_local_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
-    # A device tensor-product element publishes the apply at one point for the apply on the matrix
-    # cores (HIP builds; the header and the struct are guarded there).
+    # A device tensor-product element publishes the apply at one point for the apply on the FP64
+    # matrix units (HIP and CUDA builds; the header and the struct are guarded there).
     use_tensor_product_reference = _use_tensor_product_reference(
         quadrature_rule,
         _sfem_soa_reference_inputs(array_inputs),
@@ -1004,7 +1004,7 @@ def _sfem_soa_local_header(
         )
     ]
     for _ in apply_points[:1]:
-        lines.extend(["#if defined(SFEM_ENABLE_HIP)", '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
+        lines.extend([MATRIX_CORE_GUARD, '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     for form in forms:
@@ -1537,16 +1537,21 @@ def _sfem_soa_tensor_product_point_tangent_struct(form, name, dim):
     ]
 
 
-#: The device library of the apply on AMD's FP64 matrix cores (`sfem::tensor_product::hip::matrix_core_apply`,
-#: HIP builds only), for the elements `plans.direct_assembly.matrix_core_apply_launch_admits` admits.
+#: The device library of the apply on the FP64 matrix units (`sfem::tensor_product::matrix_core_apply`:
+#: AMD's matrix cores under HIP, NVIDIA's tensor cores under CUDA), for the elements
+#: `plans.direct_assembly.matrix_core_apply_launch_admits` admits.
 TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER = "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+
+#: The guard of what reads that library: a device compiler of either vendor (a host compilation of
+#: the device headers, as the compile test's, skips it).
+MATRIX_CORE_GUARD = "#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)"
 
 
 def _sfem_soa_tensor_product_apply_point_name(local_prefix, form):
     return "%s_%s_point" % (local_prefix, form.name)
 
 
-#: What an entry point needs to launch `sfem::tensor_product::hip::matrix_core_apply`: the point
+#: What an entry point needs to launch `sfem::tensor_product::matrix_core_apply`: the point
 #: (`_sfem_soa_tensor_product_apply_point_struct`), the 1D shape and quadrature tables' structs and
 #: their sizes, the field's components, the geometry and whether the state is read.
 TensorProductMatrixCoreLaunch = collections.namedtuple(
@@ -1565,9 +1570,9 @@ def _matrix_core_field_lines(declaration, name, cast, n_components, indent):
 
 
 def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_names, dim, indent="  "):
-    """The entry point's launch of the library's apply on the matrix cores, under HIP and in double
-    only: it returns unless turned off (`SFEM_MATRIX_CORE_APPLY=0`), so the generated kernel's launch
-    after it is the CUDA build's, float's and the fallback."""
+    """The entry point's launch of the library's apply on the FP64 matrix units, in double only: it
+    returns unless turned off (`SFEM_MATRIX_CORE_APPLY=0`) or without FP64 tensor cores (CUDA below
+    sm_80), so the generated kernel's launch after it is float's and the fallback."""
     if launch is None or scalar_type != "double":
         return []
     at = indent + "  "
@@ -1584,14 +1589,14 @@ def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_name
         else []
     )
     return [
-        "#if defined(SFEM_ENABLE_HIP)",
+        MATRIX_CORE_GUARD,
         "%s{" % indent,
-        "%s// AMD's FP64 matrix cores (`%s`)." % (at, TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER),
-        "%sconst sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = %s;" % (at, affine),
+        "%s// The FP64 matrix units (`%s`)." % (at, TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER),
+        "%sconst sfem::tensor_product::MatrixCoreAffineGeometry<geom_t> affine = %s;" % (at, affine),
         *state,
         *_matrix_core_field_lines("const double *const", "h", "const double *", launch.n_components, at),
         *_matrix_core_field_lines("double *const", "out", "double *", launch.n_components, at),
-        "%sconst int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<%s<double>, %s<double>, %d, %d, %d, %s, sfem::codegen::%s, geom_t>("
+        "%sconst int matrix_core_status = sfem::tensor_product::matrix_core_apply<%s<double>, %s<double>, %d, %d, %d, %s, sfem::codegen::%s, geom_t>("
         % (
             at,
             launch.ref,
@@ -1612,7 +1617,7 @@ def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_name
             by_address % "h",
             by_address % "out",
         ),
-        "%sif (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;" % at,
+        "%sif (matrix_core_status != sfem::tensor_product::MATRIX_CORE_DECLINED) return matrix_core_status;" % at,
         "%s}" % indent,
         "#endif",
     ]
@@ -1622,7 +1627,7 @@ def _sfem_soa_tensor_product_apply_point_struct(form, name, dim):
     """The apply at one point: the reference flux `loperand` (index 3 c + k) from the direction's and,
     when the material reads it, the state's reference gradients there, the adjugate, determinant and
     weight. The apply block's point section (`_append_sfem_soa_tensor_weak_form_lines`) as a functor,
-    which `sfem::tensor_product::hip::matrix_core_apply` reads per point."""
+    which `sfem::tensor_product::matrix_core_apply` reads per point."""
     weak_form = form.weak_form
     parameters = form_material_parameter_names(form)
     n_components = form_n_field_components(form, dim)
@@ -1634,9 +1639,9 @@ def _sfem_soa_tensor_product_apply_point_struct(form, name, dim):
 
     at = "    "
     lines = [
-        "#if defined(SFEM_ENABLE_HIP)",
+        MATRIX_CORE_GUARD,
         "// %s: the apply at one point, the apply block's point section; the device's apply on the" % name,
-        "// matrix cores reads it (`%s`)." % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER,
+        "// FP64 matrix units reads it (`%s`)." % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER,
         "struct %s {" % name,
         "  static constexpr int n_parameters = %d;" % len(parameters),
         "  static constexpr bool reads_current = %s;" % ("true" if uses_current else "false"),
@@ -6585,9 +6590,9 @@ def _sfem_soa_mesh_operator_function(
 
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
-    # Under HIP the apply of a tensor-product element of the orders the plan admits runs on the matrix cores
-    # (`TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER`), in double; the generated kernel stays the CUDA
-    # build's and float's.
+    # The apply of a tensor-product element of the orders the plan admits runs on the FP64 matrix
+    # units (`TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER`), in double; the generated kernel stays float's
+    # and the fallback.
     matrix_core_admitted = matrix_core_apply_launch_admits(
         form,
         dim,

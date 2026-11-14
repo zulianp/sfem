@@ -24,7 +24,7 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
 #include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
 #endif
 namespace sfem {
@@ -516,9 +516,9 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
 
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
 // saint_venant_kirchhoff_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
-// matrix cores reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+// FP64 matrix units reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
 struct saint_venant_kirchhoff_d3_tensor_product_apply_point {
   static constexpr int n_parameters = 2;
   static constexpr bool reads_current = true;

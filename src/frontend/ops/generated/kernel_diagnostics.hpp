@@ -20,6 +20,16 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+// HIP compiles a kernel without launch bounds for blocks of 1024 threads, which caps a
+// thread at 128 VGPRs; the generated kernels then spill (half of them did). Empty elsewhere.
+#ifndef SFEM_GENERATED_LAUNCH_BOUNDS
+#if defined(__HIP_PLATFORM_AMD__)
+#define SFEM_GENERATED_LAUNCH_BOUNDS(threads_per_block) __launch_bounds__(threads_per_block)
+#else
+#define SFEM_GENERATED_LAUNCH_BOUNDS(threads_per_block)
+#endif
+#endif
+
 namespace sfem {
 namespace codegen {
 

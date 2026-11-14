@@ -159,7 +159,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -338,7 +338,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) navier_stokes_form_2_u_p_tet10_tet4_jacobian_action_isoparametric_mesh_mixed_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

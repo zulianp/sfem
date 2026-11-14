@@ -929,6 +929,11 @@ class ARMSMETarget(ARMSVETarget):
         return ("-march=armv9-a+sme",)
 
 
+#: The threads a block of a device mesh kernel's launch (`mesh_launch_lines`), and the launch bound
+#: its declaration carries for HIP (`mesh_function_line`, `SFEM_GENERATED_LAUNCH_BOUNDS`).
+MESH_BLOCK_SIZE = 256
+
+
 @dataclass(frozen=True)
 class CUDATarget(TargetPlatform):
     name: str = "cuda"
@@ -1172,7 +1177,7 @@ class CUDATarget(TargetPlatform):
         return "CUH"
 
     def mesh_function_line(self, implementation_name):
-        return "__global__ void %s(" % implementation_name
+        return "__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(%d) %s(" % (MESH_BLOCK_SIZE, implementation_name)
 
     def cooperative_mesh_function_line(self, implementation_name, n_qp):
         #: Its registers bounded for `MIN_BLOCKS` resident blocks: unbounded, the point's tangent
@@ -1206,7 +1211,7 @@ class CUDATarget(TargetPlatform):
             #: A part of a mesh without elements (a rank holding none of a block) has nothing to
             #: launch, and CUDA refuses a grid of zero blocks.
             "%sif (%s <= 0) return SFEM_SUCCESS;" % (indent, extent),
-            "%sconst int block_size = 256;" % indent,
+            "%sconst int block_size = %d;" % (indent, MESH_BLOCK_SIZE),
             "%sconst int grid_size = (int)((%s + block_size - 1) / block_size);"
             % (indent, extent),
             #: The stream the caller handed the entry point.  SFEM's own device

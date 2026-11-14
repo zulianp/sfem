@@ -24,7 +24,7 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
 #include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
 #endif
 namespace sfem {
@@ -271,9 +271,9 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_apply_
   tensor_test_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
 
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
 // laplace_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
-// matrix cores reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+// FP64 matrix units reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
 struct laplace_d3_tensor_product_apply_point {
   static constexpr int n_parameters = 1;
   static constexpr bool reads_current = false;

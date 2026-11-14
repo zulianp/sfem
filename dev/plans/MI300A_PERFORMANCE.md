@@ -242,6 +242,43 @@ kernels are measured without it (step 0).
   ones. Kernel table (136 M): the HEX8 coarse apply 86.9 -> 39.2 us a call (2.22 -> 1.00 s; GH200
   26 us), the level-2 apply 1009 -> 413 us; ctest 119/119. On CUDA the same kernels do not spill (the
   build's ptxas report), so the bounds are HIP-only.
+- Step 2d, the same lessons on GH200 (step 6's question, asked early): the generated high-order
+  applies spill there too (ptxas: linear elasticity Q2 isoparametric 22.6 KB of stack, Neo-Hookean
+  28.0 KB, Saint Venant-Kirchhoff Q3 60.9 KB), while the hand-written ones do not, so HIP's launch
+  bounds are an AMD lesson and the cooperative shape a general one.
+  - `matrix_core_apply` gains a CUDA kernel on the FP64 tensor cores (mma.sync m8n8k4 f64, sm_80
+    and later; it declines below, and the generated kernel runs): a warp takes 8 elements and
+    computes the transposes R^T = U^T G^T and Y^T = F^T G, so each lane's flux slot j is the A
+    operand of the second GEMM's k-step j (the sum's order is free) and nothing moves between them.
+    The library API is vendor-neutral (`sfem::tensor_product::matrix_core_apply`), and the generator
+    emits the point and the launch for both vendors.
+  - Generated mesh kernels carry `SFEM_GENERATED_LAUNCH_BOUNDS(256)` (`__launch_bounds__` under HIP,
+    empty elsewhere; `targets.MESH_BLOCK_SIZE`, the launch's block size; all 1045 launches of a
+    bounded kernel use it). MI300A, the generated kernels alone: linear elasticity HEX8 2.82 -> 1.63
+    ms, Neo-Hookean HEX8 12.6 -> 6.3 ms, the Q2 ones 1.4-7x (Mooney-Rivlin Q2 isoparametric 170 ->
+    24 ms); TET4 unchanged or 8% faster.
+  - Generated kernel against the matrix units, both with the launch bounds (state 1e-5 x; x^T y
+    within 1e-15 relative; Q2 1 M elements, Q3 216 k):
+
+    | apply | MI300A off / on (ms) | | GH200 off / on (ms) | |
+    |---|---|---|---|---|
+    | linear elasticity Q2 affine | 4.27 / 2.35 | 1.82x | 2.83 / 2.20 | 1.29x |
+    | linear elasticity Q2 isoparametric | 15.0 / 4.57 | 3.28x | 18.7 / 4.88 | 3.82x |
+    | Neo-Hookean Q2 affine | 6.86 / 4.00 | 1.71x | 5.91 / 4.24 | 1.40x |
+    | Neo-Hookean Q2 isoparametric | 20.5 / 13.0 | 1.58x | 24.9 / 8.81 | 2.83x |
+    | Saint Venant-Kirchhoff Q2 affine | 6.67 / 3.50 | 1.90x | 5.90 / 3.58 | 1.65x |
+    | Saint Venant-Kirchhoff Q2 isoparametric | 20.2 / 11.7 | 1.73x | 24.9 / 7.65 | 3.25x |
+    | modified Mooney-Rivlin Q2 affine | 9.72 / 15.0 | 0.65x | 11.4 / 18.6 | 0.61x |
+    | modified Mooney-Rivlin Q2 isoparametric | 24.2 / 36.0 | 0.67x | 38.0 / 38.1 | 1.00x |
+    | Saint Venant-Kirchhoff Q3 affine | 5.52 / 3.26 | 1.69x | 7.02 / 3.36 | 2.09x |
+    | Saint Venant-Kirchhoff Q3 isoparametric | 16.9 / 9.59 | 1.76x | 18.1 / 7.82 | 2.31x |
+    | modified Mooney-Rivlin Q3 affine | 7.25 / 6.88 | 1.05x | 10.2 / 13.9 | 0.73x |
+    | modified Mooney-Rivlin Q3 isoparametric | 19.6 / 15.2 | 1.29x | 24.2 / 27.8 | 0.87x |
+
+  - So the plan launches the matrix units only for a point of at most 200 common subexpressions
+    (`apply_point_temporaries`: linear elasticity 7, Saint Venant-Kirchhoff 83, Neo-Hookean 113,
+    modified Mooney-Rivlin 367): Mooney-Rivlin's point, evaluated with a tile's accumulators live,
+    spills. Its generated kernel, with the launch bounds, is the faster on both vendors at Q2.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

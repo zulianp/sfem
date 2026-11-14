@@ -93,7 +93,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_objective_steps_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -254,7 +254,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_objective_steps_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -501,7 +501,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_gradient_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -662,7 +662,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_gradient_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -909,7 +909,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_apply_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -1070,7 +1070,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_tet10_apply_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_tet10_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,

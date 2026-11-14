@@ -93,7 +93,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_objective_steps_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -263,7 +263,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_objective_steps_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -480,7 +480,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_gradient_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -650,7 +650,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_gradient_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -867,7 +867,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_apply_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -1013,15 +1013,15 @@ extern "C" int cu_linear_elasticity_proteus_hex27_apply_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      #if defined(SFEM_ENABLE_HIP)
+      #if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
         {
-          // AMD's FP64 matrix cores (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
-          const sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = {{g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0}};
+          // The FP64 matrix units (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+          const sfem::tensor_product::MatrixCoreAffineGeometry<geom_t> affine = {{g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0}};
           const double *const h[3] = {(const double *)hx, (const double *)hy, (const double *)hz};
           double *const out[3] = {(double *)outx, (double *)outy, (double *)outz};
-          const int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<sfem::codegen::ref_line_p2_q3<double>, sfem::codegen::quad_line_q3<double>, 3, 3, 3, false, sfem::codegen::linear_elasticity_d3_tensor_product_apply_point, geom_t>(
+          const int matrix_core_status = sfem::tensor_product::matrix_core_apply<sfem::codegen::ref_line_p2_q3<double>, sfem::codegen::quad_line_q3<double>, 3, 3, 3, false, sfem::codegen::linear_elasticity_d3_tensor_product_apply_point, geom_t>(
               nelements, elements, affine, nullptr, {{(double)lmbda, (double)mu}}, 0, nullptr, h_stride, h, out_stride, out, (cudaStream_t)stream);
-          if (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;
+          if (matrix_core_status != sfem::tensor_product::MATRIX_CORE_DECLINED) return matrix_core_status;
         }
       #endif
         if (nelements <= 0) return SFEM_SUCCESS;
@@ -1048,7 +1048,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_elasticity_proteus_hex27_apply_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -1186,15 +1186,15 @@ extern "C" int cu_linear_elasticity_proteus_hex27_apply_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      #if defined(SFEM_ENABLE_HIP)
+      #if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
         {
-          // AMD's FP64 matrix cores (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
-          const sfem::tensor_product::hip::MatrixCoreAffineGeometry<geom_t> affine = {};
+          // The FP64 matrix units (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+          const sfem::tensor_product::MatrixCoreAffineGeometry<geom_t> affine = {};
           const double *const h[3] = {(const double *)hx, (const double *)hy, (const double *)hz};
           double *const out[3] = {(double *)outx, (double *)outy, (double *)outz};
-          const int matrix_core_status = sfem::tensor_product::hip::matrix_core_apply<sfem::codegen::ref_line_p2_q4<double>, sfem::codegen::quad_line_q4<double>, 3, 4, 3, true, sfem::codegen::linear_elasticity_d3_tensor_product_apply_point, geom_t>(
+          const int matrix_core_status = sfem::tensor_product::matrix_core_apply<sfem::codegen::ref_line_p2_q4<double>, sfem::codegen::quad_line_q4<double>, 3, 4, 3, true, sfem::codegen::linear_elasticity_d3_tensor_product_apply_point, geom_t>(
               nelements, elements, affine, points, {{(double)lmbda, (double)mu}}, 0, nullptr, h_stride, h, out_stride, out, (cudaStream_t)stream);
-          if (matrix_core_status != sfem::tensor_product::hip::MATRIX_CORE_DECLINED) return matrix_core_status;
+          if (matrix_core_status != sfem::tensor_product::MATRIX_CORE_DECLINED) return matrix_core_status;
         }
       #endif
         if (nelements <= 0) return SFEM_SUCCESS;
@@ -1297,7 +1297,7 @@ __host__ __device__ __forceinline__ void linear_elasticity_proteus_hex27_hessian
 }
 
 template <typename s_t, typename v_t, typename g_t, int FORMAT>
-__global__ void linear_elasticity_proteus_hex27_hessian_i_msoa_assemble_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_elasticity_proteus_hex27_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

@@ -285,9 +285,34 @@ def tensor_product_point_tangent_admits(form, dim, *, on_device, tensor_product)
     )
 
 
+#: The largest apply point (common subexpressions of the linearised stress at a point,
+#: `apply_point_temporaries`) the matrix-core apply is launched for. The point is evaluated with a
+#: tile's accumulators live, so a heavy one spills. Measured against the generated kernel (both with
+#: launch bounds): linear elasticity (7), Saint Venant-Kirchhoff (83) and Neo-Hookean Ogden (113) win
+#: on MI300A (1.6-3.3x) and GH200 (1.3-3.8x); modified Mooney-Rivlin (367) loses on GH200 (0.61-1.0x)
+#: and at order 2 on MI300A (0.65x), winning only at order 3 there (1.05-1.29x).
+MATRIX_CORE_APPLY_MAX_POINT_TEMPORARIES = 200
+
+_APPLY_POINT_TEMPORARIES = {}
+
+
+def apply_point_temporaries(form, dim):
+    """The common subexpressions of the apply's flux at a point: the linearised first Piola-Kirchhoff
+    stress in the trial gradient, as the emitter forms the point (`<prefix>_apply_point`)."""
+    weak_form = form.weak_form
+    entry = _APPLY_POINT_TEMPORARIES.get(id(weak_form))
+    if entry is None or entry[0] is not weak_form:
+        trial = tuple(sp.symbols("trial_grad[%d]" % i) for i in range(weak_form.n_field_components * dim))
+        replacements, _ = sp.cse(list(weak_form.linearized_first_piola(trial)))
+        entry = (weak_form, len(replacements))
+        _APPLY_POINT_TEMPORARIES[id(weak_form)] = entry
+    return entry[1]
+
+
 def matrix_core_apply_admits(form, dim, *, on_device, tensor_product):
-    """Whether HIP builds apply a device tensor-product element on AMD's FP64 matrix cores
-    (`sfem::tensor_product::hip::matrix_core_apply`, a wavefront per 16 elements), reading the material
+    """Whether a device tensor-product element is applied on the FP64 matrix units
+    (`sfem::tensor_product::matrix_core_apply`: AMD's matrix cores, a wavefront per 16 elements;
+    NVIDIA's tensor cores, a warp per 8 elements), reading the material
     at a point through the published `<prefix>_apply_point`: the operator action (the form `apply`,
     which reads a direction and writes per shape) of a 3D scalar or vector form without
     integration-point fields. Every element of the family shares the header that holds the point,
@@ -306,16 +331,17 @@ def matrix_core_apply_admits(form, dim, *, on_device, tensor_product):
 
 #: The orders the matrix-core apply is launched for (nodes a direction). At order 1 half of each
 #: 16-point tile is padding and the element (8 nodes) a quarter of a 16-row output tile, so it is not
-#: launched there. Measured on MI300A against the generated kernel: order 2 (1 M elements) linear
+#: launched there. Measured against the generated kernel, MI300A: order 2 (1 M elements) linear
 #: elasticity 3.3x affine and 5.8x isoparametric, the nonlinear materials 3.5-4.4x; order 3 (216 k
-#: elements) Saint Venant-Kirchhoff 3.4x / 3.7x, modified Mooney-Rivlin 5.4x / 5.9x.
+#: elements) Saint Venant-Kirchhoff 3.4x / 3.7x, modified Mooney-Rivlin 5.4x / 5.9x. GH200: linear
+#: elasticity 1.3x / 3.9x, Saint Venant-Kirchhoff 3.4x isoparametric at order 2 and 2.1x / 2.3x at 3.
 MATRIX_CORE_APPLY_SHAPE_1D = (3, 4)
 
 
 def matrix_core_apply_launch_admits(
     form, dim, quadrature_rule, *, on_device, tensor_product, isoparametric, tensor_product_geometry
 ):
-    """Whether an entry point of the apply launches the matrix-core kernel under HIP (double only):
+    """Whether an entry point of the apply launches the matrix-core kernel (double only):
     `matrix_core_apply_admits`, an element of `MATRIX_CORE_APPLY_SHAPE_1D` nodes a
     direction (`quadrature_rule`, a tensor-product rule), and, isoparametric, a geometry interpolated
     by the field's own tensor-product basis (the kernel differentiates the coordinates with the same
@@ -324,6 +350,7 @@ def matrix_core_apply_launch_admits(
         matrix_core_apply_admits(form, dim, on_device=on_device, tensor_product=tensor_product)
         and quadrature_rule.tensor_product_n_shape_1d in MATRIX_CORE_APPLY_SHAPE_1D
         and (tensor_product_geometry or not isoparametric)
+        and apply_point_temporaries(form, dim) <= MATRIX_CORE_APPLY_MAX_POINT_TEMPORARIES
     )
 
 

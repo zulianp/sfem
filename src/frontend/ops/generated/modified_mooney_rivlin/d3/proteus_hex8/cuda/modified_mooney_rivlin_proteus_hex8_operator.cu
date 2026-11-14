@@ -91,7 +91,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_objective_steps_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -263,7 +263,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_objective_steps_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -482,7 +482,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_gradient_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -654,7 +654,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_gradient_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -873,7 +873,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_apply_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -1060,7 +1060,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void modified_mooney_rivlin_proteus_hex8_apply_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -1295,7 +1295,7 @@ __host__ __device__ __forceinline__ void modified_mooney_rivlin_proteus_hex8_hes
 }
 
 template <typename s_t, typename v_t, typename g_t, int FORMAT>
-__global__ void modified_mooney_rivlin_proteus_hex8_hessian_i_msoa_assemble_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) modified_mooney_rivlin_proteus_hex8_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
