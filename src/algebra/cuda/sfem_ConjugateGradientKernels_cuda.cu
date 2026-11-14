@@ -148,10 +148,9 @@ namespace sfem {
             // No device↔host scalar traffic.
         }
 
-#if defined(SFEM_ENABLE_HIP)
         // The preconditioned loop on the device (ConjugateGradientKernels::run_precond, CGDeviceRun).
-        // On MI300A the host's two waits per iteration dominate the coarse solve (646 us an iteration
-        // against GH200's 337, its kernels ~130 us). Here the scalars stay in a device array, each
+        // The host's two waits per iteration dominate the coarse solve (MI300A 646 us an iteration,
+        // GH200 337, MI300A's kernels ~130 us). Here the scalars stay in a device array, each
         // iteration's x and r update is skipped once the run has stopped, and RUN_BATCH iterations are
         // one captured graph after which the host reads whether it stopped: x is the loop's, at most
         // RUN_BATCH - 1 iterations' products spent after the stop. The graph is what pays (launched
@@ -298,7 +297,19 @@ namespace sfem {
             result.converged  = scalars.host[1] == T(1);
             return result;
         }
-#endif  // SFEM_ENABLE_HIP
+
+        // SFEM_CG_DEVICE_RUN: the preconditioned loop on the device (1, the default) or the host's (0).
+        // MaMAL 136 M, alternated three times on one node: MI300A 31.4 s against 34.0; GH200 16.18-16.71
+        // s against 16.94-17.56 (0.7 M: 1.04-1.10 against 1.09-1.19 s), the same iterations.
+        static bool cg_device_run_enabled() {
+            static int enabled = -1;
+            if (enabled < 0) {
+                int SFEM_CG_DEVICE_RUN = 1;
+                SFEM_READ_ENV(SFEM_CG_DEVICE_RUN, atoi);
+                enabled = SFEM_CG_DEVICE_RUN;
+            }
+            return enabled != 0;
+        }
 
     }  // namespace
 
@@ -309,9 +320,7 @@ namespace sfem {
         tpl.update_x_r_and_rtr = [s](auto&&... a) { return update_x_r_and_rtr<T>(a..., s); };
         tpl.update_x_r         = [s](auto&&... a) { update_x_r<T>(a..., s); };
         tpl.update_p           = [s](auto&&... a) { update_p<T>(a..., s); };
-#if defined(SFEM_ENABLE_HIP)
-        tpl.run_precond = [](const CGDeviceRun<T>& run) { return run_precond<T>(run); };
-#endif
+        if (cg_device_run_enabled()) tpl.run_precond = [](const CGDeviceRun<T>& run) { return run_precond<T>(run); };
     }
 
     template class GPUConjugateGradientKernels<float>;

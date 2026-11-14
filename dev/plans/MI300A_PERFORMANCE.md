@@ -286,6 +286,15 @@ kernels are measured without it (step 0).
   at 6.66 ms, never made the default. MaMAL 136 M alternated three times on one node: 16.94, 16.97,
   17.36 s against 19.39, 19.29, 19.34 s with kernel 4, the same iterations and residuals digit for
   digit; 0.7 M within noise. Kernel 6 is now the CUDA default.
+- Step 6b, the AMD paths on GH200:
+  - The preconditioned CG's loop on the device (step 4b; `SFEM_CG_DEVICE_RUN`, now the default on
+    both vendors): MaMAL 136 M alternated three times on one node, 16.18, 16.27, 16.71 s against
+    16.94, 17.35, 17.56 s with the host's loop; 0.7 M 1.04-1.10 s against 1.09-1.19 s; the same
+    iterations and residuals. CUDA graphs capture the generated launchers' stream allocations, so
+    the allocation-free table stays HIP's.
+  - The dot's block cap (step 4a; `SFEM_DOT_BLOCKS_PER_UNIT`, 4 on both vendors): nsys, MaMAL 136 M,
+    the 169 fine-level dots outside the graphs 1121 -> 344 us each (0.189 -> 0.058 s); the run 16.0
+    s against 16.5 s (one each).
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
