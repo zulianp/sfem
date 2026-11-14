@@ -1,3 +1,4 @@
+import collections
 import contextlib
 from dataclasses import dataclass
 import functools
@@ -176,6 +177,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     reference_include_lines,
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
+    quadrature_reference_owner,
 )
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.reference_data import validate_reference_data_plan
@@ -184,6 +186,10 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.direct_assembly import (
     assembles_in_closed_form,
+    block_assembly_admits,
+    matrix_core_apply_admits,
+    matrix_core_apply_launch_admits,
+    tensor_product_point_tangent_admits,
 )
 from codegen.framework.plans.scheduling import build_expression_graph
 
@@ -983,6 +989,22 @@ def _sfem_soa_local_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
+    # A device tensor-product element publishes the apply at one point for the apply on the FP64
+    # matrix units (HIP and CUDA builds; the header and the struct are guarded there).
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        _sfem_soa_reference_inputs(array_inputs),
+        basis_family,
+    )
+    apply_points = [
+        form
+        for form in forms
+        if matrix_core_apply_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+    ]
+    for _ in apply_points[:1]:
+        lines.extend([MATRIX_CORE_GUARD, '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     for form in forms:
@@ -1000,6 +1022,13 @@ def _sfem_soa_local_header(
             )
         )
         lines.append("")
+        for point_form in [candidate for candidate in apply_points if candidate is form]:
+            lines.extend(
+                _sfem_soa_tensor_product_apply_point_struct(
+                    point_form, _sfem_soa_tensor_product_apply_point_name(prefix, point_form), dim
+                )
+            )
+            lines.append("")
         specialized = _constant_p1_specialized_local(
             prefix,
             quadrature_rule,
@@ -1187,8 +1216,17 @@ def _sfem_soa_hessian_header(
         and not use_tensor_product_reference
         and use_reference_gradient_vectors
     )
-    if cooperative:
+    # A device tensor-product element carries its point tangent for the assembly a block per element.
+    point_tangents = [
+        tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        for form in forms
+    ]
+    if cooperative or any(point_tangents):
         lines.insert(lines.index(tensor_include) + 1, '#include "%s"' % COOPERATIVE_ASSEMBLY_HEADER)
+    if any(point_tangents):
+        lines.insert(lines.index(tensor_include) + 2, '#include "%s"' % TENSOR_PRODUCT_BSR_HESSIAN_HEADER)
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     emitted = set()
@@ -1228,6 +1266,16 @@ def _sfem_soa_hessian_header(
                     reference_inputs,
                     source_builder,
                     project=tangent_projection,
+                )
+            )
+            lines.append("")
+        point_tangent = tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        if point_tangent:
+            lines.extend(
+                _sfem_soa_tensor_product_point_tangent_struct(
+                    form, _sfem_soa_tensor_product_point_tangent_name(prefix), dim
                 )
             )
             lines.append("")
@@ -1423,6 +1471,222 @@ def _sfem_soa_direct_hessian_point_tangent_name(local_prefix):
 
 #: The device library of the cooperative assembly (`pullback_symmetric`, `pair_blocks_bsr`, ...).
 COOPERATIVE_ASSEMBLY_HEADER = "sfem_cuda_CooperativeAssembly.cuh"
+
+#: The device library of a tensor-product element's BSR assembly a block of threads per element
+#: (`sfem::tensor_product::cuda::bsr_hessian`), for elements whose matrix a thread cannot hold
+#: (`plans.direct_assembly.block_assembly_admits`).
+TENSOR_PRODUCT_BSR_HESSIAN_HEADER = "sfem_cuda_TensorProductBSRHessian.cuh"
+
+def _sfem_soa_tensor_product_point_tangent_name(local_prefix):
+    return "%s_point_tangent" % local_prefix
+
+
+#: What an entry point needs to launch `sfem::tensor_product::cuda::bsr_hessian`: the point tangent
+#: (`_sfem_soa_tensor_product_point_tangent_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes.
+TensorProductBSRLaunch = collections.namedtuple("TensorProductBSRLaunch", "point ref quad nq1 ns1")
+
+
+def _tensor_product_bsr_launch_lines(launch, scalar_type, values_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's assembly a block per element, on the caller's stream."""
+    parameters = ", ".join("(%s)%s" % (scalar_type, parameter) for parameter in material_parameter_names)
+    state = ", ".join("(const %s *)u%s" % (scalar_type, _component_name(d)) for d in range(dim))
+    return (
+        "%sreturn sfem::tensor_product::cuda::bsr_hessian<sfem::codegen::%s, %s<%s>, %s<%s>, %s, %s, geom_t, %d, %d>("
+        % (indent, launch.point, launch.ref, scalar_type, launch.quad, scalar_type, scalar_type, values_type, launch.nq1, launch.ns1),
+        "%s    nelements, elements, points, {{%s}}, u_stride, %s, rowptr, colidx, (%s *)values, stream);"
+        % (indent, parameters, state, values_type),
+    )
+
+
+def _sfem_soa_tensor_product_point_tangent_struct(form, name, dim):
+    """The tangent at one point, from the state's reference gradient there, pulled back to the
+    reference cell and weighted, packed: `T[(i, m), (j, n)] = (w / det) sum_{d, e} adj[m][d]
+    D[(i, d), (j, e)] adj[n][e]`, what `sfem::tensor_product::cuda::bsr_hessian` reads per point. D is
+    the element-matrix kernel's own (`_sfem_soa_direct_hessian_tangent_lines`)."""
+    material = _sfem_soa_direct_hessian_material(form, dim)
+    parameters = form_material_parameter_names(form)
+    adj_names = [current_target().work_item_name("adj", component) for component in range(dim * dim)]
+    det_name = current_target().work_item_name("det", 0)
+    at = "    "
+    n_components = form_n_field_components(form, dim)
+    return [
+        "// %s: the tangent at one point, pulled back to the reference cell and weighted, packed" % name,
+        "// (`sfem::cooperative::packed`); the device's assembly a block per element reads it",
+        "// (`%s`)." % TENSOR_PRODUCT_BSR_HESSIAN_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t w,",
+        "                                               s_t *const RSTR T) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t gu_ref%d = gu_ref[%d];" % (at, k, k) for k in range(n_components * dim)),
+        *("%sconst s_t %s = adj[%d];" % (at, adj_name, component) for component, adj_name in enumerate(adj_names)),
+        "%sconst s_t %s = det;" % (at, det_name),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, det_name),
+        *_sfem_soa_direct_hessian_push_forward_lines(form.weak_form, dim, at),
+        *_sfem_soa_direct_hessian_tangent_lines(material, dim, at),
+        "%ssfem::cooperative::pullback_symmetric<s_t, %d, %d>(adj, w * idet, D, T);" % (at, n_components, dim),
+        "  }",
+        "};",
+    ]
+
+
+#: The device library of the apply on the FP64 matrix units (`sfem::tensor_product::matrix_core_apply`:
+#: AMD's matrix cores under HIP, NVIDIA's tensor cores under CUDA), for the elements
+#: `plans.direct_assembly.matrix_core_apply_launch_admits` admits.
+TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER = "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+
+#: The guard of what reads that library: a device compiler of either vendor (a host compilation of
+#: the device headers, as the compile test's, skips it).
+MATRIX_CORE_GUARD = "#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)"
+
+
+def _sfem_soa_tensor_product_apply_point_name(local_prefix, form):
+    return "%s_%s_point" % (local_prefix, form.name)
+
+
+#: What an entry point needs to launch `sfem::tensor_product::matrix_core_apply`: the point
+#: (`_sfem_soa_tensor_product_apply_point_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes, the field's components, the geometry and whether the state is read.
+TensorProductMatrixCoreLaunch = collections.namedtuple(
+    "TensorProductMatrixCoreLaunch", "point ref quad nq1 ns1 n_components isoparametric reads_current"
+)
+
+
+def _matrix_core_field_lines(declaration, name, cast, n_components, indent):
+    """The kernel's view of a field's component arrays: a pointer per component, an array of them
+    for a vector field and the one pointer for a scalar (handed on by address)."""
+    components = ["(%s)%s%s" % (cast, name, _component_name(d)) for d in range(n_components)]
+    return {
+        True: ["%s%s %s[%d] = {%s};" % (indent, declaration, name, n_components, ", ".join(components))],
+        False: ["%s%s %s = %s;" % (indent, declaration, name, components[0])],
+    }[n_components > 1]
+
+
+def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's apply on the FP64 matrix units, in double only: it
+    returns unless turned off (`SFEM_MATRIX_CORE_APPLY=0`) or without FP64 tensor cores (CUDA below
+    sm_80), so the generated kernel's launch after it is float's and the fallback."""
+    if launch is None or scalar_type != "double":
+        return []
+    at = indent + "  "
+    by_address = {True: "%s", False: "&%s"}[launch.n_components > 1]
+    affine = (
+        "{}"
+        if launch.isoparametric
+        else "{{%s}}" % ", ".join(["g_adj%d" % i for i in range(dim * dim)] + ["g_det0"])
+    )
+    parameters = ", ".join("(double)%s" % parameter for parameter in material_parameter_names)
+    state = (
+        _matrix_core_field_lines("const double *const", "u", "const double *", launch.n_components, at)
+        if launch.reads_current
+        else []
+    )
+    return [
+        MATRIX_CORE_GUARD,
+        "%s{" % indent,
+        "%s// The FP64 matrix units (`%s`)." % (at, TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER),
+        "%sconst sfem::tensor_product::MatrixCoreAffineGeometry<geom_t> affine = %s;" % (at, affine),
+        *state,
+        *_matrix_core_field_lines("const double *const", "h", "const double *", launch.n_components, at),
+        *_matrix_core_field_lines("double *const", "out", "double *", launch.n_components, at),
+        "%sconst int matrix_core_status = sfem::tensor_product::matrix_core_apply<%s<double>, %s<double>, %d, %d, %d, %s, sfem::codegen::%s, geom_t>("
+        % (
+            at,
+            launch.ref,
+            launch.quad,
+            launch.ns1,
+            launch.nq1,
+            launch.n_components,
+            "true" if launch.isoparametric else "false",
+            launch.point,
+        ),
+        "%s    nelements, elements, affine, %s, {{%s}}, %s, %s, h_stride, %s, out_stride, %s, (cudaStream_t)stream);"
+        % (
+            at,
+            "points" if launch.isoparametric else "nullptr",
+            parameters,
+            "u_stride" if launch.reads_current else "0",
+            (by_address % "u") if launch.reads_current else "nullptr",
+            by_address % "h",
+            by_address % "out",
+        ),
+        "%sif (matrix_core_status != sfem::tensor_product::MATRIX_CORE_DECLINED) return matrix_core_status;" % at,
+        "%s}" % indent,
+        "#endif",
+    ]
+
+
+def _sfem_soa_tensor_product_apply_point_struct(form, name, dim):
+    """The apply at one point: the reference flux `loperand` (index 3 c + k) from the direction's and,
+    when the material reads it, the state's reference gradients there, the adjugate, determinant and
+    weight. The apply block's point section (`_append_sfem_soa_tensor_weak_form_lines`) as a functor,
+    which `sfem::tensor_product::matrix_core_apply` reads per point."""
+    weak_form = form.weak_form
+    parameters = form_material_parameter_names(form)
+    n_components = form_n_field_components(form, dim)
+    uses_current = form_reads_current(form, default=True)
+    target = current_target()
+
+    def geometry_value(geometry_name, component):
+        return target.work_item_name(geometry_name, component)
+
+    at = "    "
+    lines = [
+        MATRIX_CORE_GUARD,
+        "// %s: the apply at one point, the apply block's point section; the device's apply on the" % name,
+        "// FP64 matrix units reads it (`%s`)." % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "  static constexpr bool reads_current = %s;" % ("true" if uses_current else "false"),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR grad_h_ref,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t qw,",
+        "                                               s_t *const RSTR loperand) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t %s = adj[%d];" % (at, geometry_value("adj", component), component) for component in range(dim * dim)),
+        "%sconst s_t %s = det;" % (at, geometry_value("det", 0)),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, geometry_value("det", 0)),
+        *(["%ss_t gu[%d];" % (at, n_components * dim)] if uses_current else []),
+        "%ss_t trial_grad[%d];" % (at, n_components * dim),
+    ]
+    mapped = [("gu_ref", "gu")] * uses_current + [("grad_h_ref", "trial_grad")]
+    for row in range(n_components):
+        for col in range(dim):
+            for source, target_name in mapped:
+                terms = " + ".join(
+                    "%s[%d] * %s" % (source, row * dim + k, geometry_value("adj", k * dim + col)) for k in range(dim)
+                )
+                lines.append("%s%s[%d] = (%s) * idet;" % (at, target_name, row * dim + col, terms))
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(weak_form, "gu"),
+        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(weak_form.n_field_components * dim)),
+    )
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+        scalar_temporaries=True,
+        destination=lambda index: "loperand[%d] =" % index,
+        indent=at,
+    )
+    lines.extend(["  }", "};", "#endif"])
+    return lines
 
 
 def _sfem_soa_direct_hessian_point_tangent_function(form, name, dim, reference_inputs, source_builder, project=False):
@@ -6326,16 +6590,47 @@ def _sfem_soa_mesh_operator_function(
 
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    # The apply of a tensor-product element of the orders the plan admits runs on the FP64 matrix
+    # units (`TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER`), in double; the generated kernel stays float's
+    # and the fallback.
+    matrix_core_admitted = matrix_core_apply_launch_admits(
+        form,
+        dim,
+        quadrature_rule,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        isoparametric=geometry_mode == "isoparametric",
+        tensor_product_geometry=use_tensor_product_geometry,
+    )
+    matrix_core_launch = (
+        TensorProductMatrixCoreLaunch(
+            _sfem_soa_tensor_product_apply_point_name(local_prefix, form),
+            quadrature_reference_owner(quadrature_rule, "shape_1d"),
+            quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+            quadrature_rule.tensor_product_n_qp_1d,
+            quadrature_rule.tensor_product_n_shape_1d,
+            n_field_components,
+            geometry_mode == "isoparametric",
+            uses_current,
+        )
+        if matrix_core_admitted
+        else None
+    )
+    if matrix_core_launch is not None and metric is not None:
+        raise ValueError("the matrix-core apply reads the adjugate, not a cached metric")
     lines.extend(
         runtime_typed_entry_point_lines(
             function_name,
             wrapper_params,
-            lambda scalar_type, _positional: source_builder.wrapper_call_lines(
-                implementation_name,
-                scalar_type,
-                _mesh_template_arguments(effective_vector_size),
-                cast_arguments(wrapper_params, wrapper_args, scalar_type),
-            ),
+            lambda scalar_type, _positional: [
+                *_matrix_core_apply_launch_lines(matrix_core_launch, scalar_type, material_parameter_names, dim),
+                *source_builder.wrapper_call_lines(
+                    implementation_name,
+                    scalar_type,
+                    _mesh_template_arguments(effective_vector_size),
+                    cast_arguments(wrapper_params, wrapper_args, scalar_type),
+                ),
+            ],
             parameter_lines=parameter_list_lines,
         )
     )
@@ -9375,6 +9670,40 @@ def _holding_one_element_hessian_matrix_assembly_function(
         quadrature_rule,
         geometry_mode,
     )
+    block_assembly = block_assembly_admits(
+        form,
+        dim,
+        n_nodes,
+        n_qp,
+        formats,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        tensor_product_geometry=use_tensor_product_geometry,
+        affine=is_affine_assembly,
+        projected=projected,
+    )
+    if block_assembly:
+        # A block of threads per element (`TENSOR_PRODUCT_BSR_HESSIAN_HEADER`, included by the hessian
+        # header with the point tangent): no kernel here, so no namespace to close either; the entry
+        # points launch the library's.
+        return [
+            *_sfem_soa_hessian_matrix_public_wrappers(
+                function_base,
+                None,
+                dim,
+                formats,
+                material_parameter_names,
+                uses_current,
+                geometry_mode=geometry_mode,
+                tensor_product_launch=TensorProductBSRLaunch(
+                    _sfem_soa_tensor_product_point_tangent_name(local_prefix),
+                    quadrature_reference_owner(quadrature_rule, "shape_1d"),
+                    quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+                    quadrature_rule.tensor_product_n_qp_1d,
+                    quadrature_rule.tensor_product_n_shape_1d,
+                ),
+            ),
+        ]
     implementation_name = "%s_assemble_impl" % function_base
     reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
@@ -10531,6 +10860,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
+    tensor_product_launch=None,
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -10556,6 +10886,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     geometry_mode=geometry_mode,
                     quadrature_streams=quadrature_streams,
                     cooperative_points=cooperative_points,
+                    tensor_product_launch=tensor_product_launch,
                 )
             )
     if projected:
@@ -10695,6 +11026,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
+    tensor_product_launch=None,
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -10722,7 +11054,11 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         # A cooperative kernel (`cooperative_points`, its points per element) is launched a block per
         # `sfem::cooperative::ELEMENTS` elements.
         lambda scalar_type, _positional, values_type=None: list(
-            (
+            _tensor_product_bsr_launch_lines(
+                tensor_product_launch, scalar_type, values_type or scalar_type, material_parameter_names, dim
+            )
+            if tensor_product_launch is not None
+            else (
                 current_target().mesh_launch_lines
                 if cooperative_points is None
                 else functools.partial(current_target().cooperative_mesh_launch_lines, n_qp=cooperative_points)

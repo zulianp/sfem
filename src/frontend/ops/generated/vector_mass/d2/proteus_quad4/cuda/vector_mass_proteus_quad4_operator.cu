@@ -368,7 +368,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void vector_mass_proteus_quad4_residual_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) vector_mass_proteus_quad4_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -475,7 +475,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void vector_mass_proteus_quad4_residual_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) vector_mass_proteus_quad4_residual_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -629,7 +629,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void vector_mass_proteus_quad4_jacobian_action_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) vector_mass_proteus_quad4_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -736,7 +736,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void vector_mass_proteus_quad4_jacobian_action_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) vector_mass_proteus_quad4_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -941,7 +941,7 @@ __host__ __device__ __forceinline__ void vector_mass_proteus_quad4_hessian_crs_i
 }
 
 template <typename s_t, typename v_t>
-__global__ void vector_mass_proteus_quad4_hessian_crs_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) vector_mass_proteus_quad4_hessian_crs_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

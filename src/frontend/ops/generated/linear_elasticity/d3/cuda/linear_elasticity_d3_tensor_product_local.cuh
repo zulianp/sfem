@@ -24,6 +24,9 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
+#include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+#endif
 namespace sfem {
 namespace codegen {
 
@@ -386,6 +389,73 @@ static __host__ __device__ __forceinline__ void linear_elasticity_d3_tensor_prod
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[3 * NQ], out_streams, 1);
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
+
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
+// linear_elasticity_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
+// FP64 matrix units reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+struct linear_elasticity_d3_tensor_product_apply_point {
+  static constexpr int n_parameters = 2;
+  static constexpr bool reads_current = false;
+
+  template <typename s_t>
+  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,
+                                               const s_t *const RSTR grad_h_ref,
+                                               const s_t *const RSTR gu_ref,
+                                               const s_t *const RSTR adj,
+                                               const s_t det,
+                                               const s_t qw,
+                                               s_t *const RSTR loperand) {
+    const s_t lmbda = parameters[0];
+    const s_t mu = parameters[1];
+    const s_t adj_value0 = adj[0];
+    const s_t adj_value1 = adj[1];
+    const s_t adj_value2 = adj[2];
+    const s_t adj_value3 = adj[3];
+    const s_t adj_value4 = adj[4];
+    const s_t adj_value5 = adj[5];
+    const s_t adj_value6 = adj[6];
+    const s_t adj_value7 = adj[7];
+    const s_t adj_value8 = adj[8];
+    const s_t det_value0 = det;
+    const s_t idet = s_t(1) / det_value0;
+    s_t trial_grad[9];
+    trial_grad[0] = (grad_h_ref[0] * adj_value0 + grad_h_ref[1] * adj_value3 + grad_h_ref[2] * adj_value6) * idet;
+    trial_grad[1] = (grad_h_ref[0] * adj_value1 + grad_h_ref[1] * adj_value4 + grad_h_ref[2] * adj_value7) * idet;
+    trial_grad[2] = (grad_h_ref[0] * adj_value2 + grad_h_ref[1] * adj_value5 + grad_h_ref[2] * adj_value8) * idet;
+    trial_grad[3] = (grad_h_ref[3] * adj_value0 + grad_h_ref[4] * adj_value3 + grad_h_ref[5] * adj_value6) * idet;
+    trial_grad[4] = (grad_h_ref[3] * adj_value1 + grad_h_ref[4] * adj_value4 + grad_h_ref[5] * adj_value7) * idet;
+    trial_grad[5] = (grad_h_ref[3] * adj_value2 + grad_h_ref[4] * adj_value5 + grad_h_ref[5] * adj_value8) * idet;
+    trial_grad[6] = (grad_h_ref[6] * adj_value0 + grad_h_ref[7] * adj_value3 + grad_h_ref[8] * adj_value6) * idet;
+    trial_grad[7] = (grad_h_ref[6] * adj_value1 + grad_h_ref[7] * adj_value4 + grad_h_ref[8] * adj_value7) * idet;
+    trial_grad[8] = (grad_h_ref[6] * adj_value2 + grad_h_ref[7] * adj_value5 + grad_h_ref[8] * adj_value8) * idet;
+    const s_t weak_mat_tmp0 = s_t(2)*trial_grad[0];
+    const s_t weak_mat_tmp1 = s_t(2)*trial_grad[4];
+    const s_t weak_mat_tmp2 = s_t(2)*trial_grad[8];
+    const s_t weak_mat_tmp3 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1 + weak_mat_tmp2);
+    const s_t weak_mat_tmp4 = mu*(trial_grad[1] + trial_grad[3]);
+    const s_t weak_mat_tmp5 = mu*(trial_grad[2] + trial_grad[6]);
+    const s_t weak_mat_tmp6 = mu*(trial_grad[5] + trial_grad[7]);
+    const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp3;
+    const s_t material1 = weak_mat_tmp4;
+    const s_t material2 = weak_mat_tmp5;
+    const s_t material3 = weak_mat_tmp4;
+    const s_t material4 = mu*weak_mat_tmp1 + weak_mat_tmp3;
+    const s_t material5 = weak_mat_tmp6;
+    const s_t material6 = weak_mat_tmp5;
+    const s_t material7 = weak_mat_tmp6;
+    const s_t material8 = mu*weak_mat_tmp2 + weak_mat_tmp3;
+    loperand[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+    loperand[1] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+    loperand[2] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
+    loperand[3] = qw * (material3 * adj_value0 + material4 * adj_value1 + material5 * adj_value2);
+    loperand[4] = qw * (material3 * adj_value3 + material4 * adj_value4 + material5 * adj_value5);
+    loperand[5] = qw * (material3 * adj_value6 + material4 * adj_value7 + material5 * adj_value8);
+    loperand[6] = qw * (material6 * adj_value0 + material7 * adj_value1 + material8 * adj_value2);
+    loperand[7] = qw * (material6 * adj_value3 + material7 * adj_value4 + material8 * adj_value5);
+    loperand[8] = qw * (material6 * adj_value6 + material7 * adj_value7 + material8 * adj_value8);
+  }
+};
+#endif
 
 } // namespace codegen
 } // namespace sfem

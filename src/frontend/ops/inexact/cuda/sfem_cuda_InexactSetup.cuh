@@ -504,12 +504,22 @@ namespace sfem {
                 using L                     = SetupShared<M, Sink>;
                 static constexpr int  NQ    = M::element::NQ;
                 static constexpr std::size_t per = (std::size_t)L::per_element * sizeof(double);
-                static constexpr std::size_t cap = 96 * 1024;
                 static_assert(per <= 200 * 1024, "one element's set-up does not fit a block's shared memory");
+                // The device's limits: a block takes `fits` without asking and at most `optin` when it asks
+                // (H100 48 and 227 KB, MI300A 64 and 64 KB); 96 KB at most, which measured best on the H100.
+                static const std::pair<std::size_t, std::size_t> limits = [] {
+                    int device = 0, fits = 0, optin = 0;
+                    cudaGetDevice(&device);
+                    cudaDeviceGetAttribute(&fits, cudaDevAttrMaxSharedMemoryPerBlock, device);
+                    cudaDeviceGetAttribute(&optin, cudaDevAttrMaxSharedMemoryPerBlockOptin, device);
+                    return std::make_pair((std::size_t)fits, (std::size_t)std::max(fits, optin));
+                }();
+                const std::size_t cap = std::min<std::size_t>(96 * 1024, limits.second);
+                if (per > cap) SFEM_ERROR("inexact (device): one element's set-up (%zu bytes) exceeds a block's shared memory (%zu)\n", per, cap);
                 int epb = std::max(1, THREADS / NQ);
                 while (epb > 1 && epb * per > cap) --epb;
                 const std::size_t shared = epb * per;
-                if (shared > 48 * 1024) {
+                if (shared > limits.first) {
                     check(cudaFuncSetAttribute(setup_kernel<M, Sink, PROJECT>, cudaFuncAttributeMaxDynamicSharedMemorySize, (int)shared),
                           "set-up shared memory");
                 }

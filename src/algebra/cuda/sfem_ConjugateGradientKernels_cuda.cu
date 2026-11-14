@@ -1,5 +1,6 @@
 #include "sfem_ConjugateGradientKernels_cuda.hpp"
 
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_cuda_base.hpp"
 #include "sfem_reduction_scratch_cuda.hpp"
@@ -147,6 +148,158 @@ namespace sfem {
             // No device↔host scalar traffic.
         }
 
+#if defined(SFEM_ENABLE_HIP)
+        // The preconditioned loop on the device (ConjugateGradientKernels::run_precond, CGDeviceRun).
+        // On MI300A the host's two waits per iteration dominate the coarse solve (646 us an iteration
+        // against GH200's 337, its kernels ~130 us). Here the scalars stay in a device array, each
+        // iteration's x and r update is skipped once the run has stopped, and RUN_BATCH iterations are
+        // one captured graph after which the host reads whether it stopped: x is the loop's, at most
+        // RUN_BATCH - 1 iterations' products spent after the stop. The graph is what pays (launched
+        // without it the run gains nothing); it needs products that allocate nothing on the stream,
+        // which HIP 6.4 does not capture (the generated operators keep their connectivity table
+        // under HIP for this).
+        enum { RUN_RTZ = 0, RUN_RTZ_NEW, RUN_PTAP, RUN_ALPHA, RUN_BETA, RUN_ITER, RUN_STOP, RUN_N };
+        static constexpr int RUN_BATCH = 16;
+
+        // beta = rtz_new / rtz, rtz = rtz_new.
+        template <typename T>
+        __global__ void run_beta_kernel(T* const SFEM_RESTRICT s) {
+            if (s[RUN_STOP] != T(0)) return;
+            s[RUN_BETA] = s[RUN_RTZ_NEW] / s[RUN_RTZ];
+            s[RUN_RTZ]  = s[RUN_RTZ_NEW];
+        }
+
+        // alpha = rtz / ptAp.
+        template <typename T>
+        __global__ void run_alpha_kernel(T* const SFEM_RESTRICT s) {
+            if (s[RUN_STOP] != T(0)) return;
+            s[RUN_ALPHA] = s[RUN_RTZ] / s[RUN_PTAP];
+        }
+
+        // The loop's stop: |r|_M below atol or rtol relative to the first, or max_it iterations. The
+        // iteration count is the loop's (the index of the stopping iteration, max_it without a stop).
+        template <typename T>
+        __global__ void run_decide_kernel(T* const SFEM_RESTRICT s, const T rtz0, const T atol, const T rtol, const int max_it) {
+            if (s[RUN_STOP] != T(0)) return;
+            const T anorm = sqrt(s[RUN_RTZ]);
+            const T rnorm = anorm / sqrt(rtz0);
+            if (anorm < atol || rnorm < rtol) {
+                s[RUN_STOP] = T(1);
+                return;
+            }
+            s[RUN_ITER] += T(1);
+            if (s[RUN_ITER] >= T(max_it)) s[RUN_STOP] = T(2);
+        }
+
+        // update_p_kernel's p = z + beta p, beta from the run's scalars.
+        template <typename T>
+        __global__ void run_update_p_kernel(const ptrdiff_t              n,
+                                            const T* const SFEM_RESTRICT s,
+                                            const T* const SFEM_RESTRICT z,
+                                            T* const SFEM_RESTRICT       p) {
+            if (s[RUN_STOP] != T(0)) return;
+            const T beta = s[RUN_BETA];
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                p[i] = z[i] + beta * p[i];
+            }
+        }
+
+        // update_x_r_kernel's x += alpha p, r -= alpha Ap, alpha from the run's scalars.
+        template <typename T>
+        __global__ void run_update_x_r_kernel(const ptrdiff_t              n,
+                                              const T* const SFEM_RESTRICT s,
+                                              const T* const SFEM_RESTRICT p,
+                                              const T* const SFEM_RESTRICT Ap,
+                                              T* const SFEM_RESTRICT       x,
+                                              T* const SFEM_RESTRICT       r) {
+            if (s[RUN_STOP] != T(0)) return;
+            const T alpha = s[RUN_ALPHA];
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
+                x[i] += alpha * p[i];
+                r[i] -= alpha * Ap[i];
+            }
+        }
+
+        // The run's scalars on the device and its stop read back, kept for the thread's later runs.
+        template <typename T>
+        struct RunScalars {
+            T* device{nullptr};
+            T* host{nullptr};  // pinned: RUN_ITER, RUN_STOP
+            RunScalars() {
+                SFEM_CUDA_CHECK(cudaMalloc((void**)&device, RUN_N * sizeof(T)));
+                SFEM_CUDA_CHECK(cudaMallocHost((void**)&host, 2 * sizeof(T)));
+            }
+            ~RunScalars() {
+                if (device) cudaFree(device);
+                if (host) cudaFreeHost(host);
+            }
+        };
+
+        template <typename T>
+        static CGDeviceRunResult run_precond(const CGDeviceRun<T>& run) {
+            SFEM_TRACE_SCOPE("ConjugateGradient::device_run");
+            static thread_local RunScalars<T> scalars;
+            T* const           s      = scalars.device;
+            const cudaStream_t stream = static_cast<cudaStream_t>(run.stream);
+
+            int       block_size;
+            ptrdiff_t n_blocks;
+            cg_launch_params(run.n, block_size, n_blocks);
+
+            // One of the loop's iterations, its scalars in s.
+            auto iteration = [&]() {
+                run.precondition(run.r, run.z);
+                run.dot(run.r, run.z, s + RUN_RTZ_NEW);
+                run_beta_kernel<T><<<1, 1, 0, stream>>>(s);
+                run_update_p_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, s, run.z, run.p);
+                run.product(run.p, run.Ap);
+                run.dot(run.p, run.Ap, s + RUN_PTAP);
+                run_alpha_kernel<T><<<1, 1, 0, stream>>>(s);
+                run_update_x_r_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, s, run.p, run.Ap, run.x, run.r);
+                run_decide_kernel<T><<<1, 1, 0, stream>>>(s, run.rtz0, run.atol, run.rtol, run.max_it);
+            };
+            auto batch = [&]() {
+                for (int k = 0; k < RUN_BATCH; ++k) iteration();
+                SFEM_CUDA_CHECK(cudaMemcpyAsync(scalars.host, s + RUN_ITER, 2 * sizeof(T), cudaMemcpyDeviceToHost, stream));
+            };
+
+            const T start[RUN_N] = {run.rtz, T(0), T(0), T(0), T(0), T(0), T(0)};
+            SFEM_CUDA_CHECK(cudaMemcpyAsync(s, start, RUN_N * sizeof(T), cudaMemcpyHostToDevice, stream));
+            SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+
+            // The batch as one graph, captured from the run's own launches; launched as they are
+            // where it cannot be captured.
+            cudaGraph_t     graph = nullptr;
+            cudaGraphExec_t exec  = nullptr;
+            if (cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
+                batch();
+                const cudaError_t ended = cudaStreamEndCapture(stream, &graph);
+                if (ended != cudaSuccess || !graph || cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) exec = nullptr;
+            }
+            cudaGetLastError();
+
+            // The decision stops the run by max_it at the latest, within max_it / RUN_BATCH + 1 batches.
+            const int max_batches = run.max_it / RUN_BATCH + 2;
+            for (int b = 0; b < max_batches; ++b) {
+                if (exec) {
+                    SFEM_CUDA_CHECK(cudaGraphLaunch(exec, stream));
+                } else {
+                    batch();
+                }
+                SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
+                if (scalars.host[1] != T(0)) break;
+            }
+            if (exec) cudaGraphExecDestroy(exec);
+            if (graph) cudaGraphDestroy(graph);
+
+            CGDeviceRunResult result;
+            result.ran        = true;
+            result.iterations = int(scalars.host[0]);
+            result.converged  = scalars.host[1] == T(1);
+            return result;
+        }
+#endif  // SFEM_ENABLE_HIP
+
     }  // namespace
 
     template <typename T>
@@ -156,6 +309,9 @@ namespace sfem {
         tpl.update_x_r_and_rtr = [s](auto&&... a) { return update_x_r_and_rtr<T>(a..., s); };
         tpl.update_x_r         = [s](auto&&... a) { update_x_r<T>(a..., s); };
         tpl.update_p           = [s](auto&&... a) { update_p<T>(a..., s); };
+#if defined(SFEM_ENABLE_HIP)
+        tpl.run_precond = [](const CGDeviceRun<T>& run) { return run_precond<T>(run); };
+#endif
     }
 
     template class GPUConjugateGradientKernels<float>;

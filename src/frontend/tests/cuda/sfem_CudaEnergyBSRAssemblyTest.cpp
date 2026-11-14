@@ -64,9 +64,10 @@ namespace {
     }
 
     // max |device - host| / max |host| over the BSR values, on `mesh` (a semi-structured one through
-    // its micro elements).
-    real_t assemble_and_compare(const std::shared_ptr<Mesh> &mesh, const char *const yaml) {
+    // its micro elements, or with `high_order` one Lagrange element per macro element).
+    real_t assemble_and_compare(const std::shared_ptr<Mesh> &mesh, const char *const yaml, const bool high_order = false) {
         auto fs = FunctionSpace::create(mesh, 3);
+        if (high_order) fs->set_semi_structured_basis(FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
 
         ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
         auto       host = create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_HOST);
@@ -80,7 +81,7 @@ namespace {
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            x     = deformed(mesh, ndofs);
 
-        auto       graph  = fs->node_to_node_graph();
+        auto       graph  = fs->element_node_graph();
         const auto nvals  = graph->nnz() * 9;
         auto       values = create_host_buffer<real_t>(nvals);
         if (host->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data()) != SFEM_SUCCESS) return 1;
@@ -152,6 +153,18 @@ int test_neohookean_bsr_on_device() {
     SFEM_TEST_ASSERT(assemble_and_compare(cube(), yaml) < 1e-12);
     SFEM_TEST_ASSERT(assemble_and_compare(tet_cube(), yaml) < 1e-12);
     SFEM_TEST_ASSERT(gradient_and_compare(tet_cube(), yaml) < 1e-12);
+    return SFEM_TEST_SUCCESS;
+}
+
+// PROTEUS_HEX64, a cubic Lagrange element per macro element of a level-3 mesh: its element matrix,
+// 192 x 192, is beyond a thread's stack on AMD GPUs, and the device assembles it a column at a time
+// with a block per element (sfem_cuda_TensorProductBSRHessian.cuh; on CUDA with
+// SFEM_TP_HESSIAN_ASSEMBLY=cooperative).
+int test_proteus_hex64_bsr_on_device() {
+    auto hex64 = smesh::to_semistructured(3, Mesh::create_hex8_cube(Communicator::world(), 2, 2, 1, 0, 0, 0, 1, 1, 1), true, false);
+    SFEM_TEST_ASSERT(assemble_and_compare(hex64, "{type: GeneratedSaintVenantKirchhoff, mu: 1, lmbda: 2}", true) < 1e-12);
+    SFEM_TEST_ASSERT(
+            assemble_and_compare(hex64, "{type: GeneratedModifiedMooneyRivlin, c1: 0.3, c2: 0.05, kappa: 50}", true) < 1e-12);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -238,6 +251,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_linear_elasticity_bsr_on_device);
     SFEM_RUN_TEST(test_neohookean_bsr_on_device);
     SFEM_RUN_TEST(test_prony_bsr_on_device);
+    SFEM_RUN_TEST(test_proteus_hex64_bsr_on_device);
     SFEM_RUN_TEST(test_linear_elasticity_block_diag_on_device);
     SFEM_RUN_TEST(test_single_precision_tangent_on_device);
     SFEM_UNIT_TEST_FINALIZE();

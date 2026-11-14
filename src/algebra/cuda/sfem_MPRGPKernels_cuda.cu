@@ -443,7 +443,53 @@ namespace sfem {
 
         // After a CG iteration, as MPRGP::team_cg_steps takes it: a decision that is no step ends
         // the run, not counted; a step is counted, then the run ends converged or at max_it, or
-        // before a proportioning step, or goes on (the graph's loop condition).
+        // before a proportioning step, or goes on (the result).
+        template <typename T>
+        __device__ bool run_decide(const T* const SFEM_RESTRICT control,
+                                   T* const SFEM_RESTRICT       loop,
+                                   const T                      gamma,
+                                   const T                      atol,
+                                   const T                      rtol,
+                                   const T                      norm_gp0,
+                                   const int                    max_it) {
+            const MPRGPControl<T>& c = *reinterpret_cast<const MPRGPControl<T>*>(control);
+            if (c.move != T(MPRGPMove::STEP)) {
+                loop[2] = T(MPRGPExit::NOT_A_STEP);
+                return false;
+            }
+            loop[1] += 1;
+            const T norm_gf = sqrt(c.gf2), norm_gc = sqrt(c.gc2), norm_gp = sqrt(c.gp2);
+            const T rel     = norm_gp / norm_gp0;
+            const bool done = norm_gp < atol || rel < rtol;
+            loop[0] += 1;
+            loop[3] = done;
+            if (loop[0] >= T(max_it) || done) {
+                loop[2] = T(MPRGPExit::DONE);
+                return false;
+            }
+            if (!(norm_gc <= gamma * norm_gf)) {
+                loop[2] = T(MPRGPExit::PROPORTIONING);
+                return false;
+            }
+            return true;
+        }
+
+#if defined(SFEM_ENABLE_HIP)
+        // HIP (6.4) has no conditional graph node: the graph is one CG iteration, and the host
+        // launches it while the run goes on (`cg_run`), reading the run's state back after each.
+        // The iterations are the steps' launches, captured, so they give the same bits.
+        template <typename T>
+        __global__ void run_decide_kernel(const T* const SFEM_RESTRICT control,
+                                          T* const SFEM_RESTRICT       loop,
+                                          const T                      gamma,
+                                          const T                      atol,
+                                          const T                      rtol,
+                                          const T                      norm_gp0,
+                                          const int                    max_it) {
+            run_decide(control, loop, gamma, atol, rtol, norm_gp0, max_it);
+        }
+#else
+        // The graph's loop condition.
         template <typename T>
         __global__ void run_decide_kernel(const cudaGraphConditionalHandle handle,
                                           const T* const SFEM_RESTRICT control,
@@ -453,34 +499,16 @@ namespace sfem {
                                           const T                      rtol,
                                           const T                      norm_gp0,
                                           const int                    max_it) {
-            const MPRGPControl<T>& c  = *reinterpret_cast<const MPRGPControl<T>*>(control);
-            unsigned               go = 0;
-            if (c.move != T(MPRGPMove::STEP)) {
-                loop[2] = T(MPRGPExit::NOT_A_STEP);
-            } else {
-                loop[1] += 1;
-                const T norm_gf = sqrt(c.gf2), norm_gc = sqrt(c.gc2), norm_gp = sqrt(c.gp2);
-                const T rel     = norm_gp / norm_gp0;
-                const bool done = norm_gp < atol || rel < rtol;
-                loop[0] += 1;
-                loop[3] = done;
-                if (loop[0] >= T(max_it) || done) {
-                    loop[2] = T(MPRGPExit::DONE);
-                } else if (!(norm_gc <= gamma * norm_gf)) {
-                    loop[2] = T(MPRGPExit::PROPORTIONING);
-                } else {
-                    go = 1;
-                }
-            }
-            cudaGraphSetConditional(handle, go);
+            cudaGraphSetConditional(handle, run_decide(control, loop, gamma, atol, rtol, norm_gp0, max_it) ? 1u : 0u);
         }
+#endif
 
         // A solve's run graph: a WHILE node whose body is one CG iteration -- the operator's
         // product, the curvature pass, the step pass, the next direction -- and the decision that
         // sets its condition, captured from the launches themselves, so the iteration is the one
-        // the host would launch. Captured from and launched on the solver's stream, which the
-        // operator's product runs on too (MPRGP takes device runs only then), so it follows the
-        // solver's work and that follows it.
+        // the host would launch (on HIP the iteration alone, see run_decide_kernel). Captured from
+        // and launched on the solver's stream, which the operator's product runs on too (MPRGP
+        // takes device runs only then), so it follows the solver's work and that follows it.
         template <typename T>
         struct RunGraph {
             cudaStream_t    stream{nullptr};
@@ -495,23 +523,8 @@ namespace sfem {
                 if (host) cudaFreeHost(host);
             }
 
-            bool build(const MPRGPRun<T>& r) {
-                SFEM_TRACE_SCOPE("MPRGPRunGraph::build");
-                stream = static_cast<cudaStream_t>(r.stream);
-                SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
-                SFEM_CUDA_CHECK(cudaGraphCreate(&graph, 0));
-                cudaGraphConditionalHandle handle;
-                SFEM_CUDA_CHECK(cudaGraphConditionalHandleCreate(&handle, graph, 1, cudaGraphCondAssignDefault));
-                cudaGraphNodeParams params = {};
-                params.type                = cudaGraphNodeTypeConditional;
-                params.conditional.handle  = handle;
-                params.conditional.type    = cudaGraphCondTypeWhile;
-                params.conditional.size    = 1;
-                cudaGraphNode_t node;
-                SFEM_CUDA_CHECK(cudaGraphAddNode(&node, graph, nullptr, 0, &params));
-                cudaGraph_t body = params.conditional.phGraph_out[0];
-
-                SFEM_CUDA_CHECK(cudaStreamBeginCaptureToGraph(stream, body, nullptr, nullptr, 0, cudaStreamCaptureModeThreadLocal));
+            // One CG iteration's launches on the run's stream, in capture.
+            void iteration(const MPRGPRun<T>& r) {
                 r.product(r.p, r.Ap);
                 curvature<T>(r.n,
                              r.lb,
@@ -529,13 +542,41 @@ namespace sfem {
                              stream);
                 step<T>(r.n, r.lb, r.ub, r.p, r.Ap, r.x, r.g, r.gf, r.eps, r.w, true, r.control, r.work, r.reduce, stream);
                 update_direction<T>(r.n, r.gf, r.p, r.control, stream);
+            }
+
+            bool build(const MPRGPRun<T>& r) {
+                SFEM_TRACE_SCOPE("MPRGPRunGraph::build");
+                stream = static_cast<cudaStream_t>(r.stream);
+                SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
+#if defined(SFEM_ENABLE_HIP)
+                SFEM_CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal));
+                iteration(r);
+                run_decide_kernel<T><<<1, 1, 0, stream>>>(r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
+                const cudaError_t ended    = cudaStreamEndCapture(stream, &graph);
+                cudaGraph_t       captured = graph;
+#else
+                SFEM_CUDA_CHECK(cudaGraphCreate(&graph, 0));
+                cudaGraphConditionalHandle handle;
+                SFEM_CUDA_CHECK(cudaGraphConditionalHandleCreate(&handle, graph, 1, cudaGraphCondAssignDefault));
+                cudaGraphNodeParams params = {};
+                params.type                = cudaGraphNodeTypeConditional;
+                params.conditional.handle  = handle;
+                params.conditional.type    = cudaGraphCondTypeWhile;
+                params.conditional.size    = 1;
+                cudaGraphNode_t node;
+                SFEM_CUDA_CHECK(cudaGraphAddNode(&node, graph, nullptr, 0, &params));
+                cudaGraph_t body = params.conditional.phGraph_out[0];
+
+                SFEM_CUDA_CHECK(cudaStreamBeginCaptureToGraph(stream, body, nullptr, nullptr, 0, cudaStreamCaptureModeThreadLocal));
+                iteration(r);
                 run_decide_kernel<T>
                         <<<1, 1, 0, stream>>>(handle, r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
                 cudaGraph_t captured = nullptr;
                 // A launch the capture could not take (on the legacy stream, a synchronisation)
                 // leaves it invalid: the run is then the host's, iteration by iteration, which is
                 // said once.
-                const cudaError_t ended        = cudaStreamEndCapture(stream, &captured);
+                const cudaError_t ended = cudaStreamEndCapture(stream, &captured);
+#endif
                 const cudaError_t instantiated = ended == cudaSuccess && captured ? cudaGraphInstantiate(&exec, graph, 0) : ended;
                 if (instantiated != cudaSuccess || !captured) {
                     static bool said = false;
@@ -564,9 +605,18 @@ namespace sfem {
 
             T* const loop = r.work + LOOP;
             run_start_kernel<T><<<1, 1, 0, run->stream>>>(loop, T(iterations));
+#if defined(SFEM_ENABLE_HIP)
+            // The iteration graph while the run goes on: its state read back after each.
+            do {
+                SFEM_CUDA_CHECK(cudaGraphLaunch(run->exec, run->stream));
+                SFEM_CUDA_CHECK(cudaMemcpyAsync(run->host, loop, 4 * sizeof(T), cudaMemcpyDeviceToHost, run->stream));
+                SFEM_CUDA_CHECK(cudaStreamSynchronize(run->stream));
+            } while (run->host[2] == T(0));
+#else
             SFEM_CUDA_CHECK(cudaGraphLaunch(run->exec, run->stream));
             SFEM_CUDA_CHECK(cudaMemcpyAsync(run->host, loop, 4 * sizeof(T), cudaMemcpyDeviceToHost, run->stream));
             SFEM_CUDA_CHECK(cudaStreamSynchronize(run->stream));
+#endif
             result.ran        = true;
             result.iterations = int(run->host[0]);
             result.steps      = int(run->host[1]);

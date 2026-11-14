@@ -218,7 +218,7 @@ static inline __device__ void subtet_scatter_add(const int                      
 }
 
 template <typename T>
-__global__ void cu_macro_tet4_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_macro_tet4_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
                                                              idx_t **const SFEM_RESTRICT         elements,
                                                              const ptrdiff_t                          jacobian_stride,
                                                              const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,

@@ -401,6 +401,15 @@ namespace sfem {
             return err;
         }
 
+        // The contact nodes' volume indices in the memory the kernels run in: the device copy on the
+        // device, where the host buffer is not readable.
+        const idx_t *node_indices() const {
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == execution_space) return contact_surface->node_mapping_device()->data();
+#endif
+            return contact_surface->node_mapping()->data();
+        }
+
         // The row pointers of a two-level buffer, readable on the host (a device buffer keeps its
         // row pointers in device memory). Rows beyond the buffer's are null.
         template <typename T>
@@ -504,6 +513,13 @@ namespace sfem {
 
     const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping() { return impl_->contact_surface->node_mapping(); }
 
+    const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping(const enum ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+        if (EXECUTION_SPACE_DEVICE == es) return impl_->contact_surface->node_mapping_device();
+#endif
+        return impl_->contact_surface->node_mapping();
+    }
+
     SharedBuffer<real_t *> ContactConditions::normals() const { return impl_->normals; }
 
     void ContactConditions::normal_rows(real_t **const rows) const {
@@ -530,6 +546,16 @@ namespace sfem {
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
         auto cc = std::make_unique<ContactConditions>(space);
+#ifdef SFEM_ENABLE_CUDA
+        // On the device the obstacle is sampled at the rank's own surface nodes only, and the sums
+        // across ranks (normals, gap, surface mass) are formed on the host over device memory: refuse
+        // the combination rather than read device pointers on the host. The node_sdf obstacle
+        // (NodeObstacleContact) runs on the device across ranks.
+        if (EXECUTION_SPACE_DEVICE == es && cc->impl_->is_mpi()) {
+            SFEM_ERROR("ContactConditions: the SDF contact surface on the device runs on one rank only; "
+                       "use the node_sdf obstacle with several ranks\n");
+        }
+#endif
         {
 #ifdef SFEM_ENABLE_SRESAMPLE
             // The mesh's z-range bounds where the contact surface samples the obstacle
@@ -609,9 +635,10 @@ namespace sfem {
     int ContactConditions::signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const {
         const ptrdiff_t n   = impl_->contact_surface->node_mapping()->size();
         const int       dim = impl_->space->mesh()->spatial_dimension();
-        auto            gap = create_host_buffer<real_t>(n > 0 ? n : 0);
-        auto *          self = const_cast<ContactConditions *>(this);
-        const int       err  = self->signed_distance(x, n > 0 ? gap->data() : nullptr);
+        // The gap in the execution space, where signed_distance samples it; the field on the host.
+        auto       gap  = create_buffer<real_t>(n > 0 ? n : 0, impl_->execution_space);
+        auto      *self = const_cast<ContactConditions *>(this);
+        const int  err  = self->signed_distance(x, n > 0 ? gap->data() : nullptr);
         if (err != SFEM_SUCCESS) {
             return err;
         }
@@ -619,9 +646,11 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
-        auto               normals = impl_->normals->data();
-        auto               tt      = gap->data();
+        const idx_t *const idx       = impl_->contact_surface->node_mapping()->data();
+        auto               h_normals = smesh::to_host(impl_->normals);
+        auto               h_gap     = smesh::to_host(gap);
+        auto               normals   = h_normals->data();
+        auto               tt        = h_gap->data();
 
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < n; ++i) {
@@ -641,16 +670,16 @@ namespace sfem {
         const int       dim     = impl_->space->mesh()->spatial_dimension();
         auto            normals = impl_->normals->data();
 
+        const idx_t *const idx = impl_->node_indices();
+
         int err;
 #ifdef SFEM_ENABLE_CUDA
         if (EXECUTION_SPACE_DEVICE == impl_->execution_space) {
-            const idx_t *const idx = impl_->contact_surface->node_mapping_device()->data();
-            err                    = cu_obstacle_normal_project(dim, n, idx, normals, h, out, nullptr);
+            err = cu_obstacle_normal_project(dim, n, idx, normals, h, out, nullptr);
         } else
 #endif
         {
-            const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
-            err                    = obstacle_normal_project(dim, n, idx, normals, h, out);
+            err = obstacle_normal_project(dim, n, idx, normals, h, out);
 
             if (impl_->debug) {
                 for (ptrdiff_t i = 0; i < n; ++i) {
@@ -665,7 +694,7 @@ namespace sfem {
     int ContactConditions::distribute_contact_forces(const real_t *const f, real_t *const out) {
         SFEM_TRACE_SCOPE("ContactConditions::distribute_contact_forces");
         const ptrdiff_t    n   = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
+        const idx_t *const idx = impl_->node_indices();
 
         const int dim     = impl_->space->mesh()->spatial_dimension();
         auto      normals = impl_->normals->data();
@@ -680,11 +709,11 @@ namespace sfem {
 #endif
         {
             err = obstacle_distribute_contact_forces(dim, n, idx, normals, m, f, out);
-        }
 
-        if (impl_->debug) {
-            for (ptrdiff_t i = 0; i < n; ++i) {
-                printf("CC_t: %g = %g  * %g * %g\n", out[(ptrdiff_t)idx[i] * dim + 0], normals[0][i], f[i], m[i]);
+            if (impl_->debug) {
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    printf("CC_t: %g = %g  * %g * %g\n", out[(ptrdiff_t)idx[i] * dim + 0], normals[0][i], f[i], m[i]);
+                }
             }
         }
 
@@ -693,7 +722,7 @@ namespace sfem {
 
     int ContactConditions::full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s) {
         const ptrdiff_t    n       = impl_->contact_surface->node_mapping()->size();
-        const idx_t *const idx     = impl_->contact_surface->node_mapping()->data();
+        const idx_t *const idx     = impl_->node_indices();
         auto               m       = impl_->mass_vector->data();
         const int          dim     = impl_->space->mesh()->spatial_dimension();
         auto               normals = impl_->normals->data();
@@ -1007,7 +1036,7 @@ namespace sfem {
         if (n == 0) {
             return SFEM_SUCCESS;
         }
-        const idx_t *const idx = impl_->contact_surface->node_mapping()->data();
+        const idx_t *const idx = impl_->node_indices();
 
         const int dim     = impl_->space->mesh()->spatial_dimension();
         auto      normals = impl_->normals->data();

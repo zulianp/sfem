@@ -87,6 +87,7 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> normal_prod;
     std::shared_ptr<Buffer<real_t>> cc_op_x;
     std::shared_ptr<Buffer<real_t>> cc_op_t_r;
+    std::shared_ptr<Buffer<real_t>> stress;  // full_apply_boundary_mass_inverse of the gradient
     std::shared_ptr<Buffer<real_t>> rpen;
     std::shared_ptr<Buffer<real_t>> Jpen;
     std::shared_ptr<Buffer<real_t>> restricted;
@@ -112,6 +113,8 @@ struct TestOutput {
         SFEM_TEST_ASSERT(other.cc_op_x != nullptr);
         SFEM_TEST_ASSERT(cc_op_t_r != nullptr);
         SFEM_TEST_ASSERT(other.cc_op_t_r != nullptr);
+        SFEM_TEST_ASSERT(stress != nullptr);
+        SFEM_TEST_ASSERT(other.stress != nullptr);
         SFEM_TEST_ASSERT(rpen != nullptr);
         SFEM_TEST_ASSERT(other.rpen != nullptr);
         SFEM_TEST_ASSERT(Jpen != nullptr);
@@ -125,6 +128,7 @@ struct TestOutput {
         SFEM_TEST_EQ(normal_prod->size(), other.normal_prod->size());
         SFEM_TEST_EQ(cc_op_x->size(), other.cc_op_x->size());
         SFEM_TEST_EQ(cc_op_t_r->size(), other.cc_op_t_r->size());
+        SFEM_TEST_EQ(stress->size(), other.stress->size());
         SFEM_TEST_EQ(rpen->size(), other.rpen->size());
         SFEM_TEST_EQ(Jpen->size(), other.Jpen->size());
         SFEM_ASSERT_ARRAY_APPROX_EQ(x->size(), x->data(), other.x->data(), tol);
@@ -136,6 +140,7 @@ struct TestOutput {
         SFEM_ASSERT_ARRAY_APPROX_EQ(normal_prod->size(), normal_prod->data(), other.normal_prod->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_x->size(), cc_op_x->data(), other.cc_op_x->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_t_r->size(), cc_op_t_r->data(), other.cc_op_t_r->data(), tol);
+        SFEM_ASSERT_ARRAY_APPROX_EQ(stress->size(), stress->data(), other.stress->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(rpen->size(), rpen->data(), other.rpen->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(Jpen->size(), Jpen->data(), other.Jpen->data(), tol);
         SFEM_TEST_APPROXEQ(e_pen, other.e_pen, tol);
@@ -158,6 +163,7 @@ struct TestOutput {
                       .normal_prod = smesh::to_host(normal_prod),
                       .cc_op_x     = smesh::to_host(cc_op_x),
                       .cc_op_t_r   = smesh::to_host(cc_op_t_r),
+                      .stress      = smesh::to_host(stress),
                       .rpen        = smesh::to_host(rpen),
                       .Jpen        = smesh::to_host(Jpen),
                       .e_pen       = e_pen,
@@ -230,6 +236,11 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto cc_op_t_r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     cc_op_t->apply(cc_op_x->data(), cc_op_t_r->data());
 
+    // The contact stress of the gradient: the contact nodes' indices on the device too.
+    auto stress = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    sfem::blas<real_t>(es)->zeros(fs->n_dofs(), stress->data());
+    contact_conds->full_apply_boundary_mass_inverse(g->data(), stress->data());
+
     ShiftedPenaltyKernels<real_t> impl;
     if (EXECUTION_SPACE_DEVICE == es) {
         GPUShiftedPenaltyKernels<real_t>::build(impl);
@@ -277,6 +288,7 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
                   .normal_prod = normal_prod,
                   .cc_op_x     = cc_op_x,
                   .cc_op_t_r   = cc_op_t_r,
+                  .stress      = stress,
                   .rpen        = rpen,
                   .Jpen        = Jpen,
                   .e_pen       = e_pen,

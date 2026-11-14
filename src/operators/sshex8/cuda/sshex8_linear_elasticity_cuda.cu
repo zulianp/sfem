@@ -10,7 +10,7 @@
 #include "sshex8_inline_cuda.hpp"
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -238,7 +238,7 @@ static __host__ __device__ void apply_micro_loop(const T *const elemental_matrix
 #endif
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -434,7 +434,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_ker
 }
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -599,6 +599,7 @@ static __device__ __forceinline__ int cu_sshex8_hex_vertex_from_offsets(const in
     return x + (3 - 2 * x) * y + (z << 2);
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 static __device__ __forceinline__ void cu_sshex8_mma_m8n8k4_f64(const double A, const double B, double &C0, double &C1) {
     asm volatile(
             "mma.sync.aligned.m8n8k4.row.col.f64.f64.f64.f64 "
@@ -606,6 +607,7 @@ static __device__ __forceinline__ void cu_sshex8_mma_m8n8k4_f64(const double A, 
             : "=d"(C0), "=d"(C1)
             : "d"(A), "d"(B), "d"(C0), "d"(C1));
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T>
 static __device__ __forceinline__ void cu_sshex8_tp_ref_grad(const int q, const int node, T *const SFEM_RESTRICT g) {
@@ -638,7 +640,7 @@ static __device__ __forceinline__ int cu_sshex8_level8_padded_lidx(const int x, 
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
         const ptrdiff_t                          jacobian_stride,
@@ -803,6 +805,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_level8_gather_kernel(
     }
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_kernel(
         const ptrdiff_t                          nelements,
@@ -1003,6 +1006,7 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_k
         __syncthreads();
     }
 }
+#endif  // !SFEM_ENABLE_HIP
 
 // Build 24x24 micro-element matrix into shared emat. __noinline__ so apply-phase
 // register pressure does not inherit matrix_block / quadrature temporaries.
@@ -1052,6 +1056,7 @@ __device__ __noinline__ void cu_sshex8_tp_build_emat_24x24(const int            
 
 // Optimized TP path (LEVEL8_KERNEL=6): launch_bounds + noinline emat build + padded shared.
 // KERNEL=4 baseline is left unchanged for A/B.
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ __launch_bounds__(128, 4) void cu_affine_sshex8_linear_elasticity_apply_tensor_product_matrix_opt_kernel(
         const ptrdiff_t                          nelements,
@@ -1235,6 +1240,7 @@ __global__ __launch_bounds__(128, 4) void cu_affine_sshex8_linear_elasticity_app
         __syncthreads();
     }
 }
+#endif  // !SFEM_ENABLE_HIP
 
 #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_segmented_kernel
 // #define local_mem_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_kernel
@@ -1383,6 +1389,7 @@ int cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl(const ptrd
     return SFEM_SUCCESS;
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t                          nelements,
                                                                 idx_t **const SFEM_RESTRICT              elements,
@@ -1426,7 +1433,9 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_tpl(const ptrdiff_t 
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
         const ptrdiff_t                          nelements,
@@ -1477,6 +1486,487 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
+
+#if defined(SFEM_ENABLE_HIP)
+// The level-8 apply on AMD's FP64 matrix cores (v_mfma_f64_16x16x4f64, gfx90a and later): a block of
+// four wavefronts per macro element. Its 512 micro elements share one 24x24 element matrix K (affine),
+// so the apply is the GEMM Y = U K^T, U the 512 x 24 gathered displacements (a row per micro element,
+// columns 3 vertex + component), then each Y row scattered to its eight vertices. A wavefront takes
+// tiles of 16 micro elements: six k-steps of four and two 16-column halves of the 24 outputs (the
+// second half padded), K^T in registers, U read from the block's displacements in LDS. The tiles'
+// results stay in registers until all are done; the same LDS then accumulates them (LDS FP64 atomics)
+// and the node values go out once: the 7^3 interior nodes, which no other macro element touches,
+// without atomics. Lane layout of 16x16x4 f64 (measured on gfx942): A(i, k) at lane
+// i + 16 k, B(k, j) at lane j + 16 k, D(i, j) in slot i / 4 of lane j + 16 (i % 4).
+typedef double cu_sshex8_mfma_double4 __attribute__((ext_vector_type(4)));
+
+template <typename T, int N_WAVES>
+__global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elasticity_apply_level8_mfma_kernel(
+        const ptrdiff_t                          nelements,
+        idx_t **const SFEM_RESTRICT              elements,
+        const ptrdiff_t                          jacobian_stride,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T                                  mu,
+        const T                                  lambda,
+        const ptrdiff_t                          u_stride,
+        const T *const SFEM_RESTRICT             g_ux,
+        const T *const SFEM_RESTRICT             g_uy,
+        const T *const SFEM_RESTRICT             g_uz,
+        const ptrdiff_t                          out_stride,
+        T *const SFEM_RESTRICT                   g_outx,
+        T *const SFEM_RESTRICT                   g_outy,
+        T *const SFEM_RESTRICT                   g_outz) {
+    static_assert(sizeof(T) == sizeof(double), "FP64 matrix cores");
+    static const int LEVEL          = 8;
+    static const int BLOCK_SIZE     = LEVEL + 1;
+    static const int BLOCK_SIZE_2   = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3   = BLOCK_SIZE_2 * BLOCK_SIZE;
+    static const int PADDED_3       = 90 * BLOCK_SIZE;  // cu_sshex8_level8_padded_lidx
+    static const int N_DOF          = 24;
+    static const int N_TILES        = (LEVEL * LEVEL * LEVEL) / 16;  // 32
+    static const int TILES_PER_WAVE = N_TILES / N_WAVES;             // 8
+
+    __shared__ double field[3][PADDED_3];  // the displacements, then the outputs
+    __shared__ idx_t  nodes[BLOCK_SIZE_3];  // the macro element's nodes, read once
+    __shared__ double kt[N_DOF * N_DOF];   // K^T: kt[k * 24 + n] = K(n, k)
+    __shared__ double shared_adjugate[9];
+    __shared__ double shared_determinant;
+
+    const int thread_id = threadIdx.x;
+    const int lane      = thread_id & 63;
+    const int wave      = thread_id >> 6;
+    const int lane_row  = lane & 15;  // A row; B, D column
+    const int lane_k    = lane >> 4;  // A, B k; D row mod 4
+
+    for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        for (int i = thread_id; i < BLOCK_SIZE_3; i += blockDim.x) {
+            const int z = i / BLOCK_SIZE_2;
+            const int r = i - z * BLOCK_SIZE_2;
+            const int y = r / BLOCK_SIZE;
+            const int x = r - y * BLOCK_SIZE;
+
+            const int       pi   = cu_sshex8_level8_padded_lidx(x, y, z);
+            const idx_t     node = elements[i][e];
+            const ptrdiff_t in   = node * u_stride;
+
+            nodes[i]     = node;
+            field[0][pi] = g_ux[in];
+            field[1][pi] = g_uy[in];
+            field[2][pi] = g_uz[in];
+        }
+
+        if (thread_id == 0) {
+            for (int d = 0; d < 9; d++) shared_adjugate[d] = g_jacobian_adjugate[d * jacobian_stride + e];
+            shared_determinant = g_jacobian_determinant[e];
+            cu_hex8_sub_adj_0_in_place<double>(1. / LEVEL, shared_adjugate, &shared_determinant);
+        }
+
+        __syncthreads();
+
+        // K, a vertex pair per thread (the gather kernel's).
+        if (thread_id < 64) {
+            const int out_vertex = thread_id >> 3;
+            const int in_vertex  = thread_id & 7;
+
+            double block[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+#pragma unroll
+            for (int q = 0; q < 8; q++) {
+                double test_grad[3];
+                double trial_grad[3];
+                cu_sshex8_tp_ref_grad<double>(q, out_vertex, test_grad);
+                cu_sshex8_tp_ref_grad<double>(q, in_vertex, trial_grad);
+                cu_linear_elasticity_matrix_block<double>(
+                        mu, lambda, shared_adjugate, shared_determinant, 0.125, trial_grad, test_grad, block);
+            }
+#pragma unroll
+            for (int out_comp = 0; out_comp < 3; out_comp++) {
+#pragma unroll
+                for (int in_comp = 0; in_comp < 3; in_comp++) {
+                    const int n          = out_vertex * 3 + out_comp;
+                    const int k          = in_vertex * 3 + in_comp;
+                    kt[k * N_DOF + n] = block[out_comp * 3 + in_comp];
+                }
+            }
+        }
+
+        __syncthreads();
+
+        // This lane's part of K^T: B(k = 4 step + lane_k, n = 16 half + lane_row), zero past 24.
+        double b[6][2];
+#pragma unroll
+        for (int step = 0; step < 6; step++) {
+            const int k = 4 * step + lane_k;
+            b[step][0]  = kt[k * N_DOF + lane_row];
+            b[step][1]  = lane_row < 8 ? kt[k * N_DOF + 16 + lane_row] : 0.;
+        }
+
+        // The wave's tiles: the Y rows of micro elements 16 t .. 16 t + 15.
+        cu_sshex8_mfma_double4 acc[TILES_PER_WAVE][2];
+#pragma unroll
+        for (int tw = 0; tw < TILES_PER_WAVE; tw++) {
+            const int tile = wave + N_WAVES * tw;
+            const int m    = 16 * tile + lane_row;  // this lane's A row (micro element)
+            const int xe   = m & 7;
+            const int ye   = (m >> 3) & 7;
+            const int ze   = m >> 6;
+
+            acc[tw][0] = cu_sshex8_mfma_double4{0, 0, 0, 0};
+            acc[tw][1] = cu_sshex8_mfma_double4{0, 0, 0, 0};
+#pragma unroll
+            for (int step = 0; step < 6; step++) {
+                const int    k      = 4 * step + lane_k;
+                const int    vertex = k / 3;
+                const int    comp   = k - 3 * vertex;
+                const int    ip     = cu_sshex8_level8_padded_lidx(xe + cu_sshex8_hex_vertex_x(vertex),
+                                                            ye + cu_sshex8_hex_vertex_y(vertex),
+                                                            ze + cu_sshex8_hex_vertex_z(vertex));
+                const double a      = field[comp][ip];
+                acc[tw][0]          = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][0], acc[tw][0], 0, 0, 0);
+                acc[tw][1]          = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][1], acc[tw][1], 0, 0, 0);
+            }
+        }
+
+        __syncthreads();
+
+        for (int i = thread_id; i < 3 * PADDED_3; i += blockDim.x) (&field[0][0])[i] = 0;
+
+        __syncthreads();
+
+        // D(i, j) of a tile: micro element 16 t + 4 s + lane_k (slot s), output 16 half + lane_row.
+#pragma unroll
+        for (int tw = 0; tw < TILES_PER_WAVE; tw++) {
+            const int tile = wave + N_WAVES * tw;
+#pragma unroll
+            for (int half = 0; half < 2; half++) {
+                const int n = 16 * half + lane_row;
+                if (n < N_DOF) {
+                    const int vertex = n / 3;
+                    const int comp   = n - 3 * vertex;
+#pragma unroll
+                    for (int s = 0; s < 4; s++) {
+                        const int m  = 16 * tile + 4 * s + lane_k;
+                        const int xe = m & 7;
+                        const int ye = (m >> 3) & 7;
+                        const int ze = m >> 6;
+                        const int ip = cu_sshex8_level8_padded_lidx(xe + cu_sshex8_hex_vertex_x(vertex),
+                                                                    ye + cu_sshex8_hex_vertex_y(vertex),
+                                                                    ze + cu_sshex8_hex_vertex_z(vertex));
+                        atomicAdd(&field[comp][ip], acc[tw][half][s]);
+                    }
+                }
+            }
+        }
+
+        __syncthreads();
+
+        for (int i = thread_id; i < BLOCK_SIZE_3; i += blockDim.x) {
+            const int z = i / BLOCK_SIZE_2;
+            const int r = i - z * BLOCK_SIZE_2;
+            const int y = r / BLOCK_SIZE;
+            const int x = r - y * BLOCK_SIZE;
+
+            const int       pi      = cu_sshex8_level8_padded_lidx(x, y, z);
+            const ptrdiff_t out_idx = nodes[i] * out_stride;
+
+            if (x > 0 && x < LEVEL && y > 0 && y < LEVEL && z > 0 && z < LEVEL) {
+                // An interior node: no other macro element adds to it.
+                g_outx[out_idx] += field[0][pi];
+                g_outy[out_idx] += field[1][pi];
+                g_outz[out_idx] += field[2][pi];
+            } else {
+                atomicAdd(&g_outx[out_idx], field[0][pi]);
+                atomicAdd(&g_outy[out_idx], field[1][pi]);
+                atomicAdd(&g_outz[out_idx], field[2][pi]);
+            }
+        }
+
+        __syncthreads();
+    }
+}
+
+template <typename T>
+int cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl(const ptrdiff_t                          nelements,
+                                                             idx_t **const SFEM_RESTRICT              elements,
+                                                             const ptrdiff_t                          jacobian_stride,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                             const T                                  mu,
+                                                             const T                                  lambda,
+                                                             const ptrdiff_t                          u_stride,
+                                                             const T *const SFEM_RESTRICT             ux,
+                                                             const T *const SFEM_RESTRICT             uy,
+                                                             const T *const SFEM_RESTRICT             uz,
+                                                             const ptrdiff_t                          out_stride,
+                                                             T *const SFEM_RESTRICT                   outx,
+                                                             T *const SFEM_RESTRICT                   outy,
+                                                             T *const SFEM_RESTRICT                   outz,
+                                                             void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE(stream);
+    if constexpr (sizeof(T) != sizeof(double)) {
+        SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl: FP64 only\n");
+        return SFEM_FAILURE;
+    } else {
+        // Eight wavefronts, four tiles each: 244 VGPRs, two waves per SIMD, no spills. MI300A, 44^3
+        // macro elements: 7.66 ms against 8.08 with four (one wave per SIMD) and 16.3 with sixteen
+        // (128 VGPRs, spilling).
+        static const int N_WAVES = 8;
+        dim3             n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+        cu_affine_sshex8_linear_elasticity_apply_level8_mfma_kernel<T, N_WAVES>
+                <<<n_blocks, 64 * N_WAVES, 0, (cudaStream_t)stream>>>(nelements, elements, jacobian_stride, jacobian_adjugate,
+                                                                      jacobian_determinant, mu, lambda, u_stride, ux, uy, uz,
+                                                                      out_stride, outx, outy, outz);
+        SFEM_CUDA_CHECK(cudaPeekAtLastError());
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return SFEM_SUCCESS;
+    }
+}
+
+// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL (HIP): 2=warp, 7=AMD FP64 matrix cores (default). The
+// warp kernel's 2-point rule is written to 10 digits, so the two differ by ~2e-11 relative.
+static int cu_sshex8_linear_elasticity_level4_kernel() {
+    static int kernel = -1;
+    if (kernel < 0) {
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL = 7;
+        SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL, atoi);
+        kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL;
+    }
+    return kernel;
+}
+
+// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES (HIP): wavefronts (macro elements) a block, 2, 4 or 8.
+// MI300A, 44^3 macro elements: 1.39-1.42 ms with two, 1.47-1.49 with four, 1.40-1.47 with eight
+// (the warp kernel: 6.75-6.86 ms).
+static int cu_sshex8_linear_elasticity_level4_mfma_waves() {
+    static int waves = -1;
+    if (waves < 0) {
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES = 2;
+        SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES, atoi);
+        waves = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES;
+    }
+    return waves;
+}
+
+// The level-4 apply on the FP64 matrix cores: a wavefront per macro element. Its 64 micro elements
+// are four 16-row tiles of the GEMM Y = U K^T (as the level-8 kernel), and its 64 lanes are the
+// vertex pairs of K, so each wave builds its own K^T in its part of the block's LDS. The waves of a
+// block take consecutive macro elements in step (the barriers are the block's).
+template <typename T, int N_WAVES>
+__global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elasticity_apply_level4_mfma_kernel(
+        const ptrdiff_t                          nelements,
+        idx_t **const SFEM_RESTRICT              elements,
+        const ptrdiff_t                          jacobian_stride,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
+        const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_determinant,
+        const T                                  mu,
+        const T                                  lambda,
+        const ptrdiff_t                          u_stride,
+        const T *const SFEM_RESTRICT             g_ux,
+        const T *const SFEM_RESTRICT             g_uy,
+        const T *const SFEM_RESTRICT             g_uz,
+        const ptrdiff_t                          out_stride,
+        T *const SFEM_RESTRICT                   g_outx,
+        T *const SFEM_RESTRICT                   g_outy,
+        T *const SFEM_RESTRICT                   g_outz) {
+    static_assert(sizeof(T) == sizeof(double), "FP64 matrix cores");
+    static const int LEVEL        = 4;
+    static const int BLOCK_SIZE   = LEVEL + 1;
+    static const int BLOCK_SIZE_2 = BLOCK_SIZE * BLOCK_SIZE;
+    static const int BLOCK_SIZE_3 = BLOCK_SIZE_2 * BLOCK_SIZE;  // 125
+    static const int N_DOF        = 24;
+    static const int N_TILES      = (LEVEL * LEVEL * LEVEL) / 16;  // 4
+
+    __shared__ double field[N_WAVES][3][BLOCK_SIZE_3];  // the displacements, then the outputs
+    __shared__ idx_t  nodes[N_WAVES][BLOCK_SIZE_3];
+    __shared__ double kt[N_WAVES][N_DOF * N_DOF];  // K^T: kt[k * 24 + n] = K(n, k)
+
+    const int lane     = threadIdx.x & 63;
+    const int wave     = threadIdx.x >> 6;
+    const int lane_row = lane & 15;  // A row; B, D column
+    const int lane_k   = lane >> 4;  // A, B k; D row mod 4
+
+    for (ptrdiff_t base = (ptrdiff_t)blockIdx.x * N_WAVES; base < nelements; base += (ptrdiff_t)gridDim.x * N_WAVES) {
+        const ptrdiff_t e     = base + wave;
+        const bool      valid = e < nelements;
+
+        if (valid) {
+            for (int i = lane; i < BLOCK_SIZE_3; i += 64) {
+                const idx_t     node = elements[i][e];
+                const ptrdiff_t in   = node * u_stride;
+                nodes[wave][i]       = node;
+                field[wave][0][i]    = g_ux[in];
+                field[wave][1][i]    = g_uy[in];
+                field[wave][2][i]    = g_uz[in];
+            }
+
+            // K, a vertex pair per lane (the level-8 kernel's).
+            double adjugate[9], determinant;
+            for (int d = 0; d < 9; d++) adjugate[d] = g_jacobian_adjugate[d * jacobian_stride + e];
+            determinant = g_jacobian_determinant[e];
+            cu_hex8_sub_adj_0_in_place<double>(1. / LEVEL, adjugate, &determinant);
+
+            const int out_vertex = lane >> 3;
+            const int in_vertex  = lane & 7;
+            double    block[9]   = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+#pragma unroll
+            for (int q = 0; q < 8; q++) {
+                double test_grad[3];
+                double trial_grad[3];
+                cu_sshex8_tp_ref_grad<double>(q, out_vertex, test_grad);
+                cu_sshex8_tp_ref_grad<double>(q, in_vertex, trial_grad);
+                cu_linear_elasticity_matrix_block<double>(mu, lambda, adjugate, determinant, 0.125, trial_grad, test_grad, block);
+            }
+#pragma unroll
+            for (int out_comp = 0; out_comp < 3; out_comp++) {
+#pragma unroll
+                for (int in_comp = 0; in_comp < 3; in_comp++) {
+                    kt[wave][(in_vertex * 3 + in_comp) * N_DOF + out_vertex * 3 + out_comp] = block[out_comp * 3 + in_comp];
+                }
+            }
+        }
+
+        __syncthreads();
+
+        cu_sshex8_mfma_double4 acc[N_TILES][2];
+        if (valid) {
+            double b[6][2];
+#pragma unroll
+            for (int step = 0; step < 6; step++) {
+                const int k = 4 * step + lane_k;
+                b[step][0]  = kt[wave][k * N_DOF + lane_row];
+                b[step][1]  = lane_row < 8 ? kt[wave][k * N_DOF + 16 + lane_row] : 0.;
+            }
+
+#pragma unroll
+            for (int tile = 0; tile < N_TILES; tile++) {
+                const int m  = 16 * tile + lane_row;  // this lane's A row (micro element)
+                const int xe = m & 3;
+                const int ye = (m >> 2) & 3;
+                const int ze = m >> 4;
+
+                acc[tile][0] = cu_sshex8_mfma_double4{0, 0, 0, 0};
+                acc[tile][1] = cu_sshex8_mfma_double4{0, 0, 0, 0};
+#pragma unroll
+                for (int step = 0; step < 6; step++) {
+                    const int    k      = 4 * step + lane_k;
+                    const int    vertex = k / 3;
+                    const int    comp   = k - 3 * vertex;
+                    const int    ip     = (xe + cu_sshex8_hex_vertex_x(vertex)) + BLOCK_SIZE * (ye + cu_sshex8_hex_vertex_y(vertex)) +
+                                   BLOCK_SIZE_2 * (ze + cu_sshex8_hex_vertex_z(vertex));
+                    const double a      = field[wave][comp][ip];
+                    acc[tile][0]        = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][0], acc[tile][0], 0, 0, 0);
+                    acc[tile][1]        = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][1], acc[tile][1], 0, 0, 0);
+                }
+            }
+        }
+
+        __syncthreads();
+
+        for (int i = lane; i < 3 * BLOCK_SIZE_3; i += 64) (&field[wave][0][0])[i] = 0;
+
+        __syncthreads();
+
+        if (valid) {
+            // D(i, j) of a tile: micro element 16 t + 4 s + lane_k (slot s), output 16 half + lane_row.
+#pragma unroll
+            for (int tile = 0; tile < N_TILES; tile++) {
+#pragma unroll
+                for (int half = 0; half < 2; half++) {
+                    const int n = 16 * half + lane_row;
+                    if (n < N_DOF) {
+                        const int vertex = n / 3;
+                        const int comp   = n - 3 * vertex;
+#pragma unroll
+                        for (int s = 0; s < 4; s++) {
+                            const int m  = 16 * tile + 4 * s + lane_k;
+                            const int xe = m & 3;
+                            const int ye = (m >> 2) & 3;
+                            const int ze = m >> 4;
+                            const int ip = (xe + cu_sshex8_hex_vertex_x(vertex)) + BLOCK_SIZE * (ye + cu_sshex8_hex_vertex_y(vertex)) +
+                                           BLOCK_SIZE_2 * (ze + cu_sshex8_hex_vertex_z(vertex));
+                            atomicAdd(&field[wave][comp][ip], acc[tile][half][s]);
+                        }
+                    }
+                }
+            }
+        }
+
+        __syncthreads();
+
+        if (valid) {
+            for (int i = lane; i < BLOCK_SIZE_3; i += 64) {
+                const int z = i / BLOCK_SIZE_2;
+                const int r = i - z * BLOCK_SIZE_2;
+                const int y = r / BLOCK_SIZE;
+                const int x = r - y * BLOCK_SIZE;
+
+                const ptrdiff_t out_idx = nodes[wave][i] * out_stride;
+                if (x > 0 && x < LEVEL && y > 0 && y < LEVEL && z > 0 && z < LEVEL) {
+                    // An interior node: no other macro element adds to it.
+                    g_outx[out_idx] += field[wave][0][i];
+                    g_outy[out_idx] += field[wave][1][i];
+                    g_outz[out_idx] += field[wave][2][i];
+                } else {
+                    atomicAdd(&g_outx[out_idx], field[wave][0][i]);
+                    atomicAdd(&g_outy[out_idx], field[wave][1][i]);
+                    atomicAdd(&g_outz[out_idx], field[wave][2][i]);
+                }
+            }
+        }
+
+        __syncthreads();
+    }
+}
+
+template <typename T>
+int cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl(const ptrdiff_t                          nelements,
+                                                             idx_t **const SFEM_RESTRICT              elements,
+                                                             const ptrdiff_t                          jacobian_stride,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
+                                                             const cu_jacobian_t *const SFEM_RESTRICT jacobian_determinant,
+                                                             const T                                  mu,
+                                                             const T                                  lambda,
+                                                             const ptrdiff_t                          u_stride,
+                                                             const T *const SFEM_RESTRICT             ux,
+                                                             const T *const SFEM_RESTRICT             uy,
+                                                             const T *const SFEM_RESTRICT             uz,
+                                                             const ptrdiff_t                          out_stride,
+                                                             T *const SFEM_RESTRICT                   outx,
+                                                             T *const SFEM_RESTRICT                   outy,
+                                                             T *const SFEM_RESTRICT                   outz,
+                                                             void                                    *stream) {
+    SFEM_DEBUG_SYNCHRONIZE(stream);
+    if constexpr (sizeof(T) != sizeof(double)) {
+        SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl: FP64 only\n");
+        return SFEM_FAILURE;
+    } else {
+        const int        waves    = cu_sshex8_linear_elasticity_level4_mfma_waves();
+        const ptrdiff_t  n_groups = (nelements + waves - 1) / waves;
+        dim3             n_blocks(MIN(n_groups, sfem_cuda_max_grid_dim_x()), 1, 1);
+        switch (waves) {
+            case 2:
+                cu_affine_sshex8_linear_elasticity_apply_level4_mfma_kernel<T, 2><<<n_blocks, 128, 0, (cudaStream_t)stream>>>(
+                        nelements, elements, jacobian_stride, jacobian_adjugate, jacobian_determinant, mu, lambda, u_stride, ux, uy, uz,
+                        out_stride, outx, outy, outz);
+                break;
+            case 8:
+                cu_affine_sshex8_linear_elasticity_apply_level4_mfma_kernel<T, 8><<<n_blocks, 512, 0, (cudaStream_t)stream>>>(
+                        nelements, elements, jacobian_stride, jacobian_adjugate, jacobian_determinant, mu, lambda, u_stride, ux, uy, uz,
+                        out_stride, outx, outy, outz);
+                break;
+            default:
+                cu_affine_sshex8_linear_elasticity_apply_level4_mfma_kernel<T, 4><<<n_blocks, 256, 0, (cudaStream_t)stream>>>(
+                        nelements, elements, jacobian_stride, jacobian_adjugate, jacobian_determinant, mu, lambda, u_stride, ux, uy, uz,
+                        out_stride, outx, outy, outz);
+                break;
+        }
+        SFEM_CUDA_CHECK(cudaPeekAtLastError());
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return SFEM_SUCCESS;
+    }
+}
+#endif  // SFEM_ENABLE_HIP
 
 template <typename T, int LEVEL>
 int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t                          nelements,
@@ -1528,7 +2018,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
 }
 
 template <typename T, int LEVEL>
-__global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS((LEVEL * LEVEL * LEVEL <= 512 ? LEVEL * LEVEL * LEVEL : LEVEL * LEVEL)) cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdiff_t                          nelements,
                                                                      idx_t **const SFEM_RESTRICT              elements,
                                                                      const ptrdiff_t                          jacobian_stride,
                                                                      const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -1544,10 +2034,11 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdi
                                                                      T *const SFEM_RESTRICT       g_outx,
                                                                      T *const SFEM_RESTRICT       g_outy,
                                                                      T *const SFEM_RESTRICT       g_outz) {
+    // A thread per micro element of a z-layer, the layers zi, zi + blockDim.z, ... (one when the
+    // block holds all LEVEL^3: a block has at most 1024 threads).
     const auto xi         = threadIdx.x;
     const auto yi         = threadIdx.y;
-    const auto zi         = threadIdx.z;
-    const bool is_element = xi < LEVEL && yi < LEVEL && zi < LEVEL;
+    const bool is_element = xi < LEVEL && yi < LEVEL && threadIdx.z < LEVEL;
 
     static const int n_qp  = 2;
     static const T   qx[2] = {0.2113248654, 0.7886751346};
@@ -1561,7 +2052,8 @@ __global__ void cu_affine_sshex8_linear_elasticity_apply_warp_kernel(const ptrdi
         T sub_adjugate[9];
         T sub_determinant;
 
-        for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+        for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x)
+        for (int zi = threadIdx.z; zi < LEVEL; zi += blockDim.z) {
             idx_t ev[8];
             ev[0] = cu_sshex8_lidx(LEVEL, xi, yi, zi);
             ev[1] = cu_sshex8_lidx(LEVEL, xi + 1, yi, zi);
@@ -1652,8 +2144,12 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
                                                       void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
-    dim3 block_size(LEVEL, LEVEL, LEVEL);
-    dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
+    // A thread per micro element up to LEVEL 8 (512 threads); from LEVEL 16 on a block of one z-layer
+    // whose threads loop over the layers (LEVEL^3 = 4096 is beyond a block, and 1024 beyond the
+    // registers for this kernel).
+    static constexpr int Z_LAYERS = LEVEL * LEVEL * LEVEL <= 512 ? LEVEL : 1;
+    dim3                 block_size(LEVEL, LEVEL, Z_LAYERS);
+    dim3                 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 
     cu_affine_sshex8_linear_elasticity_apply_warp_kernel<T, LEVEL>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(nelements,
@@ -1677,7 +2173,6 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 }
 
 #define my_kernel cu_affine_sshex8_linear_elasticity_apply_warp_tpl
-// #define my_kernel_large cu_affine_sshex8_linear_elasticity_apply_warp_tpl
 // #define my_kernel cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_large cu_affine_sshex8_linear_elasticity_apply_local_mem_tpl
 #define my_kernel_segmented cu_affine_sshex8_linear_elasticity_apply_shared_mem_segmented_tpl
@@ -1687,12 +2182,19 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 #define my_kernel_level8_gather cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl
 
 // SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL: 0=local_mem_seg, 2=warp, 3=local_mem,
-// 4=TP (default), 5=gather, 6=TP opt (launch_bounds+padded shared).
+// 4=TP (default), 5=gather, 6=TP opt (launch_bounds+padded shared), 7=AMD FP64 matrix cores (HIP).
 static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
     if (kernel < 0) {
+#if defined(SFEM_ENABLE_HIP)
+        // The TP kernels (4, 6) multiply on NVIDIA's double-precision tensor cores (mma PTX); AMD's
+        // FP64 matrix cores take the same GEMM in kernel 7. MI300A, 44^3 macro elements (44 M nodes):
+        // 7.66 ms against 15.3 (5, gather), 54.1 (0), 49.6 (2) and 49.5 ms (3).
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 7;
+#else
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 4;
+#endif
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL, atoi);
         kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL;
     }
@@ -1742,6 +2244,26 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                            stream);
         }
         case 4: {
+#if defined(SFEM_ENABLE_HIP)
+            if (cu_sshex8_linear_elasticity_level4_kernel() == 7) {
+                return cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl<real_t>(nelements,
+                                                                                       elements,
+                                                                                       jacobian_stride,
+                                                                                       (cu_jacobian_t *)jacobian_adjugate,
+                                                                                       (cu_jacobian_t *)jacobian_determinant,
+                                                                                       mu,
+                                                                                       lambda,
+                                                                                       u_stride,
+                                                                                       (real_t *)ux,
+                                                                                       (real_t *)uy,
+                                                                                       (real_t *)uz,
+                                                                                       out_stride,
+                                                                                       (real_t *)outx,
+                                                                                       (real_t *)outy,
+                                                                                       (real_t *)outz,
+                                                                                       stream);
+            }
+#endif
             return my_kernel<real_t, 4>(nelements,
                                         elements,
                                         jacobian_stride,
@@ -1815,6 +2337,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                    (real_t *)outz,
                                                                    stream);
                 }
+#if !defined(SFEM_ENABLE_HIP)
                 case 4: {
                     return my_kernel_tensor_product<real_t, 8>(nelements,
                                                                elements,
@@ -1833,6 +2356,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                (real_t *)outz,
                                                                stream);
                 }
+#endif
                 case 5: {
                     return my_kernel_level8_gather<real_t, 8>(nelements,
                                                               elements,
@@ -1851,6 +2375,27 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                               (real_t *)outz,
                                                               stream);
                 }
+#if defined(SFEM_ENABLE_HIP)
+                case 7: {
+                    return cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl<real_t>(nelements,
+                                                                                    elements,
+                                                                                    jacobian_stride,
+                                                                                    (cu_jacobian_t *)jacobian_adjugate,
+                                                                                    (cu_jacobian_t *)jacobian_determinant,
+                                                                                    mu,
+                                                                                    lambda,
+                                                                                    u_stride,
+                                                                                    (real_t *)ux,
+                                                                                    (real_t *)uy,
+                                                                                    (real_t *)uz,
+                                                                                    out_stride,
+                                                                                    (real_t *)outx,
+                                                                                    (real_t *)outy,
+                                                                                    (real_t *)outz,
+                                                                                    stream);
+                }
+#endif
+#if !defined(SFEM_ENABLE_HIP)
                 case 6: {
                     return my_kernel_tensor_product_opt<real_t, 8>(nelements,
                                                                    elements,
@@ -1869,6 +2414,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                                    (real_t *)outz,
                                                                    stream);
                 }
+#endif
                 default: {
                     return my_kernel_segmented<real_t, 8>(nelements,
                                                           elements,
@@ -1890,7 +2436,10 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
             }
         }
         case 16: {
-            return my_kernel_large<real_t, 16>(nelements,
+            // The warp kernel, a block per z-layer: the local-memory one holds the 17^3 macro element per
+            // thread, 45 times slower on an H100 (8^3 elements, 2.1 M nodes: 0.60 against 27 ms), and
+            // beyond an AMD GPU's 128 KB of stack.
+            return my_kernel<real_t, 16>(nelements,
                                                elements,
                                                jacobian_stride,
                                                (cu_jacobian_t *)jacobian_adjugate,
@@ -2009,7 +2558,7 @@ extern int cu_affine_sshex8_linear_elasticity_apply(const int                   
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_diag_kernel(const int                                level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_diag_kernel(const int                                level,
                                                                const ptrdiff_t                          nelements,
                                                                idx_t **const SFEM_RESTRICT              elements,
                                                                const ptrdiff_t                          jacobian_stride,
@@ -2183,7 +2732,7 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
 }
 
 template <typename T>
-__global__ void cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
         const int                                level,
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
@@ -2467,7 +3016,7 @@ static __device__ void cu_sshex8_micro_nodes(const int                         l
 }
 
 template <typename T>
-__global__ void cu_sshex8_linear_elasticity_apply_kernel(const int                         level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_sshex8_linear_elasticity_apply_kernel(const int                         level,
                                                          const ptrdiff_t                   nelements,
                                                          idx_t **const SFEM_RESTRICT       elements,
                                                          const ptrdiff_t                   corners_stride,
@@ -2545,7 +3094,7 @@ __global__ void cu_sshex8_linear_elasticity_apply_kernel(const int              
 // The diagonal blocks, packed 00 01 02 11 12 22, into out[0..5]; with `diag_only` only the
 // diagonal, the packed entries 0, 3 and 5, into out[0..2].
 template <typename T>
-__global__ void cu_sshex8_linear_elasticity_block_diag_sym_kernel(const int                         level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_sshex8_linear_elasticity_block_diag_sym_kernel(const int                         level,
                                                                   const ptrdiff_t                   nelements,
                                                                   idx_t **const SFEM_RESTRICT       elements,
                                                                   const ptrdiff_t                   corners_stride,

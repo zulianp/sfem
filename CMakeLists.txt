@@ -165,6 +165,10 @@ if(SFEM_ENABLE_CUDA)
     if(SFEM_ENABLE_AMG)
         list(APPEND SFEM_MODULES amg/cuda amg/vector_amg)
     endif()
+
+    if(SFEM_ENABLE_HIP)
+        list(APPEND SFEM_MODULES base/hip)
+    endif()
 endif()
 
 # The library's sources live under src/.
@@ -252,11 +256,17 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
 endif()
 
+# A HIP build compiles the same device sources with the HIP compiler (base/hip/sfem_gpu_runtime.hpp).
+if(SFEM_ENABLE_HIP)
+    set_source_files_properties(${SFEM_KERNEL_SOURCES} PROPERTIES LANGUAGE HIP)
+endif()
+
 # The stored tangent's device stores (frontend/ops/inexact/cuda and each unit's generated
 # `_inexact_store.cu`) keep IEEE single precision under the build's -use_fast_math: flush-to-zero
 # puts a denormal test on every double-to-float conversion of an increment difference (18 per
 # element in the TET4 element-matrix apply, 18% slower), and the set-up then rounds as the host's.
-if(SFEM_ENABLE_CUDA)
+# HIP's defaults are IEEE already (below).
+if(SFEM_ENABLE_CUDA AND NOT SFEM_ENABLE_HIP)
     set(SFEM_INEXACT_DEVICE_SOURCES ${SFEM_KERNEL_SOURCES})
     list(FILTER SFEM_INEXACT_DEVICE_SOURCES INCLUDE REGEX "(_inexact_store|/frontend/ops/inexact/cuda/[^/]*)\\.cu$")
     set_source_files_properties(${SFEM_INEXACT_DEVICE_SOURCES} PROPERTIES
@@ -311,7 +321,25 @@ target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
 
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    # The CUDA headers' names resolve to base/hip/compat, ahead of everything else.
+    target_include_directories(sfem BEFORE PUBLIC
+        $<BUILD_INTERFACE:${SFEM_SRC_DIR}/base/hip/compat>
+        $<INSTALL_INTERFACE:include/hip_compat>)
+    # rocThrust and rocPRIM headers, for the .cu files only (see SFEMDependencies.cmake).
+    foreach(hdr_target roc::rocthrust roc::rocprim)
+        target_include_directories(sfem PRIVATE
+            "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
+    endforeach()
+    # IEEE division and square root are the HIP compiler's defaults; flushing subnormals is a
+    # per-target choice, so keeping them, as the CUDA build does, is stated.
+    target_compile_options(sfem PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-fno-gpu-flush-denormals-to-zero>)
+    # nvcc includes cuda_runtime.h into every .cu before its first line; base/hip/compat's does here.
+    target_compile_options(sfem PRIVATE "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:HIP_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:HIP>:-fgpu-default-stream=per-thread>>)
+elseif(SFEM_ENABLE_CUDA)
     # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
     target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:CUDA_API_PER_THREAD_DEFAULT_STREAM>)
     target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:CUDA>:--default-stream=per-thread>>)
@@ -411,6 +439,11 @@ if(NOT SFEM_ENABLE_MINIMAL)
         add_executable(bench_packed_laplacian_cuda
             bench/cuda/bench_packed_laplacian.cpp
             bench/cuda/bench_packed_laplacian.cu)
+        if(SFEM_ENABLE_HIP)
+            set_source_files_properties(bench/cuda/bench_packed_laplacian.cu PROPERTIES LANGUAGE HIP)
+            target_compile_options(bench_packed_laplacian_cuda PRIVATE
+                "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
+        endif()
         target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
         # if(SFEM_ENABLE_OPENMP)
         #     if(OPENMP_DIR)
@@ -633,6 +666,10 @@ install(FILES ${CMAKE_BINARY_DIR}/sfem_config.py DESTINATION scripts/sfem)
 install(FILES ${CMAKE_BINARY_DIR}/sfem_config.sh DESTINATION workflows)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
+
+if(SFEM_ENABLE_HIP)
+    install(DIRECTORY ${SFEM_SRC_DIR}/base/hip/compat/ DESTINATION include/hip_compat)
+endif()
 
 install(
     EXPORT SFEMTargets

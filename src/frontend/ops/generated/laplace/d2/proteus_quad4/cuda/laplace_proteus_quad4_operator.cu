@@ -91,7 +91,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_proteus_quad4_objective_steps_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_proteus_quad4_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -289,7 +289,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_proteus_quad4_gradient_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_proteus_quad4_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -487,7 +487,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void laplace_proteus_quad4_apply_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -686,7 +686,7 @@ __host__ __device__ __forceinline__ void laplace_proteus_quad4_hessian_i_msoa_sc
 }
 
 template <typename s_t, typename v_t, typename g_t, int FORMAT>
-__global__ void laplace_proteus_quad4_hessian_i_msoa_assemble_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) laplace_proteus_quad4_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

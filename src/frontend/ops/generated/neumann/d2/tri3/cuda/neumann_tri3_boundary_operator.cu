@@ -107,7 +107,7 @@ __host__ __device__ __forceinline__ void neumann_tri3_edgeshell2_boundary_residu
 }
 
 template <typename s_t>
-__global__ void neumann_tri3_edgeshell2_boundary_residual_soa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) neumann_tri3_edgeshell2_boundary_residual_soa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -134,7 +134,7 @@ __global__ void neumann_tri3_edgeshell2_boundary_residual_soa_impl(
 }
 
 template <typename s_t>
-__global__ void neumann_tri3_edgeshell2_boundary_residual_ss_soa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) neumann_tri3_edgeshell2_boundary_residual_ss_soa_impl(
     const ptrdiff_t nsides,
     const ptrdiff_t,
     idx_t **const RSTR elements,

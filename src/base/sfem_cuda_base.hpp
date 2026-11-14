@@ -89,4 +89,14 @@ namespace sfem {
 
 #endif  // SFEM_ENABLE_NVTX
 
+// A kernel's block size for HIP's register allocation. Without launch bounds HIP compiles a kernel
+// for blocks of 1024 threads, which caps a thread at 128 VGPRs (CUDA allows 255), so kernels that fit
+// on NVIDIA spill to scratch on AMD. Empty in CUDA builds. The kernel must not be launched with more
+// threads a block.
+#if defined(__HIP_PLATFORM_AMD__)
+#define SFEM_HIP_LAUNCH_BOUNDS(threads_per_block) __launch_bounds__(threads_per_block)
+#else
+#define SFEM_HIP_LAUNCH_BOUNDS(threads_per_block)
+#endif
+
 #endif  // SFEM_CUDA_BASE_H

@@ -42,7 +42,7 @@ namespace sfem {
             /// On the device it is a call: inlined into the set-up kernel after the generated point
             /// tangent, nvcc 12.6 at -O3 returned a wrong projection of a correct tangent (with and
             /// without fast math, at every ptxas level; right at -G and as a call; 2026-11-08).
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
             template <typename s_t>
             static __host__ __device__ __noinline__ void project_point_tangent(s_t *const T, const s_t adj[9], const s_t det) {
 #else

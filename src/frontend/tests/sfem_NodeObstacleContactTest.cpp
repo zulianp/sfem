@@ -43,6 +43,11 @@ namespace {
 
     real_t pseudo_random(const ptrdiff_t i, const int salt) { return std::sin(real_t(0.7 * (i + 1) + salt)); }
 
+    // The grids hold float values, so the spline's gradient is good to about eps |phi| / h, near
+    // 1e-6 here, and the gap -phi / |grad phi| to that relative error: rounding alone moves a gap of
+    // 1.1 by 1.4e-6 on x86-64 without FMA. The gap, its normal and gap_field are held to 1e-5 of it.
+    real_t gap_tol(const real_t gap) { return real_t(1e-5) * std::max(real_t(1), std::abs(gap)); }
+
 }  // namespace
 
 // The gap is the height, the frames are rotations whose first axis is the normal.
@@ -54,7 +59,7 @@ int test_gap_and_frames() {
     const geom_t *const z   = f.mesh->points()->data()[2];
     const real_t *const gap = f.contact->gap()->data();
     for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
-        SFEM_TEST_ASSERT(std::abs(gap[i] - z[i]) < 1e-6);
+        SFEM_TEST_ASSERT(std::abs(gap[i] - z[i]) < gap_tol(z[i]));
     }
 
     std::vector<real_t> v(f.ndofs), w(f.ndofs);
@@ -62,7 +67,7 @@ int test_gap_and_frames() {
     f.contact->to_frame(nullptr, w.data(), w.data());
     for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
         // The normal component, and the length kept.
-        SFEM_TEST_ASSERT(std::abs(w[i * 3] + v[i * 3 + 2]) < 1e-6);
+        SFEM_TEST_ASSERT(std::abs(w[i * 3] + v[i * 3 + 2]) < gap_tol(1));
         const real_t lv = v[i * 3] * v[i * 3] + v[i * 3 + 1] * v[i * 3 + 1] + v[i * 3 + 2] * v[i * 3 + 2];
         const real_t lw = w[i * 3] * w[i * 3] + w[i * 3 + 1] * w[i * 3 + 1] + w[i * 3 + 2] * w[i * 3 + 2];
         SFEM_TEST_ASSERT(std::abs(lv - lw) < 1e-12);
@@ -75,8 +80,8 @@ int test_gap_and_frames() {
     std::vector<real_t> to_surface(f.ndofs);
     f.contact->gap_field(to_surface.data());
     for (ptrdiff_t i = 0; i < f.nnodes; ++i) {
-        SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - 0) < 1e-6);
-        SFEM_TEST_ASSERT(std::abs(to_surface[i * 3 + 2] + z[i]) < 1e-6);
+        SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - 0) < gap_tol(z[i]));
+        SFEM_TEST_ASSERT(std::abs(to_surface[i * 3 + 2] + z[i]) < gap_tol(z[i]));
     }
     return SFEM_TEST_SUCCESS;
 }
@@ -114,12 +119,12 @@ int test_union_of_grids() {
     int                 beside = 0;
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         const real_t gz = pz[i], gx = real_t(1.27) - px[i];
-        SFEM_TEST_ASSERT(std::abs(gap[i] - std::min(gz, gx)) < 1e-6);
+        SFEM_TEST_ASSERT(std::abs(gap[i] - std::min(gz, gx)) < gap_tol(std::min(gz, gx)));
         if (gx < gz) {
             beside++;
-            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - gx) < 1e-6 && std::abs(to_surface[i * 3 + 2]) < 1e-6);
+            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3] - gx) < gap_tol(gx) && std::abs(to_surface[i * 3 + 2]) < gap_tol(gx));
         } else {
-            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3]) < 1e-6 && std::abs(to_surface[i * 3 + 2] + gz) < 1e-6);
+            SFEM_TEST_ASSERT(std::abs(to_surface[i * 3]) < gap_tol(gz) && std::abs(to_surface[i * 3 + 2] + gz) < gap_tol(gz));
         }
     }
     // Both obstacles constrain some nodes.

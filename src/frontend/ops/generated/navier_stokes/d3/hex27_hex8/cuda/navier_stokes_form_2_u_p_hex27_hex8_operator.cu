@@ -44,6 +44,10 @@ extern "C" const sfem::codegen::KernelDiagnostics * cu_navier_stokes_form_2_u_p_
         void
 );
 
+#if defined(SFEM_ENABLE_HIP)
+#include <unordered_map>
+#endif
+
 namespace {
   //! Reorder a device table of connectivity rows on the device.
   template <int N>
@@ -58,6 +62,20 @@ namespace {
     const int k = threadIdx.x;
     if (k < N) permuted[k] = elements[order.source[k]];
   }
+
+#if defined(SFEM_ENABLE_HIP)
+  //! The permuted table's storage under HIP: one per host thread and stream, kept for the
+  //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does
+  //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the
+  //! products of a captured solver run (the coarse CG's) allocate nothing this way.
+  template <typename T, int N>
+  T **permuted_connectivity_table(const cudaStream_t stream) {
+    static thread_local std::unordered_map<cudaStream_t, T **> tables;
+    T **&table = tables[stream];
+    if (!table && cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;
+    return table;
+  }
+#endif
 }  // namespace
 
 extern "C" int cu_navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_i_msoa(
@@ -74,12 +92,19 @@ extern "C" int cu_navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_i_msoa(
         void *const RSTR p_out,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 27>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
     permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
@@ -106,12 +131,19 @@ extern "C" int cu_navier_stokes_form_2_u_p_hex27_hex8_jacobian_action_a_msoa(
         void *const RSTR p_out,
         void *const stream
 ) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 27>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
     idx_t **proteus_elements = nullptr;
     if (cudaMallocAsync((void **)&proteus_elements, 27 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
     const ConnectivityOrder<27> proteus_elements_order{{0, 8, 1, 11, 24, 9, 3, 10, 2, 16, 20, 17, 23, 26, 21, 19, 22, 18, 4, 12, 5, 15, 25, 13, 7, 14, 6}};
     permute_connectivity<idx_t, 27><<<1, 27, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
     const int status = cu_navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, direction_stride, u_direction_data, p_direction_data, out_stride, u_out, p_out, stream);
+#if !defined(SFEM_ENABLE_HIP)
     cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
     return status;
 }
 
