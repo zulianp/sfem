@@ -279,6 +279,13 @@ kernels are measured without it (step 0).
     (`apply_point_temporaries`: linear elasticity 7, Saint Venant-Kirchhoff 83, Neo-Hookean 113,
     modified Mooney-Rivlin 367): Mooney-Rivlin's point, evaluated with a tile's accumulators live,
     spills. Its generated kernel, with the launch bounds, is the faster on both vendors at Q2.
+- Step 6a, the level-8 apply on GH200: kernel 7's shape on the FP64 tensor cores (mma.sync m8n8k4,
+  a block per macro element, K^T in registers, 16 warps of 4 tiles of 8 micro elements) takes 10.9
+  ms at 44^3 macro elements (12.7 with 8 warps), against 9.59 ms for the default kernel 4; not
+  kept. The comparison found kernel 6 (TP opt, launch bounds and padded shared memory, CUDA only)
+  at 6.66 ms, never made the default. MaMAL 136 M alternated three times on one node: 16.94, 16.97,
+  17.36 s against 19.39, 19.29, 19.34 s with kernel 4, the same iterations and residuals digit for
+  digit; 0.7 M within noise. Kernel 6 is now the CUDA default.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

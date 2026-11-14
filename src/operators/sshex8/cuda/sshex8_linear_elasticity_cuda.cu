@@ -2182,7 +2182,8 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 #define my_kernel_level8_gather cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl
 
 // SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL: 0=local_mem_seg, 2=warp, 3=local_mem,
-// 4=TP (default), 5=gather, 6=TP opt (launch_bounds+padded shared), 7=AMD FP64 matrix cores (HIP).
+// 4=TP, 5=gather, 6=TP opt (launch_bounds+padded shared; the CUDA default), 7=AMD FP64 matrix cores
+// (HIP; the HIP default).
 static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
@@ -2193,7 +2194,9 @@ static int cu_sshex8_linear_elasticity_level8_kernel() {
         // 7.66 ms against 15.3 (5, gather), 54.1 (0), 49.6 (2) and 49.5 ms (3).
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 7;
 #else
-        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 4;
+        // GH200, 44^3 macro elements: 6.66 ms against 9.59 (4), 10.9 (5); MaMAL 136 M alternated
+        // three times on one node: 16.94-17.36 s against 19.29-19.39 s, the same iterations.
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 6;
 #endif
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL, atoi);
         kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL;
