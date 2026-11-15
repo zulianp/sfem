@@ -1496,8 +1496,8 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
 // tiles of 16 micro elements: six k-steps of four and two 16-column halves of the 24 outputs (the
 // second half padded), K^T in registers, U read from the block's displacements in LDS. The tiles'
 // results stay in registers until all are done; the same LDS then accumulates them (LDS FP64 atomics)
-// and the node values go out once: the 7^3 interior nodes, which no other macro element touches,
-// without atomics. Lane layout of 16x16x4 f64 (measured on gfx942): A(i, k) at lane
+// and the node values go out once, as atomics in address order. Lane layout of 16x16x4 f64 (measured
+// on gfx942): A(i, k) at lane
 // i + 16 k, B(k, j) at lane j + 16 k, D(i, j) in slot i / 4 of lane j + 16 (i % 4).
 typedef double cu_sshex8_mfma_double4 __attribute__((ext_vector_type(4)));
 
@@ -1661,25 +1661,21 @@ __global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elastici
 
         __syncthreads();
 
-        for (int i = thread_id; i < BLOCK_SIZE_3; i += blockDim.x) {
+        // Value f = 3 node + component per thread, so a wavefront's atomics cover consecutive addresses
+        // of the interleaved vector. MI300A, 44^3 macro elements (132M dofs): 6.38-6.44 ms against
+        // 7.63-7.66 with a node per thread (interior nodes plain adds) and 7.09-7.10 with atomics
+        // for every node.
+        for (int f = thread_id; f < 3 * BLOCK_SIZE_3; f += blockDim.x) {
+            const int i = f / 3;
+            const int c = f - 3 * i;
             const int z = i / BLOCK_SIZE_2;
             const int r = i - z * BLOCK_SIZE_2;
             const int y = r / BLOCK_SIZE;
             const int x = r - y * BLOCK_SIZE;
 
-            const int       pi      = cu_sshex8_level8_padded_lidx(x, y, z);
-            const ptrdiff_t out_idx = nodes[i] * out_stride;
-
-            if (x > 0 && x < LEVEL && y > 0 && y < LEVEL && z > 0 && z < LEVEL) {
-                // An interior node: no other macro element adds to it.
-                g_outx[out_idx] += field[0][pi];
-                g_outy[out_idx] += field[1][pi];
-                g_outz[out_idx] += field[2][pi];
-            } else {
-                atomicAdd(&g_outx[out_idx], field[0][pi]);
-                atomicAdd(&g_outy[out_idx], field[1][pi]);
-                atomicAdd(&g_outz[out_idx], field[2][pi]);
-            }
+            const int pi    = cu_sshex8_level8_padded_lidx(x, y, z);
+            T *const  g_out = c == 0 ? g_outx : (c == 1 ? g_outy : g_outz);
+            atomicAdd(&g_out[nodes[i] * out_stride], field[c][pi]);
         }
 
         __syncthreads();

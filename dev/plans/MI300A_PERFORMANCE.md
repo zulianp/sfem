@@ -75,6 +75,7 @@ kernels are measured without it (step 0).
 | 3a, 2d, 6b | launch bounds on the generated kernels too; every default at 351bafc82 (Nibi job 27330947; GH200 Alps job 5352529, three runs each) | 21.66-21.94 s (GH200 15.85-16.09 s) | 1.35-1.57 s (GH200 1.00-1.03 s) |
 | 4c | coarse CG in nine graph nodes an iteration; one-kernel zeroing on HIP (Nibi job 27426836, three runs each) | 21.26-21.59 s (GH200 15.57-15.78 s) | 1.28-1.54 s (GH200 0.97-0.99 s) |
 | 3b | coarse HEX8 apply: interleaved atomics in address order (Nibi job 27438830, another node: the build before it 21.14-21.34 s) | 20.86-21.00 s (GH200 15.62-15.86 s) | 1.65-1.66 s (GH200 0.97-1.03 s) |
+| 2e | level-8 apply (kernel 7): node values added as atomics in address order (Nibi job 27446262, three runs each against the build before it) | 19.72-19.93 s (20.65-21.07 s) | 1.32-1.64 s (1.30-1.53 s) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -331,7 +332,22 @@ kernels are measured without it (step 0).
   - The same address order in the level-8 scatter (kernel 6, values already in shared memory) loses
     on GH200: 7.61 ms against 6.65 at 44^3 macro elements, 8.84 ms with the interior nodes added
     without atomics (a load and a store cost more than an atomic whose result is unused). Kernel 7
-    adds its interior nodes that way: to be measured against atomics on MI300A.
+    adds its interior nodes that way: see step 2e.
+- Step 2e, the level-8 scatter of kernel 7 (MI300A): the node values, already summed in LDS, go out
+  a value per thread (3 node + component), so a wavefront's atomics cover consecutive addresses.
+  `bench_op_apply`, 44^3 macro elements (132 M dofs, Nibi job 27439284, two runs each): 6.38-6.44 ms
+  against 7.63-7.66 with a node per thread and the interior nodes added without atomics, 7.09-7.10
+  with atomics for every node. MaMAL in the progress table (same iterations and residuals; the 0.7 M
+  case's coarse CG takes 0.26 s or 0.41-0.48 s in either build); ctest 119/119 (Nibi 27446262).
+- Kernel profile at 52565c0fc, MaMAL 136 M (roctracer, Nibi job 27439696; nsys, Alps job 5360065):
+  kernels 14.2 s on MI300A against 11.5 s on GH200. The level-8 apply 8.67 ms a call against 6.83
+  (before step 2e); the coarse CG's vector kernels 2-4 us a call slower (25 440 calls each, ~0.6 s);
+  `sshex8_hierarchical_restriction_kernel` 6.3 ms against 2.8 (48 calls); `taxpby`, level 4, the
+  smoother and the coarse HEX8 apply within 10%. roctracer's copy records overlap (a copy's time
+  includes its wait in the queue): 15.6 s summed, 1.0 s as a union, nearly all in the set-up.
+- The MaMAL runs' 24 OpenMP threads (`srun --cpus-per-task=24` inside `--ntasks=4
+  --cpus-per-task=6`, even with `--gres-flags=enforce-binding`) got cores 0-6, 24-30, 48-54, 72-78:
+  seven on each APU, the GPU on NUMA node 0.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
