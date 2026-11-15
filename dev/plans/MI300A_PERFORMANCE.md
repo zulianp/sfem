@@ -73,6 +73,8 @@ kernels are measured without it (step 0).
 | 5a | level-4 apply on the FP64 matrix cores | 25.5-25.6 s (28.6-29.1 with the warp kernel, same node) | 1.8-1.9 s (1.7-2.1) |
 | 3a | HIP launch bounds on 17 hand-written kernels (coarse HEX8 apply, level-2 apply, ...) | 26.3 s (another node) | |
 | 3a, 2d, 6b | launch bounds on the generated kernels too; every default at 351bafc82 (Nibi job 27330947; GH200 Alps job 5352529, three runs each) | 21.66-21.94 s (GH200 15.85-16.09 s) | 1.35-1.57 s (GH200 1.00-1.03 s) |
+| 4c | coarse CG in nine graph nodes an iteration; one-kernel zeroing on HIP (Nibi job 27426836, three runs each) | 21.26-21.59 s (GH200 15.57-15.78 s) | 1.28-1.54 s (GH200 0.97-0.99 s) |
+| 3b | coarse HEX8 apply: interleaved atomics in address order (Nibi job 27438830, another node: the build before it 21.14-21.34 s) | 20.86-21.00 s (GH200 15.62-15.86 s) | 1.65-1.66 s (GH200 0.97-1.03 s) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -296,6 +298,40 @@ kernels are measured without it (step 0).
   - The dot's block cap (step 4a; `SFEM_DOT_BLOCKS_PER_UNIT`, 4 on both vendors): nsys, MaMAL 136 M,
     the 169 fine-level dots outside the graphs 1121 -> 344 us each (0.189 -> 0.058 s); the run 16.0
     s against 16.5 s (one each).
+- Step 4c, the coarse CG's device loop in nine graph nodes an iteration (both vendors): beta and alpha
+  formed in the kernels that use them, each dot adding into a word the kernel before it zeroed (no
+  memset node), the dots in at most one block of 512 per compute unit. Graph microbenchmark at the
+  coarse size (307 461 dofs): an empty node costs 1.7 us on MI300A and 0.5 on GH200; a memset-and-dot
+  pair 11.8 us on MI300A with four blocks of 128 per unit, 5.8 with one of 512 (atomics on one word
+  serialise), GH200 5.2 either way. HIP's `hipMemsetAsync` is two fill kernels; below 4 M entries
+  `GPUBLAS::zeros` launches one of its own under HIP (307 k doubles 2.4 us against 4.0). MaMAL,
+  alternated three times on one node against 351bafc82, the same iterations and residuals:
+
+  | | 136 M total | 136 M coarse CG | 0.7 M coarse CG |
+  |---|---|---|---|
+  | MI300A (Nibi job 27426836) | 21.26-21.59 s (21.79-21.94) | 2.41-2.45 s (2.88-2.91) | 0.25 s (0.29) |
+  | GH200, without the HIP zeroing (Alps) | 15.57-15.78 s (15.76-15.95) | 1.33 s (1.51) | |
+
+- Step 3b, the coarse HEX8 apply: 39.3 us a call in the solver on MI300A and 26.2 on GH200, 18.8 and
+  18.9 us in a standalone copy on the dumped coarse mesh (86 400 elements). The mesh is well ordered
+  (an element's nodes within one node plane; first-touch renumbering 20.6 us); the difference is the
+  layout: SFEM's vectors interleave x, y, z, and a warp's atomics then touch three times the cache
+  lines (GH200: 25.3 us interleaved, 19.4 separate; MI300A 39.0 and 17.1; reads cost nothing).
+  Each 32-lane group now adds its 96 values in address order, exchanged through shared memory on
+  GH200 (19.3 us; shuffles 21.0) and through shuffles on MI300A (18.9 us; shared memory 20.7).
+  MaMAL alternated three times on one node against the build before it, the same residuals:
+
+  | | 136 M total | 136 M coarse CG | 0.7 M total | 0.7 M coarse CG |
+  |---|---|---|---|---|
+  | MI300A (Nibi job 27438830) | 20.86-21.00 s (21.14-21.34) | 1.93-1.97 s (2.43-2.50) | 1.65-1.66 s (1.63-1.65) | 0.48 s (0.47) |
+  | GH200 (Alps job 5358902) | 15.62-15.86 s (15.70-15.81) | 1.27-1.29 s (1.33) | 0.97-1.03 s (1.01-1.09) | 0.127 s (0.127) |
+
+  The 0.7 M case's coarse mesh is small and loses ~10 ms on MI300A. ctest 119/119 on both
+  (Nibi 27438830, Alps 5359920).
+  - The same address order in the level-8 scatter (kernel 6, values already in shared memory) loses
+    on GH200: 7.61 ms against 6.65 at 44^3 macro elements, 8.84 ms with the interior nodes added
+    without atomics (a load and a store cost more than an atomic whose result is unused). Kernel 7
+    adds its interior nodes that way: to be measured against atomics on MI300A.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
