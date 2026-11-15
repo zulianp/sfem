@@ -574,6 +574,17 @@ namespace sfem {
 
     template <typename T>
     void GPUBLAS<T>::zeros(const std::size_t size, T *const x) {
+#if defined(SFEM_ENABLE_HIP)
+        // HIP's memset is two fill kernels: below a few million entries one kernel of ours is faster
+        // (MI300A, in a graph: 307 k doubles 2.4 us against 4.0, 2.3 M 6.6 against 8.5; even at 1 M
+        // and 5 M; the memset from 50 M on, 136 M 268 against 295 us).
+        if (size <= std::size_t(4000000)) {
+            const int       block_size = 256;
+            const ptrdiff_t n_blocks   = std::max(ptrdiff_t(1), (ptrdiff_t(size) + block_size - 1) / block_size);
+            tvalues_kernel<<<n_blocks, block_size, 0, stream_of(*this)>>>(ptrdiff_t(size), T(0), x);
+            return;
+        }
+#endif
         CHECK_CUDA(cudaMemsetAsync(x, 0, size * sizeof(T), stream_of(*this)));
     }
 

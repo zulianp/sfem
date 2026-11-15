@@ -26,8 +26,6 @@ namespace sfem {
         int       max_it{0};
         /// z = M r and Ap = A p, as the loop applies them (an accumulating operator's output zeroed).
         std::function<void(const T *const, T *const)> precondition, product;
-        /// a . b into the word `result` where the vectors are, as the loop's dots compute it.
-        std::function<void(const T *const, const T *const, T *const)> dot;
         /// The solver's stream: the run is ordered on it.
         void *stream{nullptr};
     };

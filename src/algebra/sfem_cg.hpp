@@ -499,7 +499,6 @@ namespace sfem {
                     run.max_it       = max_it;
                     run.precondition = [&](const T* const in, T* const out) { e.apply(M, in, out, apply_overwrites_output); };
                     run.product      = [&](const T* const in, T* const out) { e.apply(A, in, out, apply_overwrites_output); };
-                    run.dot          = [&](const T* const a, const T* const b, T* const result) { blas->dot(n, a, b, result); };
                     run.stream       = blas->context().stream();
                     const CGDeviceRunResult ran = impl.run_precond(run);
                     if (ran.ran) {
