@@ -72,6 +72,7 @@ kernels are measured without it (step 0).
 | 2b | level-8 apply on the FP64 matrix cores (kernel 7) | 25.7 s (31.7 with kernel 5, same node) | 1.6-1.8 s |
 | 5a | level-4 apply on the FP64 matrix cores | 25.5-25.6 s (28.6-29.1 with the warp kernel, same node) | 1.8-1.9 s (1.7-2.1) |
 | 3a | HIP launch bounds on 17 hand-written kernels (coarse HEX8 apply, level-2 apply, ...) | 26.3 s (another node) | |
+| 3a, 2d, 6b | launch bounds on the generated kernels too; every default at 351bafc82 (Nibi job 27330947; GH200 Alps job 5352529, three runs each) | 21.66-21.94 s (GH200 15.85-16.09 s) | 1.35-1.57 s (GH200 1.00-1.03 s) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
