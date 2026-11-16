@@ -394,8 +394,11 @@ kernels are measured without it (step 0).
   (102 400 nodes, 3000 iterations): MI300A 41.5-44.1 us an iteration against 49.1-50.3, H100 21.8
   against 27.4. H100 (Fir job 4363120, three runs each, the same iterations and residuals): MaMAL
   136 M 19.28-21.37 s against 19.32-21.48, coarse CG 1.32 s against 1.37; 0.7 M coarse CG 0.091 s
-  against 0.103; ctest 119/119 (the two NCCL tests on four GPUs, Fir job 4363809). MI300A: Nibi
-  job 27476190, queued.
+  against 0.103; ctest 119/119 (the two NCCL tests on four GPUs, Fir job 4363809). MI300A (Nibi
+  job 27476190, the same iterations and residuals): MaMAL 136 M 19.10-19.48 s against
+  19.33-20.49, coarse CG 1.57-1.64 s against 1.72-1.79; 0.7 M runs in two modes, the fast one's
+  coarse CG 0.206 s against 0.223. ctest 119/119 once the line search allows for rounding
+  (86cb68201, Nibi job 27508487).
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
