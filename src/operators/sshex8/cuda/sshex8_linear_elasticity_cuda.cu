@@ -2730,8 +2730,13 @@ extern int cu_affine_sshex8_linear_elasticity_diag(const int                    
     }
 }
 
+// Node-centric: the 8 corner blocks of a sub-element (all alike, affine) once per macro element,
+// then each node's sum over the corners of the sub-elements around it, added once. EB macro elements
+// a block, so the node index loads cover EB consecutive entries of each array.
+static const int CU_SSHEX8_BLOCK_DIAG_EB = 8;
+
 template <typename T>
-__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(256) cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel(
         const int                                level,
         const ptrdiff_t                          nelements,
         idx_t **const SFEM_RESTRICT              elements,
@@ -2762,23 +2767,25 @@ __global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_b
                                      7,
                                      6};
 
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
-        T adjugate[9];
+    constexpr int EB = CU_SSHEX8_BLOCK_DIAG_EB;
+    __shared__ T  corner_blocks[EB][8][6];  // indexed by the corner's grid position x + 2 y + 4 z
 
-        // Copy over jacobian adjugate
-        for (int i = 0; i < 9; i++) {
-            adjugate[i] = jacobian_adjugate[i * jacobian_stride + e];
-        }
+    const ptrdiff_t e0 = (ptrdiff_t)blockIdx.x * EB;
 
-        T determinant = jacobian_determinant[e];
+    if (threadIdx.x < EB * 8) {
+        const int       el     = threadIdx.x / 8;
+        const int       edof_i = threadIdx.x % 8;
+        const ptrdiff_t e      = e0 + el;
+        T               element_matrix[6] = {0, 0, 0, 0, 0, 0};
+        if (e < nelements) {
+            T adjugate[9];
+            for (int i = 0; i < 9; i++) {
+                adjugate[i] = jacobian_adjugate[i * jacobian_stride + e];
+            }
 
-        cu_hex8_sub_adj_0_in_place<T>(1. / level, adjugate, &determinant);
+            T determinant = jacobian_determinant[e];
+            cu_hex8_sub_adj_0_in_place<T>(1. / level, adjugate, &determinant);
 
-        // Assemble the diagonal part of the matrix
-        for (int edof_i = 0; edof_i < 8; edof_i++) {
-            T element_matrix[6] = {0, 0, 0, 0, 0, 0};
-
-            // Quadrature
             for (int qzi = 0; qzi < n_qp; qzi++) {
                 for (int qyi = 0; qyi < n_qp; qyi++) {
                     for (int qxi = 0; qxi < n_qp; qxi++) {
@@ -2795,29 +2802,40 @@ __global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_linear_elasticity_b
                     }
                 }
             }
-
-            const int x_map = hex8_to_grid_map[edof_i] & 1;
-            const int y_map = (hex8_to_grid_map[edof_i] >> 1) & 1;
-            const int z_map = hex8_to_grid_map[edof_i] >> 2;
-
-            // Iterate over sub-elements
-            for (int zi = 0; zi < level; zi++) {
-                for (int yi = 0; yi < level; yi++) {
-                    for (int xi = 0; xi < level; xi++) {
-                        const int lidx = cu_sshex8_lidx(level, xi + x_map, yi + y_map, zi + z_map);
-                        // local to global
-                        const ptrdiff_t idx = elements[lidx][e] * out_stride;
-
-                        atomicAdd(&out0[idx], element_matrix[0]);
-                        atomicAdd(&out1[idx], element_matrix[1]);
-                        atomicAdd(&out2[idx], element_matrix[2]);
-                        atomicAdd(&out3[idx], element_matrix[3]);
-                        atomicAdd(&out4[idx], element_matrix[4]);
-                        atomicAdd(&out5[idx], element_matrix[5]);
-                    }
-                }
-            }
         }
+
+        for (int k = 0; k < 6; k++) corner_blocks[el][hex8_to_grid_map[edof_i]][k] = element_matrix[k];
+    }
+    __syncthreads();
+
+    // Node (x, y, z) is corner (cx, cy, cz) of sub-element (x - cx, y - cy, z - cz) where that exists
+    const int nxe = (level + 1) * (level + 1) * (level + 1);
+    for (int i = threadIdx.x; i < EB * nxe; i += blockDim.x) {
+        const int       el   = i % EB;
+        const int       node = i / EB;
+        const ptrdiff_t e    = e0 + el;
+        if (e >= nelements) continue;
+
+        const int x = node % (level + 1);
+        const int y = (node / (level + 1)) % (level + 1);
+        const int z = node / ((level + 1) * (level + 1));
+
+        T acc[6] = {0, 0, 0, 0, 0, 0};
+        for (int c = 0; c < 8; c++) {
+            const int sx = x - (c & 1);
+            const int sy = y - ((c >> 1) & 1);
+            const int sz = z - (c >> 2);
+            if (sx < 0 || sx >= level || sy < 0 || sy >= level || sz < 0 || sz >= level) continue;
+            for (int k = 0; k < 6; k++) acc[k] += corner_blocks[el][c][k];
+        }
+
+        const ptrdiff_t idx = elements[cu_sshex8_lidx(level, x, y, z)][e] * out_stride;
+        atomicAdd(&out0[idx], acc[0]);
+        atomicAdd(&out1[idx], acc[1]);
+        atomicAdd(&out2[idx], acc[2]);
+        atomicAdd(&out3[idx], acc[3]);
+        atomicAdd(&out4[idx], acc[4]);
+        atomicAdd(&out5[idx], acc[5]);
     }
 }
 
@@ -2840,16 +2858,8 @@ int cu_affine_sshex8_linear_elasticity_block_diag_sym_tpl(const int             
                                                           void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
-    int block_size = 128;
-#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-    {
-        int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(
-                &min_grid_size, &block_size, cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel<T>, 0, 0);
-    }
-#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-
-    ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
+    const int       block_size = 256;
+    const ptrdiff_t n_blocks   = MAX(ptrdiff_t(1), (nelements + CU_SSHEX8_BLOCK_DIAG_EB - 1) / CU_SSHEX8_BLOCK_DIAG_EB);
 
     cu_affine_sshex8_linear_elasticity_block_diag_sym_kernel<T>
             <<<n_blocks, block_size, 0, (cudaStream_t)stream>>>(level,

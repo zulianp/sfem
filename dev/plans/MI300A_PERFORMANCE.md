@@ -379,6 +379,12 @@ kernels are measured without it (step 0).
   against 5.4; MaMAL 136 M 19.47 s against 19.68-19.71, the same iterations and residuals; ctest
   119/119 (the two NCCL tests on four GPUs, Fir job 4346660). smesh branch
   `sshex8-restriction-node-centric` (from main), merged with `launcher-local-rank` for the pin.
+- The affine SSHEX8 block diagonal (4 calls a run) was a thread a macro element, 6 atomics for
+  each of the 8 corners of each of the level^3 sub-elements. Node-centric: eight macro elements a
+  block of 256, each corner block computed once in shared memory, each node summing the corners
+  that touch it and adding its 6 entries once. MI300A (Nibi job 27470449) 6.6 ms against 46.5;
+  H100 (Fir job 4345660) 3.4 ms against 22.7. MaMAL 136 M on MI300A 19.19-19.34 s against
+  19.24-19.34 (three runs each, the same iterations and residuals); ctest 119/119 on both.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
