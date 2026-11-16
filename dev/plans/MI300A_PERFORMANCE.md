@@ -403,5 +403,31 @@ kernels are measured without it (step 0).
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
 
+## Left for later
+
+Where it stands (MaMAL, three runs each): 136 M 19.10-19.48 s on MI300A against 15.59-15.78 s on
+GH200 (69.4 against 19.0 at the start); 0.7 M 1.24-1.54 s against 0.97-0.99 s. By expected gain:
+
+1. **Level-8 apply under the power cap.** 7.54 ms a call in the solver against 6.38 standalone
+   (GH200 6.83 and 6.65): during the solve the socket draws its 550 W and the GPU clock drops to
+   1.53-1.85 GHz. Under the cap the time follows the energy an apply spends, so the lever is the
+   traffic, not the parallelism: in step 2b's breakdown the global gather and the atomics were 4.6
+   of 8.3 ms. Measure the apply's energy (`amd-smi metric` over a loop of applies) next to its time,
+   then cut the gather and scatter.
+2. **The coarse CG's decision node.** After step 4e an iteration is five graph nodes; the decision
+   (alpha, beta and the stopping test) is a node of its own. Formed in the kernels either side, as
+   step 4c did for beta and alpha, it leaves four. An empty node costs 1.7 us on MI300A (0.5 on
+   GH200), ~25 000 iterations a run. MaMAL 136 M coarse CG: MI300A 1.57-1.64 s, H100 1.32 s.
+3. **Level-2 apply.** Still `local_mem_original`, a thread per macro element (413 us a call after
+   the launch bounds). Level 2 has 8 micro elements a macro element: two macro elements a 16-row
+   tile of the matrix-core shape of levels 4 and 8 (Y = U K^T).
+4. **Level 4 -> 2 restriction.** smesh's thread-tile kernel, 1.5 ms a call, 24 calls a run; the
+   node-centric form of the 8 -> 4 restriction (zulianp/smesh#18) carries over.
+5. **Prolongation** (`cu_sshex8_hierarchical_prolongation_kernel`, smesh): not separated in the
+   kernel tables above. Time it at each level; where it shows, the node-centric form, each fine
+   node reading its coarse corners once.
+6. **Step 6 on GH200.** Steps 2e and 4e, the node-centric block diagonal and restriction were
+   checked on H100 (Fir) while Alps was unreachable; run MaMAL and ctest on GH200 when it is back.
+
 Out of scope: the host-side set-up (`to_semistructured`, `SPMG::init_solver`, 1.3-2.5x), which runs
 on the APU's 24 cores against Grace's 72.
