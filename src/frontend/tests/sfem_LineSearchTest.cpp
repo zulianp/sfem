@@ -159,6 +159,40 @@ int test_nonmonotone_reference() {
     return SFEM_TEST_SUCCESS;
 }
 
+// Near the solution: m0 = 0.05 and a predicted decrease of a few eps m0, the full step's merit a
+// few eps above m0 and the shorter ones a few below, as rounding left them. Armijo without the
+// rounding takes s = 1/2; with it, the full step. A rise above the rounding is still refused.
+class Rounded final : public sfem::Merit {
+public:
+    explicit Rounded(const real_t full) : full_(full) {}
+    const char *name() const override { return "rounded"; }
+    int         evaluate(const real_t *const, const real_t *const, const int nsteps, const real_t *const steps, real_t *const out) override {
+        for (int i = 0; i < nsteps; ++i) out[i] = steps[i] == 1 ? full_ : m0 * (1 - 4 * eps);
+        return SFEM_SUCCESS;
+    }
+    real_t at(const real_t *const, const real_t *const) override { return m0; }
+    real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t) override { return -2 * eps * m0; }
+    bool   batched() const override { return true; }
+
+    static constexpr real_t m0  = real_t(0.05);
+    static constexpr real_t eps = std::numeric_limits<real_t>::epsilon();
+
+private:
+    real_t full_;
+};
+
+int test_armijo_within_rounding() {
+    Rounded          noisy(Rounded::m0 * (1 + 4 * Rounded::eps));
+    sfem::LineSearch ls;
+    auto             r = ls.search(noisy, nullptr, nullptr, Rounded::m0, noisy.slope(nullptr, nullptr, nullptr, 0));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == 1);
+
+    Rounded rising(Rounded::m0 * (1 + real_t(1e-10)));
+    r = ls.search(rising, nullptr, nullptr, Rounded::m0, rising.slope(nullptr, nullptr, nullptr, 0));
+    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::ACCEPTED && r.alpha == real_t(0.5));
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_disabled_takes_the_full_step() {
     Parabola                m(0.3, true);
     sfem::LineSearchOptions options;
@@ -177,6 +211,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_damped_ignores_the_merit);
     SFEM_RUN_TEST(test_ascent_direction_fails);
     SFEM_RUN_TEST(test_at_resolution);
+    SFEM_RUN_TEST(test_armijo_within_rounding);
     SFEM_RUN_TEST(test_best_decrease);
     SFEM_RUN_TEST(test_disabled_takes_the_full_step);
     SFEM_RUN_TEST(test_nonmonotone_reference);

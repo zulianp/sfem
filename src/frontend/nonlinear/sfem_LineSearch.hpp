@@ -22,7 +22,8 @@ namespace sfem {
         real_t damping{1};
         /// The step lengths tried, in order.
         std::vector<real_t> steps{1, real_t(1) / 2, real_t(1) / 4, real_t(1) / 8, real_t(1) / 16, real_t(1) / 32, real_t(1) / 64, real_t(1) / 128};
-        /// Armijo's constant: a step s is accepted when m(s) <= m_ref + c1 s m'(0).
+        /// Armijo's constant: a step s is accepted when m(s) <= m_ref + c1 s m'(0) + e, e the
+        /// rounding in comparing the two merits, 64 eps max(|m_ref|, |m(s)|).
         real_t c1{real_t(1e-4)};
         /// Where no step of the schedule decreases the merit, m_ref is the largest of the iterate's
         /// merit and those of the iterates before it in the step, this many in all (Grippo,
