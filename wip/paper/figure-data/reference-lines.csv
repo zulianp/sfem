@@ -1,0 +1,21 @@
+figure,series,kind,point,x,y,x_unit,y_unit
+7,one-pack-per-thread,vertical,0,1,,packs per thread,MDOF/s
+8,lagged-bsr-f64,horizontal,0,,462.4,scheme,MDOF/s
+8,lagged-bsr-f32,horizontal,0,,843.2,scheme,MDOF/s
+9,lagged-bsr-f64,horizontal,0,,441.9,scheme,MDOF/s
+9,lagged-bsr-f32,horizontal,0,,837.7,scheme,MDOF/s
+10,measured-range-envelope,polygon,0,0.16,63.0644710878,FLOP/transported byte,GFLOP/s
+10,measured-range-envelope,polygon,1,5.99637995536,2363.49081454,FLOP/transported byte,GFLOP/s
+10,measured-range-envelope,polygon,2,10,2363.49081454,FLOP/transported byte,GFLOP/s
+10,measured-range-envelope,polygon,3,10,2462.05062923,FLOP/transported byte,GFLOP/s
+10,measured-range-envelope,polygon,4,5.89658089088,2462.05062923,FLOP/transported byte,GFLOP/s
+10,measured-range-envelope,polygon,5,0.16,66.8061895471,FLOP/transported byte,GFLOP/s
+10,copy-slope,polyline,0,0.16,64.1951897292,FLOP/transported byte,GFLOP/s
+10,copy-slope,polyline,1,6.10166418997,2448.10931462,FLOP/transported byte,GFLOP/s
+10,triad-slope,polyline,0,0.16,65.8287600338,FLOP/transported byte,GFLOP/s
+10,triad-slope,polyline,1,5.95024864721,2448.10931462,FLOP/transported byte,GFLOP/s
+10,dgemm-plateau,polyline,0,5.95024864721,2448.10931462,FLOP/transported byte,GFLOP/s
+10,dgemm-plateau,polyline,1,10,2448.10931462,FLOP/transported byte,GFLOP/s
+10,vendor-fp64-roof,polyline,0,.16,80.0,FLOP/transported byte,GFLOP/s
+10,vendor-fp64-roof,polyline,1,7.1,3550.0,FLOP/transported byte,GFLOP/s
+10,vendor-fp64-roof,polyline,2,10,3550.0,FLOP/transported byte,GFLOP/s

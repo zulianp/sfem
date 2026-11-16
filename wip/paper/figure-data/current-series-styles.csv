@@ -1,0 +1,43 @@
+figure,series,pgfplots_style,color_hex,marker,fill,line,description
+5,packed-residual-f64,"PackA,mark=*,mark size=1.6pt,thick",#4C72B0,*,solid,solid,packed residual FP64
+5,atomic-residual-f64,"PackD,mark=square*,mark size=1.6pt,thick",#C44E52,square*,solid,solid,atomic residual FP64
+5,lagged-bsr-f64,"PackE,mark=triangle*,mark size=1.6pt,thick",#8172B3,triangle*,solid,solid,lagged bsr FP64
+5,lagged-bsr-f32,"PackC,mark=diamond*,mark size=1.6pt,thick",#55A868,diamond*,solid,solid,lagged bsr FP32
+6,ideal-scaling,"black!45,dashed,no marks,forget plot",,,solid,dashed,ideal scaling
+6,packed-first-order,"PackA,mark=*,mark size=1.4pt,thick",#4C72B0,*,solid,solid,packed first order
+6,atomic-first-order,"PackD,mark=square*,mark size=1.4pt,thick",#C44E52,square*,solid,solid,atomic first order
+6,packed-higher-order,"PackA,mark=o,mark size=1.4pt,thick",#4C72B0,o,solid,solid,packed higher order
+6,atomic-higher-order,"PackD,mark=square,mark size=1.4pt,thick",#C44E52,square,solid,solid,atomic higher order
+7,first-order-n64,"PackC,mark=triangle*,mark size=1.6pt,thick",#55A868,triangle*,solid,solid,first order n64
+7,first-order-n128,"PackA,mark=*,mark size=1.6pt,thick",#4C72B0,*,solid,solid,first order n128
+7,darwish-n64,"PackC,mark=triangle*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot",#55A868,triangle*,solid,dashed,darwish n64
+7,darwish-n128,"PackA,mark=*,mark size=1.4pt,thick,densely dashed,mark options={solid},forget plot",#4C72B0,*,solid,dashed,darwish n128
+8,packed-f32,"draw=PackA, fill=PackA, fill opacity=0.35, draw opacity=0.6, bar shift=-7pt, forget plot",#4C72B0,,translucent,solid,packed FP32
+8,packed-f64,"draw=PackA, fill=PackA, bar shift=-7pt",#4C72B0,,solid,solid,packed FP64
+8,ecolor-f32,"draw=PackB, fill=PackB, fill opacity=0.35, draw opacity=0.6, bar shift=0pt, forget plot",#DD8452,,translucent,solid,element coloured FP32
+8,ecolor-f64,"draw=PackB, fill=PackB, bar shift=0pt",#DD8452,,solid,solid,element coloured FP64
+8,atomic-f32,"draw=PackD, fill=PackD, fill opacity=0.35, draw opacity=0.6, bar shift=7pt, forget plot",#C44E52,,translucent,solid,atomic FP32
+8,atomic-f64,"draw=PackD, fill=PackD, bar shift=7pt",#C44E52,,solid,solid,atomic FP64
+9,packed-f32,"draw=PackA, fill=PackA, fill opacity=0.35, draw opacity=0.6, bar shift=-7pt, forget plot",#4C72B0,,translucent,solid,packed FP32
+9,packed-f64,"draw=PackA, fill=PackA, bar shift=-7pt",#4C72B0,,solid,solid,packed FP64
+9,ecolor-f32,"draw=PackB, fill=PackB, fill opacity=0.35, draw opacity=0.6, bar shift=0pt, forget plot",#DD8452,,translucent,solid,element coloured FP32
+9,ecolor-f64,"draw=PackB, fill=PackB, bar shift=0pt",#DD8452,,solid,solid,element coloured FP64
+9,atomic-f32,"draw=PackD, fill=PackD, fill opacity=0.35, draw opacity=0.6, bar shift=7pt, forget plot",#C44E52,,translucent,solid,atomic FP32
+9,atomic-f64,"draw=PackD, fill=PackD, bar shift=7pt",#C44E52,,solid,solid,atomic FP64
+10,measured-range-envelope,"draw=none,fill=gray!15,forget plot",,,solid,solid,measured range envelope
+10,copy-slope,"gray,dashed,thick,no marks,forget plot",,,solid,dashed,copy slope
+10,triad-slope,"gray,dotted,thick,no marks,forget plot",,,solid,dotted,triad slope
+10,dgemm-plateau,"gray,dashdotted,thick,no marks,forget plot",,,solid,dashdotted,dgemm plateau
+10,vendor-fp64-roof,"black,solid,thick,no marks,forget plot",,,solid,solid,vendor fp64 roof
+10,residual-fo-atomic-samples,"only marks,color=rlBlue,mark=*,mark options={fill=white},mark size=1.25pt,opacity=0.45,forget plot",#235C96,*,open,solid,residual fo atomic samples
+10,residual-fo-atomic-mean,"only marks,color=rlBlue,mark=*,mark options={fill=white},mark size=2.7pt,thick",#235C96,*,open,solid,residual fo atomic mean
+10,residual-fo-packed-samples,"only marks,color=rlBlue,mark=*,mark options={fill=rlBlue},mark size=1.25pt,opacity=0.45,forget plot",#235C96,*,solid,solid,residual fo packed samples
+10,residual-fo-packed-mean,"only marks,color=rlBlue,mark=*,mark options={fill=rlBlue},mark size=2.7pt,thick",#235C96,*,solid,solid,residual fo packed mean
+10,residual-darwish-atomic-samples,"only marks,color=rlOrange,mark=square*,mark options={fill=white},mark size=1.25pt,opacity=0.45,forget plot",#D26E1E,square*,open,solid,residual darwish atomic samples
+10,residual-darwish-atomic-mean,"only marks,color=rlOrange,mark=square*,mark options={fill=white},mark size=2.7pt,thick",#D26E1E,square*,open,solid,residual darwish atomic mean
+10,residual-darwish-packed-samples,"only marks,color=rlOrange,mark=square*,mark options={fill=rlOrange},mark size=1.25pt,opacity=0.45,forget plot",#D26E1E,square*,solid,solid,residual darwish packed samples
+10,residual-darwish-packed-mean,"only marks,color=rlOrange,mark=square*,mark options={fill=rlOrange},mark size=2.7pt,thick",#D26E1E,square*,solid,solid,residual darwish packed mean
+10,lagged-fo-packed-samples,"only marks,color=rlGreen,mark=square*,mark options={fill=rlGreen},mark size=1.25pt,opacity=0.45,forget plot",#2D8755,square*,solid,solid,lagged fo packed samples
+10,lagged-fo-packed-mean,"only marks,color=rlGreen,mark=square*,mark options={fill=rlGreen},mark size=2.7pt,thick",#2D8755,square*,solid,solid,lagged fo packed mean
+10,spmv-fo-packed-samples,"only marks,color=black,mark=diamond*,mark options={fill=black},mark size=1.25pt,opacity=0.45,forget plot",,diamond*,solid,solid,spmv fo packed samples
+10,spmv-fo-packed-mean,"only marks,color=black,mark=diamond*,mark options={fill=black},mark size=2.7pt,thick",,diamond*,solid,solid,spmv fo packed mean

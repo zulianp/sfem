@@ -15,6 +15,12 @@ make check     the submission gates (clean build, no undefined refs, page limit)
 results with `make figures`, first supply the evidence archives described under
 "Residual accumulation measurement", "Darwish coefficient cache" and "Equivalent consistent matrix" below. Missing evidence is an error.
 
+## Data for figure restyling
+
+A [figure-by-figure CSV index](figure-data/README.md) maps the current numerical
+figures to their plotted values, units, series and reference lines. It also links
+the schematic sources and explains the aggregation rules.
+
 ## The rule this directory is built around
 
 **No measured number is typed into `main.tex`.** Everything arrives through `\input{}` of a
