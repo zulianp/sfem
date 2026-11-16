@@ -364,6 +364,21 @@ kernels are measured without it (step 0).
 - The MaMAL runs' 24 OpenMP threads (`srun --cpus-per-task=24` inside `--ntasks=4
   --cpus-per-task=6`, even with `--gres-flags=enforce-binding`) got cores 0-6, 24-30, 48-54, 72-78:
   seven on each APU, the GPU on NUMA node 0.
+- Power (Nibi job 27469215, `amd-smi metric` each second): during MaMAL's solve at 136 M the
+  MI300A socket draws 520-554 W, its 550 W limit, and the GPU clock sits at 1.53-1.85 GHz against
+  2.1 GHz at most; host OpenMP spinning is not the cause (`OMP_WAIT_POLICY=passive`: 19.28-19.51 s
+  against 19.28-19.52 s). A standalone benchmark of a few hundred milliseconds runs at higher
+  clocks: the level-8 apply takes 6.38 ms in `bench_op_apply` and 7.54 ms in the solver (GH200 6.65
+  and 6.83).
+- smesh's level 8 -> 4 restriction (`sshex8_hierarchical_restriction_kernel`, 24 of its 48 calls;
+  the other 24 are 4 -> 2 at 1.5 ms): a tile of 8 threads a macro element, 3000 atomics an element.
+  Node-centric (a block of 1024 for four macro elements: fine values in shared memory, reduced in
+  x, y, z with the hat weights, each coarse value added once): standalone at 44^3 macro elements
+  2.37 ms against 8.97; in MaMAL 3.14 ms against 13.6 (0.075 s against 0.327 a run; Nibi job
+  27466695, the same residuals, ctest 119/119). H100 (Fir job 4345660, Alps unreachable): 1.37 ms
+  against 5.4; MaMAL 136 M 19.47 s against 19.68-19.71, the same iterations and residuals; ctest
+  119/119 (the two NCCL tests on four GPUs, Fir job 4346660). smesh branch
+  `sshex8-restriction-node-centric` (from main), merged with `launcher-local-rank` for the pin.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.
