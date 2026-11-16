@@ -76,6 +76,7 @@ kernels are measured without it (step 0).
 | 4c | coarse CG in nine graph nodes an iteration; one-kernel zeroing on HIP (Nibi job 27426836, three runs each) | 21.26-21.59 s (GH200 15.57-15.78 s) | 1.28-1.54 s (GH200 0.97-0.99 s) |
 | 3b | coarse HEX8 apply: interleaved atomics in address order (Nibi job 27438830, another node: the build before it 21.14-21.34 s) | 20.86-21.00 s (GH200 15.62-15.86 s) | 1.65-1.66 s (GH200 0.97-1.03 s) |
 | 2e | level-8 apply (kernel 7): node values added as atomics in address order (Nibi job 27446262, three runs each against the build before it) | 19.72-19.93 s (20.65-21.07 s) | 1.32-1.64 s (1.30-1.53 s) |
+| 4d | coarse CG: z and Ap zeroed by the vector updates, the Dirichlet copies in one launch (Nibi job 27457524, three runs each against the build before it; GH200 Alps job 5364236) | 19.43-19.73 s (19.68-20.01 s; GH200 15.59-15.78 s) | 1.24-1.54 s (1.29-1.64 s; GH200 0.93-0.99 s) |
 
 - Step 1, hardware FP atomics: no effect. With `-munsafe-fp-atomics` the applies of every level of the
   hierarchy (44^3 macro elements, levels 8, 4, 2 and the HEX8 coarse one) time within noise of the
@@ -339,6 +340,21 @@ kernels are measured without it (step 0).
   against 7.63-7.66 with a node per thread and the interior nodes added without atomics, 7.09-7.10
   with atomics for every node. MaMAL in the progress table (same iterations and residuals; the 0.7 M
   case's coarse CG takes 0.26 s or 0.41-0.48 s in either build); ctest 119/119 (Nibi 27446262).
+- Step 4d, the coarse CG's iteration in seven graph nodes and the operators' own (both vendors):
+  z and Ap are dead between the decision and the next z += M r / Ap += A p, so the x, r update zeroes
+  z and the p update zeroes Ap (the products add into their output); the run zeroes z once before
+  its first batch. The three Dirichlet copies of each product (MaMAL: three conditions, one a
+  component) go in one launch. Four nodes an iteration fewer; the same iterations and residuals:
+
+  | | 136 M total | 136 M coarse CG | 0.7 M coarse CG |
+  |---|---|---|---|
+  | MI300A (Nibi jobs 27457524, 27463123) | 19.43-19.73 s (19.68-20.01) | 1.68-1.79 s (1.91-1.93) | 0.22-0.23 s (0.26), 0.38-0.39 s (0.41-0.49) |
+  | GH200 (Alps job 5364236) | 15.59-15.78 s (15.63-15.85) | 1.15 s (1.27-1.28) | 0.102 s (0.127) |
+
+  ctest 119/119 on both (Nibi 27457524, Alps 5364236). The 0.7 M case on MI300A runs in one of two
+  modes in either build, told apart by a host-side scope the change does not touch
+  (`ContactConditions::normal_project` 4.5 ms or 17 ms; eight runs each, Nibi job 27463123): the
+  coarse CG as above in each.
 - Kernel profile at 52565c0fc, MaMAL 136 M (roctracer, Nibi job 27439696; nsys, Alps job 5360065):
   kernels 14.2 s on MI300A against 11.5 s on GH200. The level-8 apply 8.67 ms a call against 6.83
   (before step 2e); the coarse CG's vector kernels 2-4 us a call slower (25 440 calls each, ~0.6 s);

@@ -160,10 +160,11 @@ namespace sfem {
         enum { RUN_RTZ = 0, RUN_RTZ_NEW, RUN_PTAP, RUN_ITER, RUN_STOP, RUN_N };
         static constexpr int RUN_BATCH = 16;
 
-        // An iteration is nine graph nodes: z = M r, r.z, p's update, Ap = A p, p.Ap, x and r's update,
-        // the decision. beta and alpha are formed where they are used, and each dot adds into a word
-        // the kernel before it zeroed (no memset node); a node costs ~1.7 us on MI300A and ~0.5 on
-        // GH200 before it moves a byte.
+        // An iteration is seven graph nodes and the operators' own: z += M r, r.z, p's update, Ap += A p,
+        // p.Ap, x and r's update, the decision. beta and alpha are formed where they are used, each dot
+        // adds into a word the kernel before it zeroed, and z and Ap are zeroed by the updates where
+        // they are dead (no memset node); a node costs ~1.7 us on MI300A and ~0.5 on GH200 before it
+        // moves a byte.
 
         // s[slot] += a . b. One block of RUN_DOT_BLOCK_SIZE threads per compute unit: the blocks'
         // atomics on the one word serialise (MI300A, 307 k entries: 5.8 us at one block of 512 per
@@ -216,33 +217,47 @@ namespace sfem {
             if (s[RUN_ITER] >= T(max_it)) s[RUN_STOP] = T(2);
         }
 
-        // update_p_kernel's p = z + beta p, beta = rtz_new / rtz; p.Ap's word zeroed.
+        // update_p_kernel's p = z + beta p, beta = rtz_new / rtz; p.Ap's word zeroed, and Ap (dead
+        // until the product adds into it), `allocation` entries.
         template <typename T>
         __global__ void run_update_p_kernel(const ptrdiff_t              n,
+                                            const ptrdiff_t              allocation,
                                             T* const SFEM_RESTRICT       s,
                                             const T* const SFEM_RESTRICT z,
-                                            T* const SFEM_RESTRICT       p) {
+                                            T* const SFEM_RESTRICT       p,
+                                            T* const SFEM_RESTRICT       Ap) {
             if (s[RUN_STOP] != T(0)) return;
             const T beta = s[RUN_RTZ_NEW] / s[RUN_RTZ];
             if (!blockIdx.x && !threadIdx.x) s[RUN_PTAP] = T(0);
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
-                p[i] = z[i] + beta * p[i];
+                p[i]  = z[i] + beta * p[i];
+                Ap[i] = T(0);
+            }
+            for (ptrdiff_t i = n + blockIdx.x * blockDim.x + threadIdx.x; i < allocation; i += blockDim.x * gridDim.x) {
+                Ap[i] = T(0);
             }
         }
 
-        // update_x_r_kernel's x += alpha p, r -= alpha Ap, alpha = rtz_new / p.Ap.
+        // update_x_r_kernel's x += alpha p, r -= alpha Ap, alpha = rtz_new / p.Ap; z (dead until the
+        // preconditioner adds into it) zeroed, `allocation` entries.
         template <typename T>
         __global__ void run_update_x_r_kernel(const ptrdiff_t              n,
+                                              const ptrdiff_t              allocation,
                                               const T* const SFEM_RESTRICT s,
                                               const T* const SFEM_RESTRICT p,
                                               const T* const SFEM_RESTRICT Ap,
                                               T* const SFEM_RESTRICT       x,
-                                              T* const SFEM_RESTRICT       r) {
+                                              T* const SFEM_RESTRICT       r,
+                                              T* const SFEM_RESTRICT       z) {
             if (s[RUN_STOP] != T(0)) return;
             const T alpha = s[RUN_RTZ_NEW] / s[RUN_PTAP];
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
                 x[i] += alpha * p[i];
                 r[i] -= alpha * Ap[i];
+                z[i] = T(0);
+            }
+            for (ptrdiff_t i = n + blockIdx.x * blockDim.x + threadIdx.x; i < allocation; i += blockDim.x * gridDim.x) {
+                z[i] = T(0);
             }
         }
 
@@ -266,7 +281,8 @@ namespace sfem {
             SFEM_TRACE_SCOPE("ConjugateGradient::device_run");
             static thread_local RunScalars<T> scalars;
             T* const           s      = scalars.device;
-            const cudaStream_t stream = static_cast<cudaStream_t>(run.stream);
+            const cudaStream_t stream     = static_cast<cudaStream_t>(run.stream);
+            const ptrdiff_t    allocation = std::max(run.n, run.allocation);
 
             int       block_size;
             ptrdiff_t n_blocks;
@@ -283,10 +299,10 @@ namespace sfem {
             auto iteration = [&]() {
                 run.precondition(run.r, run.z);
                 run_dot_kernel<T><<<dot_blocks, RUN_DOT_BLOCK_SIZE, 0, stream>>>(run.n, s, RUN_RTZ_NEW, run.r, run.z);
-                run_update_p_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, s, run.z, run.p);
+                run_update_p_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, allocation, s, run.z, run.p, run.Ap);
                 run.product(run.p, run.Ap);
                 run_dot_kernel<T><<<dot_blocks, RUN_DOT_BLOCK_SIZE, 0, stream>>>(run.n, s, RUN_PTAP, run.p, run.Ap);
-                run_update_x_r_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, s, run.p, run.Ap, run.x, run.r);
+                run_update_x_r_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, allocation, s, run.p, run.Ap, run.x, run.r, run.z);
                 run_decide_kernel<T><<<1, 1, 0, stream>>>(s, run.rtz0, run.atol, run.rtol, run.max_it);
             };
             auto batch = [&]() {
@@ -296,6 +312,8 @@ namespace sfem {
 
             const T start[RUN_N] = {run.rtz, T(0), T(0), T(0), T(0)};
             SFEM_CUDA_CHECK(cudaMemcpyAsync(s, start, RUN_N * sizeof(T), cudaMemcpyHostToDevice, stream));
+            // The first z += M r adds into zeros; each Ap is zeroed by the p update before it.
+            SFEM_CUDA_CHECK(cudaMemsetAsync(run.z, 0, allocation * sizeof(T), stream));
             SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
 
             // The batch as one graph, captured from the run's own launches; launched as they are

@@ -24,8 +24,9 @@ namespace sfem {
         T        *x{nullptr}, *r{nullptr}, *z{nullptr}, *p{nullptr}, *Ap{nullptr};
         T         rtz{0}, rtz0{0}, atol{0}, rtol{0};
         int       max_it{0};
-        /// z = M r and Ap = A p, as the loop applies them (an accumulating operator's output zeroed).
+        /// z += M r and Ap += A p: the run zeroes z and Ap, `allocation` entries, where they are dead.
         std::function<void(const T *const, T *const)> precondition, product;
+        ptrdiff_t                                     allocation{0};
         /// The solver's stream: the run is ordered on it.
         void *stream{nullptr};
     };

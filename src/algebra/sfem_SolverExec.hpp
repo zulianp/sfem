@@ -65,6 +65,8 @@ namespace sfem {
             : blas_(blas), n_(n), allocation_(allocation > n ? allocation : n), comm_(comm && comm->size() > 1 ? comm : nullptr) {}
 
         T    dot(const T *const a, const T *const b) { return sum(blas_.dot(n_, a, b)); }
+        /// The entries an output spans when zeroed before a product.
+        ptrdiff_t allocation() const { return allocation_; }
         /// Whether its sums are over more than this rank.
         bool across_ranks() const { return comm_ != nullptr; }
         /// The ranks' sum of a value each computed over its entries.
