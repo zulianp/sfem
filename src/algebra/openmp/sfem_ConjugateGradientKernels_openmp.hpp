@@ -29,6 +29,11 @@ namespace sfem {
         ptrdiff_t                                     allocation{0};
         /// The solver's stream: the run is ordered on it.
         void *stream{nullptr};
+        /// M where it is 3 x 3 blocks a node on the device (ShiftableOperator::device_blocks3, 4 or 8
+        /// bytes a scalar): z = M r is formed in x and r's update, with r.z, instead of by
+        /// `precondition`; z is the same, r.z summed in another order.
+        const void *m_blocks{nullptr};
+        int         m_blocks_bytes{0};
     };
 
     /// How a run ended. `ran` false: it could not be taken there, and nothing was done.

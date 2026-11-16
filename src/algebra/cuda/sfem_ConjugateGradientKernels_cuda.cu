@@ -157,7 +157,7 @@ namespace sfem {
         // without it the run gains nothing); it needs products that allocate nothing on the stream,
         // which HIP 6.4 does not capture (the generated operators keep their connectivity table
         // under HIP for this).
-        enum { RUN_RTZ = 0, RUN_RTZ_NEW, RUN_PTAP, RUN_ITER, RUN_STOP, RUN_N };
+        enum { RUN_RTZ = 0, RUN_RTZ_NEW, RUN_PTAP, RUN_ITER, RUN_STOP, RUN_RTZ_NEXT, RUN_N };
         static constexpr int RUN_BATCH = 16;
 
         // An iteration is seven graph nodes and the operators' own: z += M r, r.z, p's update, Ap += A p,
@@ -261,6 +261,81 @@ namespace sfem {
             }
         }
 
+        // Where M is 3 x 3 blocks a node (CGDeviceRun::m_blocks): run_update_x_r_kernel's x and r, then
+        // z = M r (as sbv3_apply forms it) and r.z into RUN_RTZ_NEXT, for the next iteration. The
+        // preconditioner's node and r.z's go: an iteration is five nodes and the product's. A
+        // decision in the last block instead (a fence a block) costs more than its node on MI300A.
+        // MaMAL's coarse size (307 k entries, a stand-in product): MI300A 41.5-44.1 us an iteration
+        // against 49.1-50.3, H100 21.8 against 27.4.
+        static constexpr int RUN_M3_BLOCK_SIZE = 256;
+        template <typename T, typename B>
+        __global__ void SFEM_HIP_LAUNCH_BOUNDS(RUN_M3_BLOCK_SIZE)
+                run_update_x_r_m3_kernel(const ptrdiff_t              n_blocks,
+                                         T* const SFEM_RESTRICT       s,
+                                         const B* const SFEM_RESTRICT blocks,
+                                         const T* const SFEM_RESTRICT p,
+                                         const T* const SFEM_RESTRICT Ap,
+                                         T* const SFEM_RESTRICT       x,
+                                         T* const SFEM_RESTRICT       r,
+                                         T* const SFEM_RESTRICT       z) {
+            __shared__ T block_accumulator[SFEM_WARP_SIZE];
+            if (s[RUN_STOP] != T(0)) return;
+            const T alpha = s[RUN_RTZ_NEW] / s[RUN_PTAP];
+
+            T acc = 0;
+            for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n_blocks; i += blockDim.x * gridDim.x) {
+                T ri[3];
+                for (int d = 0; d < 3; d++) {
+                    x[i * 3 + d] += alpha * p[i * 3 + d];
+                    ri[d]        = r[i * 3 + d] - alpha * Ap[i * 3 + d];
+                    r[i * 3 + d] = ri[d];
+                }
+                const B* const di = &blocks[i * 9];
+                for (int d1 = 0; d1 < 3; d1++) {
+                    T zi = 0;
+                    for (int d2 = 0; d2 < 3; d2++) {
+                        zi += (T)di[d1 * 3 + d2] * ri[d2];
+                    }
+                    z[i * 3 + d1] = zi;
+                    acc += ri[d1] * zi;
+                }
+            }
+
+            acc                        = cg_warp_reduce_32(acc);
+            const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
+            const unsigned int lid     = cg_lane_id();
+            const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
+            if (!lid) {
+                block_accumulator[warp_id] = acc;
+            }
+            __syncthreads();
+            if (!warp_id) {
+                acc = lid < n_warps ? block_accumulator[lid] : T(0);
+                acc = cg_warp_reduce_32(acc);
+                if (!threadIdx.x) {
+                    atomicAdd(&s[RUN_RTZ_NEXT], acc);
+                }
+            }
+        }
+
+        // run_decide_kernel, then the next iteration's r.z (run_update_x_r_m3_kernel's) as rtz_new.
+        template <typename T>
+        __global__ void run_decide_next_kernel(T* const SFEM_RESTRICT s, const T rtz0, const T atol, const T rtol, const int max_it) {
+            if (s[RUN_STOP] != T(0)) return;
+            const T rtz     = s[RUN_RTZ_NEW];
+            s[RUN_RTZ]      = rtz;
+            s[RUN_RTZ_NEW]  = s[RUN_RTZ_NEXT];
+            s[RUN_RTZ_NEXT] = T(0);
+            const T anorm = sqrt(rtz);
+            const T rnorm = anorm / sqrt(rtz0);
+            if (anorm < atol || rnorm < rtol) {
+                s[RUN_STOP] = T(1);
+                return;
+            }
+            s[RUN_ITER] += T(1);
+            if (s[RUN_ITER] >= T(max_it)) s[RUN_STOP] = T(2);
+        }
+
         // The run's scalars on the device and its stop read back, kept for the thread's later runs.
         template <typename T>
         struct RunScalars {
@@ -295,8 +370,29 @@ namespace sfem {
             }();
             const int dot_blocks = int(std::min(ptrdiff_t(units), (run.n + RUN_DOT_BLOCK_SIZE - 1) / RUN_DOT_BLOCK_SIZE));
 
+            const ptrdiff_t m3_blocks   = run.n / 3;
+            const ptrdiff_t m3_n_blocks = std::max(ptrdiff_t(1), (m3_blocks + RUN_M3_BLOCK_SIZE - 1) / RUN_M3_BLOCK_SIZE);
+            auto update_x_r_m3 = [&]() {
+                if (run.m_blocks_bytes == int(sizeof(float))) {
+                    run_update_x_r_m3_kernel<T, float><<<m3_n_blocks, RUN_M3_BLOCK_SIZE, 0, stream>>>(
+                            m3_blocks, s, static_cast<const float*>(run.m_blocks), run.p, run.Ap, run.x, run.r, run.z);
+                } else {
+                    run_update_x_r_m3_kernel<T, double><<<m3_n_blocks, RUN_M3_BLOCK_SIZE, 0, stream>>>(
+                            m3_blocks, s, static_cast<const double*>(run.m_blocks), run.p, run.Ap, run.x, run.r, run.z);
+                }
+            };
+            const bool m3 = run.m_blocks && (run.m_blocks_bytes == int(sizeof(float)) || run.m_blocks_bytes == int(sizeof(double)));
+
             // One of the loop's iterations, its scalars in s.
             auto iteration = [&]() {
+                if (m3) {
+                    run_update_p_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, allocation, s, run.z, run.p, run.Ap);
+                    run.product(run.p, run.Ap);
+                    run_dot_kernel<T><<<dot_blocks, RUN_DOT_BLOCK_SIZE, 0, stream>>>(run.n, s, RUN_PTAP, run.p, run.Ap);
+                    update_x_r_m3();
+                    run_decide_next_kernel<T><<<1, 1, 0, stream>>>(s, run.rtz0, run.atol, run.rtol, run.max_it);
+                    return;
+                }
                 run.precondition(run.r, run.z);
                 run_dot_kernel<T><<<dot_blocks, RUN_DOT_BLOCK_SIZE, 0, stream>>>(run.n, s, RUN_RTZ_NEW, run.r, run.z);
                 run_update_p_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, allocation, s, run.z, run.p, run.Ap);
@@ -310,10 +406,15 @@ namespace sfem {
                 SFEM_CUDA_CHECK(cudaMemcpyAsync(scalars.host, s + RUN_ITER, 2 * sizeof(T), cudaMemcpyDeviceToHost, stream));
             };
 
-            const T start[RUN_N] = {run.rtz, T(0), T(0), T(0), T(0)};
+            const T start[RUN_N] = {run.rtz, T(0), T(0), T(0), T(0), T(0)};
             SFEM_CUDA_CHECK(cudaMemcpyAsync(s, start, RUN_N * sizeof(T), cudaMemcpyHostToDevice, stream));
             // The first z += M r adds into zeros; each Ap is zeroed by the p update before it.
             SFEM_CUDA_CHECK(cudaMemsetAsync(run.z, 0, allocation * sizeof(T), stream));
+            if (m3) {
+                // The loop's first z = M r and r.z, which its iterations form for the next.
+                run.precondition(run.r, run.z);
+                run_dot_kernel<T><<<dot_blocks, RUN_DOT_BLOCK_SIZE, 0, stream>>>(run.n, s, RUN_RTZ_NEW, run.r, run.z);
+            }
             SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
 
             // The batch as one graph, captured from the run's own launches; launched as they are

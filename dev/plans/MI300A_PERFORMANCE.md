@@ -385,6 +385,17 @@ kernels are measured without it (step 0).
   that touch it and adding its 6 entries once. MI300A (Nibi job 27470449) 6.6 ms against 46.5;
   H100 (Fir job 4345660) 3.4 ms against 22.7. MaMAL 136 M on MI300A 19.19-19.34 s against
   19.24-19.34 (three runs each, the same iterations and residuals); ctest 119/119 on both.
+- Step 4e, the coarse CG's block-Jacobi preconditioner inside the x, r update (both vendors). In
+  situ an iteration took ~62 us on MI300A against ~43 on GH200, the vector kernels 2-7 us a node
+  slower; a standalone sweep of block and grid sizes moved nothing, the extra cost is the chain of
+  nodes. Where M is 3 x 3 blocks a node on the device (`ShiftableOperator::device_blocks3`), one
+  kernel forms x += alpha p, r -= alpha Ap, z = M r and r.z; the decision takes r.z from it. Five
+  nodes an iteration instead of seven; z is the same, r.z summed in another order. Standalone
+  (102 400 nodes, 3000 iterations): MI300A 41.5-44.1 us an iteration against 49.1-50.3, H100 21.8
+  against 27.4. H100 (Fir job 4363120, three runs each, the same iterations and residuals): MaMAL
+  136 M 19.28-21.37 s against 19.32-21.48, coarse CG 1.32 s against 1.37; 0.7 M coarse CG 0.091 s
+  against 0.103; ctest 119/119 (the two NCCL tests on four GPUs, Fir job 4363809). MI300A: Nibi
+  job 27476190, queued.
 - Seen on the way, not part of this plan: on GH200 the level-8 warp kernel (2) never launches
   (231 registers per thread, 242 on main, 512 threads per block: 118 k registers against 64 k
   per SM) and returns zeros without an error; it is not the default on CUDA.

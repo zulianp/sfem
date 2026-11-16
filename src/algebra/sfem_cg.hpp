@@ -501,6 +501,15 @@ namespace sfem {
                     run.product      = [&](const T* const in, T* const out) { e.apply(A, in, out, true); };
                     run.allocation   = e.allocation();
                     run.stream       = blas->context().stream();
+                    if (auto shiftable = shiftable_preconditioner()) {
+                        ptrdiff_t   n_blocks = 0;
+                        int         bytes    = 0;
+                        const void* blocks   = shiftable->device_blocks3(n_blocks, bytes);
+                        if (blocks && n_blocks * 3 == n) {
+                            run.m_blocks       = blocks;
+                            run.m_blocks_bytes = bytes;
+                        }
+                    }
                     const CGDeviceRunResult ran = impl.run_precond(run);
                     if (ran.ran) {
                         iterations_ = ran.iterations;
