@@ -5,6 +5,7 @@
 #include "sfem_SDACRS.hpp"
 #include "sfem_sell_spmv.hpp"
 #include "sfem_BSRTangent.hpp"
+#include "sfem_SELLTangent.hpp"
 #include "sfem_CooSym.hpp"
 #include "sfem_DIA.hpp"
 #include "sfem_Function.hpp"
@@ -554,6 +555,12 @@ namespace sfem {
                 return sfem::hessian_bcrs_sym(f, u, es);
             } else if (format == op_type::DIA) {
                 return sfem::hessian_dia(f, u, es);
+            } else if (format == op_type::SELL) {
+                // SELL-C-sigma of 3x3 blocks (SELLTangent), f32 values; the scalar SELL above is for
+                // scalar problems.
+                auto tangent = sfem::SELLTangent::create(f, es);
+                if (!tangent || tangent->assemble(u ? u->data() : nullptr) != SFEM_SUCCESS) return nullptr;
+                return tangent->op(u);
             }
         }
 

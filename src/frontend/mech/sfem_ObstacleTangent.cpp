@@ -10,6 +10,7 @@
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_InexactInterface.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_SELLTangent.hpp"
 #include "sfem_MemoryLedger.hpp"
 #include "sfem_NodeObstacleContact.hpp"
 #include "sfem_TeamBLAS.hpp"
@@ -238,6 +239,13 @@ namespace sfem {
                                                              const std::shared_ptr<NodeObstacleContact> &contact,
                                                              const Options                              &options) {
         const ExecutionSpace es = f->execution_space();
+        if (options.format == op_type::SELL) {
+            // The stored tangent in the SELL layout (SELLTangent::options), composed as INEXACT's is.
+            Options stored = options;
+            stored.format  = op_type::INEXACT;
+            stored.inexact = SELLTangent::options(options.sell_encoding);
+            return create(f, contact, stored);
+        }
         if (options.format == op_type::BSR) {
             // Its values are changed in place after `op` (the curvature, the shifts), which a copy
             // taken there would miss: stored in real_t or, assembled so, in float.
@@ -253,9 +261,10 @@ namespace sfem {
         }
 
         if (options.format != op_type::INEXACT && options.format != op_type::MATRIX_FREE) {
-            SFEM_ERROR("ObstacleTangent: format \"%s\" (%s, %s or %s)\n",
+            SFEM_ERROR("ObstacleTangent: format \"%s\" (%s, %s, %s or %s)\n",
                        options.format.c_str(),
                        op_type::BSR,
+                       op_type::SELL,
                        op_type::INEXACT,
                        op_type::MATRIX_FREE);
             return nullptr;

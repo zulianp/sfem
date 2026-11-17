@@ -128,6 +128,8 @@ namespace sfem {
                 "solver.linear.inexact.encoding",
                 "solver.linear.inexact.fold",
                 "solver.linear.inexact.traversal",
+                "solver.linear.inexact.layout",
+                "solver.linear.sell.encoding",
                 "output.path",
                 "output.export_freq",
                 "output.history_csv",
