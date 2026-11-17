@@ -351,6 +351,9 @@ if(CVFEM_REPORT_PYTHON)
 endif()
 
 if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_mms_refinement_summary
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_mms_refinement_summary.py)
     add_test(NAME cvfem_check_dump
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_check_dump_test.py)

@@ -76,6 +76,14 @@ darwish-cache:
 	$(PY) python/darwish_cache_figures.py --selftest
 	$(PY) python/darwish_cache_figures.py
 
+# Full replay needs the external archive; ordinary PDF builds use generated inputs.
+.PHONY: mesh-validation
+mesh-validation:
+	$(PY) python/unstructured_figures.py --selftest
+	$(PY) python/mms_refinement.py --selftest
+	$(PY) python/unstructured_figures.py
+	$(PY) python/mms_refinement.py
+
 consistent-matrix:
 	$(PY) python/darwish_cache_figures.py --consistent-matrix --selftest
 	$(PY) python/darwish_cache_figures.py --consistent-matrix
