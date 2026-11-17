@@ -7,7 +7,7 @@ full 14-term series of simulation 2 and the series truncated to its K slowest te
 same relaxation beyond them (g_i/D, C10 and C01 times D, D = g_inf + g_1 + ... + g_K; the step
 study's cut series holds the terms the campaign's step stores). A run whose Newton fails is recorded as such.
 
-    stress_strain.py <playground> <out> [--rates 1e1,1e5,1e7,1e9] [--terms 4,5,6,15] [--eps 0.5]
+    stress_strain.py <playground> <out> [--rates 1e1,1e5,1e7,1e9] [--terms 3,4,5,14] [--eps 0.5]
                      [--steps 200]
 
 <out> must not exist. Writes <out>/curves.csv (terms, rate, step, t, strain, stress), and

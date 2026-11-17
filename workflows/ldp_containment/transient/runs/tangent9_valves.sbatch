@@ -27,20 +27,21 @@
 # starts from rest: the run's copy of sim2.yaml loses its initial_conditions (simulation 1's state
 # lives on the original mesh; the storage at scale, scale_mesh.sbatch, needs none). SIM1 starts the
 # strokes from another containment (LDP24A: a sim1.sbatch SUFFIX, e.g. $CASE/s1_s0_proj/sim1). A
-# run whose folder exists is skipped: nothing is overwritten.
+# run whose folder exists is skipped: nothing is overwritten. The machine: ../../machine.sh.
 set -u
-SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PLAYGROUND=${PLAYGROUND:-$SRC/build-cuda/playground}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+SRC=$SFEM_ROOT
+PLAYGROUND=${PLAYGROUND:-${SFEM_BUILD:-$SRC/build-cuda}/playground}
 T=$SRC/workflows/ldp_containment/transient
-export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores MPICH_GPU_SUPPORT_ENABLED=0
 # CASE_ARGS: the element's own options (LDP24A TET10: its QPs need up to 60,000 iterations, sim2.yaml).
 CASE_ARGS=""
 case ${PUMP:-LDP24A}/${ELEMENT:-TET4} in
-  LDP24A/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_s0/sim1}; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
-  LDP24A/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_p2/sim1}; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A
+  LDP24A/TET4) CASE=$LDP_CASES/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_s0/sim1}; PREFIX=${PREFIX:-la_s0}; DB=solid; FILES=LDP24A ;;
+  LDP24A/TET10) CASE=$LDP_CASES/LDP24A_r100; SIM1=${SIM1:-$CASE/s1_p2/sim1}; PREFIX=${PREFIX:-la_p2}; DB=solid_p2; FILES=LDP24A
                 CASE_ARGS="--set obstacle.qp.max_it=60000" ;;
-  FF200/TET4) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; DB=solid; FILES=FF200_ExodusMesh ;;
-  FF200/TET10) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; DB=solid_p2; FILES=FF200_ExodusMesh ;;
+  FF200/TET4) CASE=$LDP_CASES/FF200_ExodusMesh; SIM1=$CASE/prony3_sim1/sim1; PREFIX=${PREFIX:-tp9_s0}; DB=solid; FILES=FF200_ExodusMesh ;;
+  FF200/TET10) CASE=$LDP_CASES/FF200_ExodusMesh; SIM1=$CASE/p2_sim1/sim1; PREFIX=${PREFIX:-tp9_p2}; DB=solid_p2; FILES=FF200_ExodusMesh ;;
   *) echo "unknown PUMP/ELEMENT ${PUMP:-LDP24A}/${ELEMENT:-TET4}"; exit 1 ;;
 esac
 I="--set solver.linear.format=INEXACT --set solver.linear.inexact.store"
@@ -95,7 +96,7 @@ go() {  # <run>
   case " ${SNAP_RUNS:-} " in *" $run "*) snap=(--set "output.history_snapshots={times: [${SNAP}]}") ;; esac
   W=$CASE/${PREFIX}_$run
   [ -e "$W" ] && { echo "$run: $W exists; give a new PREFIX"; return; }
-  mkdir -p "$W"; cd "$W"
+  mkdir -p "$W"; cd "$W" || return
   ln -s "$SIM1" sim1
   case ${PUMP:-LDP24A} in
     LDP24A) cp "$T/LDP24A/pv_load.csv" "$T/LDP24A/sv_load.csv" . ;;
@@ -107,7 +108,7 @@ go() {  # <run>
   [ "${NO_IC:-0}" = 1 ] && sed -i '/^initial_conditions:/,/^[a-z]/{/^initial_conditions:/d;/^[a-z]/!d}' sim2.yaml
   start=$(date +%s.%N)
   # shellcheck disable=SC2086
-  SMESH_TRACE_FILE=$W/smesh.trace.csv srun --exact -n 1 -c 72 --gpus-per-task=1 "$PLAYGROUND" sim2.yaml \
+  SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_GPU "$PLAYGROUND" sim2.yaml \
       --set execution_space=device $CASE_ARGS $targs $hargs ${snap[@]+"${snap[@]}"} ${EXTRA:-} \
       --set output.path=sim2 --set output.history_csv=sim2/history.csv > run.log 2>&1
   local rc=$?
@@ -118,7 +119,7 @@ go() {  # <run>
 # Sourced (qp_window.sbatch), only the definitions.
 [ "${BASH_SOURCE[0]}" != "$0" ] && return 0
 for run in ${RUNS}; do
-  while [ "$(jobs -rp | wc -l)" -ge 4 ]; do wait -n; done
+  sfem_throttle
   go "$run" &
 done
 wait

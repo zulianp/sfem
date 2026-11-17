@@ -9,10 +9,12 @@
 #SBATCH --view=default
 # The one-element stress-strain curves (stress_strain.py) on the host, one core per run, into OUT
 # (a new folder; the script stops if it exists). ARGS: further options of stress_strain.py.
-#   [OUT=runs/stress_strain] [ARGS="--rates 1e1,1e5,1e7,1e9 --terms 4,5,6,15"]
+#   [OUT=runs/stress_strain] [ARGS="--rates 1e1,1e5,1e7,1e9 --terms 3,4,5,14"]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-OUT=${OUT:-$D/runs/stress_strain}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+D=$SFEM_ROOT
+OUT=${OUT:-$SFEM_RUNS/stress_strain}
 # shellcheck disable=SC2086
-srun -n 1 -c 72 $D/venv/bin/python $D/workflows/ldp_containment/single_element/stress_strain.py \
-    $D/build-cuda/playground $OUT ${ARGS:-}
+$SFEM_LAUNCH_HOST $SFEM_PY $D/workflows/ldp_containment/single_element/stress_strain.py \
+    ${SFEM_BUILD:-$D/build-cuda}/playground $OUT ${ARGS:-}

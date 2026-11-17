@@ -15,23 +15,26 @@
 # with its edges rounded by 0.1 mm, convex and concave, and the exact distance to the result (ssdf
 # sdf_round, a build of ssdf's sdf-round branch: SSDF). The case files read db/sdf_valves_r100: the
 # seats' edges as cut are half a cell sharp, and the strokes failed where the valves slam onto them.
-# Prints the nodes and elements.
+# Prints the nodes and elements. With SFEM_BUILD set, every tool is that build's (sdf_round: bin/,
+# built with SFEM_ENABLE_SSDF=ON); the machine: ../../machine.sh.
 #   [CASE=ldp_cases/LDP24A_r100] [SRC=ldp_cases/LDP24AT_v3] [SSDF=<ssdf build>]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-SMESH=$D/build-cuda/external/smesh
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100}
-SRC=${SRC:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24AT_v3}
-SSDF=${SSDF:-/ritom/scratch/cscs/zulianp/ssdf-round-build-4}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+D=$SFEM_ROOT
+SMESH=${SFEM_BUILD:-$D/build-cuda}/external/smesh
+REFINE=${SFEM_BUILD:-$D/build-x28}/external/smesh/refine
+CASE=${CASE:-$LDP_CASES/LDP24A_r100}
+SRC=${SRC:-$LDP_CASES/LDP24AT_v3}
+SDF_ROUND=${SFEM_BUILD:-${SSDF:-/ritom/scratch/cscs/zulianp/ssdf-round-build-4}}/bin/sdf_round
 [ -e $CASE ] && { echo "prepare: $CASE exists"; exit 1; }
 mkdir -p $CASE/db
 cp -r $SRC/db/solid $SRC/db/sdf_valves $CASE/db/ || exit 1
-cd $CASE/db
-export OMP_NUM_THREADS=72
-srun -n 1 -c 72 $SMESH/mesh_promote TET10 solid solid_p2_promoted > promote.log 2>&1 || { echo "prepare: mesh_promote failed"; exit 1; }
-srun -n 1 -c 72 $SMESH/sfc solid_p2_promoted solid_p2 > sfc.log 2>&1 || { echo "prepare: sfc failed"; exit 1; }
-SMESH_REFINEMENT_LEVELS=1 srun -n 1 -c 72 $D/build-x28/external/smesh/refine solid solid_r1 > refine.log 2>&1 || { echo "prepare: refine failed"; exit 1; }
-srun -n 1 -c 72 $SSDF/bin/sdf_round sdf_valves 1e-4 sdf_valves_r100 > round.log 2>&1 || { echo "prepare: sdf_round failed"; exit 1; }
+cd $CASE/db || exit 1
+$SFEM_LAUNCH_HOST $SMESH/mesh_promote TET10 solid solid_p2_promoted > promote.log 2>&1 || { echo "prepare: mesh_promote failed"; exit 1; }
+$SFEM_LAUNCH_HOST $SMESH/sfc solid_p2_promoted solid_p2 > sfc.log 2>&1 || { echo "prepare: sfc failed"; exit 1; }
+SMESH_REFINEMENT_LEVELS=1 $SFEM_LAUNCH_HOST $REFINE solid solid_r1 > refine.log 2>&1 || { echo "prepare: refine failed"; exit 1; }
+$SFEM_LAUNCH_HOST $SDF_ROUND sdf_valves 1e-4 sdf_valves_r100 > round.log 2>&1 || { echo "prepare: sdf_round failed"; exit 1; }
 grep "^sdf_round" round.log
 for m in solid solid_p2 solid_r1; do
   echo "$m nodes $(( $(stat -c %s $m/x.float32) / 4 )) sidesets: $(ls $m/sidesets 2>/dev/null | tr '\n' ' ')"

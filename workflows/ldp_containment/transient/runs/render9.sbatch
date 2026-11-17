@@ -18,14 +18,16 @@
 # the SNAP its runs were given, which the runs do not record). TIMES must name as many times as the
 # reference has snapshots. RENDERS is a new folder: the job stops if it exists.
 set -u
-SRC=/ritom/scratch/cscs/zulianp/sfem-prony-md
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+SRC=$SFEM_ROOT
 case ${PUMP:-FF200} in
-  FF200)  CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; TAG=${TAG:-tp9}; TIMES=${TIMES:-0.012,0.0255,0.043}; RENDERS=${RENDERS:-history9} ;;
-  LDP24A) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; TAG=${TAG:-la}; RENDERS=${RENDERS:-history_la}
+  FF200)  CASE=$LDP_CASES/FF200_ExodusMesh; TAG=${TAG:-tp9}; TIMES=${TIMES:-0.012,0.0255,0.043}; RENDERS=${RENDERS:-history9} ;;
+  LDP24A) CASE=$LDP_CASES/LDP24A_r100; TAG=${TAG:-la}; RENDERS=${RENDERS:-history_la}
           [ -n "${TIMES:-}" ] || { echo "render9: LDP24A needs TIMES, the snapshot times (SNAP) its runs were given"; exit 1; } ;;
   *) echo "render9: unknown PUMP ${PUMP}"; exit 1 ;;
 esac
-O=$SRC/runs/$RENDERS
+O=$SFEM_RUNS/$RENDERS
 [ -e $O ] && { echo "render9: $O exists; give a new RENDERS"; exit 1; }
 # One time a snapshot: checked against the reference's before anything is written.
 ref=$CASE/${TAG}_p2_bsr32__full_a/sim2/history
@@ -38,7 +40,7 @@ for d in $CASE/${TAG}_p2_*; do
   case $r in *_s0 | qbsr8__* | *int8_* | *float16_scaled*) continue ;; esac
   [ $r != bsr32__full_a ] && [ -f $d/sim2/history/0/PRESSURE_VALVE.iso.Hsum.err.float64 ] && runs="$runs,$r"
 done
-VTK_DEFAULT_EGL_DEVICE_INDEX=0 pvbatch $SRC/workflows/ldp_containment/transient/render_history.py $CASE $O \
+VTK_DEFAULT_EGL_DEVICE_INDEX=0 $SFEM_PVBATCH $SRC/workflows/ldp_containment/transient/render_history.py $CASE $O \
   --prefix=${TAG}_p2_ --reference=bsr32__full_a --runs=${runs#,} --times=$TIMES --field=Hsum --range=-8,-1 \
   --size=1200,900 --pump=${PUMP:-FF200}
 ls $O | wc -l

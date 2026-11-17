@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The tests of 70 EPDM 281 repeated on one element, with the valves' material.
 
-    measured_tests.py <playground> <measurements> <out> [--terms 4,15] [--steps 2000]
+    measured_tests.py <playground> <measurements> <out> [--terms 3,14] [--steps 2000]
 
 <measurements> holds uniaxial.csv, equibiax.csv and pureshear.csv (t, engineering strain, engineering
 stress in MPa; epdm281_extract.py). Per test, one HEX8 unit cube follows the measured strain history,

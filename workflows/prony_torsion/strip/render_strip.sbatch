@@ -14,7 +14,9 @@
 #   RUN=<run folder> OUT=<folder> [RANGE=0,<umax>] [TIMES=t0,t1,...] [STRIDE=10] [FINE=k0,k1] [SIZE=1600,700]
 # Without RANGE the colour range is 0 to the largest |u| over every STRIDE-th step (computed once).
 set -u
-T=/ritom/scratch/cscs/zulianp/sfem-prony-md/workflows/prony_torsion/strip/render_strip.py
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+T=$SFEM_ROOT/workflows/prony_torsion/strip/render_strip.py
 export VTK_DEFAULT_EGL_DEVICE_INDEX=0
 mkdir -p $OUT
 if [ -z "${RANGE:-}" ]; then
@@ -34,13 +36,13 @@ PYEOF
 fi
 echo "colour range $RANGE"
 if [ -n "${TIMES:-}" ]; then
-  pvbatch $T $RUN $OUT/sequence --times=$TIMES --range=$RANGE --size=${SIZE:-2400,1300} --prefix=seq --crop
+  $SFEM_PVBATCH $T $RUN $OUT/sequence --times=$TIMES --range=$RANGE --size=${SIZE:-2400,1300} --prefix=seq --crop
 fi
 n=$(wc -l < $RUN/results/out/time.txt)
 steps=$(seq 0 ${STRIDE:-10} $((n - 1)))
 [ -n "${FINE:-}" ] && steps=$( { echo "$steps"; seq ${FINE%,*} ${FINE#*,}; } | sort -n -u)
 echo "$steps" | xargs -n 20 | while read chunk; do
-  pvbatch $T $RUN $OUT/movie --steps=$(echo $chunk | tr ' ' ',') --range=$RANGE --size=${SIZE:-1600,700} --stamp --prefix=frame \
+  $SFEM_PVBATCH $T $RUN $OUT/movie --steps=$(echo $chunk | tr ' ' ',') --range=$RANGE --size=${SIZE:-1600,700} --stamp --prefix=frame \
     || echo "render_strip: chunk starting $(echo $chunk | cut -d' ' -f1) failed"
 done
 ls $OUT/sequence $OUT/movie 2>/dev/null | wc -l
