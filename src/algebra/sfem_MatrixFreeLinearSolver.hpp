@@ -155,6 +155,10 @@ namespace sfem {
         /// barrier: where team_shift_capable() (host, the update touching only the blocks' nodes).
         virtual bool team_shift_capable() const { return false; }
         virtual void team_shift(const std::shared_ptr<SparseBlockVector<T>>& /*block_diag*/, const SharedBuffer<T>& /*scaling*/) {}
+        /// Where this is y += B x with B a 3 x 3 block a node, stored on the device (row-major, 9
+        /// entries a node): the blocks, their count and their scalar's size in bytes, for a solver
+        /// that applies them inside its own kernels (CGDeviceRun::m_blocks). nullptr otherwise.
+        virtual const void* device_blocks3(ptrdiff_t& /*n_blocks*/, int& /*scalar_bytes*/) const { return nullptr; }
     };
 
     template <typename T>

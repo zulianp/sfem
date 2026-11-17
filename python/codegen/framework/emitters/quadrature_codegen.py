@@ -33,6 +33,13 @@ def quadrature_reference_accessor(cell_rule, reference_name, scalar_type="s_t"):
     return "sfem::codegen::%s<%s>::%s()" % (owner, scalar_type, accessor)
 
 
+def quadrature_reference_owner(cell_rule, reference_name):
+    """The struct, a template on the scalar, that holds one reference table:
+    `sfem::codegen::ref_line_p3_q5` for a cubic line's `shape_1d`."""
+    owner, _accessor = _owner(cell_rule, reference_name)
+    return "sfem::codegen::%s" % owner
+
+
 #: Where a shared reference header lives, relative to the generated tree root.
 #:
 #: One directory rather than the tree root beside `kernel_math.hpp`: the set

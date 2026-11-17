@@ -3,6 +3,7 @@
 // conditions -- the same iterations and, but for the order of the sums, the same solution. Each
 // run's time is printed: SFEM_TEAM_SOLVE_CELLS sizes the cube for a timing on a full socket.
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <vector>
@@ -224,7 +225,9 @@ int test_team_bicgstab() {
         }
         printf("  BiCGStab%s: team %d, plain %d iterations, |x_team - x_plain| / |x_plain| = %.2e\n",
                precond ? " (Jacobi)" : "", its[1], its[0], std::sqrt(num / den));
-        SFEM_TEST_ASSERT(std::abs(its[1] - its[0]) <= 2);
+        // BiCGStab's iteration count follows the rounding of its sums: on x86-64 the plain solver
+        // alone takes 63, 65 and 66 iterations (Jacobi) at 1, 4 and 16 threads. Within 10%.
+        SFEM_TEST_ASSERT(std::abs(its[1] - its[0]) <= std::max(2, its[0] / 10));
         SFEM_TEST_ASSERT(std::sqrt(num / den) < 1e-7);
     }
     return SFEM_TEST_SUCCESS;

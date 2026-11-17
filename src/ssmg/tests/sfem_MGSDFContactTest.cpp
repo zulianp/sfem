@@ -735,12 +735,17 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
 
     SFEM_RUN_TEST(test_contact);
-    SFEM_RUN_TEST(test_checkerboard_hex_ssmgc);
-    SFEM_RUN_TEST(test_checkerboard_hex_ssmgc_generated);
-    SFEM_RUN_TEST(test_tet_ssmgc);
-    SFEM_RUN_TEST(test_quad2d_ssmgc);
-    SFEM_RUN_TEST(test_function_is_linear);
-    SFEM_RUN_TEST(test_contact_neohookean);
+    // SFEM_MGSDF_CONTACT_ONLY=1 runs test_contact alone (workflows/bench_MaMAL): the solver's
+    // statistics file (SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH) is then its solve's, which each
+    // later test's solve would overwrite.
+    if (!smesh::Env::read("SFEM_MGSDF_CONTACT_ONLY", int(0))) {
+        SFEM_RUN_TEST(test_checkerboard_hex_ssmgc);
+        SFEM_RUN_TEST(test_checkerboard_hex_ssmgc_generated);
+        SFEM_RUN_TEST(test_tet_ssmgc);
+        SFEM_RUN_TEST(test_quad2d_ssmgc);
+        SFEM_RUN_TEST(test_function_is_linear);
+        SFEM_RUN_TEST(test_contact_neohookean);
+    }
 
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

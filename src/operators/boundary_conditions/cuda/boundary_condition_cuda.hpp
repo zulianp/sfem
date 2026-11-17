@@ -38,6 +38,22 @@ namespace sfem {
                                          const real_t *const               steps,
                                          real_t *const                     out,
                                          void *const                       stream);
+
+    /// Up to `capacity` conditions' nodes and components, passed to one kernel by value.
+    struct ConstraintNodesBatch {
+        static constexpr int capacity = 8;
+        int                  count{0};
+        ptrdiff_t            offset[capacity + 1]{0};  // condition c's nodes are entries offset[c] .. offset[c + 1]
+        const idx_t         *nodes[capacity]{};
+        int                  component[capacity]{};
+    };
+
+    /// d_constraint_nodes_copy_vec for every condition of the batch, in one launch.
+    void d_constraint_nodes_copy_vec_batch(const ConstraintNodesBatch &batch,
+                                           const int                   block_size,
+                                           const real_t               *source,
+                                           real_t                     *dest,
+                                           void *const                 stream);
 }  // namespace sfem
 
 #ifdef __cplusplus

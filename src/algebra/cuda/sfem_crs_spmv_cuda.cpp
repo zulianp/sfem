@@ -339,6 +339,75 @@ namespace sfem {
     }
 
 #if CUDART_VERSION >= 12000
+#if defined(SFEM_ENABLE_HIP)
+    // hipSPARSE has no generic BSR matrix (cusparseCreateBsr): its bsrmv takes the same arrays, row-major
+    // blocks and 32-bit indices.
+    static hipsparseStatus_t hip_bsrmv(const int mb, const int nb, const int nnzb, const double* alpha,
+                                       const hipsparseMatDescr_t descr, const double* values, const int* rowptr,
+                                       const int* colidx, const int block_size, const double* x, const double* beta,
+                                       double* y) {
+        return hipsparseDbsrmv(cusparse_handle, HIPSPARSE_DIRECTION_ROW, HIPSPARSE_OPERATION_NON_TRANSPOSE, mb, nb,
+                               nnzb, alpha, descr, values, rowptr, colidx, block_size, x, beta, y);
+    }
+
+    static hipsparseStatus_t hip_bsrmv(const int mb, const int nb, const int nnzb, const float* alpha,
+                                       const hipsparseMatDescr_t descr, const float* values, const int* rowptr,
+                                       const int* colidx, const int block_size, const float* x, const float* beta,
+                                       float* y) {
+        return hipsparseSbsrmv(cusparse_handle, HIPSPARSE_DIRECTION_ROW, HIPSPARSE_OPERATION_NON_TRANSPOSE, mb, nb,
+                               nnzb, alpha, descr, values, rowptr, colidx, block_size, x, beta, y);
+    }
+
+    class BSRImpl {
+    public:
+        static_assert(std::is_same<count_t, int>::value && std::is_same<idx_t, int>::value,
+                      "hipSPARSE's bsrmv takes 32-bit row pointers and column indices");
+
+        hipsparseMatDescr_t descr{nullptr};
+        ptrdiff_t           block_rows;
+        ptrdiff_t           block_cols;
+        int                 block_size;
+        real_t              alpha{1};
+        real_t              beta{1};
+
+        std::shared_ptr<Buffer<count_t>> rowptr;
+        std::shared_ptr<Buffer<idx_t>>   colidx;
+        std::shared_ptr<Buffer<real_t>>  values;
+
+        BSRImpl(const ptrdiff_t block_rows, const ptrdiff_t block_cols, const int block_size,
+                const std::shared_ptr<Buffer<count_t>>& rowptr, const std::shared_ptr<Buffer<idx_t>>& colidx,
+                const std::shared_ptr<Buffer<real_t>>& values, const real_t scale_output)
+            : block_rows(block_rows),
+              block_cols(block_cols),
+              block_size(block_size),
+              beta(scale_output),
+              rowptr(rowptr),
+              colidx(colidx),
+              values(values) {
+            sfem_cusparse_init();
+            CHECK_CUSPARSE(hipsparseCreateMatDescr(&descr));
+            CHECK_CUSPARSE(hipsparseSetMatIndexBase(descr, HIPSPARSE_INDEX_BASE_ZERO));
+        }
+
+        ~BSRImpl() { CHECK_CUSPARSE(hipsparseDestroyMatDescr(descr)); }
+
+        void apply(const real_t* const x, real_t* const y) {
+            SFEM_TRACE_SCOPE("BSR_CUDA::apply");
+            CHECK_CUSPARSE(hip_bsrmv(block_rows,
+                                     block_cols,
+                                     colidx->size(),
+                                     &alpha,
+                                     descr,
+                                     values->data(),
+                                     rowptr->data(),
+                                     colidx->data(),
+                                     block_size,
+                                     x,
+                                     &beta,
+                                     y));
+        }
+    };
+#else
     class BSRImpl {
     public:
         cusparseSpMatDescr_t matrix;
@@ -456,6 +525,7 @@ namespace sfem {
                                         dBuffer));
         }
     };
+#endif  // SFEM_ENABLE_HIP
 
     std::shared_ptr<BSR<count_t, idx_t, real_t>> d_bsr_spmv(const ptrdiff_t                         block_rows,
                                                             const ptrdiff_t                         block_cols,

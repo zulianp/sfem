@@ -24,6 +24,33 @@ namespace sfem {
         }
         return device;
     }
+
+    static __global__ void constraint_nodes_copy_vec_batch_kernel(const ConstraintNodesBatch batch,
+                                                                  const int                  block_size,
+                                                                  const real_t *const SFEM_RESTRICT source,
+                                                                  real_t *const SFEM_RESTRICT       dest) {
+        const ptrdiff_t n = batch.offset[batch.count];
+        for (ptrdiff_t k = blockIdx.x * ptrdiff_t(blockDim.x) + threadIdx.x; k < n; k += ptrdiff_t(blockDim.x) * gridDim.x) {
+            int c = 0;
+            while (k >= batch.offset[c + 1]) c++;
+            const ptrdiff_t i = ptrdiff_t(batch.nodes[c][k - batch.offset[c]]) * block_size + batch.component[c];
+            dest[i]           = source[i];
+        }
+    }
+
+    // One launch for the conditions a product copies (MaMAL's coarse CG: three, one a component).
+    void d_constraint_nodes_copy_vec_batch(const ConstraintNodesBatch &batch,
+                                           const int                   block_size,
+                                           const real_t               *source,
+                                           real_t                     *dest,
+                                           void *const                 stream) {
+        const ptrdiff_t n = batch.offset[batch.count];
+        if (!n) return;
+        const int       kernel_block_size = 128;
+        const ptrdiff_t n_blocks          = std::min(ptrdiff_t(sfem_cuda_max_grid_dim_x()), (n + kernel_block_size - 1) / kernel_block_size);
+        constraint_nodes_copy_vec_batch_kernel<<<n_blocks, kernel_block_size, 0, (cudaStream_t)stream>>>(batch, block_size, source, dest);
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+    }
 }  // namespace sfem
 
 extern "C" {

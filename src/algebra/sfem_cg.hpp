@@ -9,6 +9,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "sfem_MatrixFreeLinearSolver.hpp"
@@ -478,6 +479,50 @@ namespace sfem {
                 assert(ptAp != 0);
                 const T alpha = rtz / ptAp;
                 x_r(e, n, alpha, p, Ap, x, r, false);
+            }
+
+            if constexpr (std::is_same_v<E, BlasExec<T>>) {
+                // The backend's run of the loop below (device builds, SFEM_CG_DEVICE_RUN): where nothing
+                // reads an iteration on the host (no monitor, interceptor or curvature stop), the sums
+                // are this rank's, and M is a Jacobi-type preconditioner (ShiftableOperator), whose
+                // apply is kernels alone: the run captures it into a graph, where a preconditioner that
+                // waits on the stream (an inner solve's dot read on the host) would fail the capture
+                // inside its own error check. Fusion off (the separate-BLAS baseline) and max_it <= 0
+                // (the loop below then takes no iteration) keep the host's loop.
+                auto shiftable = shiftable_preconditioner();
+                if (impl.run_precond && use_fusion() && max_it > 0 && shiftable && !verbose && !interceptor &&
+                    !stop_on_negative_curvature && !e.across_ranks()) {
+                    CGDeviceRun<T> run;
+                    run.n            = n;
+                    run.x            = x;
+                    run.r            = r;
+                    run.z            = z;
+                    run.p            = p;
+                    run.Ap           = Ap;
+                    run.rtz          = rtz;
+                    run.rtz0         = rtz0;
+                    run.atol         = atol;
+                    run.rtol         = rtol;
+                    run.max_it       = max_it;
+                    run.precondition = [&](const T* const in, T* const out) { e.apply(M, in, out, true); };
+                    run.product      = [&](const T* const in, T* const out) { e.apply(A, in, out, true); };
+                    run.allocation   = e.allocation();
+                    run.stream       = blas->context().stream();
+                    {
+                        ptrdiff_t   n_blocks = 0;
+                        int         bytes    = 0;
+                        const void* blocks   = shiftable->device_blocks3(n_blocks, bytes);
+                        if (blocks && n_blocks * 3 == n) {
+                            run.m_blocks       = blocks;
+                            run.m_blocks_bytes = bytes;
+                        }
+                    }
+                    const CGDeviceRunResult ran = impl.run_precond(run);
+                    if (ran.ran) {
+                        iterations_ = ran.iterations;
+                        return ran.converged ? SFEM_SUCCESS : SFEM_FAILURE;
+                    }
+                }
             }
 
             int info = SFEM_FAILURE;

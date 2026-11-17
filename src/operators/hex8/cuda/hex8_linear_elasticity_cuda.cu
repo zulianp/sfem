@@ -7,8 +7,16 @@
 
 #include <stdio.h>
 
+static constexpr int HEX8_APPLY_BLOCK_SIZE = 128;
+
+// Launched with blocks of HEX8_APPLY_BLOCK_SIZE threads. SFEM's vectors interleave x, y, z, and a
+// 32-lane group adding its own nodes' x, then y, then z touches three times the cache lines that
+// separate arrays would. The group instead adds its 96 values in address order, value k * 32 + lane
+// in instruction k, exchanged through shared memory, on AMD through shuffles (MGSDF coarse mesh,
+// 86400 elements: GH200 19.3 us against 25.3, shuffles 21.0; MI300A shuffles 18.9 us against 39.0,
+// shared memory 20.7; separate arrays 18.9 and 17.1).
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(HEX8_APPLY_BLOCK_SIZE) cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t                          nelements,
                                                               idx_t **const SFEM_RESTRICT              elements,
                                                               const ptrdiff_t                          jacobian_stride,
                                                               const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -31,7 +39,18 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t   
     // static const T qx[3] = {0.1127016654, 1. / 2, 0.8872983346};
     // static const T qw[3] = {0.2777777778, 0.4444444444, 0.2777777778};
 
-    for (ptrdiff_t e = blockIdx.x * blockDim.x + threadIdx.x; e < nelements; e += blockDim.x * gridDim.x) {
+#if !defined(SFEM_ENABLE_HIP)
+    __shared__ T     s_out[3 * HEX8_APPLY_BLOCK_SIZE];
+    __shared__ idx_t s_node[HEX8_APPLY_BLOCK_SIZE];
+    const int        group = threadIdx.x & ~31;
+#endif
+    const int lane = threadIdx.x & 31;
+
+    // Every lane of a block takes every step (the scatter exchanges values); a lane past the end
+    // repeats the last element and adds nothing.
+    for (ptrdiff_t eb = ptrdiff_t(blockIdx.x) * blockDim.x; eb < nelements; eb += ptrdiff_t(blockDim.x) * gridDim.x) {
+        const bool      active = eb + threadIdx.x < nelements;
+        const ptrdiff_t e      = active ? eb + threadIdx.x : nelements - 1;
         idx_t ev[8];
 
         // Sub-geometry
@@ -98,14 +117,44 @@ __global__ void cu_affine_hex8_linear_elasticity_apply_kernel(const ptrdiff_t   
         }
 
         for (int v = 0; v < 8; v++) {
-            const ptrdiff_t idx = ev[v] * out_stride;
             assert(outx[v] == outx[v]);
             assert(outy[v] == outy[v]);
             assert(outz[v] == outz[v]);
 
-            atomicAdd(&g_outx[idx], outx[v]);
-            atomicAdd(&g_outy[idx], outy[v]);
-            atomicAdd(&g_outz[idx], outz[v]);
+#if defined(SFEM_ENABLE_HIP)
+            const idx_t mine = active ? ev[v] : idx_t(-1);
+            for (int k = 0; k < 3; k++) {
+                const int   f    = k * 32 + lane;
+                const int   src  = f / 3;
+                const int   c    = f - 3 * src;
+                const T     vx   = __shfl_sync(0xffffffff, outx[v], src, 32);
+                const T     vy   = __shfl_sync(0xffffffff, outy[v], src, 32);
+                const T     vz   = __shfl_sync(0xffffffff, outz[v], src, 32);
+                const idx_t node = __shfl_sync(0xffffffff, mine, src, 32);
+                if (node >= 0) {
+                    T *const g_out = c == 0 ? g_outx : (c == 1 ? g_outy : g_outz);
+                    atomicAdd(&g_out[node * out_stride], c == 0 ? vx : (c == 1 ? vy : vz));
+                }
+            }
+#else
+            s_out[3 * threadIdx.x]     = outx[v];
+            s_out[3 * threadIdx.x + 1] = outy[v];
+            s_out[3 * threadIdx.x + 2] = outz[v];
+            s_node[threadIdx.x]        = active ? ev[v] : idx_t(-1);
+            __syncwarp();
+
+            for (int k = 0; k < 3; k++) {
+                const int   f    = k * 32 + lane;
+                const int   src  = f / 3;
+                const int   c    = f - 3 * src;
+                const idx_t node = s_node[group + src];
+                if (node >= 0) {
+                    T *const g_out = c == 0 ? g_outx : (c == 1 ? g_outy : g_outz);
+                    atomicAdd(&g_out[node * out_stride], s_out[3 * group + f]);
+                }
+            }
+            __syncwarp();
+#endif
         }
     }
 }
@@ -129,13 +178,8 @@ int cu_affine_hex8_linear_elasticity_apply_tpl(const ptrdiff_t                  
                                                void                                    *stream) {
     SFEM_DEBUG_SYNCHRONIZE(stream);
 
-    int block_size = 128;
-#ifdef SFEM_USE_OCCUPANCY_MAX_POTENTIAL
-    {
-        int min_grid_size;
-        cudaOccupancyMaxPotentialBlockSize(&min_grid_size, &block_size, cu_affine_hex8_linear_elasticity_apply_kernel<T>, 0, 0);
-    }
-#endif  // SFEM_USE_OCCUPANCY_MAX_POTENTIAL
+    // The shared-memory scatter fixes the block size
+    const int block_size = HEX8_APPLY_BLOCK_SIZE;
 
     ptrdiff_t n_blocks = MAX(ptrdiff_t(1), (nelements + block_size - 1) / block_size);
 
@@ -243,7 +287,7 @@ extern int cu_affine_hex8_linear_elasticity_apply(const ptrdiff_t               
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_bsr_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_bsr_kernel(const ptrdiff_t                          nelements,
                                                             idx_t **const SFEM_RESTRICT              elements,
                                                             const ptrdiff_t                          jacobian_stride,
                                                             const cu_jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate,
@@ -419,7 +463,7 @@ extern int cu_affine_hex8_linear_elasticity_bsr(const ptrdiff_t                 
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_block_diag_sym_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_block_diag_sym_kernel(const ptrdiff_t                          nelements,
                                                                        idx_t **const SFEM_RESTRICT              elements,
                                                                        const ptrdiff_t                          jacobian_stride,
                                                                        const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,
@@ -617,7 +661,7 @@ extern int cu_affine_hex8_linear_elasticity_block_diag_sym(const ptrdiff_t      
 }
 
 template <typename T>
-__global__ void cu_affine_hex8_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_hex8_linear_elasticity_diag_kernel(const ptrdiff_t                          nelements,
                                                              idx_t **const SFEM_RESTRICT              elements,
                                                              const ptrdiff_t                          jacobian_stride,
                                                              const cu_jacobian_t *const SFEM_RESTRICT jacobian_adjugate,

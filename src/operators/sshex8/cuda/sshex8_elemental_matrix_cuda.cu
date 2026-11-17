@@ -156,7 +156,7 @@ extern int cu_affine_hex8_elemental_matrix_apply(const ptrdiff_t                
 ////////////////////////
 
 template <typename T>
-__global__ void cu_affine_sshex8_elemental_matrix_apply_kernel(const int                    level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_elemental_matrix_apply_kernel(const int                    level,
                                                                const ptrdiff_t              nelements,
                                                                idx_t **const SFEM_RESTRICT  elements,
                                                                T **const SFEM_RESTRICT      elemental_matrix,
@@ -193,7 +193,7 @@ __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel(const int        
                     }
 
                     for (int i = 0; i < 8; i++) {
-                        const auto SFEM_RESTRICT mi = &mat[i * 8];
+                        const auto *const SFEM_RESTRICT mi = &mat[i * 8];
                         for (int j = 0; j < 8; j++) {
                             out[i] += mi[j] * in[j];
                         }
@@ -508,6 +508,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_warp_tpl(const ptrdiff_t        
     return SFEM_SUCCESS;
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_TC(const ptrdiff_t                  nelements,
                                                                       const idx_t *const SFEM_RESTRICT elements,
@@ -704,6 +705,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_TC_tpl(const ptrdiff_t          
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T>
 int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                        level,
@@ -713,6 +715,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
                                                     const T *const SFEM_RESTRICT     x,
                                                     T *const SFEM_RESTRICT           y,
                                                     void                            *stream) {
+#if !defined(SFEM_ENABLE_HIP)  // the TC kernels are mma PTX, NVIDIA tensor cores only
     int SFEM_ENABLE_TC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
 
@@ -734,6 +737,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_tpl(const int                   
                 break;
         }
     }
+#endif
 
     switch (level) {
         case 4: {
@@ -896,6 +900,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_warp_tpl(
     return SFEM_SUCCESS;
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL, int NVECS>
 __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_multivector_TC(
         const ptrdiff_t                  nelements,
@@ -1061,6 +1066,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_TC_tpl(
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T, int LEVEL>
 static int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_level_tpl(
@@ -1100,6 +1106,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_tpl(
         const T *const SFEM_RESTRICT     x,
         T *const SFEM_RESTRICT           y,
         void                            *stream) {
+#if !defined(SFEM_ENABLE_HIP)  // the TC kernels are mma PTX, NVIDIA tensor cores only
     int SFEM_ENABLE_TC = 0;
     SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
 
@@ -1154,6 +1161,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_multivector_tpl(
                 break;
         }
     }
+#endif
 
     switch (level) {
         case 4:
@@ -1348,6 +1356,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_warp_tpl(const ptrdiff_t 
     return SFEM_SUCCESS;
 }
 
+#if !defined(SFEM_ENABLE_HIP)  // mma PTX: NVIDIA tensor cores only
 template <typename T, int LEVEL>
 __global__ void cu_affine_sshex8_elemental_matrix_apply_kernel_AoS_vector_TC(
         const ptrdiff_t                  nelements,
@@ -1525,6 +1534,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_TC_tpl(const ptrdiff_t   
     SFEM_DEBUG_SYNCHRONIZE(stream);
     return SFEM_SUCCESS;
 }
+#endif  // !SFEM_ENABLE_HIP
 
 template <typename T>
 int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int                        level,
@@ -1535,6 +1545,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int            
                                                            T *const SFEM_RESTRICT           y,
                                                            void                            *stream) {
     // Default off until vector TC is validated against LinearElasticity (scalar TC defaults off too).
+#if !defined(SFEM_ENABLE_HIP)  // the TC kernels are mma PTX, NVIDIA tensor cores only
     int SFEM_ENABLE_TC = 1;
     SFEM_READ_ENV(SFEM_ENABLE_TC, atoi);
 
@@ -1560,6 +1571,7 @@ int cu_affine_sshex8_elemental_matrix_apply_AoS_vector_tpl(const int            
                 break;
         }
     }
+#endif
 
     switch (level) {
         case 2: {

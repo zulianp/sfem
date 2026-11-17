@@ -32,6 +32,13 @@ print whatever comes back.
 
 import sympy as sp
 
+from codegen.framework.plans.form_emission import (
+    form_n_field_components,
+    form_reads_current,
+    form_reads_direction,
+    writes_per_shape,
+)
+from codegen.framework.plans.quadrature_fields import quadrature_field_streams
 from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
     evaluation_strategy,
@@ -254,3 +261,111 @@ def sum_factorized_assembly_admits(*, tensor_product, dependencies, **shared):
     if not tensor_product:
         return False
     return substituted_assembly_admits(dependencies=dependencies, **shared)
+
+
+# ----------------------------------------------------------------------------- a block per element
+
+#: The element matrix, in double, a device thread holds in its stack. PROTEUS_HEX64's (192 x 192,
+#: 295 KB) is beyond what an AMD GPU gives a thread (128 KB) and what an H100 reserves for a launch;
+#: its device assembly takes a block of threads per element (`block_assembly_admits`).
+PER_THREAD_ELEMENT_MATRIX_BYTES = 96 * 1024
+
+
+def tensor_product_point_tangent_admits(form, dim, *, on_device, tensor_product):
+    """Whether a device tensor-product element's tangent at one point is published for the assembly
+    a block per element: a 3D vector energy reading the state, without integration-point fields.
+    Every element of the family shares the header that holds it, so the element's size is not asked."""
+    return bool(
+        on_device
+        and tensor_product
+        and dim == 3
+        and form_n_field_components(form, dim) == 3
+        and form_reads_current(form, default=True)
+        and not quadrature_field_streams(form)
+    )
+
+
+#: The largest apply point (common subexpressions of the linearised stress at a point,
+#: `apply_point_temporaries`) the matrix-core apply is launched for. The point is evaluated with a
+#: tile's accumulators live, so a heavy one spills. Measured against the generated kernel (both with
+#: launch bounds): linear elasticity (7), Saint Venant-Kirchhoff (83) and Neo-Hookean Ogden (113) win
+#: on MI300A (1.6-3.3x) and GH200 (1.3-3.8x); modified Mooney-Rivlin (367) loses on GH200 (0.61-1.0x)
+#: and at order 2 on MI300A (0.65x), winning only at order 3 there (1.05-1.29x).
+MATRIX_CORE_APPLY_MAX_POINT_TEMPORARIES = 200
+
+_APPLY_POINT_TEMPORARIES = {}
+
+
+def apply_point_temporaries(form, dim):
+    """The common subexpressions of the apply's flux at a point: the linearised first Piola-Kirchhoff
+    stress in the trial gradient, as the emitter forms the point (`<prefix>_apply_point`)."""
+    weak_form = form.weak_form
+    entry = _APPLY_POINT_TEMPORARIES.get(id(weak_form))
+    if entry is None or entry[0] is not weak_form:
+        trial = tuple(sp.symbols("trial_grad[%d]" % i) for i in range(weak_form.n_field_components * dim))
+        replacements, _ = sp.cse(list(weak_form.linearized_first_piola(trial)))
+        entry = (weak_form, len(replacements))
+        _APPLY_POINT_TEMPORARIES[id(weak_form)] = entry
+    return entry[1]
+
+
+def matrix_core_apply_admits(form, dim, *, on_device, tensor_product):
+    """Whether a device tensor-product element is applied on the FP64 matrix units
+    (`sfem::tensor_product::matrix_core_apply`: AMD's matrix cores, a wavefront per 16 elements;
+    NVIDIA's tensor cores, a warp per 8 elements), reading the material
+    at a point through the published `<prefix>_apply_point`: the operator action (the form `apply`,
+    which reads a direction and writes per shape) of a 3D scalar or vector form without
+    integration-point fields. Every element of the family shares the header that holds the point,
+    so the element's size is not asked."""
+    return bool(
+        on_device
+        and tensor_product
+        and dim == 3
+        and form.name == "apply"
+        and form_n_field_components(form, dim) in (1, 3)
+        and form_reads_direction(form, default=True)
+        and writes_per_shape(form)
+        and not quadrature_field_streams(form)
+    )
+
+
+#: The orders the matrix-core apply is launched for (nodes a direction). At order 1 half of each
+#: 16-point tile is padding and the element (8 nodes) a quarter of a 16-row output tile, so it is not
+#: launched there. Measured against the generated kernel, MI300A: order 2 (1 M elements) linear
+#: elasticity 3.3x affine and 5.8x isoparametric, the nonlinear materials 3.5-4.4x; order 3 (216 k
+#: elements) Saint Venant-Kirchhoff 3.4x / 3.7x, modified Mooney-Rivlin 5.4x / 5.9x. GH200: linear
+#: elasticity 1.3x / 3.9x, Saint Venant-Kirchhoff 3.4x isoparametric at order 2 and 2.1x / 2.3x at 3.
+MATRIX_CORE_APPLY_SHAPE_1D = (3, 4)
+
+
+def matrix_core_apply_launch_admits(
+    form, dim, quadrature_rule, *, on_device, tensor_product, isoparametric, tensor_product_geometry
+):
+    """Whether an entry point of the apply launches the matrix-core kernel (double only):
+    `matrix_core_apply_admits`, an element of `MATRIX_CORE_APPLY_SHAPE_1D` nodes a
+    direction (`quadrature_rule`, a tensor-product rule), and, isoparametric, a geometry interpolated
+    by the field's own tensor-product basis (the kernel differentiates the coordinates with the same
+    reference gradient matrix)."""
+    return bool(
+        matrix_core_apply_admits(form, dim, on_device=on_device, tensor_product=tensor_product)
+        and quadrature_rule.tensor_product_n_shape_1d in MATRIX_CORE_APPLY_SHAPE_1D
+        and (tensor_product_geometry or not isoparametric)
+        and apply_point_temporaries(form, dim) <= MATRIX_CORE_APPLY_MAX_POINT_TEMPORARIES
+    )
+
+
+def block_assembly_admits(
+    form, dim, n_nodes, n_qp, formats, *, on_device, tensor_product, tensor_product_geometry, affine, projected
+):
+    """Whether the device assembles the element's BSR a block of threads per element, a thread per
+    point (at most 128), rather than a thread per element holding the element matrix: where that
+    matrix is beyond `PER_THREAD_ELEMENT_MATRIX_BYTES`."""
+    return bool(
+        tensor_product_point_tangent_admits(form, dim, on_device=on_device, tensor_product=tensor_product)
+        and tensor_product_geometry
+        and not affine
+        and not projected
+        and tuple(formats) == ("bsr",)
+        and n_qp <= 128
+        and (form_n_field_components(form, dim) * n_nodes) ** 2 * 8 > PER_THREAD_ELEMENT_MATRIX_BYTES
+    )
