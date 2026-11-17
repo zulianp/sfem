@@ -10,6 +10,7 @@
 #include "sfem_CRS_X_BSR.hpp"
 #include "sfem_SelfContact.hpp"
 #include "smesh_crs_graph.hpp"
+#include "smesh_device_buffer.hpp"
 #include "smesh_env.hpp"
 
 #include "sfem_BSR.hpp"
@@ -658,6 +659,10 @@ namespace sfem {
                 contact_block_diag_soa[i]  = create_buffer<real_t>(6, n_contact, es);
                 contact_block_diag_aos[i]  = create_buffer<real_t>(n_contact * 6, es);
                 contact_block_idx[i]       = contact_surfaces[i]->node_mapping();
+#ifdef SFEM_ENABLE_CUDA
+                // The block vector's kernels read its indices where its blocks are.
+                if (EXECUTION_SPACE_DEVICE == es) contact_block_idx[i] = smesh::to_device(contact_block_idx[i]);
+#endif
                 contact_block_diag[i]      = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
                 contact_hessian_local_x[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
                 contact_hessian_local_y[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
