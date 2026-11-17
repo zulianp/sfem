@@ -327,12 +327,17 @@ if(SFEM_ENABLE_HIP)
         $<BUILD_INTERFACE:${SFEM_SRC_DIR}/base/hip/compat>
         $<INSTALL_INTERFACE:include/hip_compat>)
     # rocThrust and rocPRIM headers, for the .cu files only (see SFEMDependencies.cmake).
-    foreach(hdr_target roc::rocthrust roc::rocprim)
-        target_include_directories(sfem PRIVATE
-            "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
-    endforeach()
-    # IEEE division and square root are the HIP compiler's defaults; flushing subnormals is a
-    # per-target choice, so keeping them, as the CUDA build does, is stated.
+    if(SFEM_ENABLE_AMG)
+        foreach(hdr_target roc::rocthrust roc::rocprim)
+            target_include_directories(sfem PRIVATE
+                "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
+        endforeach()
+    endif()
+    # The HIP build keeps IEEE arithmetic: division and square root correctly rounded (the compiler's
+    # default) and subnormals kept (stated here, flushing being a per-target choice). The CUDA build
+    # differs: -use_fast_math (SFEMBuildTypes.cmake) takes approximate division and square root and
+    # flushes subnormals to zero, so the two vendors' results differ in their last digits, the HIP
+    # build's being the more accurate.
     target_compile_options(sfem PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-fno-gpu-flush-denormals-to-zero>)
     # nvcc includes cuda_runtime.h into every .cu before its first line; base/hip/compat's does here.
     target_compile_options(sfem PRIVATE "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
@@ -533,7 +538,7 @@ if(SFEM_ENABLE_TESTING)
         endif()
         # Tests whose cases are YAML.
         if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
-           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|InexactViscous|CudaInexactViscous)Test$")
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|CudaMatrixCoreApply|InexactViscous|CudaInexactViscous)Test$")
             continue()
         endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
@@ -541,6 +546,12 @@ if(SFEM_ENABLE_TESTING)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
+
+    # The same applies with the matrix-core path turned off: the generated kernels answer.
+    if(TARGET sfem_CudaMatrixCoreApplyTest)
+        add_test(NAME sfem_CudaMatrixCoreApplyTest_generated COMMAND sfem_CudaMatrixCoreApplyTest)
+        set_tests_properties(sfem_CudaMatrixCoreApplyTest_generated PROPERTIES ENVIRONMENT "SFEM_MATRIX_CORE_APPLY=0")
+    endif()
 
     # Every device launch names its stream (scripts/testing/check_streams.py): a scan of the
     # sources, run in every configuration.

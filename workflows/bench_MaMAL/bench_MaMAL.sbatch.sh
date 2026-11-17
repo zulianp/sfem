@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=bench-mamal
-#SBATCH --account=c40
+# The project to charge: sbatch --account=<project> bench_MaMAL.sbatch.sh
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=72
@@ -19,8 +19,6 @@ echo "#---------------#"
 date
 echo "#---------------#"
 
-export PATH=/capstor/scratch/cscs/zulianp/sfem/build:$PATH
-
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-72}"
 export OMP_PROC_BIND="${OMP_PROC_BIND:-true}"
 export OMP_PLACES="${OMP_PLACES:-cores}"
@@ -28,7 +26,7 @@ export MPICH_GPU_SUPPORT_ENABLED="${MPICH_GPU_SUPPORT_ENABLED:-1}"
 
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$PWD}"
 BUILD_DIR="${BUILD_DIR:-${SUBMIT_DIR}}"
-BIN="${SFEM_BIN:-/capstor/scratch/cscs/zulianp/sfem/build/sfem_MGSDFContactTest}"
+BIN="${SFEM_BIN:-${BUILD_DIR}/sfem_MGSDFContactTest}"
 OUT_DIR="${OUT_DIR:-bench_MaMAL_${SLURM_JOB_ID:-local}}"
 CSV="${CSV:-${OUT_DIR}/bench_MaMAL.csv}"
 

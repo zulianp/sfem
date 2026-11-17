@@ -79,6 +79,9 @@ typedef unsigned int       cuuint32_t;
 #define cudaStreamEndCapture hipStreamEndCapture
 #define cudaStreamCaptureModeGlobal hipStreamCaptureModeGlobal
 #define cudaStreamCaptureModeThreadLocal hipStreamCaptureModeThreadLocal
+#define cudaStreamCaptureModeRelaxed hipStreamCaptureModeRelaxed
+#define cudaStreamCaptureMode hipStreamCaptureMode
+#define cudaThreadExchangeStreamCaptureMode hipThreadExchangeStreamCaptureMode
 #define cudaGraph_t hipGraph_t
 #define cudaGraphExec_t hipGraphExec_t
 // CUDA 12's cudaGraphInstantiate(exec, graph, flags).

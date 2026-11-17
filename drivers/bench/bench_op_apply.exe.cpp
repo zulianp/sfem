@@ -34,6 +34,7 @@ int main(int argc, char *argv[]) {
         const int         resolution = smesh::Env::read("SFEM_BASE_RESOLUTION", 8);
         const int         level      = smesh::Env::read("SFEM_ELEMENT_REFINE_LEVEL", 0);
         const int         repeat     = smesh::Env::read("SFEM_REPEAT", 10);
+        if (repeat < 1) SFEM_ERROR("SFEM_REPEAT=%d: at least one timed apply\n", repeat);
         const auto        es = smesh::execution_space_from_string(smesh::Env::read_string("SFEM_EXECUTION_SPACE", "device").c_str());
 
         auto mesh = sfem::Mesh::create_cube(

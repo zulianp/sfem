@@ -424,7 +424,13 @@ namespace sfem {
             if (cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
                 batch();
                 const cudaError_t ended = cudaStreamEndCapture(stream, &graph);
-                if (ended != cudaSuccess || !graph || cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) exec = nullptr;
+                // A launch that failed while capturing is missing from the graph: launched as they
+                // are, the batch reports it.
+                const cudaError_t launched = cudaGetLastError();
+                if (ended != cudaSuccess || launched != cudaSuccess || !graph || cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) {
+                    if (exec) cudaGraphExecDestroy(exec);
+                    exec = nullptr;
+                }
             }
             cudaGetLastError();
 

@@ -1499,7 +1499,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
 // and the node values go out once, as atomics in address order. Lane layout of 16x16x4 f64 (measured
 // on gfx942): A(i, k) at lane
 // i + 16 k, B(k, j) at lane j + 16 k, D(i, j) in slot i / 4 of lane j + 16 (i % 4).
-typedef double cu_sshex8_mfma_double4 __attribute__((ext_vector_type(4)));
+typedef sfem_hip_double4 cu_sshex8_mfma_double4;
 
 template <typename T, int N_WAVES>
 __global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elasticity_apply_level8_mfma_kernel(
@@ -1623,8 +1623,8 @@ __global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elastici
                                                             ye + cu_sshex8_hex_vertex_y(vertex),
                                                             ze + cu_sshex8_hex_vertex_z(vertex));
                 const double a      = field[comp][ip];
-                acc[tw][0]          = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][0], acc[tw][0], 0, 0, 0);
-                acc[tw][1]          = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][1], acc[tw][1], 0, 0, 0);
+                acc[tw][0]          = sfem_hip_mfma_f64_16x16x4(a, b[step][0], acc[tw][0]);
+                acc[tw][1]          = sfem_hip_mfma_f64_16x16x4(a, b[step][1], acc[tw][1]);
             }
         }
 
@@ -1719,16 +1719,28 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl(const ptrdiff_t    
     }
 }
 
-// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL (HIP): 2=warp, 7=AMD FP64 matrix cores (default). The
-// warp kernel's 2-point rule is written to 10 digits, so the two differ by ~2e-11 relative.
+// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL (HIP): 2=warp, 7=AMD FP64 matrix cores (default; in
+// float, or on a GPU without them, the warp kernel). The warp kernel's 2-point rule is written to 10
+// digits, so the two differ by ~2e-11 relative.
 static int cu_sshex8_linear_elasticity_level4_kernel() {
     static int kernel = -1;
     if (kernel < 0) {
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL = 7;
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL, atoi);
+        if (SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL != 2 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL != 7) {
+            SFEM_ERROR("SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL=%d: 2 (warp) or 7 (matrix cores)\n",
+                       SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL);
+        }
         kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_KERNEL;
     }
     return kernel;
+}
+
+// Kernels 7 multiply in FP64 on AMD's matrix cores: in float, or on a GPU without them, the
+// selection's fallback runs instead.
+template <typename T>
+static bool cu_sshex8_linear_elasticity_mfma_usable() {
+    return sizeof(T) == sizeof(double) && sfem_hip_device_has_fp64_mfma();
 }
 
 // SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES (HIP): wavefronts (macro elements) a block, 2, 4 or 8.
@@ -1739,6 +1751,10 @@ static int cu_sshex8_linear_elasticity_level4_mfma_waves() {
     if (waves < 0) {
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES = 2;
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES, atoi);
+        if (SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES != 2 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES != 4 &&
+            SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES != 8) {
+            SFEM_ERROR("SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES=%d: 2, 4 or 8\n", SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES);
+        }
         waves = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL4_WAVES;
     }
     return waves;
@@ -1851,8 +1867,8 @@ __global__ void __launch_bounds__(64 * N_WAVES) cu_affine_sshex8_linear_elastici
                     const int    ip     = (xe + cu_sshex8_hex_vertex_x(vertex)) + BLOCK_SIZE * (ye + cu_sshex8_hex_vertex_y(vertex)) +
                                    BLOCK_SIZE_2 * (ze + cu_sshex8_hex_vertex_z(vertex));
                     const double a      = field[wave][comp][ip];
-                    acc[tile][0]        = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][0], acc[tile][0], 0, 0, 0);
-                    acc[tile][1]        = __builtin_amdgcn_mfma_f64_16x16x4f64(a, b[step][1], acc[tile][1], 0, 0, 0);
+                    acc[tile][0]        = sfem_hip_mfma_f64_16x16x4(a, b[step][0], acc[tile][0]);
+                    acc[tile][1]        = sfem_hip_mfma_f64_16x16x4(a, b[step][1], acc[tile][1]);
                 }
             }
         }
@@ -2177,9 +2193,9 @@ int cu_affine_sshex8_linear_elasticity_apply_warp_tpl(const ptrdiff_t           
 #define my_kernel_tensor_product_opt cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl
 #define my_kernel_level8_gather cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl
 
-// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL: 0=local_mem_seg, 2=warp, 3=local_mem,
-// 4=TP, 5=gather, 6=TP opt (launch_bounds+padded shared; the CUDA default), 7=AMD FP64 matrix cores
-// (HIP; the HIP default).
+// SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL: 0=local_mem_seg, 1=shared_mem_seg, 2=warp, 3=local_mem,
+// 4=TP (CUDA), 5=gather, 6=TP opt (launch_bounds+padded shared; CUDA, the CUDA default), 7=AMD FP64
+// matrix cores (HIP, the HIP default; in float, or on a GPU without them, the gather kernel).
 static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
@@ -2195,6 +2211,16 @@ static int cu_sshex8_linear_elasticity_level8_kernel() {
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 6;
 #endif
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL, atoi);
+#if defined(SFEM_ENABLE_HIP)
+        const bool valid = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL >= 0 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL <= 7 &&
+                           SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL != 4 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL != 6;
+#else
+        const bool valid = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL >= 0 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL <= 6;
+#endif
+        if (!valid) {
+            SFEM_ERROR("SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL=%d: not a level-8 kernel of this build\n",
+                       SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL);
+        }
         kernel = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL;
     }
 
@@ -2244,7 +2270,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
         }
         case 4: {
 #if defined(SFEM_ENABLE_HIP)
-            if (cu_sshex8_linear_elasticity_level4_kernel() == 7) {
+            if (cu_sshex8_linear_elasticity_level4_kernel() == 7 && cu_sshex8_linear_elasticity_mfma_usable<real_t>()) {
                 return cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl<real_t>(nelements,
                                                                                        elements,
                                                                                        jacobian_stride,
@@ -2376,6 +2402,24 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                 }
 #if defined(SFEM_ENABLE_HIP)
                 case 7: {
+                    if (!cu_sshex8_linear_elasticity_mfma_usable<real_t>()) {
+                        return my_kernel_level8_gather<real_t, 8>(nelements,
+                                                                  elements,
+                                                                  jacobian_stride,
+                                                                  (cu_jacobian_t *)jacobian_adjugate,
+                                                                  (cu_jacobian_t *)jacobian_determinant,
+                                                                  mu,
+                                                                  lambda,
+                                                                  u_stride,
+                                                                  (real_t *)ux,
+                                                                  (real_t *)uy,
+                                                                  (real_t *)uz,
+                                                                  out_stride,
+                                                                  (real_t *)outx,
+                                                                  (real_t *)outy,
+                                                                  (real_t *)outz,
+                                                                  stream);
+                    }
                     return cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl<real_t>(nelements,
                                                                                     elements,
                                                                                     jacobian_stride,

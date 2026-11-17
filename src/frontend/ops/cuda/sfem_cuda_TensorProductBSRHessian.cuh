@@ -97,7 +97,9 @@ namespace sfem {
             /// The blocks of row `row` at the element's NS nodes: block[i] the entry of the column of
             /// node i; whether the row has any. The block's threads read the row once, coalesced, and
             /// look each column up among the element's sorted nodes (shared memory): one trip to global
-            /// memory, where a search per node took one per halving.
+            /// memory, where a search per node took one per halving. The graph must hold every pair of
+            /// the element's nodes (the element-node graph does): an entry not found keeps the previous
+            /// row's value.
             template <int NS>
             __device__ __forceinline__ bool row_blocks(const idx_t                        row,
                                                        const count_t *const SFEM_RESTRICT rowptr,

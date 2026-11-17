@@ -34,6 +34,8 @@
 
 #if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
 
+#include "sfem_cuda_base.hpp"
+
 #include <cstddef>
 #include <cstdlib>
 
@@ -112,7 +114,7 @@ namespace sfem {
             using sfem::tensor_product::MatrixCoreParameters;
             using sfem::tensor_product::reference_gradient_entries;
 
-            typedef double matrix_core_double4 __attribute__((ext_vector_type(4)));
+            typedef sfem_hip_double4 matrix_core_double4;
 
             /// The doubles a lane keeps in accumulators: the gradient tiles of a tile row (the field's
             /// components, the coordinates when isoparametric, the state's components when read) and
@@ -282,7 +284,7 @@ namespace sfem {
                             for (int k = 0; k < 3; ++k)
 #pragma unroll
                                 for (int f = 0; f < NF; ++f)
-                                    acc[f][k] = __builtin_amdgcn_mfma_f64_16x16x4f64(G[k], v[f], acc[f][k], 0, 0, 0);
+                                    acc[f][k] = sfem_hip_mfma_f64_16x16x4(G[k], v[f], acc[f][k]);
                         }
 
                         // The flux at the lane's points, written over the trial gradients.
@@ -348,7 +350,7 @@ namespace sfem {
                                 for (int k = 0; k < 3; ++k)
 #pragma unroll
                                     for (int c = 0; c < NC; ++c)
-                                        out[c][to] = __builtin_amdgcn_mfma_f64_16x16x4f64(G[k], acc[c][k][i], out[c][to], 0, 0, 0);
+                                        out[c][to] = sfem_hip_mfma_f64_16x16x4(G[k], acc[c][k][i], out[c][to]);
                             }
                         }
                     }
@@ -373,7 +375,8 @@ namespace sfem {
             /// Launches the apply on `stream`. `affine` holds the adjugate (9 entries) and determinant
             /// per element (unused when isoparametric), `points` the device array of the coordinate
             /// arrays (unused when affine), `u` the state when P reads it. Returns SFEM_SUCCESS or
-            /// SFEM_FAILURE on a launch error, or MATRIX_CORE_DECLINED when turned off.
+            /// SFEM_FAILURE on a launch error, or MATRIX_CORE_DECLINED when turned off or on a GPU
+            /// without the FP64 matrix instruction (sfem_hip_device_has_fp64_mfma).
             template <class Basis, class Quadrature, int NS1, int NQ1, int NC, bool ISOPARAMETRIC, class P, typename g_t>
             int matrix_core_apply(const ptrdiff_t                              nelements,
                                   idx_t **const                                elements,
@@ -388,7 +391,7 @@ namespace sfem {
                                   double *const *const                         out,
                                   cudaStream_t                                 stream) {
                 static constexpr int N_WAVES = matrix_core_waves<NS1, NC, ISOPARAMETRIC, P::reads_current>();
-                if (!matrix_core_apply_enabled()) return MATRIX_CORE_DECLINED;
+                if (!matrix_core_apply_enabled() || !sfem_hip_device_has_fp64_mfma()) return MATRIX_CORE_DECLINED;
                 if (nelements <= 0) return SFEM_SUCCESS;
                 const ptrdiff_t per_block = 16 * N_WAVES;
                 const int       n_blocks  = (int)((nelements + per_block - 1) / per_block);
@@ -433,20 +436,10 @@ namespace sfem {
                              : "=d"(c0), "=d"(c1)
                              : "d"(a), "d"(b), "d"(c0), "d"(c1));
 #else
-                __trap();  // not launched: matrix_core_apply declines below sm_80
+                __trap();  // not launched: matrix_core_apply declines a kernel built for PTX below 8.0
 #endif
             }
 
-            /// Whether the current device has FP64 tensor cores (compute capability 8.0 and later).
-            inline bool device_has_fp64_tensor_cores() {
-                static const bool has = [] {
-                    int device = 0, major = 0;
-                    if (cudaGetDevice(&device) != cudaSuccess) return false;
-                    if (cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device) != cudaSuccess) return false;
-                    return major >= 8;
-                }();
-                return has;
-            }
 
             template <class Basis, class Quadrature, int NS1, int NQ1, int NC, bool ISOPARAMETRIC, class P, int N_WARPS, typename g_t>
             __global__ void __launch_bounds__(32 * N_WARPS)
@@ -676,7 +669,9 @@ namespace sfem {
             }
 
             /// As the HIP one: launches the apply on `stream`; MATRIX_CORE_DECLINED when turned off or
-            /// on a device without FP64 tensor cores.
+            /// where the kernel the device runs was built for PTX below 8.0. That, not the device's
+            /// compute capability, says whether it holds the mma instruction: a build for sm_70 run on
+            /// an H100 JIT-compiles its compute_70 PTX, the trap branch.
             template <class Basis, class Quadrature, int NS1, int NQ1, int NC, bool ISOPARAMETRIC, class P, typename g_t>
             int matrix_core_apply(const ptrdiff_t                              nelements,
                                   idx_t **const                                elements,
@@ -691,7 +686,17 @@ namespace sfem {
                                   double *const *const                         out,
                                   cudaStream_t                                 stream) {
                 static constexpr int N_WARPS = 8;
-                if (!matrix_core_apply_enabled() || !device_has_fp64_tensor_cores()) return MATRIX_CORE_DECLINED;
+                static const bool    has_mma = [] {
+                    cudaFuncAttributes attributes;
+                    if (cudaFuncGetAttributes(&attributes,
+                                              (const void *)matrix_core_apply_kernel<Basis, Quadrature, NS1, NQ1, NC, ISOPARAMETRIC, P, N_WARPS, g_t>) !=
+                        cudaSuccess) {
+                        cudaGetLastError();  // no image of it for this device: declined
+                        return false;
+                    }
+                    return attributes.ptxVersion >= 80;
+                }();
+                if (!matrix_core_apply_enabled() || !has_mma) return MATRIX_CORE_DECLINED;
                 if (nelements <= 0) return SFEM_SUCCESS;
                 const ptrdiff_t per_block = 8 * N_WARPS;
                 const int       n_blocks  = (int)((nelements + per_block - 1) / per_block);

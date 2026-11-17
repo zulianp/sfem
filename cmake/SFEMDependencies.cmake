@@ -11,11 +11,18 @@ endif()
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
 # are never compiled into libsmesh.
 if(SFEM_ENABLE_HIP)
-    # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
-    # enable_language.
-    if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
-        set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures")
+    if(CMAKE_VERSION VERSION_LESS 3.21)
+        message(FATAL_ERROR "SFEM_ENABLE_HIP needs CMake 3.21 or later (enable_language(HIP)); this is ${CMAKE_VERSION}")
     endif()
+    # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
+    # enable_language. SFEM_HIP_ARCHITECTURES is the one setting, for SFEM and its subprojects alike:
+    # a reconfigure with another value takes it.
+    foreach(arch IN LISTS SFEM_HIP_ARCHITECTURES)
+        if(NOT arch MATCHES "^gfx[0-9a-f]+(:.*)?$")
+            message(FATAL_ERROR "SFEM_HIP_ARCHITECTURES: '${arch}' is not an AMD GPU target (gfx...)")
+        endif()
+    endforeach()
+    set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures (from SFEM_HIP_ARCHITECTURES)" FORCE)
     enable_language(HIP)
     if(NOT DEFINED CMAKE_HIP_STANDARD)
         set(CMAKE_HIP_STANDARD 17)
@@ -416,10 +423,10 @@ endif()
 
 # After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
 # created here first (a subdirectory sees its parent's imported targets).
-if(SFEM_ENABLE_HIP)
-    # rocThrust (amg/cuda) and the rocPRIM under it are header-only and used by the .cu files only;
-    # CMakeLists.txt adds their include directories to the HIP sources. Their targets are not
-    # linked, because through rocPRIM they bring hip::device, which compiles every C++ source as HIP.
+if(SFEM_ENABLE_HIP AND SFEM_ENABLE_AMG)
+    # rocThrust (amg/cuda, its only user) and the rocPRIM under it are header-only and used by the .cu
+    # files only; CMakeLists.txt adds their include directories to the HIP sources. Their targets are
+    # not linked, because through rocPRIM they bring hip::device, which compiles every C++ source as HIP.
     if(NOT TARGET roc::rocthrust)
         find_package(rocthrust REQUIRED)
     endif()

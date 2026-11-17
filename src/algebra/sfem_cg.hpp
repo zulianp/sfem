@@ -482,9 +482,14 @@ namespace sfem {
             }
 
             if constexpr (std::is_same_v<E, BlasExec<T>>) {
-                // The backend's run of the loop below (HIP builds): where nothing reads an iteration
-                // on the host (no monitor, interceptor or curvature stop) and the sums are this rank's.
-                if (impl.run_precond && !verbose && !interceptor && !stop_on_negative_curvature && !e.across_ranks()) {
+                // The backend's run of the loop below (device builds, SFEM_CG_DEVICE_RUN): where nothing
+                // reads an iteration on the host (no monitor, interceptor or curvature stop), the sums
+                // are this rank's, and M is a Jacobi-type preconditioner (ShiftableOperator), whose
+                // apply is kernels alone: the run captures it into a graph, where a preconditioner that
+                // waits on the stream (an inner solve's dot read on the host) would fail the capture
+                // inside its own error check.
+                auto shiftable = shiftable_preconditioner();
+                if (impl.run_precond && shiftable && !verbose && !interceptor && !stop_on_negative_curvature && !e.across_ranks()) {
                     CGDeviceRun<T> run;
                     run.n            = n;
                     run.x            = x;
@@ -501,7 +506,7 @@ namespace sfem {
                     run.product      = [&](const T* const in, T* const out) { e.apply(A, in, out, true); };
                     run.allocation   = e.allocation();
                     run.stream       = blas->context().stream();
-                    if (auto shiftable = shiftable_preconditioner()) {
+                    {
                         ptrdiff_t   n_blocks = 0;
                         int         bytes    = 0;
                         const void* blocks   = shiftable->device_blocks3(n_blocks, bytes);
