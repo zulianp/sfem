@@ -68,14 +68,8 @@ namespace sfem {
         }
 
         // Armijo needs a descent direction; along an ascent one only a measured decrease counts.
-        // The comparison allows for the rounding of the two merits compared (Hager and Zhang, SIAM
-        // J. Optim. 16, 2005): near the solution the decrease falls with the square of the residual
-        // and drops below it, and an atomic scatter's order then decides the step. A TET4 stretch
-        // at |r| 6e-9 predicts 1e-17 against an energy of 0.05, and took s = 1/2 in 4% of runs.
         auto armijo = [&](const int i, const real_t ref) {
-            if (!(slope < 0) || !std::isfinite(values_[i])) return false;
-            const real_t rounding = 64 * std::numeric_limits<real_t>::epsilon() * std::max(std::abs(ref), std::abs(values_[i]));
-            return values_[i] <= ref + options_.c1 * steps[i] * slope + rounding;
+            return slope < 0 && values_[i] <= ref + options_.c1 * steps[i] * slope;
         };
 
         int accepted = -1;
