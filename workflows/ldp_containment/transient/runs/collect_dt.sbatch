@@ -22,17 +22,18 @@
 #   [CASE=ldp_cases/FF200_ExodusMesh] [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625"]
 #   [MESH=s0] [OUT=runs/paper_dt_<finest tag>] [CHECK=runs/paper_data10/valve_runs.csv]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=$D/venv/bin/python
-COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+PY=$SFEM_PY
+COL=$PAPER_PY/collect_prony.py
+CASE=${CASE:-$LDP_CASES/FF200_ExodusMesh}
 TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625}
-CHECK=${CHECK:-$D/runs/paper_data10/valve_runs.csv}
+CHECK=${CHECK:-$SFEM_RUNS/paper_data10/valve_runs.csv}
 MESH=${MESH:-s0}
 [ $MESH = s0 ] && [ ! -f "$CHECK" ] && { echo "collect_dt: no $CHECK to check the campaign's repeat against; give CHECK"; exit 1; }
 SET=dt_TET4; [ $MESH = p2 ] && SET=dt_TET10
 finest=${TAGS##* }
-P=${OUT:-$D/runs/paper_dt_$finest}
+P=${OUT:-$SFEM_RUNS/paper_dt_$finest}
 [ -e $P ] && { echo "collect_dt: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 RUNS=${RUNS:-bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__full_s32_a bsr32__float32_plain_s32_a}

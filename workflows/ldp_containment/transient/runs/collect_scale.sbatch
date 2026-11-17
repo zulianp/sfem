@@ -18,13 +18,14 @@
 #   [CASE=ldp_cases/FF200_ExodusMesh] [TAG=sc10] [TAG4=TAG] [TAG10=TAG] [T_END4=1e-3] [T_END10=1e-3]
 #   [OUT=runs/paper_scale for sc10, runs/paper_scale_<TAG> otherwise]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=$D/venv/bin/python
-COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+PY=$SFEM_PY
+COL=$PAPER_PY/collect_prony.py
+CASE=${CASE:-$LDP_CASES/FF200_ExodusMesh}
 TAG=${TAG:-sc10}
 TAG4=${TAG4:-$TAG}; TAG10=${TAG10:-$TAG}
-if [ $TAG = sc10 ]; then P=${OUT:-$D/runs/paper_scale}; else P=${OUT:-$D/runs/paper_scale_$TAG}; fi
+if [ $TAG = sc10 ]; then P=${OUT:-$SFEM_RUNS/paper_scale}; else P=${OUT:-$SFEM_RUNS/paper_scale_$TAG}; fi
 [ -e $P ] && { echo "collect_scale: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 for spec in TET4x8:${TAG4}_s0_:${T_END4:-1e-3} TET10x8:${TAG10}_p2_:${T_END10:-1e-3}; do
@@ -44,7 +45,9 @@ done
 $PY - $P/scale_runs.csv <<'PYEOF'
 import csv, sys
 for r in csv.DictReader(open(sys.argv[1])):
-    state = sum(float(r[k]) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress")) / 1e6
+    # The relaxed-stress slots (bytes_stress) of runs before sfem#103, the previous displacement
+    # (bytes_previous) after it: each run fills one, the other is empty.
+    state = sum(float(r.get(k) or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "bytes_previous")) / 1e6
     tangent = sum(float(r["bytes_%s_device" % c] or 0) for c in ("tangent_values", "tangent_structure", "tangent_work")) / 1e6
     print("%-8s %-32s dofs %-9s elements %-8s steps %-3s failed %-2s tangent %8.1f MB prony %8.1f MB peak %8.0f MB" % (
         r["set"], r["run"], r["dofs"], r["elements"], r["steps"], r["failed"], tangent, state, float(r["device_used_peak"]) / 1e6))

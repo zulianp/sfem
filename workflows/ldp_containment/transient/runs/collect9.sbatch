@@ -22,17 +22,18 @@
 # folder is a new one: the job stops if it exists.
 #   [PUMP=FF200|LDP24A] [TAG=<campaign>] [DATA=<folder under runs> | OUT=<path>] [PAPER_PY=xsesfsi_papers/ldp_containment/python]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=$D/venv/bin/python
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+PY=$SFEM_PY
 # The paper's collectors (the paper lives in the private repository xsesfsi_papers, ldp_containment).
-PAPER=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}
+PAPER=$PAPER_PY
 COL=$PAPER/collect_prony.py
 PUMP=${PUMP:-FF200}
 case $PUMP in
-  FF200)  CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh; TAG=${TAG:-tp9}; T_END=0.18
-          P=${OUT:-$D/runs/${DATA:-paper_data_$TAG}} ;;
-  LDP24A) CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100; TAG=${TAG:-la}; T_END=0.1655
-          P=${OUT:-$D/runs/${DATA:-paper_la}} ;;
+  FF200)  CASE=$LDP_CASES/FF200_ExodusMesh; TAG=${TAG:-tp9}; T_END=0.18
+          P=${OUT:-$SFEM_RUNS/${DATA:-paper_data_$TAG}} ;;
+  LDP24A) CASE=$LDP_CASES/LDP24A_r100; TAG=${TAG:-la}; T_END=0.1655
+          P=${OUT:-$SFEM_RUNS/${DATA:-paper_la}} ;;
   *) echo "collect9: unknown PUMP $PUMP"; exit 1 ;;
 esac
 [ -e $P ] && { echo "collect9: $P exists; give a new DATA or OUT"; exit 1; }
@@ -84,7 +85,7 @@ if [ $PUMP = FF200 ]; then
   python3 $PAPER/collect_transient.py $P > $P/transient.log 2>&1; echo "transient rc=$?"
   # The torsion bar's rows, collected by collect8.sbatch.
   for f in runs series; do
-    $PY - $D/runs/paper_data8/prony_$f.csv $P/torsion_$f.csv <<'PYEOF'
+    $PY - $SFEM_RUNS/paper_data8/prony_$f.csv $P/torsion_$f.csv <<'PYEOF'
 import csv, sys
 rows = [r for r in csv.DictReader(open(sys.argv[1])) if r["set"].startswith("torsion")]
 with open(sys.argv[2], "w", newline="") as f:
@@ -106,14 +107,15 @@ else
     for s in TET4x8 TET10x8; do
       for b in $CASE/db/solid_r1/blocks/*/; do echo "$s,$(basename $b),$(( $(stat -c %s $b/i0.int32) / 4 ))"; done
     done; } > $P/scale_blocks.csv
-  $PY $PAPER/collect_transient.py $P/strokes > $P/transient.log 2>&1; echo "transient rc=$?"
+  $PY $PAPER/collect_transient.py $P/strokes --case $CASE --tag $TAG > $P/transient.log 2>&1; echo "transient rc=$?"
   wc -l $P/*.csv $P/strokes/*.csv
 fi
 $PY - <<PYEOF
 import csv
 for r in csv.DictReader(open("$P/valve_runs.csv")):
     t = sum(float(r["bytes_%s_device" % c] or 0) for c in ("tangent_values", "tangent_structure", "tangent_work"))
-    s = sum(float(r[k] or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"))
+    # bytes_stress (the relaxed-stress slots, runs before sfem#103) or bytes_previous (after): one is empty.
+    s = sum(float(r.get(k) or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "bytes_previous"))
     print("%-10s %-36s e_u med %-9.3g max %-9.3g shift %-6s failed %-3s t %-8s tangent %8.2f MB prony %8.2f MB peak %8.1f MB" % (
         r["set"], r["run"], float(r["e_u_median"]), float(r["e_u_max"]), r["event_shift_ms"], r["failed"], r["stepper_s"],
         t / 1e6, s / 1e6, float(r["device_used_peak"]) / 1e6))

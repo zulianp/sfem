@@ -9,10 +9,12 @@
 #SBATCH --view=default
 # The tests of 70 EPDM 281 on one element (measured_tests.py) on the host, one core per run, into
 # OUT (a new folder; the script stops if it exists). DATA: the extracted measurements.
-#   DATA=<folder> [OUT=runs/measured_tests] [ARGS="--terms 4,15 --steps 2000"]
+#   DATA=<folder> [OUT=runs/measured_tests] [ARGS="--terms 3,14 --steps 2000"]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-OUT=${OUT:-$D/runs/measured_tests}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+D=$SFEM_ROOT
+OUT=${OUT:-$SFEM_RUNS/measured_tests}
 # shellcheck disable=SC2086
-srun -n 1 -c 72 $D/venv/bin/python $D/workflows/ldp_containment/single_element/measured_tests.py \
-    $D/build-cuda/playground $DATA $OUT ${ARGS:-}
+$SFEM_LAUNCH_HOST $SFEM_PY $D/workflows/ldp_containment/single_element/measured_tests.py \
+    ${SFEM_BUILD:-$D/build-cuda}/playground $DATA $OUT ${ARGS:-}

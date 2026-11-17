@@ -9,10 +9,12 @@
 #SBATCH --view=default
 # The fit of the valves' material to 70 EPDM 281 (fit_series.py) on the host, into OUT (a new folder;
 # the script stops if it exists). DATA: the extracted measurements.
-#   DATA=<folder> [OUT=runs/fit_series] [ARGS="--slow 4 --steps 1000 --dma-temp 30 --dma-weight 1"]
+#   DATA=<folder> [OUT=runs/fit_series] [ARGS="--slow 3 --steps 1000 --dma-temp 30 --dma-weight 1"]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-OUT=${OUT:-$D/runs/fit_series}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+D=$SFEM_ROOT
+OUT=${OUT:-$SFEM_RUNS/fit_series}
 # shellcheck disable=SC2086
-srun -n 1 -c 72 $D/venv/bin/python $D/workflows/ldp_containment/single_element/fit_series.py \
-    $D/build-cuda/playground $DATA $OUT ${ARGS:-}
+$SFEM_LAUNCH_HOST $SFEM_PY $D/workflows/ldp_containment/single_element/fit_series.py \
+    ${SFEM_BUILD:-$D/build-cuda}/playground $DATA $OUT ${ARGS:-}

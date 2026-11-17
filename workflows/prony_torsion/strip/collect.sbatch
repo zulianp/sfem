@@ -11,23 +11,24 @@
 # full_a (strip_runs.csv, strip_series.csv, sets strip_<mesh>) and the diagnostics runs (strip_diag.csv),
 # with collect_prony.py, into runs/paper_strip.
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=$D/venv/bin/python
-COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-P=${OUT:-$D/runs/paper_strip}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+PY=$SFEM_PY
+COL=$PAPER_PY/collect_prony.py
+P=${OUT:-$SFEM_RUNS/paper_strip}
 [ -e $P ] && { echo "collect: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 REDUCED="float32 int16_scaled float16_md"
 RUNS="full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
 RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
 for m in HEX8_60 HEX8_120 HEX27_30 HEX27_60 TET4_60 TET10_60; do
-  $PY $COL runs $P/strip_runs.csv $P/strip_series.csv strip_$m $D/runs/strip/$m full_a $RUNS --sub results > $P/strip_$m.log 2>&1
+  $PY $COL runs $P/strip_runs.csv $P/strip_series.csv strip_$m $SFEM_RUNS/strip/$m full_a $RUNS --sub results > $P/strip_$m.log 2>&1
   echo "strip $m rc=$?"
 done
 DRUNS=""; for f in $REDUCED; do DRUNS="$DRUNS $f ${f}_plain"; done
 for m in HEX8_120 HEX27_60 TET10_60 TET4_60; do
-  [ -d $D/runs/strip_diag/$m ] || continue
-  $PY $COL runs $P/strip_diag.csv $P/strip_diag_series.csv diag_$m $D/runs/strip_diag/$m full_a $DRUNS --sub results > $P/diag_$m.log 2>&1
+  [ -d $SFEM_RUNS/strip_diag/$m ] || continue
+  $PY $COL runs $P/strip_diag.csv $P/strip_diag_series.csv diag_$m $SFEM_RUNS/strip_diag/$m full_a $DRUNS --sub results > $P/diag_$m.log 2>&1
   echo "diag $m rc=$?"
 done
 wc -l $P/*.csv

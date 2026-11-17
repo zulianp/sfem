@@ -17,13 +17,14 @@
 # valve_runs.csv (collect9.sbatch PUMP=LDP24A); it must exist.
 #   [OUT=runs/paper_la_studies] [CHECK=runs/paper_la/valve_runs.csv]
 set -u
-D=/ritom/scratch/cscs/zulianp/sfem-prony-md
-PY=$D/venv/bin/python
-R=$D/workflows/ldp_containment/transient/runs
-COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100
-O=${OUT:-$D/runs/paper_la_studies}
-CHECK=${CHECK:-$D/runs/paper_la/valve_runs.csv}
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+PY=$SFEM_PY
+R=$SFEM_ROOT/workflows/ldp_containment/transient/runs
+COL=$PAPER_PY/collect_prony.py
+CASE=$LDP_CASES/LDP24A_r100
+O=${OUT:-$SFEM_RUNS/paper_la_studies}
+CHECK=${CHECK:-$SFEM_RUNS/paper_la/valve_runs.csv}
 [ -e $O ] && { echo "collect_la_studies: $O exists; give a new OUT"; exit 1; }
 [ -f $CHECK ] || { echo "collect_la_studies: no $CHECK (collect9.sbatch PUMP=LDP24A); give CHECK"; exit 1; }
 mkdir -p $O
