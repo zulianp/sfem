@@ -29,6 +29,28 @@ namespace sfem {
             return out;
         }
 
+        // The block's sum of each thread's acc added into *result: each warp's by shuffles, then the
+        // warps' by the first.
+        template <typename T>
+        __device__ __forceinline__ void cg_block_add(T acc, T* const result) {
+            __shared__ T block_accumulator[SFEM_WARP_SIZE];
+            acc                        = cg_warp_reduce_32(acc);
+            const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
+            const unsigned int lid     = cg_lane_id();
+            const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
+            if (!lid) {
+                block_accumulator[warp_id] = acc;
+            }
+            __syncthreads();
+            if (!warp_id) {
+                acc = lid < n_warps ? block_accumulator[lid] : T(0);
+                acc = cg_warp_reduce_32(acc);
+                if (!threadIdx.x) {
+                    atomicAdd(result, acc);
+                }
+            }
+        }
+
         template <typename T>
         __global__ void update_x_r_and_rtr_kernel(const ptrdiff_t              n,
                                                  const T                      alpha,
@@ -37,7 +59,6 @@ namespace sfem {
                                                  T* const SFEM_RESTRICT       x,
                                                  T* const SFEM_RESTRICT       r,
                                                  T* SFEM_RESTRICT             result) {
-            __shared__ T block_accumulator[SFEM_WARP_SIZE];
 
             T acc = 0;
             for (ptrdiff_t i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += blockDim.x * gridDim.x) {
@@ -47,24 +68,7 @@ namespace sfem {
                 acc += ri * ri;
             }
 
-            acc                        = cg_warp_reduce_32(acc);
-            const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-            const unsigned int lid     = cg_lane_id();
-            const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-
-            if (!lid) {
-                block_accumulator[warp_id] = acc;
-            }
-
-            __syncthreads();
-
-            if (!warp_id) {
-                acc = lid < n_warps ? block_accumulator[lid] : T(0);
-                acc = cg_warp_reduce_32(acc);
-                if (!threadIdx.x) {
-                    atomicAdd(result, acc);
-                }
-            }
+            cg_block_add(acc, result);
         }
 
         template <typename T>
@@ -173,7 +177,6 @@ namespace sfem {
         template <typename T>
         __global__ void SFEM_HIP_LAUNCH_BOUNDS(RUN_DOT_BLOCK_SIZE)
                 run_dot_kernel(const ptrdiff_t n, T* const SFEM_RESTRICT s, const int slot, const T* const SFEM_RESTRICT a, const T* const SFEM_RESTRICT b) {
-            __shared__ T block_accumulator[SFEM_WARP_SIZE];
             if (s[RUN_STOP] != T(0)) return;
 
             T acc = 0;
@@ -181,21 +184,7 @@ namespace sfem {
                 acc += a[i] * b[i];
             }
 
-            acc                        = cg_warp_reduce_32(acc);
-            const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-            const unsigned int lid     = cg_lane_id();
-            const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-            if (!lid) {
-                block_accumulator[warp_id] = acc;
-            }
-            __syncthreads();
-            if (!warp_id) {
-                acc = lid < n_warps ? block_accumulator[lid] : T(0);
-                acc = cg_warp_reduce_32(acc);
-                if (!threadIdx.x) {
-                    atomicAdd(&s[slot], acc);
-                }
-            }
+            cg_block_add(acc, &s[slot]);
         }
 
         // The loop's stop: |r|_M below atol or rtol relative to the first, or max_it iterations. The
@@ -278,7 +267,6 @@ namespace sfem {
                                          T* const SFEM_RESTRICT       x,
                                          T* const SFEM_RESTRICT       r,
                                          T* const SFEM_RESTRICT       z) {
-            __shared__ T block_accumulator[SFEM_WARP_SIZE];
             if (s[RUN_STOP] != T(0)) return;
             const T alpha = s[RUN_RTZ_NEW] / s[RUN_PTAP];
 
@@ -301,21 +289,7 @@ namespace sfem {
                 }
             }
 
-            acc                        = cg_warp_reduce_32(acc);
-            const unsigned int warp_id = threadIdx.x / SFEM_WARP_SIZE;
-            const unsigned int lid     = cg_lane_id();
-            const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
-            if (!lid) {
-                block_accumulator[warp_id] = acc;
-            }
-            __syncthreads();
-            if (!warp_id) {
-                acc = lid < n_warps ? block_accumulator[lid] : T(0);
-                acc = cg_warp_reduce_32(acc);
-                if (!threadIdx.x) {
-                    atomicAdd(&s[RUN_RTZ_NEXT], acc);
-                }
-            }
+            cg_block_add(acc, &s[RUN_RTZ_NEXT]);
         }
 
         // run_decide_kernel, then the next iteration's r.z (run_update_x_r_m3_kernel's) as rtz_new.
@@ -401,9 +375,13 @@ namespace sfem {
                 run_update_x_r_kernel<T><<<n_blocks, block_size, 0, stream>>>(run.n, allocation, s, run.p, run.Ap, run.x, run.r, run.z);
                 run_decide_kernel<T><<<1, 1, 0, stream>>>(s, run.rtz0, run.atol, run.rtol, run.max_it);
             };
-            auto batch = [&]() {
+            // While capturing, a call the capture cannot take invalidates it and every later one fails:
+            // reported, not checked, so the run falls back to launching the batch as it is.
+            auto batch = [&](const bool capturing) {
                 for (int k = 0; k < RUN_BATCH; ++k) iteration();
-                SFEM_CUDA_CHECK(cudaMemcpyAsync(scalars.host, s + RUN_ITER, 2 * sizeof(T), cudaMemcpyDeviceToHost, stream));
+                const cudaError_t copied = cudaMemcpyAsync(scalars.host, s + RUN_ITER, 2 * sizeof(T), cudaMemcpyDeviceToHost, stream);
+                if (!capturing) SFEM_CUDA_CHECK(copied);
+                return copied;
             };
 
             const T start[RUN_N] = {run.rtz, T(0), T(0), T(0), T(0), T(0)};
@@ -422,12 +400,13 @@ namespace sfem {
             cudaGraph_t     graph = nullptr;
             cudaGraphExec_t exec  = nullptr;
             if (cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal) == cudaSuccess) {
-                batch();
-                const cudaError_t ended = cudaStreamEndCapture(stream, &graph);
+                const cudaError_t copied = batch(true);
+                const cudaError_t ended  = cudaStreamEndCapture(stream, &graph);
                 // A launch that failed while capturing is missing from the graph: launched as they
                 // are, the batch reports it.
                 const cudaError_t launched = cudaGetLastError();
-                if (ended != cudaSuccess || launched != cudaSuccess || !graph || cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) {
+                if (copied != cudaSuccess || ended != cudaSuccess || launched != cudaSuccess || !graph ||
+                    cudaGraphInstantiate(&exec, graph, 0) != cudaSuccess) {
                     if (exec) cudaGraphExecDestroy(exec);
                     exec = nullptr;
                 }
@@ -440,7 +419,7 @@ namespace sfem {
                 if (exec) {
                     SFEM_CUDA_CHECK(cudaGraphLaunch(exec, stream));
                 } else {
-                    batch();
+                    batch(false);
                 }
                 SFEM_CUDA_CHECK(cudaStreamSynchronize(stream));
                 if (scalars.host[1] != T(0)) break;

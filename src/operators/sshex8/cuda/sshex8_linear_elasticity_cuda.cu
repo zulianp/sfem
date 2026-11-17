@@ -1699,6 +1699,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl(const ptrdiff_t    
                                                              T *const SFEM_RESTRICT                   outy,
                                                              T *const SFEM_RESTRICT                   outz,
                                                              void                                    *stream) {
+    if (nelements <= 0) return SFEM_SUCCESS;  // an empty grid is a launch error
     SFEM_DEBUG_SYNCHRONIZE(stream);
     if constexpr (sizeof(T) != sizeof(double)) {
         SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_level8_mfma_tpl: FP64 only\n");
@@ -1948,6 +1949,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl(const ptrdiff_t    
                                                              T *const SFEM_RESTRICT                   outy,
                                                              T *const SFEM_RESTRICT                   outz,
                                                              void                                    *stream) {
+    if (nelements <= 0) return SFEM_SUCCESS;  // an empty grid is a launch error
     SFEM_DEBUG_SYNCHRONIZE(stream);
     if constexpr (sizeof(T) != sizeof(double)) {
         SFEM_ERROR("cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl: FP64 only\n");
@@ -2004,6 +2006,7 @@ int cu_affine_sshex8_linear_elasticity_apply_level8_gather_tpl(const ptrdiff_t  
         return SFEM_FAILURE;
     }
 
+    if (nelements <= 0) return SFEM_SUCCESS;  // an empty grid is a launch error
     dim3 block_size(128, 1, 1);
     dim3 n_blocks(MIN(nelements, sfem_cuda_max_grid_dim_x()), 1, 1);
 

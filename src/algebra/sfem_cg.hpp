@@ -487,9 +487,11 @@ namespace sfem {
                 // are this rank's, and M is a Jacobi-type preconditioner (ShiftableOperator), whose
                 // apply is kernels alone: the run captures it into a graph, where a preconditioner that
                 // waits on the stream (an inner solve's dot read on the host) would fail the capture
-                // inside its own error check.
+                // inside its own error check. Fusion off (the separate-BLAS baseline) and max_it <= 0
+                // (the loop below then takes no iteration) keep the host's loop.
                 auto shiftable = shiftable_preconditioner();
-                if (impl.run_precond && shiftable && !verbose && !interceptor && !stop_on_negative_curvature && !e.across_ranks()) {
+                if (impl.run_precond && use_fusion() && max_it > 0 && shiftable && !verbose && !interceptor &&
+                    !stop_on_negative_curvature && !e.across_ranks()) {
                     CGDeviceRun<T> run;
                     run.n            = n;
                     run.x            = x;

@@ -24,6 +24,7 @@
 #include <cstddef>
 
 #include "sfem_base.hpp"
+#include "sfem_cuda_base.hpp"
 
 namespace sfem {
     namespace tensor_product {
@@ -315,6 +316,26 @@ namespace sfem {
                 }
             }
 
+#ifndef NDEBUG
+            /// Debug builds: counts the pairs of an element's nodes whose column is missing from the row
+            /// (row_blocks' precondition), a block per element.
+            template <int NS>
+            __global__ void bsr_hessian_graph_check_kernel(const ptrdiff_t                    nelements,
+                                                           idx_t **const SFEM_RESTRICT        elements,
+                                                           const count_t *const SFEM_RESTRICT rowptr,
+                                                           const idx_t *const SFEM_RESTRICT   colidx,
+                                                           unsigned long long *const          missing) {
+                for (ptrdiff_t e = blockIdx.x; e < nelements; e += gridDim.x) {
+                    for (int k = threadIdx.x; k < NS * NS; k += blockDim.x) {
+                        const idx_t row = elements[k / NS][e], col = elements[k % NS][e];
+                        bool        found = false;
+                        for (count_t c = rowptr[row]; c < rowptr[row + 1] && !found; ++c) found = colidx[c] == col;
+                        if (!found) atomicAdd(missing, 1ull);
+                    }
+                }
+            }
+#endif
+
             /// Launches the node kernel: a block of 128 threads per element (at most 125 points).
             template <class M, class Ref, class Quad, typename s_t, typename v_t, typename g_t, int NQ1, int NS1>
             int bsr_hessian(const ptrdiff_t                       nelements,
@@ -332,6 +353,23 @@ namespace sfem {
                 static_assert(NQ1 * NQ1 * NQ1 <= 128, "a thread per point");
                 if (nelements <= 0) return SFEM_SUCCESS;
                 const int grid = (int)(nelements < 65535 * 16 ? nelements : 65535 * 16);
+#ifndef NDEBUG
+                {
+                    unsigned long long *d_missing = nullptr, missing = 0;
+                    SFEM_CUDA_CHECK(cudaMalloc((void **)&d_missing, sizeof(missing)));
+                    SFEM_CUDA_CHECK(cudaMemsetAsync(d_missing, 0, sizeof(missing), (cudaStream_t)stream));
+                    bsr_hessian_graph_check_kernel<NS1 * NS1 * NS1>
+                            <<<grid, GROUP * GROUPS, 0, (cudaStream_t)stream>>>(nelements, elements, rowptr, colidx, d_missing);
+                    SFEM_CUDA_CHECK(cudaMemcpyAsync(&missing, d_missing, sizeof(missing), cudaMemcpyDeviceToHost, (cudaStream_t)stream));
+                    SFEM_CUDA_CHECK(cudaStreamSynchronize((cudaStream_t)stream));
+                    SFEM_CUDA_CHECK(cudaFree(d_missing));
+                    if (missing) {
+                        SFEM_ERROR("bsr_hessian: %llu pairs of element nodes are missing from the graph (it must hold the "
+                                   "element-node graph)\n",
+                                   missing);
+                    }
+                }
+#endif
                 bsr_hessian_kernel<M, Ref, Quad, s_t, v_t, g_t, NQ1, NS1><<<grid, GROUP * GROUPS, 0, (cudaStream_t)stream>>>(
                         nelements, elements, points, parameters, u_stride, ux, uy, uz, rowptr, colidx, values);
                 return cudaPeekAtLastError() == cudaSuccess ? SFEM_SUCCESS : SFEM_FAILURE;

@@ -13,11 +13,11 @@
 
 namespace sfem {
 
-    /// Backend strategy for fused CG vector updates (OpenMP / CUDA).
     /// A preconditioned CG's iterations in the execution space (ConjugateGradientKernels::run_precond):
     /// ConjugateGradient::run_precond's loop, from its first z = M r on, with the scalars (r.z, p.Ap,
     /// alpha, beta) kept where the vectors are, so the host does not wait for each dot. The same
-    /// operations in the same order: x is the loop's, bit for bit.
+    /// operations in the same order; the dots are summed in other blocks (one of 512 threads per
+    /// compute unit, against GPUBLAS::dot's four of 128), so x agrees with the loop's to rounding.
     template <typename T>
     struct CGDeviceRun {
         ptrdiff_t n{0};
@@ -43,6 +43,7 @@ namespace sfem {
         bool converged{false};
     };
 
+    /// Backend strategy for fused CG vector updates (OpenMP / CUDA).
     template <typename T>
     struct ConjugateGradientKernels {
         /// x ← x + alpha p;  r ← r − alpha Ap;  return (r, r)

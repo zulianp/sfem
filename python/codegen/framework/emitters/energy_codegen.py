@@ -1003,7 +1003,7 @@ def _sfem_soa_local_header(
             form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
         )
     ]
-    for _ in apply_points[:1]:
+    if apply_points:
         lines.extend([MATRIX_CORE_GUARD, '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
