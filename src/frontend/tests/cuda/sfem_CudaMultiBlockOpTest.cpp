@@ -166,6 +166,21 @@ int test_ss_gpu_em_linear_elasticity_vs_linear_elasticity() {
     return compare_host_device("em:LinearElasticity vs LinearElasticity", smesh::to_host(y_le), y_em, tol);
 }
 
+// The affine LinearElasticity apply at each level the device's hand-written kernels specialise, by
+// the build's default kernel there (level 2: a thread per macro element; 4: the warp kernel, AMD's
+// FP64 matrix cores under HIP; 8: the tensor-core kernel under CUDA, the matrix cores under HIP; 16:
+// the warp kernel a z-layer at a time), against the host's.
+int test_ss_gpu_linear_elasticity_levels_vs_host() {
+    const real_t tol = sizeof(real_t) == sizeof(double) ? real_t(1e-9) : real_t(1e-4);
+    for (const int level : {2, 4, 8, 16}) {
+        auto hex = Mesh::create_hex8_cube(Communicator::self(), 3, 2, 2, 0, 0, 0, 1, 0.8, 0.7);
+        auto fs  = FunctionSpace::create(smesh::to_semistructured(level, hex, true, false), 3);
+        printf("LinearElasticity level %d\n", level);
+        if (apply_host_device(fs, "LinearElasticity", fill_vector_host(*fs), tol) != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // LinearElasticity without the affine approximation on a distorted semi-structured mesh, where it
 // differs from it by about 1%: the device's isoparametric kernels against the host's (which
 // sfem_BSRTangentTest holds to the HEX8 operator) -- the action, the diagonal and the diagonal blocks.
@@ -223,6 +238,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_ss_gpu_em_laplacian_vs_host);
     SFEM_RUN_TEST(test_ss_gpu_em_linear_elasticity_vs_linear_elasticity);
     SFEM_RUN_TEST(test_ss_gpu_linear_elasticity_isoparametric_vs_host);
+    SFEM_RUN_TEST(test_ss_gpu_linear_elasticity_levels_vs_host);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

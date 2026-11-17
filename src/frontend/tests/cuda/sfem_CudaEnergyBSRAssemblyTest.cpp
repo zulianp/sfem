@@ -177,14 +177,10 @@ int test_prony_bsr_on_device() {
 // A tangent stored in single precision (BSRTangent, storage_bytes 4), assembled on the device from
 // element matrices in double: its values, product, diagonal, bound and shift against the host's
 // double tangent, to float's rounding.
-int test_single_precision_tangent_on_device() {
-#if SFEM_REAL_T_IS_FLOAT32
-    return SFEM_TEST_SUCCESS;
-#else
-    const char *const yaml = "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}";
-    auto              mesh = tet_cube();
-    auto              fs   = FunctionSpace::create(mesh, 3);
-    ryml::Tree        tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
+[[maybe_unused]] static int single_precision_tangent(const std::shared_ptr<Mesh> &mesh, const char *const yaml, const bool high_order) {
+    auto fs = FunctionSpace::create(mesh, 3);
+    if (high_order) fs->set_semi_structured_basis(FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
+    ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
     auto              fh   = Function::create(fs);
     auto              fd   = Function::create(fs);
     fh->add_operator(create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_HOST));
@@ -242,6 +238,18 @@ int test_single_precision_tangent_on_device() {
     for (ptrdiff_t i = 0; i < n; ++i) {
         SFEM_TEST_ASSERT(std::abs(shifted->data()[i] - (d32->data()[i] + real_t(0.5) * std::abs(d64->data()[i]))) <= 2 * eps * dmax);
     }
+    return SFEM_TEST_SUCCESS;
+}
+
+// TET4 through the thread-per-element assembly, PROTEUS_HEX64 through the block-per-element one
+// (sfem_cuda_TensorProductBSRHessian.cuh), each into float values.
+int test_single_precision_tangent_on_device() {
+#if SFEM_REAL_T_IS_FLOAT32
+    return SFEM_TEST_SUCCESS;
+#else
+    SFEM_TEST_ASSERT(single_precision_tangent(tet_cube(), "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}", false) == SFEM_TEST_SUCCESS);
+    auto hex64 = smesh::to_semistructured(3, Mesh::create_hex8_cube(Communicator::world(), 2, 2, 1, 0, 0, 0, 1, 1, 1), true, false);
+    SFEM_TEST_ASSERT(single_precision_tangent(hex64, "{type: GeneratedSaintVenantKirchhoff, mu: 1, lmbda: 2}", true) == SFEM_TEST_SUCCESS);
     return SFEM_TEST_SUCCESS;
 #endif
 }
