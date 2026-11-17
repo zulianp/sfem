@@ -640,7 +640,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_kelvin_voigt_total_proteus_hex27_residual_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_kelvin_voigt_total_proteus_hex27_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -795,7 +795,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void linear_kelvin_voigt_total_proteus_hex27_residual_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_kelvin_voigt_total_proteus_hex27_residual_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -977,7 +977,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void linear_kelvin_voigt_total_proteus_hex27_jacobian_action_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_kelvin_voigt_total_proteus_hex27_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -1121,7 +1121,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void linear_kelvin_voigt_total_proteus_hex27_jacobian_action_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_kelvin_voigt_total_proteus_hex27_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -1340,7 +1340,7 @@ __host__ __device__ __forceinline__ void linear_kelvin_voigt_total_proteus_hex27
 }
 
 template <typename s_t, typename v_t>
-__global__ void linear_kelvin_voigt_total_proteus_hex27_hessian_crs_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) linear_kelvin_voigt_total_proteus_hex27_hessian_crs_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

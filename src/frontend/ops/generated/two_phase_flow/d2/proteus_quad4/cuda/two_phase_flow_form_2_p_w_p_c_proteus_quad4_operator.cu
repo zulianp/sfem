@@ -368,7 +368,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -525,7 +525,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

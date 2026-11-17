@@ -77,6 +77,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     sdf->scale(smesh::Env::read("SFEM_SDF_SCALE", real_t(1.0)));
     auto contact_boundary = smesh::Sideset::create_from_file(comm, contact_boundary_path);
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
+    if (!contact_conds) return SFEM_FAILURE;
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            x     = sfem::create_buffer<real_t>(ndofs, es);

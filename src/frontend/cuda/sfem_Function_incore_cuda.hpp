@@ -20,7 +20,10 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<SparseBlockVector<T>> to_device(const std::shared_ptr<SparseBlockVector<T>> &in) {
-        if (in->mem_space() == MEMORY_SPACE_DEVICE) {
+        // Each array on its own: mem_space() is the blocks', and indices left on the host with
+        // device blocks would be read by the device kernels as they are. to_device returns a device
+        // array as it is.
+        if (in->idx_->mem_space() == MEMORY_SPACE_DEVICE && in->data_->mem_space() == MEMORY_SPACE_DEVICE) {
             return in;
         }
 
@@ -33,7 +36,7 @@ namespace sfem {
 
     template <typename T>
     std::shared_ptr<SparseBlockVector<T>> to_host(const std::shared_ptr<SparseBlockVector<T>> &in) {
-        if (in->mem_space() == MEMORY_SPACE_HOST) {
+        if (in->idx_->mem_space() == MEMORY_SPACE_HOST && in->data_->mem_space() == MEMORY_SPACE_HOST) {
             return in;
         }
 

@@ -327,7 +327,7 @@ extern int cu_macro_tet4_laplacian_diag(const ptrdiff_t                 nelement
 // ------------ CRS
 
 template <typename T>
-__global__ void cu_macro_tet4_laplacian_crs_kernel(const ptrdiff_t                          nelements,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_macro_tet4_laplacian_crs_kernel(const ptrdiff_t                          nelements,
                                                    idx_t **const SFEM_RESTRICT              elements,
                                                    const ptrdiff_t                          fff_stride,
                                                    const cu_jacobian_t *const SFEM_RESTRICT fff,

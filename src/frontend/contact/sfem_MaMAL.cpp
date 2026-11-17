@@ -10,6 +10,7 @@
 #include "sfem_CRS_X_BSR.hpp"
 #include "sfem_SelfContact.hpp"
 #include "smesh_crs_graph.hpp"
+#include "smesh_device_buffer.hpp"
 #include "smesh_env.hpp"
 
 #include "sfem_BSR.hpp"
@@ -658,6 +659,10 @@ namespace sfem {
                 contact_block_diag_soa[i]  = create_buffer<real_t>(6, n_contact, es);
                 contact_block_diag_aos[i]  = create_buffer<real_t>(n_contact * 6, es);
                 contact_block_idx[i]       = contact_surfaces[i]->node_mapping();
+#ifdef SFEM_ENABLE_CUDA
+                // The block vector's kernels read its indices where its blocks are.
+                if (EXECUTION_SPACE_DEVICE == es) contact_block_idx[i] = smesh::to_device(contact_block_idx[i]);
+#endif
                 contact_block_diag[i]      = create_sparse_block_vector(contact_block_idx[i], contact_block_diag_aos[i]);
                 contact_hessian_local_x[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
                 contact_hessian_local_y[i] = create_buffer<real_t>(n_contact * spatial_dim, es);
@@ -1650,7 +1655,22 @@ namespace sfem {
 
     MaMAL::~MaMAL() = default;
 
+    namespace {
+        // MaMAL's contact set-up (the block diagonals' packing, the masks, the active set's
+        // restriction) loops over its buffers on the host, which cannot read device memory (cudaMalloc;
+        // the host faults reading it on x86 H100, GH200 and MI300A alike): refused on the device until
+        // those passes have device kernels.
+        bool mamal_refuses(const Function& f) {
+            if (f.execution_space() == EXECUTION_SPACE_DEVICE) {
+                fprintf(stderr, "MaMAL: runs on the host only (its contact set-up loops read its buffers there)\n");
+                return true;
+            }
+            return false;
+        }
+    }  // namespace
+
     std::shared_ptr<MaMAL> MaMAL::create(const std::shared_ptr<Function>& f) {
+        if (mamal_refuses(*f)) return nullptr;
         auto ret = std::make_shared<MaMAL>(f);
         ret->impl_->init();
         return ret;
@@ -1658,6 +1678,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<MaMAL> MaMAL::create(const std::shared_ptr<Function>& f, const ryml::ConstNodeRef& node) {
+        if (mamal_refuses(*f)) return nullptr;
         auto ret = std::make_shared<MaMAL>(f);
         ret->impl_->init(node);
         return ret;

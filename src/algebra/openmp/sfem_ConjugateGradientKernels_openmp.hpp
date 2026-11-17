@@ -13,6 +13,36 @@
 
 namespace sfem {
 
+    /// A preconditioned CG's iterations in the execution space (ConjugateGradientKernels::run_precond):
+    /// ConjugateGradient::run_precond's loop, from its first z = M r on, with the scalars (r.z, p.Ap,
+    /// alpha, beta) kept where the vectors are, so the host does not wait for each dot. The same
+    /// operations in the same order; the dots are summed in other blocks (one of 512 threads per
+    /// compute unit, against GPUBLAS::dot's four of 128), so x agrees with the loop's to rounding.
+    template <typename T>
+    struct CGDeviceRun {
+        ptrdiff_t n{0};
+        T        *x{nullptr}, *r{nullptr}, *z{nullptr}, *p{nullptr}, *Ap{nullptr};
+        T         rtz{0}, rtz0{0}, atol{0}, rtol{0};
+        int       max_it{0};
+        /// z += M r and Ap += A p: the run zeroes z and Ap, `allocation` entries, where they are dead.
+        std::function<void(const T *const, T *const)> precondition, product;
+        ptrdiff_t                                     allocation{0};
+        /// The solver's stream: the run is ordered on it.
+        void *stream{nullptr};
+        /// M where it is 3 x 3 blocks a node on the device (ShiftableOperator::device_blocks3, 4 or 8
+        /// bytes a scalar): z = M r is formed in x and r's update, with r.z, instead of by
+        /// `precondition`; z is the same, r.z summed in another order.
+        const void *m_blocks{nullptr};
+        int         m_blocks_bytes{0};
+    };
+
+    /// How a run ended. `ran` false: it could not be taken there, and nothing was done.
+    struct CGDeviceRunResult {
+        bool ran{false};
+        int  iterations{0};
+        bool converged{false};
+    };
+
     /// Backend strategy for fused CG vector updates (OpenMP / CUDA).
     template <typename T>
     struct ConjugateGradientKernels {
@@ -36,6 +66,9 @@ namespace sfem {
 
         /// p ← z + beta p
         std::function<void(const ptrdiff_t n, const T beta, const T* const z, T* const p)> update_p;
+
+        /// A backend's own run of the preconditioned loop (CGDeviceRun); empty where it has none.
+        std::function<CGDeviceRunResult(const CGDeviceRun<T>& run)> run_precond;
 
         bool good() const {
             assert(update_x_r_and_rtr);

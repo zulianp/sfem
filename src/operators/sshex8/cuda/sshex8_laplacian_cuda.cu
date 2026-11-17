@@ -7,7 +7,7 @@
 // #define CU_AFFINE_SSHEX8_LAPLACIAN_APPLY_USE_ELEMENTAL_MATRIX
 
 template <typename real_t>
-__global__ void cu_affine_sshex8_laplacian_apply_kernel(const int                                level,
+__global__ void SFEM_HIP_LAUNCH_BOUNDS(128) cu_affine_sshex8_laplacian_apply_kernel(const int                                level,
                                                         const ptrdiff_t                          nelements,
                                                         idx_t **const SFEM_RESTRICT              elements,
                                                         const ptrdiff_t                          fff_stride,

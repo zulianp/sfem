@@ -162,10 +162,17 @@ namespace sfem {
         }
 
         int copy_constrained_dofs(const real_t *const src, real_t *const dest) override {
+            ConstraintNodesBatch batch;
             for (auto &c : conditions) {
-                d_constraint_nodes_copy_vec(
-                        c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component, src, dest, stream);
+                batch.nodes[batch.count]      = c.nodeset->data();
+                batch.component[batch.count]  = c.component;
+                batch.offset[batch.count + 1] = batch.offset[batch.count] + c.nodeset->size();
+                if (++batch.count == ConstraintNodesBatch::capacity) {
+                    d_constraint_nodes_copy_vec_batch(batch, space->block_size(), src, dest, stream);
+                    batch = ConstraintNodesBatch();
+                }
             }
+            if (batch.count) d_constraint_nodes_copy_vec_batch(batch, space->block_size(), src, dest, stream);
 
             return SFEM_SUCCESS;
         }

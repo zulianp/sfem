@@ -64,9 +64,10 @@ namespace {
     }
 
     // max |device - host| / max |host| over the BSR values, on `mesh` (a semi-structured one through
-    // its micro elements).
-    real_t assemble_and_compare(const std::shared_ptr<Mesh> &mesh, const char *const yaml) {
+    // its micro elements, or with `high_order` one Lagrange element per macro element).
+    real_t assemble_and_compare(const std::shared_ptr<Mesh> &mesh, const char *const yaml, const bool high_order = false) {
         auto fs = FunctionSpace::create(mesh, 3);
+        if (high_order) fs->set_semi_structured_basis(FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
 
         ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
         auto       host = create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_HOST);
@@ -84,7 +85,7 @@ namespace {
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            x     = deformed(mesh, ndofs);
 
-        auto       graph  = fs->node_to_node_graph();
+        auto       graph  = fs->element_node_graph();
         const auto nvals  = graph->nnz() * 9;
         auto       values = create_host_buffer<real_t>(nvals);
         if (host->hessian_bsr(x->data(), graph->rowptr()->data(), graph->colidx()->data(), values->data()) != SFEM_SUCCESS) return 1;
@@ -159,6 +160,18 @@ int test_neohookean_bsr_on_device() {
     return SFEM_TEST_SUCCESS;
 }
 
+// PROTEUS_HEX64, a cubic Lagrange element per macro element of a level-3 mesh: its element matrix,
+// 192 x 192, is beyond a thread's stack on AMD GPUs, and the device assembles it a column at a time
+// with a block per element (sfem_cuda_TensorProductBSRHessian.cuh; on CUDA with
+// SFEM_TP_HESSIAN_ASSEMBLY=cooperative).
+int test_proteus_hex64_bsr_on_device() {
+    auto hex64 = smesh::to_semistructured(3, Mesh::create_hex8_cube(Communicator::world(), 2, 2, 1, 0, 0, 0, 1, 1, 1), true, false);
+    SFEM_TEST_ASSERT(assemble_and_compare(hex64, "{type: GeneratedSaintVenantKirchhoff, mu: 1, lmbda: 2}", true) < 1e-12);
+    SFEM_TEST_ASSERT(
+            assemble_and_compare(hex64, "{type: GeneratedModifiedMooneyRivlin, c1: 0.3, c2: 0.05, kappa: 50}", true) < 1e-12);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_prony_bsr_on_device() {
     SFEM_TEST_ASSERT(assemble_and_compare(cube(), "{type: GeneratedMooneyRivlinProny, C10: 0.3, C01: 0.05, K: 50, "
                                           "relaxation: {iso: {prony: [{g: 0.4, tau: 1}, {g: 0.3, tau: 10}]}}}") < 1e-12);
@@ -168,14 +181,10 @@ int test_prony_bsr_on_device() {
 // A tangent stored in single precision (BSRTangent, storage_bytes 4), assembled on the device from
 // element matrices in double: its values, product, diagonal, bound and shift against the host's
 // double tangent, to float's rounding.
-int test_single_precision_tangent_on_device() {
-#if SFEM_REAL_T_IS_FLOAT32
-    return SFEM_TEST_SUCCESS;
-#else
-    const char *const yaml = "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}";
-    auto              mesh = tet_cube();
-    auto              fs   = FunctionSpace::create(mesh, 3);
-    ryml::Tree        tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
+[[maybe_unused]] static int single_precision_tangent(const std::shared_ptr<Mesh> &mesh, const char *const yaml, const bool high_order) {
+    auto fs = FunctionSpace::create(mesh, 3);
+    if (high_order) fs->set_semi_structured_basis(FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
+    ryml::Tree tree = ryml::parse_in_arena(ryml::to_csubstr(yaml));
     auto              fh   = Function::create(fs);
     auto              fd   = Function::create(fs);
     fh->add_operator(create_op_from_yaml(fs, tree.crootref(), EXECUTION_SPACE_HOST));
@@ -234,6 +243,18 @@ int test_single_precision_tangent_on_device() {
         SFEM_TEST_ASSERT(std::abs(shifted->data()[i] - (d32->data()[i] + real_t(0.5) * std::abs(d64->data()[i]))) <= 2 * eps * dmax);
     }
     return SFEM_TEST_SUCCESS;
+}
+
+// TET4 through the thread-per-element assembly, PROTEUS_HEX64 through the block-per-element one
+// (sfem_cuda_TensorProductBSRHessian.cuh), each into float values.
+int test_single_precision_tangent_on_device() {
+#if SFEM_REAL_T_IS_FLOAT32
+    return SFEM_TEST_SUCCESS;
+#else
+    SFEM_TEST_ASSERT(single_precision_tangent(tet_cube(), "{type: GeneratedNeoHookeanOgden, mu: 1, lmbda: 2}", false) == SFEM_TEST_SUCCESS);
+    auto hex64 = smesh::to_semistructured(3, Mesh::create_hex8_cube(Communicator::world(), 2, 2, 1, 0, 0, 0, 1, 1, 1), true, false);
+    SFEM_TEST_ASSERT(single_precision_tangent(hex64, "{type: GeneratedSaintVenantKirchhoff, mu: 1, lmbda: 2}", true) == SFEM_TEST_SUCCESS);
+    return SFEM_TEST_SUCCESS;
 #endif
 }
 
@@ -242,6 +263,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_linear_elasticity_bsr_on_device);
     SFEM_RUN_TEST(test_neohookean_bsr_on_device);
     SFEM_RUN_TEST(test_prony_bsr_on_device);
+    SFEM_RUN_TEST(test_proteus_hex64_bsr_on_device);
     SFEM_RUN_TEST(test_linear_elasticity_block_diag_on_device);
     SFEM_RUN_TEST(test_single_precision_tangent_on_device);
     SFEM_UNIT_TEST_FINALIZE();

@@ -346,7 +346,11 @@ namespace sfem {
     SharedBuffer<geom_t *> MeshContactSurface::points_device() { return impl_->surface_points_device; }
     SharedBuffer<geom_t *> MeshContactSurface::rest_points_device() { return impl_->surface_points_rest_device; }
     SharedBuffer<idx_t *>  MeshContactSurface::elements_device() { return impl_->sides_device; }
-    SharedBuffer<idx_t>    MeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
+    SharedBuffer<idx_t> MeshContactSurface::node_mapping_device() {
+        // Copied once, on first use, also for a surface built on the host.
+        if (!impl_->node_mapping_device) impl_->node_mapping_device = smesh::to_device(impl_->node_mapping);
+        return impl_->node_mapping_device;
+    }
 #endif
 
     smesh::ElemType MeshContactSurface::element_type() const { return impl_->element_type; }
@@ -551,7 +555,11 @@ namespace sfem {
     SharedBuffer<geom_t *> SSMeshContactSurface::points_device() { return impl_->surface_points_device; }
     SharedBuffer<geom_t *> SSMeshContactSurface::rest_points_device() { return impl_->surface_points_rest_device; }
     SharedBuffer<idx_t *>  SSMeshContactSurface::elements_device() { return impl_->sides_device; }
-    SharedBuffer<idx_t>    SSMeshContactSurface::node_mapping_device() { return impl_->node_mapping_device; }
+    SharedBuffer<idx_t> SSMeshContactSurface::node_mapping_device() {
+        // Copied once, on first use, also for a surface built on the host.
+        if (!impl_->node_mapping_device) impl_->node_mapping_device = smesh::to_device(impl_->node_mapping);
+        return impl_->node_mapping_device;
+    }
 #endif
 
     smesh::ElemType SSMeshContactSurface::element_type() const { return impl_->element_type; }

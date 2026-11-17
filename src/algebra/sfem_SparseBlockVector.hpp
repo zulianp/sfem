@@ -56,9 +56,15 @@ namespace sfem {
         // ExecutionSpace execution_space() const override { return data_->mem_space(); }
     };
 
+    /// The blocks `data` at the nodes `idx`, both in one memory space: a kernel reads the two
+    /// together, and a vector whose indices stay on the host while its blocks are on the device is
+    /// one that a device kernel reads host memory through (mem_space() names the blocks').
     template <typename T>
     std::shared_ptr<SparseBlockVector<T>> create_sparse_block_vector(const SharedBuffer<idx_t>& idx,
                                                                      const SharedBuffer<T>&     data) {
+        if (idx->size() > 0 && idx->mem_space() != data->mem_space()) {
+            SFEM_ERROR("create_sparse_block_vector: the indices and the blocks are in different memory spaces\n");
+        }
         auto ret         = std::make_shared<SparseBlockVector<T>>();
         ret->block_size_ = idx->size() ? static_cast<int>(data->size() / idx->size()) : 0;
         ret->idx_        = idx;

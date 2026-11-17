@@ -152,7 +152,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-__global__ void body_force_proteus_hex8_residual_a_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) body_force_proteus_hex8_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -248,7 +248,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t>
-__global__ void body_force_proteus_hex8_residual_i_msoa_impl(
+__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(256) body_force_proteus_hex8_residual_i_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,

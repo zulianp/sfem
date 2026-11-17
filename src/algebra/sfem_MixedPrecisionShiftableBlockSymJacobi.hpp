@@ -157,6 +157,13 @@ namespace sfem {
         bool input_in_share() const override { return true; }
         bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST && block_size == 3; }
 
+        const void* device_blocks3(ptrdiff_t& n_blocks, int& scalar_bytes) const override {
+            if (block_size != 3 || !inv_diag || this->execution_space() != EXECUTION_SPACE_DEVICE) return nullptr;
+            n_blocks     = inv_diag->size() / 9;
+            scalar_bytes = sizeof(LP);
+            return inv_diag->data();
+        }
+
         inline std::ptrdiff_t rows() const override { return diag->size(); }
         inline std::ptrdiff_t cols() const override { return diag->size(); }
         ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }

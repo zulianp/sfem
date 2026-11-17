@@ -24,6 +24,9 @@ typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
+#include "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+#endif
 namespace sfem {
 namespace codegen {
 
@@ -537,6 +540,192 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_tensor_produ
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[3 * NQ], out_streams, 1);
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
+
+#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)
+// neohookean_ogden_d3_tensor_product_apply_point: the apply at one point, the apply block's point section; the device's apply on the
+// FP64 matrix units reads it (`sfem_cuda_TensorProductMatrixCoreApply.cuh`).
+struct neohookean_ogden_d3_tensor_product_apply_point {
+  static constexpr int n_parameters = 2;
+  static constexpr bool reads_current = true;
+
+  template <typename s_t>
+  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,
+                                               const s_t *const RSTR grad_h_ref,
+                                               const s_t *const RSTR gu_ref,
+                                               const s_t *const RSTR adj,
+                                               const s_t det,
+                                               const s_t qw,
+                                               s_t *const RSTR loperand) {
+    const s_t lmbda = parameters[0];
+    const s_t mu = parameters[1];
+    const s_t adj_value0 = adj[0];
+    const s_t adj_value1 = adj[1];
+    const s_t adj_value2 = adj[2];
+    const s_t adj_value3 = adj[3];
+    const s_t adj_value4 = adj[4];
+    const s_t adj_value5 = adj[5];
+    const s_t adj_value6 = adj[6];
+    const s_t adj_value7 = adj[7];
+    const s_t adj_value8 = adj[8];
+    const s_t det_value0 = det;
+    const s_t idet = s_t(1) / det_value0;
+    s_t gu[9];
+    s_t trial_grad[9];
+    gu[0] = (gu_ref[0] * adj_value0 + gu_ref[1] * adj_value3 + gu_ref[2] * adj_value6) * idet;
+    trial_grad[0] = (grad_h_ref[0] * adj_value0 + grad_h_ref[1] * adj_value3 + grad_h_ref[2] * adj_value6) * idet;
+    gu[1] = (gu_ref[0] * adj_value1 + gu_ref[1] * adj_value4 + gu_ref[2] * adj_value7) * idet;
+    trial_grad[1] = (grad_h_ref[0] * adj_value1 + grad_h_ref[1] * adj_value4 + grad_h_ref[2] * adj_value7) * idet;
+    gu[2] = (gu_ref[0] * adj_value2 + gu_ref[1] * adj_value5 + gu_ref[2] * adj_value8) * idet;
+    trial_grad[2] = (grad_h_ref[0] * adj_value2 + grad_h_ref[1] * adj_value5 + grad_h_ref[2] * adj_value8) * idet;
+    gu[3] = (gu_ref[3] * adj_value0 + gu_ref[4] * adj_value3 + gu_ref[5] * adj_value6) * idet;
+    trial_grad[3] = (grad_h_ref[3] * adj_value0 + grad_h_ref[4] * adj_value3 + grad_h_ref[5] * adj_value6) * idet;
+    gu[4] = (gu_ref[3] * adj_value1 + gu_ref[4] * adj_value4 + gu_ref[5] * adj_value7) * idet;
+    trial_grad[4] = (grad_h_ref[3] * adj_value1 + grad_h_ref[4] * adj_value4 + grad_h_ref[5] * adj_value7) * idet;
+    gu[5] = (gu_ref[3] * adj_value2 + gu_ref[4] * adj_value5 + gu_ref[5] * adj_value8) * idet;
+    trial_grad[5] = (grad_h_ref[3] * adj_value2 + grad_h_ref[4] * adj_value5 + grad_h_ref[5] * adj_value8) * idet;
+    gu[6] = (gu_ref[6] * adj_value0 + gu_ref[7] * adj_value3 + gu_ref[8] * adj_value6) * idet;
+    trial_grad[6] = (grad_h_ref[6] * adj_value0 + grad_h_ref[7] * adj_value3 + grad_h_ref[8] * adj_value6) * idet;
+    gu[7] = (gu_ref[6] * adj_value1 + gu_ref[7] * adj_value4 + gu_ref[8] * adj_value7) * idet;
+    trial_grad[7] = (grad_h_ref[6] * adj_value1 + grad_h_ref[7] * adj_value4 + grad_h_ref[8] * adj_value7) * idet;
+    gu[8] = (gu_ref[6] * adj_value2 + gu_ref[7] * adj_value5 + gu_ref[8] * adj_value8) * idet;
+    trial_grad[8] = (grad_h_ref[6] * adj_value2 + grad_h_ref[7] * adj_value5 + grad_h_ref[8] * adj_value8) * idet;
+    const s_t weak_mat_tmp0 = gu[5]*gu[7];
+    const s_t weak_mat_tmp1 = gu[4] + s_t(1);
+    const s_t weak_mat_tmp2 = gu[8] + s_t(1);
+    const s_t weak_mat_tmp3 = weak_mat_tmp0 - weak_mat_tmp1*weak_mat_tmp2;
+    const s_t weak_mat_tmp4 = -weak_mat_tmp3;
+    const s_t weak_mat_tmp5 = gu[1]*gu[3];
+    const s_t weak_mat_tmp6 = gu[2]*gu[6];
+    const s_t weak_mat_tmp7 = gu[0] + s_t(1);
+    const s_t weak_mat_tmp8 = gu[1]*gu[5]*gu[6] + gu[2]*gu[3]*gu[7] - weak_mat_tmp0*weak_mat_tmp7 + weak_mat_tmp1*weak_mat_tmp2*weak_mat_tmp7 - weak_mat_tmp1*weak_mat_tmp6 - weak_mat_tmp2*weak_mat_tmp5;
+    const s_t weak_mat_tmp9 = pow_m2(weak_mat_tmp8);
+    const s_t weak_mat_tmp10 = lmbda*weak_mat_tmp9;
+    const s_t weak_mat_tmp11 = mu*weak_mat_tmp9;
+    const s_t weak_mat_tmp12 = weak_mat_tmp3*weak_mat_tmp4;
+    const s_t weak_mat_tmp13 = gu[0]*gu[4];
+    const s_t weak_mat_tmp14 = gu[3]*gu[7];
+    const s_t weak_mat_tmp15 = sfem_log1p(gu[0]*gu[8] - gu[0]*weak_mat_tmp0 + gu[0] + gu[1]*gu[5]*gu[6] + gu[2]*weak_mat_tmp14 + gu[4]*gu[8] - gu[4]*weak_mat_tmp6 + gu[4] + gu[8]*weak_mat_tmp13 - gu[8]*weak_mat_tmp5 + gu[8] - weak_mat_tmp0 + weak_mat_tmp13 - weak_mat_tmp5 - weak_mat_tmp6);
+    const s_t weak_mat_tmp16 = weak_mat_tmp10*weak_mat_tmp15;
+    const s_t weak_mat_tmp17 = gu[3]*weak_mat_tmp2 - gu[5]*gu[6];
+    const s_t weak_mat_tmp18 = -weak_mat_tmp17;
+    const s_t weak_mat_tmp19 = weak_mat_tmp10*weak_mat_tmp4;
+    const s_t weak_mat_tmp20 = weak_mat_tmp18*weak_mat_tmp19;
+    const s_t weak_mat_tmp21 = weak_mat_tmp11*weak_mat_tmp4;
+    const s_t weak_mat_tmp22 = weak_mat_tmp15*weak_mat_tmp19;
+    const s_t weak_mat_tmp23 = -gu[6]*weak_mat_tmp1 + weak_mat_tmp14;
+    const s_t weak_mat_tmp24 = weak_mat_tmp19*weak_mat_tmp23;
+    const s_t weak_mat_tmp25 = -weak_mat_tmp23;
+    const s_t weak_mat_tmp26 = gu[1]*weak_mat_tmp2 - gu[2]*gu[7];
+    const s_t weak_mat_tmp27 = -weak_mat_tmp26;
+    const s_t weak_mat_tmp28 = weak_mat_tmp19*weak_mat_tmp27;
+    const s_t weak_mat_tmp29 = gu[1]*gu[5] - gu[2]*weak_mat_tmp1;
+    const s_t weak_mat_tmp30 = weak_mat_tmp19*weak_mat_tmp29;
+    const s_t weak_mat_tmp31 = -weak_mat_tmp29;
+    const s_t weak_mat_tmp32 = gu[1]*gu[6] - gu[7]*weak_mat_tmp7;
+    const s_t weak_mat_tmp33 = -weak_mat_tmp32;
+    const s_t weak_mat_tmp34 = pow_m1(weak_mat_tmp8);
+    const s_t weak_mat_tmp35 = mu*weak_mat_tmp34;
+    const s_t weak_mat_tmp36 = gu[7]*weak_mat_tmp35;
+    const s_t weak_mat_tmp37 = lmbda*weak_mat_tmp15*weak_mat_tmp34;
+    const s_t weak_mat_tmp38 = gu[7]*weak_mat_tmp37;
+    const s_t weak_mat_tmp39 = weak_mat_tmp19*weak_mat_tmp32 + weak_mat_tmp36 - weak_mat_tmp38;
+    const s_t weak_mat_tmp40 = gu[2]*gu[3] - gu[5]*weak_mat_tmp7;
+    const s_t weak_mat_tmp41 = -weak_mat_tmp40;
+    const s_t weak_mat_tmp42 = gu[5]*weak_mat_tmp35;
+    const s_t weak_mat_tmp43 = gu[5]*weak_mat_tmp37;
+    const s_t weak_mat_tmp44 = weak_mat_tmp19*weak_mat_tmp40 + weak_mat_tmp42 - weak_mat_tmp43;
+    const s_t weak_mat_tmp45 = -weak_mat_tmp2*weak_mat_tmp7 + weak_mat_tmp6;
+    const s_t weak_mat_tmp46 = weak_mat_tmp2*weak_mat_tmp35;
+    const s_t weak_mat_tmp47 = weak_mat_tmp2*weak_mat_tmp37;
+    const s_t weak_mat_tmp48 = -weak_mat_tmp45;
+    const s_t weak_mat_tmp49 = weak_mat_tmp19*weak_mat_tmp48 - weak_mat_tmp46 + weak_mat_tmp47;
+    const s_t weak_mat_tmp50 = -weak_mat_tmp1*weak_mat_tmp7 + weak_mat_tmp5;
+    const s_t weak_mat_tmp51 = weak_mat_tmp1*weak_mat_tmp35;
+    const s_t weak_mat_tmp52 = weak_mat_tmp1*weak_mat_tmp37;
+    const s_t weak_mat_tmp53 = -weak_mat_tmp50;
+    const s_t weak_mat_tmp54 = weak_mat_tmp19*weak_mat_tmp53 - weak_mat_tmp51 + weak_mat_tmp52;
+    const s_t weak_mat_tmp55 = weak_mat_tmp11*weak_mat_tmp18;
+    const s_t weak_mat_tmp56 = weak_mat_tmp10*weak_mat_tmp18;
+    const s_t weak_mat_tmp57 = weak_mat_tmp15*weak_mat_tmp56;
+    const s_t weak_mat_tmp58 = weak_mat_tmp23*weak_mat_tmp56;
+    const s_t weak_mat_tmp59 = weak_mat_tmp40*weak_mat_tmp56;
+    const s_t weak_mat_tmp60 = weak_mat_tmp48*weak_mat_tmp56;
+    const s_t weak_mat_tmp61 = gu[6]*weak_mat_tmp35;
+    const s_t weak_mat_tmp62 = gu[6]*weak_mat_tmp37;
+    const s_t weak_mat_tmp63 = weak_mat_tmp32*weak_mat_tmp56 - weak_mat_tmp61 + weak_mat_tmp62;
+    const s_t weak_mat_tmp64 = weak_mat_tmp29*weak_mat_tmp56 - weak_mat_tmp42 + weak_mat_tmp43;
+    const s_t weak_mat_tmp65 = weak_mat_tmp27*weak_mat_tmp56 + weak_mat_tmp46 - weak_mat_tmp47;
+    const s_t weak_mat_tmp66 = gu[3]*weak_mat_tmp35;
+    const s_t weak_mat_tmp67 = gu[3]*weak_mat_tmp37;
+    const s_t weak_mat_tmp68 = weak_mat_tmp53*weak_mat_tmp56 + weak_mat_tmp66 - weak_mat_tmp67;
+    const s_t weak_mat_tmp69 = weak_mat_tmp11*weak_mat_tmp23;
+    const s_t weak_mat_tmp70 = weak_mat_tmp10*weak_mat_tmp23;
+    const s_t weak_mat_tmp71 = weak_mat_tmp15*weak_mat_tmp70;
+    const s_t weak_mat_tmp72 = weak_mat_tmp32*weak_mat_tmp70;
+    const s_t weak_mat_tmp73 = weak_mat_tmp53*weak_mat_tmp70;
+    const s_t weak_mat_tmp74 = weak_mat_tmp27*weak_mat_tmp70 - weak_mat_tmp36 + weak_mat_tmp38;
+    const s_t weak_mat_tmp75 = weak_mat_tmp40*weak_mat_tmp70 - weak_mat_tmp66 + weak_mat_tmp67;
+    const s_t weak_mat_tmp76 = weak_mat_tmp29*weak_mat_tmp70 + weak_mat_tmp51 - weak_mat_tmp52;
+    const s_t weak_mat_tmp77 = weak_mat_tmp48*weak_mat_tmp70 + weak_mat_tmp61 - weak_mat_tmp62;
+    const s_t weak_mat_tmp78 = weak_mat_tmp11*weak_mat_tmp27;
+    const s_t weak_mat_tmp79 = weak_mat_tmp10*weak_mat_tmp27;
+    const s_t weak_mat_tmp80 = weak_mat_tmp15*weak_mat_tmp79;
+    const s_t weak_mat_tmp81 = weak_mat_tmp32*weak_mat_tmp79;
+    const s_t weak_mat_tmp82 = weak_mat_tmp29*weak_mat_tmp79;
+    const s_t weak_mat_tmp83 = weak_mat_tmp48*weak_mat_tmp79;
+    const s_t weak_mat_tmp84 = gu[2]*weak_mat_tmp35;
+    const s_t weak_mat_tmp85 = gu[2]*weak_mat_tmp37;
+    const s_t weak_mat_tmp86 = weak_mat_tmp40*weak_mat_tmp79 - weak_mat_tmp84 + weak_mat_tmp85;
+    const s_t weak_mat_tmp87 = gu[1]*weak_mat_tmp35;
+    const s_t weak_mat_tmp88 = gu[1]*weak_mat_tmp37;
+    const s_t weak_mat_tmp89 = weak_mat_tmp53*weak_mat_tmp79 + weak_mat_tmp87 - weak_mat_tmp88;
+    const s_t weak_mat_tmp90 = weak_mat_tmp11*weak_mat_tmp48;
+    const s_t weak_mat_tmp91 = weak_mat_tmp10*weak_mat_tmp48;
+    const s_t weak_mat_tmp92 = weak_mat_tmp15*weak_mat_tmp91;
+    const s_t weak_mat_tmp93 = weak_mat_tmp32*weak_mat_tmp91;
+    const s_t weak_mat_tmp94 = weak_mat_tmp40*weak_mat_tmp91;
+    const s_t weak_mat_tmp95 = weak_mat_tmp29*weak_mat_tmp91 + weak_mat_tmp84 - weak_mat_tmp85;
+    const s_t weak_mat_tmp96 = weak_mat_tmp35*weak_mat_tmp7;
+    const s_t weak_mat_tmp97 = weak_mat_tmp37*weak_mat_tmp7;
+    const s_t weak_mat_tmp98 = weak_mat_tmp53*weak_mat_tmp91 - weak_mat_tmp96 + weak_mat_tmp97;
+    const s_t weak_mat_tmp99 = weak_mat_tmp11*weak_mat_tmp32;
+    const s_t weak_mat_tmp100 = weak_mat_tmp10*weak_mat_tmp32;
+    const s_t weak_mat_tmp101 = weak_mat_tmp100*weak_mat_tmp15;
+    const s_t weak_mat_tmp102 = weak_mat_tmp100*weak_mat_tmp53;
+    const s_t weak_mat_tmp103 = weak_mat_tmp100*weak_mat_tmp29 - weak_mat_tmp87 + weak_mat_tmp88;
+    const s_t weak_mat_tmp104 = weak_mat_tmp100*weak_mat_tmp40 + weak_mat_tmp96 - weak_mat_tmp97;
+    const s_t weak_mat_tmp105 = weak_mat_tmp11*weak_mat_tmp29;
+    const s_t weak_mat_tmp106 = weak_mat_tmp10*weak_mat_tmp29;
+    const s_t weak_mat_tmp107 = weak_mat_tmp106*weak_mat_tmp15;
+    const s_t weak_mat_tmp108 = weak_mat_tmp106*weak_mat_tmp40;
+    const s_t weak_mat_tmp109 = weak_mat_tmp106*weak_mat_tmp53;
+    const s_t weak_mat_tmp110 = weak_mat_tmp11*weak_mat_tmp40;
+    const s_t weak_mat_tmp111 = weak_mat_tmp10*weak_mat_tmp40;
+    const s_t weak_mat_tmp112 = weak_mat_tmp111*weak_mat_tmp15;
+    const s_t weak_mat_tmp113 = weak_mat_tmp111*weak_mat_tmp53;
+    const s_t weak_mat_tmp114 = weak_mat_tmp11*weak_mat_tmp53;
+    const s_t weak_mat_tmp115 = weak_mat_tmp16*weak_mat_tmp53;
+    const s_t material0 = trial_grad[0]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp4) - weak_mat_tmp11*weak_mat_tmp12 + weak_mat_tmp12*weak_mat_tmp16) + trial_grad[1]*(-weak_mat_tmp17*weak_mat_tmp21 + weak_mat_tmp17*weak_mat_tmp22 + weak_mat_tmp20) + trial_grad[2]*(-weak_mat_tmp21*weak_mat_tmp25 + weak_mat_tmp22*weak_mat_tmp25 + weak_mat_tmp24) + trial_grad[3]*(-weak_mat_tmp21*weak_mat_tmp26 + weak_mat_tmp22*weak_mat_tmp26 + weak_mat_tmp28) + trial_grad[4]*(-weak_mat_tmp21*weak_mat_tmp45 + weak_mat_tmp22*weak_mat_tmp45 + weak_mat_tmp49) + trial_grad[5]*(-weak_mat_tmp21*weak_mat_tmp33 + weak_mat_tmp22*weak_mat_tmp33 + weak_mat_tmp39) + trial_grad[6]*(-weak_mat_tmp21*weak_mat_tmp31 + weak_mat_tmp22*weak_mat_tmp31 + weak_mat_tmp30) + trial_grad[7]*(-weak_mat_tmp21*weak_mat_tmp41 + weak_mat_tmp22*weak_mat_tmp41 + weak_mat_tmp44) + trial_grad[8]*(-weak_mat_tmp21*weak_mat_tmp50 + weak_mat_tmp22*weak_mat_tmp50 + weak_mat_tmp54);
+    const s_t material1 = trial_grad[0]*(weak_mat_tmp20 - weak_mat_tmp3*weak_mat_tmp55 + weak_mat_tmp3*weak_mat_tmp57) + trial_grad[1]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp18) - weak_mat_tmp17*weak_mat_tmp55 + weak_mat_tmp17*weak_mat_tmp57) + trial_grad[2]*(-weak_mat_tmp25*weak_mat_tmp55 + weak_mat_tmp25*weak_mat_tmp57 + weak_mat_tmp58) + trial_grad[3]*(-weak_mat_tmp26*weak_mat_tmp55 + weak_mat_tmp26*weak_mat_tmp57 + weak_mat_tmp65) + trial_grad[4]*(-weak_mat_tmp45*weak_mat_tmp55 + weak_mat_tmp45*weak_mat_tmp57 + weak_mat_tmp60) + trial_grad[5]*(-weak_mat_tmp33*weak_mat_tmp55 + weak_mat_tmp33*weak_mat_tmp57 + weak_mat_tmp63) + trial_grad[6]*(-weak_mat_tmp31*weak_mat_tmp55 + weak_mat_tmp31*weak_mat_tmp57 + weak_mat_tmp64) + trial_grad[7]*(-weak_mat_tmp41*weak_mat_tmp55 + weak_mat_tmp41*weak_mat_tmp57 + weak_mat_tmp59) + trial_grad[8]*(-weak_mat_tmp50*weak_mat_tmp55 + weak_mat_tmp50*weak_mat_tmp57 + weak_mat_tmp68);
+    const s_t material2 = trial_grad[0]*(weak_mat_tmp24 - weak_mat_tmp3*weak_mat_tmp69 + weak_mat_tmp3*weak_mat_tmp71) + trial_grad[1]*(-weak_mat_tmp17*weak_mat_tmp69 + weak_mat_tmp17*weak_mat_tmp71 + weak_mat_tmp58) + trial_grad[2]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp23) - weak_mat_tmp25*weak_mat_tmp69 + weak_mat_tmp25*weak_mat_tmp71) + trial_grad[3]*(-weak_mat_tmp26*weak_mat_tmp69 + weak_mat_tmp26*weak_mat_tmp71 + weak_mat_tmp74) + trial_grad[4]*(-weak_mat_tmp45*weak_mat_tmp69 + weak_mat_tmp45*weak_mat_tmp71 + weak_mat_tmp77) + trial_grad[5]*(-weak_mat_tmp33*weak_mat_tmp69 + weak_mat_tmp33*weak_mat_tmp71 + weak_mat_tmp72) + trial_grad[6]*(-weak_mat_tmp31*weak_mat_tmp69 + weak_mat_tmp31*weak_mat_tmp71 + weak_mat_tmp76) + trial_grad[7]*(-weak_mat_tmp41*weak_mat_tmp69 + weak_mat_tmp41*weak_mat_tmp71 + weak_mat_tmp75) + trial_grad[8]*(-weak_mat_tmp50*weak_mat_tmp69 + weak_mat_tmp50*weak_mat_tmp71 + weak_mat_tmp73);
+    const s_t material3 = trial_grad[0]*(weak_mat_tmp28 - weak_mat_tmp3*weak_mat_tmp78 + weak_mat_tmp3*weak_mat_tmp80) + trial_grad[1]*(-weak_mat_tmp17*weak_mat_tmp78 + weak_mat_tmp17*weak_mat_tmp80 + weak_mat_tmp65) + trial_grad[2]*(-weak_mat_tmp25*weak_mat_tmp78 + weak_mat_tmp25*weak_mat_tmp80 + weak_mat_tmp74) + trial_grad[3]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp27) - weak_mat_tmp26*weak_mat_tmp78 + weak_mat_tmp26*weak_mat_tmp80) + trial_grad[4]*(-weak_mat_tmp45*weak_mat_tmp78 + weak_mat_tmp45*weak_mat_tmp80 + weak_mat_tmp83) + trial_grad[5]*(-weak_mat_tmp33*weak_mat_tmp78 + weak_mat_tmp33*weak_mat_tmp80 + weak_mat_tmp81) + trial_grad[6]*(-weak_mat_tmp31*weak_mat_tmp78 + weak_mat_tmp31*weak_mat_tmp80 + weak_mat_tmp82) + trial_grad[7]*(-weak_mat_tmp41*weak_mat_tmp78 + weak_mat_tmp41*weak_mat_tmp80 + weak_mat_tmp86) + trial_grad[8]*(-weak_mat_tmp50*weak_mat_tmp78 + weak_mat_tmp50*weak_mat_tmp80 + weak_mat_tmp89);
+    const s_t material4 = trial_grad[0]*(-weak_mat_tmp3*weak_mat_tmp90 + weak_mat_tmp3*weak_mat_tmp92 + weak_mat_tmp49) + trial_grad[1]*(-weak_mat_tmp17*weak_mat_tmp90 + weak_mat_tmp17*weak_mat_tmp92 + weak_mat_tmp60) + trial_grad[2]*(-weak_mat_tmp25*weak_mat_tmp90 + weak_mat_tmp25*weak_mat_tmp92 + weak_mat_tmp77) + trial_grad[3]*(-weak_mat_tmp26*weak_mat_tmp90 + weak_mat_tmp26*weak_mat_tmp92 + weak_mat_tmp83) + trial_grad[4]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp48) - weak_mat_tmp45*weak_mat_tmp90 + weak_mat_tmp45*weak_mat_tmp92) + trial_grad[5]*(-weak_mat_tmp33*weak_mat_tmp90 + weak_mat_tmp33*weak_mat_tmp92 + weak_mat_tmp93) + trial_grad[6]*(-weak_mat_tmp31*weak_mat_tmp90 + weak_mat_tmp31*weak_mat_tmp92 + weak_mat_tmp95) + trial_grad[7]*(-weak_mat_tmp41*weak_mat_tmp90 + weak_mat_tmp41*weak_mat_tmp92 + weak_mat_tmp94) + trial_grad[8]*(-weak_mat_tmp50*weak_mat_tmp90 + weak_mat_tmp50*weak_mat_tmp92 + weak_mat_tmp98);
+    const s_t material5 = trial_grad[0]*(weak_mat_tmp101*weak_mat_tmp3 - weak_mat_tmp3*weak_mat_tmp99 + weak_mat_tmp39) + trial_grad[1]*(weak_mat_tmp101*weak_mat_tmp17 - weak_mat_tmp17*weak_mat_tmp99 + weak_mat_tmp63) + trial_grad[2]*(weak_mat_tmp101*weak_mat_tmp25 - weak_mat_tmp25*weak_mat_tmp99 + weak_mat_tmp72) + trial_grad[3]*(weak_mat_tmp101*weak_mat_tmp26 - weak_mat_tmp26*weak_mat_tmp99 + weak_mat_tmp81) + trial_grad[4]*(weak_mat_tmp101*weak_mat_tmp45 - weak_mat_tmp45*weak_mat_tmp99 + weak_mat_tmp93) + trial_grad[5]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp32) + weak_mat_tmp101*weak_mat_tmp33 - weak_mat_tmp33*weak_mat_tmp99) + trial_grad[6]*(weak_mat_tmp101*weak_mat_tmp31 + weak_mat_tmp103 - weak_mat_tmp31*weak_mat_tmp99) + trial_grad[7]*(weak_mat_tmp101*weak_mat_tmp41 + weak_mat_tmp104 - weak_mat_tmp41*weak_mat_tmp99) + trial_grad[8]*(weak_mat_tmp101*weak_mat_tmp50 + weak_mat_tmp102 - weak_mat_tmp50*weak_mat_tmp99);
+    const s_t material6 = trial_grad[0]*(-weak_mat_tmp105*weak_mat_tmp3 + weak_mat_tmp107*weak_mat_tmp3 + weak_mat_tmp30) + trial_grad[1]*(-weak_mat_tmp105*weak_mat_tmp17 + weak_mat_tmp107*weak_mat_tmp17 + weak_mat_tmp64) + trial_grad[2]*(-weak_mat_tmp105*weak_mat_tmp25 + weak_mat_tmp107*weak_mat_tmp25 + weak_mat_tmp76) + trial_grad[3]*(-weak_mat_tmp105*weak_mat_tmp26 + weak_mat_tmp107*weak_mat_tmp26 + weak_mat_tmp82) + trial_grad[4]*(-weak_mat_tmp105*weak_mat_tmp45 + weak_mat_tmp107*weak_mat_tmp45 + weak_mat_tmp95) + trial_grad[5]*(weak_mat_tmp103 - weak_mat_tmp105*weak_mat_tmp33 + weak_mat_tmp107*weak_mat_tmp33) + trial_grad[6]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp29) - weak_mat_tmp105*weak_mat_tmp31 + weak_mat_tmp107*weak_mat_tmp31) + trial_grad[7]*(-weak_mat_tmp105*weak_mat_tmp41 + weak_mat_tmp107*weak_mat_tmp41 + weak_mat_tmp108) + trial_grad[8]*(-weak_mat_tmp105*weak_mat_tmp50 + weak_mat_tmp107*weak_mat_tmp50 + weak_mat_tmp109);
+    const s_t material7 = trial_grad[0]*(-weak_mat_tmp110*weak_mat_tmp3 + weak_mat_tmp112*weak_mat_tmp3 + weak_mat_tmp44) + trial_grad[1]*(-weak_mat_tmp110*weak_mat_tmp17 + weak_mat_tmp112*weak_mat_tmp17 + weak_mat_tmp59) + trial_grad[2]*(-weak_mat_tmp110*weak_mat_tmp25 + weak_mat_tmp112*weak_mat_tmp25 + weak_mat_tmp75) + trial_grad[3]*(-weak_mat_tmp110*weak_mat_tmp26 + weak_mat_tmp112*weak_mat_tmp26 + weak_mat_tmp86) + trial_grad[4]*(-weak_mat_tmp110*weak_mat_tmp45 + weak_mat_tmp112*weak_mat_tmp45 + weak_mat_tmp94) + trial_grad[5]*(weak_mat_tmp104 - weak_mat_tmp110*weak_mat_tmp33 + weak_mat_tmp112*weak_mat_tmp33) + trial_grad[6]*(weak_mat_tmp108 - weak_mat_tmp110*weak_mat_tmp31 + weak_mat_tmp112*weak_mat_tmp31) + trial_grad[7]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp40) - weak_mat_tmp110*weak_mat_tmp41 + weak_mat_tmp112*weak_mat_tmp41) + trial_grad[8]*(-weak_mat_tmp110*weak_mat_tmp50 + weak_mat_tmp112*weak_mat_tmp50 + weak_mat_tmp113);
+    const s_t material8 = trial_grad[0]*(-weak_mat_tmp114*weak_mat_tmp3 + weak_mat_tmp115*weak_mat_tmp3 + weak_mat_tmp54) + trial_grad[1]*(-weak_mat_tmp114*weak_mat_tmp17 + weak_mat_tmp115*weak_mat_tmp17 + weak_mat_tmp68) + trial_grad[2]*(-weak_mat_tmp114*weak_mat_tmp25 + weak_mat_tmp115*weak_mat_tmp25 + weak_mat_tmp73) + trial_grad[3]*(-weak_mat_tmp114*weak_mat_tmp26 + weak_mat_tmp115*weak_mat_tmp26 + weak_mat_tmp89) + trial_grad[4]*(-weak_mat_tmp114*weak_mat_tmp45 + weak_mat_tmp115*weak_mat_tmp45 + weak_mat_tmp98) + trial_grad[5]*(weak_mat_tmp102 - weak_mat_tmp114*weak_mat_tmp33 + weak_mat_tmp115*weak_mat_tmp33) + trial_grad[6]*(weak_mat_tmp109 - weak_mat_tmp114*weak_mat_tmp31 + weak_mat_tmp115*weak_mat_tmp31) + trial_grad[7]*(weak_mat_tmp113 - weak_mat_tmp114*weak_mat_tmp41 + weak_mat_tmp115*weak_mat_tmp41) + trial_grad[8]*(mu + weak_mat_tmp10*pow_2(weak_mat_tmp53) - weak_mat_tmp114*weak_mat_tmp50 + weak_mat_tmp115*weak_mat_tmp50);
+    loperand[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+    loperand[1] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+    loperand[2] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
+    loperand[3] = qw * (material3 * adj_value0 + material4 * adj_value1 + material5 * adj_value2);
+    loperand[4] = qw * (material3 * adj_value3 + material4 * adj_value4 + material5 * adj_value5);
+    loperand[5] = qw * (material3 * adj_value6 + material4 * adj_value7 + material5 * adj_value8);
+    loperand[6] = qw * (material6 * adj_value0 + material7 * adj_value1 + material8 * adj_value2);
+    loperand[7] = qw * (material6 * adj_value3 + material7 * adj_value4 + material8 * adj_value5);
+    loperand[8] = qw * (material6 * adj_value6 + material7 * adj_value7 + material8 * adj_value8);
+  }
+};
+#endif
 
 } // namespace codegen
 } // namespace sfem
