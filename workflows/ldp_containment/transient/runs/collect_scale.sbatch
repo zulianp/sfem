@@ -7,27 +7,34 @@
 #SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/collect_scale_%j.out
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
-# The storage at about ten times the size: FF200 refined once (scale_mesh.sbatch, db/solid_r1), TET4
-# and its TET10 promotion, ten steps from rest per configuration of the memory figure
-# (tangent9_valves.sbatch, NO_IC=1, PREFIX sc10_s0 and sc10_p2). Every run's measured bytes into
-# OUT (a new folder; the script stops if it exists), sets TET4x8 and TET10x8, against bsr32__full_a.
-#   [OUT=runs/paper_scale]
+# The storage at about ten times the size: the pump's mesh refined once (db/solid_r1: FF200's
+# scale_mesh.sbatch, LDP24A's prepare.sbatch), TET4 and its TET10 promotion, ten steps from rest per
+# configuration of the memory figure (tangent9_valves.sbatch, NO_IC=1, PREFIX <TAG>_s0 and <TAG>_p2).
+# Every run's measured bytes into OUT (a new folder; the script stops if it exists), sets TET4x8 and
+# TET10x8, against bsr32__full_a. TAG4/TAG10 and T_END4/T_END10 take each mesh's runs from their own
+# folders and span. The defaults are FF200's campaign (sc10); LDP24A's (collect_la_studies.sbatch) is
+# CASE=ldp_cases/LDP24A_r100 TAG=sc TAG10=sc1 T_END10=1e-4: its TET10x8 runs take one step, the
+# storage being the same after one step as after ten, as TET4x8's runs show.
+#   [CASE=ldp_cases/FF200_ExodusMesh] [TAG=sc10] [TAG4=TAG] [TAG10=TAG] [T_END4=1e-3] [T_END10=1e-3]
+#   [OUT=runs/paper_scale for sc10, runs/paper_scale_<TAG> otherwise]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh
-P=${OUT:-$D/runs/paper_scale}
+CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh}
+TAG=${TAG:-sc10}
+TAG4=${TAG4:-$TAG}; TAG10=${TAG10:-$TAG}
+if [ $TAG = sc10 ]; then P=${OUT:-$D/runs/paper_scale}; else P=${OUT:-$D/runs/paper_scale_$TAG}; fi
 [ -e $P ] && { echo "collect_scale: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
-for spec in TET4x8:sc10_s0_ TET10x8:sc10_p2_; do
-  set_name=${spec%:*}; prefix=${spec#*:}
+for spec in TET4x8:${TAG4}_s0_:${T_END4:-1e-3} TET10x8:${TAG10}_p2_:${T_END10:-1e-3}; do
+  set_name=${spec%%:*}; rest=${spec#*:}; prefix=${rest%:*}; t_end=${rest#*:}
   runs=""
   for d in $CASE/${prefix}*; do
     r=${d#$CASE/$prefix}
     [ $r = bsr32__full_a ] && continue
     h=$d/sim2/history.csv
-    if [ -f $h ] && tail -1 $h | awk -F, '{exit !($2 > 1e-3 - 1e-9)}'; then runs="$runs $r"; else echo "$set_name $r unfinished"; fi
+    if [ -f $h ] && tail -1 $h | awk -F, -v t=$t_end '{exit !($2 > t - 1e-9)}'; then runs="$runs $r"; else echo "$set_name $r unfinished"; fi
   done
   # shellcheck disable=SC2086
   $PY $COL runs $P/scale_runs.csv $P/scale_series.csv $set_name $CASE bsr32__full_a bsr32__full_a $runs --prefix $prefix \
