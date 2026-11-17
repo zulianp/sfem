@@ -44,7 +44,9 @@ done
 $PY - $P/scale_runs.csv <<'PYEOF'
 import csv, sys
 for r in csv.DictReader(open(sys.argv[1])):
-    state = sum(float(r[k]) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress")) / 1e6
+    # The relaxed-stress slots (bytes_stress) of runs before sfem#103, the previous displacement
+    # (bytes_previous) after it: each run fills one, the other is empty.
+    state = sum(float(r.get(k) or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "bytes_previous")) / 1e6
     tangent = sum(float(r["bytes_%s_device" % c] or 0) for c in ("tangent_values", "tangent_structure", "tangent_work")) / 1e6
     print("%-8s %-32s dofs %-9s elements %-8s steps %-3s failed %-2s tangent %8.1f MB prony %8.1f MB peak %8.0f MB" % (
         r["set"], r["run"], r["dofs"], r["elements"], r["steps"], r["failed"], tangent, state, float(r["device_used_peak"]) / 1e6))

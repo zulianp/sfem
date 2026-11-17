@@ -113,7 +113,8 @@ $PY - <<PYEOF
 import csv
 for r in csv.DictReader(open("$P/valve_runs.csv")):
     t = sum(float(r["bytes_%s_device" % c] or 0) for c in ("tangent_values", "tangent_structure", "tangent_work"))
-    s = sum(float(r[k] or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"))
+    # bytes_stress (the relaxed-stress slots, runs before sfem#103) or bytes_previous (after): one is empty.
+    s = sum(float(r.get(k) or 0) for k in ("bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress", "bytes_previous"))
     print("%-10s %-36s e_u med %-9.3g max %-9.3g shift %-6s failed %-3s t %-8s tangent %8.2f MB prony %8.2f MB peak %8.1f MB" % (
         r["set"], r["run"], float(r["e_u_median"]), float(r["e_u_max"]), r["event_shift_ms"], r["failed"], r["stepper_s"],
         t / 1e6, s / 1e6, float(r["device_used_peak"]) / 1e6))
