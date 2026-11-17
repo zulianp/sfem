@@ -24,12 +24,15 @@ namespace sfem {
     ///   store     points          the weighted, pulled-back tangent at every point (moments on
     ///                             TET10), contracted with the increment's reference gradients
     ///             element_matrix  the element matrices in difference form
-    ///             bsr             the operator's assembled tangent, quantized (sfem_QuantBSR.hpp)
+    ///             bsr             the operator's assembled tangent, encoded (algebra/sell/sfem_SELL.hpp on the host)
     ///   encoding  points:         f64, f32, f16, i8md (int8 deviations from an f32 element mean)
     ///             element_matrix: f64, f32, f16, i8pair (int8 with an 8-bit factor per node pair)
-    ///             bsr:            f16 (one scale), i8 (a scale per block)
+    ///             bsr:            f32, f16 (one scale), i8 (a scale per block)
     ///   fold      auto, on, off   the folded point store of the tensor-product elements (exact)
     ///   traversal auto, packed, atomic
+    ///   layout    bsr:            auto, sell, rows -- SELL-C-sigma (the host's, and the device's with
+    ///                             sell) or the node graph's rows, a few threads each (the device's
+    ///                             with auto or rows); `solver.linear.format: SELL` is this store with sell
     ///
     /// store and encoding `auto` (both or neither) take the format measured fastest to a Newton
     /// solution for the element and the execution space (`resolve`).
@@ -41,11 +44,13 @@ namespace sfem {
         enum class Encoding { AUTO, F64, F32, F16, I8_MEAN_DEVIATION, I8_PAIR_SCALE, I8_BLOCK };
         enum class Switch { AUTO, ON, OFF };
         enum class Traversal { AUTO, PACKED, ATOMIC };
+        enum class Layout { AUTO, ROWS, SELL };
 
         Store     store{Store::POINTS};
         Encoding  encoding{Encoding::F32};
         Switch    fold{Switch::AUTO};
         Traversal traversal{Traversal::AUTO};
+        Layout    layout{Layout::AUTO};
 
         /// Refuses a combination the stores do not offer.
         void validate() const;
@@ -69,12 +74,13 @@ namespace sfem {
         static InexactOptions from_strings(const std::string &store,
                                            const std::string &encoding,
                                            const std::string &fold      = "auto",
-                                           const std::string &traversal = "auto");
+                                           const std::string &traversal = "auto",
+                                           const std::string &layout    = "auto");
         std::string describe() const;
     };
 
 #ifdef SFEM_INEXACT_OPTIONS_YAML
-    /// `solver.linear.inexact: {store, encoding, fold, traversal}`; absent keys keep the defaults.
+    /// `solver.linear.inexact: {store, encoding, fold, traversal, layout}`; absent keys keep the defaults.
     InexactOptions inexact_options_from_yaml(const ryml::ConstNodeRef &node);
 #endif
 

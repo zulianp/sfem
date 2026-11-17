@@ -206,20 +206,26 @@ namespace sfem {
                 SFEM_TRACE_SCOPE("inexact::update_bsr");
                 if (!bsr) {
                     SFEM_TRACE_SCOPE("inexact::make_bsr");
-                    bsr = make_bsr(graph, options.encoding == InexactOptions::Encoding::I8_BLOCK, symmetric);
+                    bsr = make_bsr(graph, symmetric);
                 }
                 return bsr->update(assemble);
             }
 
-            std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool int8, const bool symmetric) const {
+            /// The layout: SELL-C-sigma on the host; on the device the node graph's rows (auto, rows) or
+            /// SELL-C-sigma (sell).
+            std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric) const {
                 if (space == EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-                    return cuda::create_bsr_store(graph, int8, symmetric, stream);
+                    return cuda::create_bsr_store(graph, options.encoding, symmetric, stream,
+                                                  options.layout == InexactOptions::Layout::SELL);
 #else
                     SFEM_ERROR("inexact: a device bsr store in a build without CUDA\n");
 #endif
                 }
-                return create_bsr_store(graph, int8, symmetric);
+                if (options.layout == InexactOptions::Layout::ROWS) {
+                    SFEM_ERROR("inexact: the host's bsr store is SELL-C-sigma only (layout auto or sell)\n");
+                }
+                return create_bsr_store(graph, options.encoding, symmetric);
             }
 
             int diagonal_bsr(real_t *const diag) const {

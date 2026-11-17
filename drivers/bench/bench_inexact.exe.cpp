@@ -241,12 +241,18 @@ int main(int argc, char *argv[]) {
         row(bytes == 8 ? "BSR f64" : "BSR f32", setup, t, read, held, out, exact);
     }
 
-    const char *const formats[][2] = {{"points", "f64"},          {"points", "f32"},          {"points", "f16"},
-                                      {"points", "i8md"},         {"element_matrix", "f64"},  {"element_matrix", "f32"},
-                                      {"element_matrix", "f16"},  {"element_matrix", "i8pair"}, {"bsr", "f16"},
-                                      {"bsr", "i8"}};
+    // The assembled tangent in both layouts: on the host SELL-C-sigma only ("SELL"), on the device the
+    // node graph's rows by default ("bsr") and SELL ("SELL", format SELL).
+    const bool        device         = es == sfem::EXECUTION_SPACE_DEVICE;
+    const char *const formats[][3] = {{"points", "f64", "auto"},       {"points", "f32", "auto"},       {"points", "f16", "auto"},
+                                      {"points", "i8md", "auto"},      {"element_matrix", "f64", "auto"}, {"element_matrix", "f32", "auto"},
+                                      {"element_matrix", "f16", "auto"}, {"element_matrix", "i8pair", "auto"}, {"bsr", "f32", "auto"},
+                                      {"bsr", "f16", "auto"},          {"bsr", "i8", "auto"},           {"bsr", "f32", "sell"},
+                                      {"bsr", "f16", "sell"},          {"bsr", "i8", "sell"}};
     for (const auto &fmt : formats) {
-        op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1]));
+        const bool assembled = std::string(fmt[0]) == "bsr";
+        if (assembled && !device && std::string(fmt[2]) == "sell") continue;  // the host's auto is SELL
+        op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1], "auto", "auto", fmt[2]));
         const double free0 = device_free(es);
         pool_high(es, true);
         const double setup = seconds(es, 3, [&] { op->inexact_update(U); });
@@ -256,7 +262,8 @@ int main(int argc, char *argv[]) {
         op->inexact_apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
         const double t = seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
-        const std::string name = std::string(fmt[0]) + " " + fmt[1];
+        const bool        sell = assembled && (!device || std::string(fmt[2]) == "sell");
+        const std::string name = (sell ? std::string("SELL") : std::string(fmt[0])) + " " + fmt[1];
         row(name.c_str(), setup, t, (double)op->inexact_bytes(), held, out, exact);
     }
     return EXIT_SUCCESS;

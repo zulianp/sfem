@@ -9,7 +9,9 @@
 // the tangent projection on, the device stores hold the projected tangent: the f64 ones apply the
 // host's projected BSR assembly.
 
+#include <algorithm>
 #include <cmath>
+#include <functional>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -30,6 +32,7 @@ namespace {
         const char *encoding;
         double      tolerance;  // against the exact apply
         double      agreement;  // against the host's stored apply
+        const char *layout = "auto";  // bsr: auto (the device's rows), sell (format SELL)
     };
 
     const Case CASES[] = {
@@ -41,9 +44,26 @@ namespace {
             {"element_matrix", "f32", 1e-5, 1e-5},
             {"element_matrix", "f16", 5e-3, 1e-3},
             {"element_matrix", "i8pair", 5e-2, 1e-2},
+            {"bsr", "f32", 1e-5, 1e-5},
             {"bsr", "f16", 5e-3, 1e-3},
             {"bsr", "i8", 5e-2, 1e-2},
+            {"bsr", "f32", 1e-5, 1e-5, "sell"},
+            {"bsr", "f16", 5e-3, 1e-3, "sell"},
+            {"bsr", "i8", 5e-2, 1e-2, "sell"},
     };
+
+    /// The slots of the device's SELL-32-1024 on graph g: the rows' off-diagonal counts sorted
+    /// within windows of 1024 rows, longest first, groups of 32 padded to their longest.
+    ptrdiff_t sell_slots(const std::shared_ptr<sfem::CRSGraph> &g) {
+        const ptrdiff_t      n  = g->n_nodes();
+        const count_t *const rp = g->rowptr()->data();
+        std::vector<count_t> len(n);
+        for (ptrdiff_t i = 0; i < n; ++i) len[i] = rp[i + 1] - rp[i] - 1;
+        for (ptrdiff_t w = 0; w < n; w += 1024) std::stable_sort(len.begin() + w, len.begin() + std::min(n, w + 1024), std::greater<count_t>());
+        ptrdiff_t slots = 0;
+        for (ptrdiff_t g0 = 0; g0 < n; g0 += 32) slots += 32 * (ptrdiff_t)*std::max_element(len.begin() + g0, len.begin() + std::min(n, g0 + 32));
+        return slots;
+    }
 
     std::vector<real_t> pseudo_random(const ptrdiff_t n, const real_t amplitude, unsigned seed) {
         std::vector<real_t> v(n);
@@ -120,15 +140,16 @@ namespace {
         }
 
         for (const Case &c : CASES) {
-            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding);
+            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding, "auto", "auto", c.layout);
             const auto d       = stored(device, true, options, u, h);
             const auto r       = stored(host, false, options, u, h);
             SFEM_TEST_ASSERT(!d.empty() && !r.empty());
             const real_t error = relative_difference(d, exact), agreement = relative_difference(d, r);
-            printf("%-14s %-15s %-7s rel diff %.3e (bound %.0e), host %.3e (bound %.0e), %zu bytes\n",
+            printf("%-14s %-15s %-7s %-4s rel diff %.3e (bound %.0e), host %.3e (bound %.0e), %zu bytes\n",
                    label,
                    c.store,
                    c.encoding,
+                   c.layout,
                    (double)error,
                    c.tolerance,
                    (double)agreement,
@@ -139,11 +160,17 @@ namespace {
             if (!strcmp(c.store, "bsr")) {
                 // The paper's footprint (eq:tangent-footprint): a record per off-diagonal block, the node
                 // graph, A_i per node, and with f16 codes a scale per node and the window's maximum.
-                const auto      g   = fs->element_node_graph();
-                const bool      f16 = !strcmp(c.encoding, "f16");
-                const ptrdiff_t n = g->n_nodes(), nb = g->nnz();
-                const ptrdiff_t formula = (f16 ? 20 : 16) * (nb - n) + 4 * nb + 4 * (n + 1) + 36 * n + (f16 ? 4 * (n + 1) : 0);
-                printf("%-14s %-15s %-7s footprint %zu bytes, formula %ld\n", label, c.store, c.encoding, device->inexact_bytes(), (long)formula);
+                // SELL: a record per slot (padding included), and its rows, steps, columns and the
+                // rows' positions.
+                const auto      g    = fs->element_node_graph();
+                const bool      f16  = !strcmp(c.encoding, "f16");
+                const bool      sell = !strcmp(c.layout, "sell");
+                const ptrdiff_t rec  = !strcmp(c.encoding, "f32") ? 36 : (f16 ? 20 : 16);
+                const ptrdiff_t n = g->n_nodes(), nb = g->nnz(), ng = (n + 31) / 32, slots = sell ? sell_slots(g) : 0;
+                const ptrdiff_t formula = rec * (sell ? slots : nb - n) + 4 * nb + 4 * (n + 1) + 36 * n + (f16 ? 4 * (n + 1) : 0) +
+                                          (sell ? 4 * 32 * ng + 8 * (ng + 1) + 4 * slots + 4 * n : 0);
+                printf("%-14s %-15s %-7s %-4s footprint %zu bytes, formula %ld\n", label, c.store, c.encoding, c.layout,
+                       device->inexact_bytes(), (long)formula);
                 SFEM_TEST_ASSERT((ptrdiff_t)device->inexact_bytes() == formula);
             }
 
@@ -151,7 +178,7 @@ namespace {
             const auto rd = stored(host, false, options, u, h, true);
             SFEM_TEST_ASSERT(!dd.empty() && !rd.empty());
             const real_t diagonal = relative_difference(dd, rd);
-            printf("%-14s %-15s %-7s diagonal against the host's %.3e\n", label, c.store, c.encoding, (double)diagonal);
+            printf("%-14s %-15s %-7s %-4s diagonal against the host's %.3e\n", label, c.store, c.encoding, c.layout, (double)diagonal);
             SFEM_TEST_ASSERT(diagonal < c.agreement);
         }
         return SFEM_TEST_SUCCESS;
@@ -252,9 +279,9 @@ namespace {
         printf("%-14s device projected BSR against the host's %.3e\n", label, (double)assembled);
         SFEM_TEST_ASSERT(assembled < 1e-10);
 
-        const Case cases[] = {{"points", "f64", 1e-10, 0}, {"element_matrix", "f64", 1e-10, 0}, {"bsr", "f16", 5e-3, 0}};
+        const Case cases[] = {{"points", "f64", 1e-10, 0}, {"element_matrix", "f64", 1e-10, 0}, {"bsr", "f16", 5e-3, 0}, {"bsr", "f16", 5e-3, 0, "sell"}};
         for (const Case &c : cases) {
-            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding);
+            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding, "auto", "auto", c.layout);
             const auto d       = stored(device, true, options, u, h);
             const auto r       = stored(host, false, options, u, h);
             SFEM_TEST_ASSERT(!d.empty() && !r.empty());
@@ -354,8 +381,9 @@ int fused_extra(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *cons
     extra.shift      = shift;
     extra.reference  = d_reference->data();
 
-    for (const char *const encoding : {"f16", "i8"}) {
-        op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", encoding));
+    for (const char *const layout : {"auto", "sell"})
+    for (const char *const encoding : {"f32", "f16", "i8"}) {
+        op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", encoding, "auto", "auto", layout));
         auto du = on_device(u), dh = on_device(h);
         SFEM_TEST_ASSERT(op->inexact_update(du->data()) == SFEM_SUCCESS);
         auto plain = on_device(std::vector<real_t>(ndofs, 0));
@@ -371,7 +399,7 @@ int fused_extra(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *cons
         SFEM_TEST_ASSERT(op->inexact_apply(dh->data(), fused->data()) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(op->set_inexact_extra(nullptr, false));
         const real_t difference = relative_difference(from_device(fused), expected);
-        printf("%-6s bsr %-3s fused extra against the plain product and the blocks: %.3e\n", label, encoding, (double)difference);
+        printf("%-6s bsr %-3s %-4s fused extra against the plain product and the blocks: %.3e\n", label, encoding, layout, (double)difference);
         SFEM_TEST_ASSERT(difference < 1e-13);
     }
     op->set_inexact_options(sfem::InexactOptions::from_strings("points", "f16"));
@@ -406,18 +434,20 @@ int windowed(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const l
         for (size_t i = 0; i < x.size(); ++i) s += (double)x[i] * (double)y[i];
         return s;
     };
+    for (const char *const layout : {"auto", "sell"})
     for (const auto &c : {std::make_pair("f16", 5e-3), std::make_pair("i8", 5e-2)}) {
         double single = 0;
+        const auto options = sfem::InexactOptions::from_strings("bsr", c.first, "auto", "auto", layout);
         for (const char *const windows : {"1", "3"}) {
             setenv("SFEM_QBSR_WINDOWS", windows, 1);
-            op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", c.first));
-            const auto Aa = stored(op, true, sfem::InexactOptions::from_strings("bsr", c.first), u, a);
-            const auto Ab = stored(op, true, sfem::InexactOptions::from_strings("bsr", c.first), u, b);
+            op->set_inexact_options(options);
+            const auto Aa = stored(op, true, options, u, a);
+            const auto Ab = stored(op, true, options, u, b);
             unsetenv("SFEM_QBSR_WINDOWS");
             SFEM_TEST_ASSERT(!Aa.empty() && !Ab.empty());
             const double error = relative_difference(Aa, exact), asymmetry = std::abs(dot(b, Aa) - dot(a, Ab)) / std::abs(dot(b, Aa));
-            printf("%-6s bsr %-3s %s window(s): rel diff %.3e (bound %.0e), asymmetry %.3e\n", label, c.first, windows, error, c.second,
-                   asymmetry);
+            printf("%-6s bsr %-3s %-4s %s window(s): rel diff %.3e (bound %.0e), asymmetry %.3e\n", label, c.first, layout, windows, error,
+                   c.second, asymmetry);
             SFEM_TEST_ASSERT(error < c.second);
             if (windows[0] == '1') {
                 single = asymmetry;

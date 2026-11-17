@@ -12,7 +12,8 @@
 #endif
 
 #include "sfem_InexactInterface.hpp"
-#include "sfem_QuantBSR.hpp"
+#include "sfem_InexactOptions.hpp"
+#include "sfem_SELL.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_crs_graph.hpp"
 #include "smesh_types.hpp"
@@ -166,26 +167,35 @@ namespace sfem {
             }
         };
 
-        /// The store for a symmetric or an unsymmetric operator on `graph`: int8 codes with a scale
-        /// per block or f16 codes with one scale; the upper form with 16-bit column offsets for a
-        /// symmetric one (about 10% smaller at the same speed on Grace), the full difference form
-        /// otherwise.
-        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph,
-                                                          const bool                              int8,
-                                                          const bool                              symmetric) {
+        /// The store for a symmetric or an unsymmetric operator on `graph`, SELL-C-sigma (C = 16): int8
+        /// codes with a scale per block, f16 codes with one scale, or f32 values; the upper form with
+        /// 16-bit column offsets for a symmetric one (about 10% smaller at the same speed on Grace),
+        /// the full difference form otherwise.
+        template <typename code_t>
+        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const char *const enc) {
             constexpr int VS = 16;
             if (symmetric) {
-                if (int8) {
-                    return std::make_unique<BsrStoreImpl<QuantBsr<int8_t, BsrForm::Upper, VS, uint16_t>>>(graph, "bsr i8 upper");
-                }
-                return std::make_unique<BsrStoreImpl<QuantBsr<half_t, BsrForm::Upper, VS, uint16_t>>>(graph, "bsr f16 upper");
+                return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Upper, VS, uint16_t>>>(
+                        graph, std::string("bsr ") + enc + " upper");
             }
-            if (int8) {
-                return std::make_unique<BsrStoreImpl<QuantBsr<int8_t, BsrForm::Difference, VS, idx_t, false>>>(
-                        graph, "bsr i8 difference");
+            return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Difference, VS, idx_t, false>>>(
+                    graph, std::string("bsr ") + enc + " difference");
+        }
+
+        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph,
+                                                          const InexactOptions::Encoding   encoding,
+                                                          const bool                       symmetric) {
+            switch (encoding) {
+                case InexactOptions::Encoding::I8_BLOCK:
+                    return create_bsr_store<int8_t>(graph, symmetric, "i8");
+                case InexactOptions::Encoding::F16:
+                    return create_bsr_store<half_t>(graph, symmetric, "f16");
+                case InexactOptions::Encoding::F32:
+                    return create_bsr_store<float>(graph, symmetric, "f32");
+                default:
+                    SFEM_ERROR("inexact: the bsr store takes f32, f16 or i8\n");
+                    return nullptr;
             }
-            return std::make_unique<BsrStoreImpl<QuantBsr<half_t, BsrForm::Difference, VS, idx_t, false>>>(
-                    graph, "bsr f16 difference");
         }
 
     }  // namespace inexact

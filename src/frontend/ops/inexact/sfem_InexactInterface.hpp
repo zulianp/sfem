@@ -67,7 +67,7 @@ namespace sfem {
         using AssembleBSR = std::function<int(const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values)>;
 
         /// The quantized assembled operator (`store: bsr`): the operator's own tangent, assembled in
-        /// single precision on the space's node graph and encoded in place (sfem_QuantBSR.hpp).
+        /// single precision on the space's node graph and encoded in place (sfem_SELL.hpp).
         ///
         /// The difference form is exact for an operator that annihilates translations.  One that
         /// does not -- a time scheme's inertia, whose mass matrix rows sum to the lumped mass --
