@@ -120,6 +120,14 @@ namespace sfem {
                             const real_t *const x_n,
                             real_t *const       values);
 
+        /// Every stored term of every group on every block, decoded on the host as decode_history
+        /// does, from one evaluation of the relaxed stresses at `x_n`: `emit(block, group, i,
+        /// values)` per term, `values` valid for the call. A stored term reads only the stress at
+        /// `x_n`, so nothing else is evaluated.
+        void decode_stored_histories(
+                const real_t *const                                                                          x_n,
+                const std::function<void(const std::string &, const std::string &, int, const real_t *)> &emit);
+
         /// Per term of `group` on `block`, PronyRelaxation::squared_norms of the committed history,
         /// where it lives: n_terms values into the host array `out`.  Computed by the last
         /// `advance` if `track_squared_norms` asked for it, else from the relaxed stresses at `x_n`,

@@ -510,20 +510,23 @@ int test_quant_grid_tracks_full_storage() {
 }
 
 int test_packed_bytes_follow_the_spread_of_the_codes() {
-    // Constant runs pack to their headers; the full spread of int16 codes to 16 bits a value.
-    const ptrdiff_t       ne = 3 * sfem::QuadratureState::PACK_BLOCK + 5;
+    // Constant runs pack to their headers; the full spread of int16 codes to 16 bits a value. As a
+    // quant_block store holds them: a 9-byte header a block (base, width, offset), each block's
+    // codes in whole 64-bit words, and the code area's slack.
+    const ptrdiff_t       ne = 3 * sfem::prony::PACKED_BLOCK + 5;
     const int             nc = 2, nq = 1;
+    const size_t          header = 9, slack = smesh::compression::kSlack;
     sfem::QuadratureState state(1, nc, nq, ne, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, real_t(1e-3));
     std::vector<real_t>   v(nc * ne, real_t(7));
     state.encode(0, v.data());
     const size_t blocks = nc * 4;
-    SFEM_TEST_ASSERT(state.packed_bytes() == blocks * 6 + 2 * sizeof(scaling_t));
+    SFEM_TEST_ASSERT(state.packed_bytes() == blocks * header + slack + 2 * sizeof(scaling_t));
 
     sfem::QuadratureState wide(1, nc, nq, ne, sfem::HistoryStorage::INT16_SCALED);
     for (ptrdiff_t k = 0; k < nc * ne; k++) v[k] = (k % 2) ? real_t(1) : real_t(-1);
     wide.encode(0, v.data());
-    // Codes -32767 and 32767: a width of 16 bits.
-    const size_t packed = nc * (3 * (6 + 128 * 2) + (6 + 5 * 2)) + ne * sizeof(scaling_t);
+    // Codes -32767 and 32767: a width of 16 bits; the last block's 5 codes, 10 bytes, take 16.
+    const size_t packed = nc * (3 * (header + 128 * 2) + (header + 16)) + slack + ne * sizeof(scaling_t);
     SFEM_TEST_ASSERT(wide.packed_bytes() == packed);
     return SFEM_TEST_SUCCESS;
 }

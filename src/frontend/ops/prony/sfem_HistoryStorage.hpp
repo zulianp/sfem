@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 
 #include "sfem_base.hpp"
@@ -114,6 +115,16 @@ namespace sfem {
             const int L = smesh::compression::level_for_bound(static_cast<double>(tolerance) * static_cast<double>(max_abs));
             if (L == INT32_MIN) return 1;
             return static_cast<real_t>(smesh::compression::pow2i(L));
+        }
+
+        /// The running maximum as a grid store keeps it, in a scaling_t: rounded up, never below
+        /// the value, so the step taken from it at the next write is never finer than this
+        /// write's (rounded to nearest, it could fall below a power of two that `max_abs` was
+        /// above, halving the step and re-coding every unchanged value).
+        inline scaling_t grid_max(const real_t max_abs) {
+            scaling_t m = static_cast<scaling_t>(max_abs);
+            if (static_cast<real_t>(m) < max_abs) m = std::nextafter(m, std::numeric_limits<scaling_t>::infinity());
+            return m;
         }
     }  // namespace prony
     /// A codec is a compile-time policy for the pointwise loops: the loops are

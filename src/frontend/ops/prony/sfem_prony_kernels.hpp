@@ -227,7 +227,7 @@ namespace sfem {
                 for (ptrdiff_t k = 0; k < rows * n; k++) max_abs = std::max(max_abs, std::abs(values[k]));
                 const real_t step = grid_step(max_abs, tolerance);
                 scales[0]         = static_cast<scaling_t>(step);
-                scales[1]         = static_cast<scaling_t>(max_abs);
+                scales[1]         = grid_max(max_abs);
                 const real_t inv  = 1 / step;
 #pragma omp parallel for
                 for (ptrdiff_t k = 0; k < rows * n; k++) out[k] = Codec::encode(values[k], inv);
@@ -440,7 +440,7 @@ namespace sfem {
                         SFEM_PRONY_COMMIT_COUNTS;
                     }
                     grid[0] = static_cast<scaling_t>(step);
-                    grid[1] = static_cast<scaling_t>(max_abs);
+                    grid[1] = grid_max(max_abs);
                 }
                 return;
             }

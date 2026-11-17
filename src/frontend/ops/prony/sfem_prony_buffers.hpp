@@ -19,6 +19,8 @@ namespace sfem {
     void  cu_prony_pool_trim(void *const stream);
     /// The work pool's high-water mark: the most a call held at once for its work.
     std::size_t cu_prony_work_pool_peak();
+    /// Wait for `stream`.
+    void cu_prony_stream_synchronize(void *const stream);
 #endif
 
     namespace prony {
@@ -53,6 +55,24 @@ namespace sfem {
 #else
             (void)stream;
             (void)persistent;
+#endif
+            return create_buffer<T>(n, es);
+        }
+
+        /// `n` zeroed values in `es` kept across steps (a packed store's codes and headers): on the
+        /// device from the default pool, allocated in `*stream` and returned in the stream `*stream`
+        /// names when the last reference is dropped, so that a store moved to another stream
+        /// (QuadratureState::set_stream) frees them in the stream it now runs in.
+        template <typename T>
+        std::shared_ptr<Buffer<T>> persistent_buffer(const ptrdiff_t n, const ExecutionSpace es, const std::shared_ptr<void *> &stream) {
+#ifdef SFEM_ENABLE_CUDA
+            if (es == EXECUTION_SPACE_DEVICE) {
+                T *const data = static_cast<T *>(cu_prony_pool_allocate(static_cast<std::size_t>(n) * sizeof(T), *stream, true));
+                return std::make_shared<Buffer<T>>(
+                        n, data, [stream](void *p) { cu_prony_pool_release(p, *stream); }, MEMORY_SPACE_DEVICE);
+            }
+#else
+            (void)stream;
 #endif
             return create_buffer<T>(n, es);
         }

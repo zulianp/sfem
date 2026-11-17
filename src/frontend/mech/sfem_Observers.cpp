@@ -791,18 +791,23 @@ namespace sfem {
                         const auto     &r  = relaxations_.relaxation(block, group.group);
                         const int       nc = r.n_components(), nq = r.n_qp();
                         const ptrdiff_t ne = r.n_elements(), n = (ptrdiff_t)nc * nq * ne;
-                        const std::string stem = block + "." + group.group + ".";
                         values_.resize(n);
                         copy_to_host(es_, relaxations_.history(block, group.history), n, values_.data());
-                        if (write_mean(dir / (stem + "Shist.float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
-                        for (int i = 0; i < r.series().n_terms(); ++i) {
-                            if (!r.stored(i)) continue;
-                            relaxations_.decode_history(block, group.group, i, x, values_.data());
-                            if (write_mean(dir / (stem + "H" + std::to_string(i) + ".float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
-                        }
+                        if (write_mean(dir / (block + "." + group.group + ".Shist.float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
                     }
                 }
-                return SFEM_SUCCESS;
+                // Every stored term from one evaluation of the relaxed stresses at x.
+                int status = SFEM_SUCCESS;
+                relaxations_.decode_stored_histories(
+                        x, [&](const std::string &block, const std::string &group, const int i, const real_t *const values) {
+                            if (status != SFEM_SUCCESS) return;
+                            const auto     &r  = relaxations_.relaxation(block, group);
+                            const int       nc = r.n_components(), nq = r.n_qp();
+                            const ptrdiff_t ne = r.n_elements();
+                            values_.assign(values, values + (ptrdiff_t)nc * nq * ne);
+                            status = write_mean(dir / (block + "." + group + ".H" + std::to_string(i) + ".float64"), nc, nq, ne);
+                        });
+                return status;
             }
         };
     }  // namespace

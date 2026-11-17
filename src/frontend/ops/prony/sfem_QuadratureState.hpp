@@ -52,7 +52,8 @@ namespace sfem {
                         const HistoryStorage storage           = HistoryStorage::FULL,
                         const ExecutionSpace es                = EXECUTION_SPACE_HOST,
                         const int            elements_per_mean = 0,
-                        const real_t         tolerance         = 0);
+                        const real_t         tolerance         = 0,
+                        void *const          stream            = nullptr);
 
         static constexpr int DEFAULT_ELEMENTS_PER_MEAN = 16;
 
@@ -62,6 +63,10 @@ namespace sfem {
         ptrdiff_t      n_elements() const { return n_elements_; }
         HistoryStorage storage() const { return storage_; }
         ExecutionSpace execution_space() const { return es_; }
+
+        /// The stream the store's device work is ordered in, and its persistent buffers returned
+        /// in: the new one's work waits for the old one's.
+        void set_stream(void *const stream);
 
         /// Values per element and tensor, n_components * n_qp.
         ptrdiff_t values_per_tensor() const { return static_cast<ptrdiff_t>(n_components_) * n_qp_; }
@@ -74,13 +79,13 @@ namespace sfem {
         /// Bytes held, scales and means included.
         std::size_t bytes() const;
 
-        /// The bytes the integer codes would take packed by frame of reference in blocks of
-        /// PACK_BLOCK consecutive elements of a row (a 6-byte header, the codes' offsets from the
-        /// block's least at the width of the largest), scales and means included: what a packed
-        /// store of the same codes would hold.  A host store of an integer format only; 0
-        /// otherwise.
+        /// The bytes the integer codes would take packed as a quant_block store packs its own:
+        /// blocks of prony::PACKED_BLOCK consecutive elements of a row, each its header (base,
+        /// width, offset) and its codes' offsets from the block's least at the width of the
+        /// largest, rounded to whole 64-bit words (prony::packed_block_bytes); scales and means
+        /// included. A quant_block store's own bytes(); for the other formats a host store of an
+        /// integer format only, 0 otherwise.
         std::size_t packed_bytes() const;
-        static constexpr ptrdiff_t PACK_BLOCK = 128;
 
         /// The grid format's tolerance, relative to each tensor's running maximum.
         real_t tolerance() const { return tolerance_; }
@@ -181,7 +186,9 @@ namespace sfem {
             std::shared_ptr<Buffer<uint32_t>> offset;
         };
         std::vector<Packed> packed_;
-        void                reset_packed(const int t);
+        //! The store's stream, shared with its persistent buffers' deleters (set_stream).
+        std::shared_ptr<void *> stream_;
+        void                reset_packed(const int t, void *const stream);
     };
 
     template <class Z>
@@ -207,7 +214,7 @@ namespace sfem {
         std::copy(layout.width.begin(), layout.width.end(), p.width->data());
         std::copy(layout.offset.begin(), layout.offset.end(), p.offset->data());
         scales_->data()[2 * t]     = static_cast<scaling_t>(step);
-        scales_->data()[2 * t + 1] = static_cast<scaling_t>(max_abs);
+        scales_->data()[2 * t + 1] = prony::grid_max(max_abs);
     }
 
 }  // namespace sfem

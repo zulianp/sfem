@@ -158,7 +158,10 @@ namespace sfem {
 
         const PronySeries          &series() const { return series_; }
         const Options              &options() const { return options_; }
-        void                        set_stream(void *const stream) { options_.stream = stream; }
+        void                        set_stream(void *const stream) {
+            options_.stream = stream;
+            if (H_) H_->set_stream(stream);
+        }
         const RelaxationIntegrator &integrator() const { return *options_.integrator; }
         int                         n_components() const { return n_components_; }
         int                         n_qp() const { return n_qp_; }

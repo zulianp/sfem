@@ -94,7 +94,13 @@ namespace sfem {
         }
         if (!block_name.empty()) block(block_name);  // an unknown name is an error, not a no-op
         norms_current_ = false;
-        keep_previous(nullptr);
+        // The new series holds nothing yet; another group or block may still hold a term on the
+        // last step's increment, which reads the displacement that step started from.
+        bool held = false;
+        for (const auto &entry : blocks_) {
+            for (const auto &other : entry.second.groups) held = held || other->holds_coefficients();
+        }
+        if (!held) previous_.reset();
     }
 
     void RelaxationGroups::set_temperature(const std::string &block_name, const std::string &group, const real_t temperature) {
@@ -379,6 +385,37 @@ namespace sfem {
         const std::vector<real_t> S_n = slot(0), S_prev = with_previous ? slot(1) : S_n;
         release_stress();
         r.decode_history(i, values, S_n.data(), S_prev.data());
+    }
+
+    void RelaxationGroups::decode_stored_histories(
+            const real_t *const                                                                          x_n,
+            const std::function<void(const std::string &, const std::string &, int, const real_t *)> &emit) {
+        std::shared_ptr<Buffer<real_t>> zeros;
+        const bool                      relaxing = relaxes();
+        if (relaxing) evaluate(start(x_n, zeros), 0);
+        std::vector<real_t> values;
+        for (auto &entry : blocks_) {
+            Block &b = entry.second;
+            for (size_t g = 0; g < b.groups.size(); g++) {
+                const PronyRelaxation &r = *b.groups[g];
+                const ptrdiff_t        n = static_cast<ptrdiff_t>(r.n_components()) * r.n_qp() * r.n_elements();
+                std::vector<real_t>    S_n;
+                if (!relaxing) {
+                    S_n.assign(n, real_t(0));
+                } else if (narrow(b, g)) {
+                    S_n = slot_on_host(b.stress[0][g].narrow->data(), n, es_);
+                } else {
+                    S_n = slot_on_host(b.stress[0][g].full->data(), n, es_);
+                }
+                values.resize(n);
+                for (int i = 0; i < r.series().n_terms(); ++i) {
+                    if (!r.stored(i)) continue;
+                    r.decode_history(i, values.data(), S_n.data(), S_n.data());
+                    emit(entry.first, declarations_[g].group, i, values.data());
+                }
+            }
+        }
+        if (relaxing) release_stress();
     }
 
     void RelaxationGroups::group_norms(const Block &b, const size_t g, const int slot_n, const int slot_prev, real_t *const out) const {

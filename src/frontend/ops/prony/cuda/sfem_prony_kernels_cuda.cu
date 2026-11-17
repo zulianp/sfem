@@ -785,6 +785,10 @@ namespace sfem {
         return (std::size_t)high;
     }
 
+    void cu_prony_stream_synchronize(void *const stream) {
+        if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess) SFEM_ERROR("cu_prony_stream_synchronize failed\n");
+    }
+
     void cu_prony_pool_trim(void *const stream) {
         if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess || cudaMemPoolTrimTo(work_pool(), 0) != cudaSuccess) {
             SFEM_ERROR("cu_prony_pool_trim: returning the work pool's memory failed\n");

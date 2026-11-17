@@ -3,6 +3,7 @@
 #include "sfem_StateFiles.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -24,14 +25,16 @@ namespace sfem {
                                      const HistoryStorage storage,
                                      const ExecutionSpace es,
                                      const int            elements_per_mean,
-                                     const real_t         tolerance)
+                                     const real_t         tolerance,
+                                     void *const          stream)
         : n_tensors_(n_tensors),
           n_components_(n_components),
           n_qp_(n_qp),
           n_elements_(n_elements),
           storage_(storage),
           es_(es),
-          tolerance_(tolerance) {
+          tolerance_(tolerance),
+          stream_(std::make_shared<void *>(stream)) {
         if (n_tensors < 0 || n_components <= 0 || n_qp <= 0 || n_elements < 0) {
             SFEM_ERROR("QuadratureState: invalid shape (%d tensors, %d components, %d points, %ld elements)\n",
                        n_tensors,
@@ -48,6 +51,14 @@ namespace sfem {
                 SFEM_ERROR("QuadratureState: %s is host only; quant_block runs on the device\n", to_string(storage));
             }
             if (!(tolerance > 0)) SFEM_ERROR("QuadratureState: %s needs a positive tolerance\n", to_string(storage));
+            // The step is the largest power of two at most tolerance x max, so a code is at most
+            // 2 / tolerance: within int32 (the grid's codes, the packed blocks' bases) from 2^-30 on.
+            // Checked here, once, for the host and the device kernels alike.
+            if (tolerance < std::ldexp(1.0, -30)) {
+                SFEM_ERROR("QuadratureState: %s's tolerance %g is below 2^-30; its codes would overflow 32 bits\n",
+                           to_string(storage),
+                           (double)tolerance);
+            }
             // A packed store's step and running maximum per tensor stay on the host, which sets
             // up every write and passes the step to the kernels.
             scales_ = is_packed(storage) ? create_host_buffer<scaling_t>(2 * n_tensors) : create_buffer<scaling_t>(2 * n_tensors, es);
@@ -56,9 +67,9 @@ namespace sfem {
             const ptrdiff_t headers = values_per_tensor() * ((n_elements + prony::PACKED_BLOCK - 1) / prony::PACKED_BLOCK);
             packed_.resize(n_tensors);
             for (auto &p : packed_) {
-                p.base   = create_buffer<int32_t>(headers, es);
-                p.width  = create_buffer<uint8_t>(headers, es);
-                p.offset = create_buffer<uint32_t>(headers, es);
+                p.base   = prony::persistent_buffer<int32_t>(headers, es, stream_);
+                p.width  = prony::persistent_buffer<uint8_t>(headers, es, stream_);
+                p.offset = prony::persistent_buffer<uint32_t>(headers, es, stream_);
             }
             // A block's offset is in 8-byte units of 32 bits: at most 4 bytes a code bounds them.
             if (static_cast<double>(values_per_tensor()) * static_cast<double>(n_elements) * 4 / 8 + headers >= 4294967296.0) {
@@ -105,30 +116,32 @@ namespace sfem {
     }
 
     namespace {
-        /// `bytes` zero bytes at `data` in `es`.
-        void zero_bytes(void *const data, const std::size_t bytes, const ExecutionSpace es) {
+        /// `bytes` zero bytes at `data` in `es`, on the device in `stream`.
+        void zero_bytes(void *const data, const std::size_t bytes, const ExecutionSpace es, void *const stream) {
 #ifdef SFEM_ENABLE_CUDA
             if (es == EXECUTION_SPACE_DEVICE) {
-                if (cu_prony_zero(bytes, data, 0, nullptr, nullptr) != SFEM_SUCCESS) SFEM_ERROR("QuadratureState: zeroing on the device failed\n");
+                if (cu_prony_zero(bytes, data, 0, nullptr, stream) != SFEM_SUCCESS) SFEM_ERROR("QuadratureState: zeroing on the device failed\n");
                 return;
             }
 #else
             (void)es;
+            (void)stream;
 #endif
             std::memset(data, 0, bytes);
         }
 
-        /// `bytes` bytes from `src` to `dst`, both in `es`.
-        void copy_bytes(void *const dst, const void *const src, const std::size_t bytes, const ExecutionSpace es) {
+        /// `bytes` bytes from `src` to `dst`, both in `es`, on the device in `stream`.
+        void copy_bytes(void *const dst, const void *const src, const std::size_t bytes, const ExecutionSpace es, void *const stream) {
 #ifdef SFEM_ENABLE_CUDA
             if (es == EXECUTION_SPACE_DEVICE) {
-                if (cu_prony_copy(bytes, src, dst, 0, nullptr, nullptr, nullptr) != SFEM_SUCCESS) {
+                if (cu_prony_copy(bytes, src, dst, 0, nullptr, nullptr, stream) != SFEM_SUCCESS) {
                     SFEM_ERROR("QuadratureState: copying on the device failed\n");
                 }
                 return;
             }
 #else
             (void)es;
+            (void)stream;
 #endif
             std::memmove(dst, src, bytes);
         }
@@ -152,14 +165,25 @@ namespace sfem {
         }
     }  // namespace
 
-    void QuadratureState::reset_packed(const int t) {
-        // Every block empty: width 0, base 0, so every value decodes to zero.
+    void QuadratureState::set_stream(void *const stream) {
+        if (*stream_ == stream) return;
+#ifdef SFEM_ENABLE_CUDA
+        // The work queued in the old stream (the last write's kernels) finishes before the new one
+        // reads or frees what it wrote.
+        if (es_ == EXECUTION_SPACE_DEVICE) cu_prony_stream_synchronize(*stream_);
+#endif
+        *stream_ = stream;
+    }
+
+    void QuadratureState::reset_packed(const int t, void *const stream) {
+        // Every block empty: width 0, base 0, so every value decodes to zero. In `stream`, after
+        // the kernels already queued there that read or write this tensor.
         Packed &p = packed_[t];
-        p.codes   = create_buffer<uint8_t>(static_cast<ptrdiff_t>(smesh::compression::kSlack), es_);
-        zero_bytes(p.codes->data(), p.codes->size(), es_);
-        zero_bytes(p.base->data(), p.base->size() * sizeof(int32_t), es_);
-        zero_bytes(p.width->data(), p.width->size(), es_);
-        zero_bytes(p.offset->data(), p.offset->size() * sizeof(uint32_t), es_);
+        p.codes   = prony::persistent_buffer<uint8_t>(static_cast<ptrdiff_t>(smesh::compression::kSlack), es_, stream_);
+        zero_bytes(p.codes->data(), p.codes->size(), es_, stream);
+        zero_bytes(p.base->data(), p.base->size() * sizeof(int32_t), es_, stream);
+        zero_bytes(p.width->data(), p.width->size(), es_, stream);
+        zero_bytes(p.offset->data(), p.offset->size() * sizeof(uint32_t), es_, stream);
         scales_->data()[2 * t]     = 1;
         scales_->data()[2 * t + 1] = 0;
     }
@@ -182,16 +206,16 @@ namespace sfem {
         const ptrdiff_t           headers = old.rows * old.n_blocks();
         // The new headers are written while the old ones are read, and replace them after; the
         // codes and headers are held until the next write.
-        auto       base   = prony::transient_buffer<int32_t>(headers, es_, stream, true);
-        auto       width  = prony::transient_buffer<uint8_t>(headers, es_, stream, true);
-        auto       offset = prony::transient_buffer<uint32_t>(headers, es_, stream, true);
+        auto       base   = prony::persistent_buffer<int32_t>(headers, es_, stream_);
+        auto       width  = prony::persistent_buffer<uint8_t>(headers, es_, stream_);
+        auto       offset = prony::persistent_buffer<uint32_t>(headers, es_, stream_);
         PackedPlan plan;
         if (cu_prony_packed_plan(old, u, stress_bytes, S_n, S_new, ref, static_cast<real_t>(scales_->data()[2 * t + 1]), tolerance_,
                                  rounding == HistoryRounding::STOCHASTIC, seed, k0, base->data(), width->data(), offset->data(), &plan,
                                  stream) != SFEM_SUCCESS) {
             SFEM_ERROR("QuadratureState::write_packed_device: the plan failed\n");
         }
-        auto codes = prony::transient_buffer<uint8_t>(static_cast<ptrdiff_t>(plan.units * 8 + smesh::compression::kSlack), es_, stream, true);
+        auto codes = prony::persistent_buffer<uint8_t>(static_cast<ptrdiff_t>(plan.units * 8 + smesh::compression::kSlack), es_, stream_);
         if (cu_prony_packed_pack(old, u, stress_bytes, S_n, S_new, ref, plan.step, rounding == HistoryRounding::STOCHASTIC, seed, k0,
                                  base->data(), width->data(), offset->data(), codes->data(), stream) != SFEM_SUCCESS) {
             SFEM_ERROR("QuadratureState::write_packed_device: packing failed\n");
@@ -203,7 +227,7 @@ namespace sfem {
         p.width                    = width;
         p.offset                   = offset;
         scales_->data()[2 * t]     = static_cast<scaling_t>(plan.step);
-        scales_->data()[2 * t + 1] = static_cast<scaling_t>(plan.max_abs);
+        scales_->data()[2 * t + 1] = prony::grid_max(plan.max_abs);
 #else
         (void)t, (void)alpha, (void)b, (void)beta, (void)stress_bytes, (void)S_n, (void)S_new, (void)ref, (void)rounding, (void)seed,
                 (void)k0, (void)stream;
@@ -223,7 +247,7 @@ namespace sfem {
 
     void QuadratureState::zero(void *const stream) {
         if (is_packed(storage_)) {
-            for (int t = 0; t < n_tensors_; t++) reset_packed(t);
+            for (int t = 0; t < n_tensors_; t++) reset_packed(t, stream);
             return;
         }
 #ifndef SFEM_ENABLE_CUDA
@@ -252,7 +276,7 @@ namespace sfem {
 
     void QuadratureState::zero_tensor(const int t, void *const stream) {
         if (is_packed(storage_)) {
-            reset_packed(t);
+            reset_packed(t, stream);
             return;
         }
         const ptrdiff_t tensor_bytes = values_per_tensor() * n_elements_ * bytes_per_value(storage_);
@@ -293,12 +317,12 @@ namespace sfem {
             const Packed &s = src.packed_[from];
             Packed       &d = packed_[to];
             // The code area by value: the source may be this store, and its slot be written next.
-            auto codes = create_buffer<uint8_t>(s.codes->size(), es_);
-            copy_bytes(codes->data(), s.codes->data(), s.codes->size(), es_);
+            auto codes = prony::persistent_buffer<uint8_t>(s.codes->size(), es_, stream_);
+            copy_bytes(codes->data(), s.codes->data(), s.codes->size(), es_, stream);
             d.codes = codes;
-            copy_bytes(d.base->data(), s.base->data(), s.base->size() * sizeof(int32_t), es_);
-            copy_bytes(d.width->data(), s.width->data(), s.width->size(), es_);
-            copy_bytes(d.offset->data(), s.offset->data(), s.offset->size() * sizeof(uint32_t), es_);
+            copy_bytes(d.base->data(), s.base->data(), s.base->size() * sizeof(int32_t), es_, stream);
+            copy_bytes(d.width->data(), s.width->data(), s.width->size(), es_, stream);
+            copy_bytes(d.offset->data(), s.offset->data(), s.offset->size() * sizeof(uint32_t), es_, stream);
             scales_->data()[2 * to]     = src.scales_->data()[2 * from];
             scales_->data()[2 * to + 1] = src.scales_->data()[2 * from + 1];
             return;
@@ -436,15 +460,16 @@ namespace sfem {
                                  (means_ ? means_->size() * sizeof(history_mean_t) : 0);
         const ptrdiff_t rows = static_cast<ptrdiff_t>(n_tensors_) * values_per_tensor();
         const ptrdiff_t n    = n_elements_;
-        std::size_t     codes = 0;
+        constexpr std::size_t header = sizeof(int32_t) + sizeof(uint8_t) + sizeof(uint32_t);  // as Packed's base, width, offset
+        std::size_t           codes  = static_cast<std::size_t>(n_tensors_) * smesh::compression::kSlack;
         dispatch_history_codec(storage_, [&](auto codec) {
             using Codec = decltype(codec);
             if constexpr (Codec::integer) {
                 const auto *const h = data<Codec>();
 #pragma omp parallel for reduction(+ : codes)
                 for (ptrdiff_t r = 0; r < rows; r++) {
-                    for (ptrdiff_t e0 = 0; e0 < n; e0 += PACK_BLOCK) {
-                        const ptrdiff_t nb = std::min(PACK_BLOCK, n - e0);
+                    for (ptrdiff_t e0 = 0; e0 < n; e0 += prony::PACKED_BLOCK) {
+                        const ptrdiff_t nb = std::min(prony::PACKED_BLOCK, n - e0);
                         int64_t         lo = h[r * n + e0], hi = lo;
                         for (ptrdiff_t l = 1; l < nb; l++) {
                             const int64_t v = h[r * n + e0 + l];
@@ -452,7 +477,7 @@ namespace sfem {
                             hi              = std::max(hi, v);
                         }
                         const int w = smesh::compression::bit_width(static_cast<uint64_t>(hi - lo));
-                        codes += 6 + (static_cast<std::size_t>(nb) * w + 7) / 8;
+                        codes += header + prony::packed_block_bytes(nb, w);
                     }
                 }
             }
@@ -494,7 +519,7 @@ namespace sfem {
                 if (state_number(sizes, ("codes_" + std::to_string(t)).c_str(), &bytes)) return SFEM_FAILURE;
                 Packed           &p = packed_[t];
                 const std::string k = prefix + ".t" + std::to_string(t);
-                p.codes             = create_buffer<uint8_t>(static_cast<ptrdiff_t>(bytes), es_);
+                p.codes             = prony::persistent_buffer<uint8_t>(static_cast<ptrdiff_t>(bytes), es_, stream_);
                 if (read_state_buffer(smesh::Path(k + ".codes"), p.codes) || read_state_buffer(smesh::Path(k + ".base"), p.base) ||
                     read_state_buffer(smesh::Path(k + ".width"), p.width) || read_state_buffer(smesh::Path(k + ".offset"), p.offset)) {
                     return SFEM_FAILURE;

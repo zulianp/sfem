@@ -101,7 +101,8 @@ namespace sfem {
                 options_.history_storage,
                 options_.execution_space,
                 options_.history_elements_per_mean,
-                options_.history_tolerance);
+                options_.history_tolerance,
+                options_.stream);
         for (int s = 0; s < n_live_; s++) grown->copy_tensor(*H_, s, s, options_.stream);
         H_ = grown;
     }
@@ -716,7 +717,8 @@ namespace sfem {
                                                    options_.history_storage,
                                                    options_.execution_space,
                                                    options_.history_elements_per_mean,
-                                                   options_.history_tolerance);
+                                                   options_.history_tolerance,
+                                                   options_.stream);
             if (H_->read_state(prefix + "_H")) return SFEM_FAILURE;
         }
         const ptrdiff_t n = static_cast<ptrdiff_t>(n_components_) * n_qp_ * n_elements_;

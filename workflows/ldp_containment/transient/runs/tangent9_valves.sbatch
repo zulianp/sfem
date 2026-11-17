@@ -64,11 +64,16 @@ tangent_args() {  # <tangent>
   echo "$a"
 }
 
-history_args() {  # <history>[_p<P>][_plain][_s32]
+history_args() {  # <history>[_p<P>][_sr][_plain][_s32], _sr and _plain in either order (quant_study.sbatch: grid6_sr_plain)
   local h=$1 a="" p=0 horizon=-1 stress=full rounding=nearest
   case $h in *_s32) stress=float32; h=${h%_s32} ;; esac
-  case $h in *_sr) rounding=stochastic; h=${h%_sr} ;; esac
-  case $h in *_plain) horizon=0; h=${h%_plain} ;; esac
+  while :; do
+    case $h in
+      *_sr) rounding=stochastic; h=${h%_sr} ;;
+      *_plain) horizon=0; h=${h%_plain} ;;
+      *) break ;;
+    esac
+  done
   case $h in *_p[0-9]*) p=${h##*_p}; h=${h%_p*} ;; esac
   local tol=""
   case $h in qblock[0-9]) tol=1e-${h#qblock}; h=quant_block ;; esac
