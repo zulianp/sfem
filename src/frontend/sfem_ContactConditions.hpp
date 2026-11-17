@@ -62,6 +62,9 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space();
 
         const SharedBuffer<idx_t> node_mapping();
+        /// The contact nodes' volume indices in the memory of the conditions' execution space: on the
+        /// device the device copy of node_mapping(), which device kernels must take instead.
+        const SharedBuffer<idx_t> node_mapping(const enum ExecutionSpace es);
         /// The obstacle's normal at each contact node (component-major, dim rows), pointing towards
         /// the obstacle: the constraint is n . u <= gap + n . u_k. Sampled by init / update.
         SharedBuffer<real_t *> normals() const;
@@ -126,6 +129,8 @@ namespace sfem {
 
         ptrdiff_t n_constrained_dofs() const;
 
+        /// The gap along the normals at the contact nodes, as a volume field for output: x (the
+        /// displacement) in the conditions' execution space, g on the host.
         int signed_distance_for_mesh_viz(const real_t *const x, real_t *const g) const;
 
         int full_apply_boundary_mass_inverse(const real_t *const r, real_t *const s);

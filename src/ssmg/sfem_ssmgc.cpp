@@ -199,7 +199,7 @@ namespace sfem {
         int  sym_block_size = (block_size == 3 ? 6 : 3);
         auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
         contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
-        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
+        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(es), normal_prod);
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
 
@@ -572,7 +572,7 @@ namespace sfem {
                 contact_conds->hessian_block_diag_sym(nullptr, normal_prod->data());
 
                 auto fine = levels[0];
-                fine->sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
+                fine->sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(es), normal_prod);
 
                 fine->sides   = contact_conds->ss_sides();
                 fine->mapping = contact_conds->node_mapping();
