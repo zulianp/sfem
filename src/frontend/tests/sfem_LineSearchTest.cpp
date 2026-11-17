@@ -159,30 +159,54 @@ int test_nonmonotone_reference() {
     return SFEM_TEST_SUCCESS;
 }
 
-// Converged: a slope below the merit's resolution, every trial a few eps above m0 = 0.05 as rounding
-// leaves it. The search reports AT_RESOLUTION (Newton's CONVERGED_AT_RESOLUTION), not a step:
-// accepting one there would have Newton take steps that change nothing until max_it.
-class Flat final : public sfem::Merit {
-public:
-    const char *name() const override { return "flat"; }
-    int         evaluate(const real_t *const, const real_t *const, const int nsteps, const real_t *const, real_t *const out) override {
-        for (int i = 0; i < nsteps; ++i) out[i] = m0 * (1 + 2 * eps);
-        return SFEM_SUCCESS;
-    }
-    real_t at(const real_t *const, const real_t *const) override { return m0; }
-    real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t) override { return -eps * m0; }
-    bool   batched() const override { return true; }
+namespace {
+    // Near the solution: every trial at `value`, a little above m0 = 0.05 as rounding leaves it, and
+    // a slope set relative to the merit's resolution, 64 eps max(|m0|, 1).
+    class Flat final : public sfem::Merit {
+    public:
+        Flat(const real_t slope, const real_t value) : slope_(slope), value_(value) {}
+        const char *name() const override { return "flat"; }
+        int         evaluate(const real_t *const, const real_t *const, const int nsteps, const real_t *const, real_t *const out) override {
+            for (int i = 0; i < nsteps; ++i) out[i] = value_;
+            return SFEM_SUCCESS;
+        }
+        real_t at(const real_t *const, const real_t *const) override { return m0; }
+        real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t) override { return slope_; }
+        bool   batched() const override { return true; }
 
-    static constexpr real_t m0  = real_t(0.05);
-    static constexpr real_t eps = std::numeric_limits<real_t>::epsilon();
-};
+        static constexpr real_t m0         = real_t(0.05);
+        static constexpr real_t eps        = std::numeric_limits<real_t>::epsilon();
+        static constexpr real_t resolution = 64 * eps;
 
+    private:
+        real_t slope_, value_;
+    };
+}  // namespace
+
+// A slope just below the resolution, the trials within rounding above m0 (one ulp, and 32 eps |m0|):
+// converged as far as the merit can tell (AT_RESOLUTION, Newton's CONVERGED_AT_RESOLUTION), no step
+// taken. Accepting a trial here, as any Armijo allowance for rounding would, has Newton take steps
+// that change nothing until max_it. Just above the resolution the same trials are a failure.
 int test_at_resolution_within_rounding() {
-    Flat             flat;
-    sfem::LineSearch ls;
-    auto             r = ls.search(flat, nullptr, nullptr, Flat::m0, flat.slope(nullptr, nullptr, nullptr, 0));
-    SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::AT_RESOLUTION);
-    SFEM_TEST_ASSERT(r.alpha == 0);
+    const int    n      = (int)sfem::LineSearchOptions().steps.size();
+    const real_t rise[] = {std::nextafter(Flat::m0, real_t(1)), Flat::m0 * (1 + 32 * Flat::eps)};
+    for (const real_t value : rise) {
+        for (const bool batched : {true, false}) {
+            sfem::LineSearchOptions options;
+            options.batched = batched;
+            sfem::LineSearch ls(options);
+
+            Flat below(-Flat::resolution / 2, value);
+            auto r = ls.search(below, nullptr, nullptr, Flat::m0, below.slope(nullptr, nullptr, nullptr, 0));
+            SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::AT_RESOLUTION);
+            SFEM_TEST_ASSERT(r.alpha == 0 && r.merit == Flat::m0 && r.evaluations == n);
+
+            Flat above(-2 * Flat::resolution, value);
+            r = ls.search(above, nullptr, nullptr, Flat::m0, above.slope(nullptr, nullptr, nullptr, 0));
+            SFEM_TEST_ASSERT(r.status == sfem::LineSearchResult::Status::NO_DECREASE);
+            SFEM_TEST_ASSERT(r.alpha == 0 && r.merit == Flat::m0 && r.evaluations == n);
+        }
+    }
     return SFEM_TEST_SUCCESS;
 }
 
