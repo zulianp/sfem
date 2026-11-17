@@ -281,6 +281,14 @@ namespace sfem {
 
     // ===
 
+    namespace {
+        // The space's mesh is distributed over more than one rank.
+        bool spans_ranks(const FunctionSpace &space) {
+            auto mesh = space.mesh();
+            return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed();
+        }
+    }  // namespace
+
     class ContactConditions::Impl {
     public:
         std::shared_ptr<FunctionSpace>         space;
@@ -297,10 +305,7 @@ namespace sfem {
 
         ~Impl() {}
 
-        bool is_mpi() const {
-            auto mesh = space->mesh();
-            return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed();
-        }
+        bool is_mpi() const { return spans_ranks(*space); }
 
         smesh::Exchange *volume_exchange() {
             if (!is_mpi()) {
@@ -620,6 +625,13 @@ namespace sfem {
             path_sdf = path + "/" + path_sdf;
         }
 
+#ifdef SFEM_ENABLE_CUDA
+        // create refuses this combination; refused here, before the grid is read.
+        if (EXECUTION_SPACE_DEVICE == es && spans_ranks(*space)) {
+            SFEM_ERROR("ContactConditions: the SDF contact surface on the device runs on one rank only; "
+                       "use the node_sdf obstacle with several ranks\n");
+        }
+#endif
         auto sdf = smesh::Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
         return create(space, std::move(sdf), {sideset}, es);
