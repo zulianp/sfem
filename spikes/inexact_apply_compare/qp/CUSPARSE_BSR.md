@@ -199,7 +199,7 @@ None of this relies on the box meshes: the application meshes below keep the ord
 The same bench on unstructured TET4 meshes from two pump simulations, the parts their cases
 compute: one valve (`fp70c`, `fp70`, two resolutions) and a pressure and a suction valve
 (`ff200`, `ff200r`, two resolutions). Each mesh as given (0) and refined once (1, each tetrahedron
-split into eight), coordinates scaled to a unit largest extent (`qp/real_meshes.py`, `QP_MESH`), at
+split into eight), coordinates scaled to a unit largest extent (`xsesfsi_papers/compressed_partial_assembly/python/real_meshes.py`, `QP_MESH`), at
 13–15 blocks per row. Logs: `measured_real/realgpu_5199831/gpu_<mesh>_<level>.out` (Alps job
 5199831, y += A x). MDOF/s of ours (TB/s of matrix), and our speed-up over each cuSPARSE product:
 

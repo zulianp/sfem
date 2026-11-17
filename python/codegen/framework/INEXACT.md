@@ -3,7 +3,7 @@
 Partial assembly as a generated set-up and a library apply: the material tangent, pulled back to
 the reference cell and weighted, is stored at every point of the rule the exact apply integrates
 with, encoded, and applied many times without touching the state, the geometry or the material
-again (`docs/compressed_partial_assembly`).
+again (the compressed partial assembly paper, `xsesfsi_papers/compressed_partial_assembly`).
 
 Plans: `plans/point_tangent.py` (the material), `plans/inexact_element.py` (the element and its
 rule). Emitter: `emitters/inexact_codegen.py`. Library: `src/frontend/ops/inexact/`. Op surface:
