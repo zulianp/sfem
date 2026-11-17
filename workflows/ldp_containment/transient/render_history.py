@@ -2,6 +2,7 @@
 
 usage: pvbatch render_history.py <case> <out folder> --reference=<run> --runs=<run>,... --times=t0,t1,...
                                   [--prefix=tp9_p2_] [--field=Hsum] [--range=lo,hi] [--size=W,H]
+                                  [--pump=FF200|LDP24A]
 
 Reads, for each run <case>/<prefix><run>/sim2, the per-element error that `collect_prony.py snapshot`
 wrote beside each history snapshot (history/<k>/<block>.iso.<field>.err.float64: |x - x_ref| over
@@ -13,7 +14,8 @@ through its corner nodes. One colour range for every image: --range in log10, or
 error over all panels and four decades below it.
 
 Writes <out>/<run>_<k>_<valve>.png (valve: pressure_valve, suction_valve) without labels or colour
-bar, and <out>/range.txt with the range (the figure's colour bar).
+bar, and <out>/range.txt with the range (the figure's colour bar). --pump places the views on the
+pump's valves (render_strokes.py's PUMPS; default FF200).
 """
 
 import os
@@ -25,7 +27,11 @@ from paraview.simple import ColorBy, CreateView, ExtractSurface, GetColorTransfe
 from vtk.util import numpy_support
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from render_strokes import VALVES, plain, valve_grid  # noqa: E402
+from render_strokes import PUMPS, plain, valve_grid  # noqa: E402
+
+# Per pump: the height (m) the views look at and their half-height (parallel scale, m), the valve's
+# disc or canopy filling the image.
+VIEWS = {"FF200": (-0.0012, 0.0042), "LDP24A": (0.0032, 0.0085)}
 
 
 def blocks(mesh):
@@ -47,13 +53,14 @@ def error(sim, k, field, order):
     return np.concatenate(parts)
 
 
-def place(view, x):
+def place(view, x, pump):
     """The valve centred at x (m) from above and in front, 40 degrees down, its disc filling the image."""
-    view.CameraFocalPoint = [x, -0.0012, 0]
-    view.CameraPosition = [x, -0.0012 + 0.05 * 0.643, 0.05 * 0.766]
+    y, scale = VIEWS[pump]
+    view.CameraFocalPoint = [x, y, 0]
+    view.CameraPosition = [x, y + 0.05 * 0.643, 0.05 * 0.766]
     view.CameraViewUp = [0, 0.766, -0.643]
     view.CameraParallelProjection = 1
-    view.CameraParallelScale = 0.0042
+    view.CameraParallelScale = scale
 
 
 def main(argv):
@@ -64,6 +71,7 @@ def main(argv):
     case, out = args
     prefix = opts.get("prefix", "")
     field = opts.get("field", "Hsum")
+    pump = opts.get("pump", "FF200")
     runs = opts["runs"].split(",")
     times = [float(t) for t in opts["times"].split(",")]
     width, height = (int(v) for v in opts.get("size", "1200,900").split(","))
@@ -113,12 +121,12 @@ def main(argv):
                 # Again after the colouring, which rescales the map to the data it first sees.
                 lut.RGBPoints = points_lut
                 shown = True
-            for name, x in VALVES:
-                place(view, x)
+            for name, x in PUMPS[pump]["valves"]:
+                place(view, x, pump)
                 # A first screenshot resets the camera to the data; the second keeps it.
                 Render(view)
                 SaveScreenshot(scratch, view, ImageResolution=[width, height])
-                place(view, x)
+                place(view, x, pump)
                 SaveScreenshot(os.path.join(out, "%s_%d_%s.png" % (r, k, name.replace(" ", "_"))), view,
                                ImageResolution=[width, height])
     if os.path.exists(scratch):
