@@ -112,12 +112,19 @@ namespace {
   //! The permuted table's storage under HIP: one per host thread and stream, kept for the
   //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does
   //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the
-  //! products of a captured solver run (the coarse CG's) allocate nothing this way.
+  //! products of a captured solver run (the coarse CG's) allocate nothing this way. The first
+  //! call on a stream allocates, in relaxed capture mode: a capture under way on this thread
+  //! would otherwise refuse the allocation and be invalidated.
   template <typename T, int N>
   T **permuted_connectivity_table(const cudaStream_t stream) {
     static thread_local std::unordered_map<cudaStream_t, T **> tables;
     T **&table = tables[stream];
-    if (!table && cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;
+    if (!table) {
+      cudaStreamCaptureMode mode = cudaStreamCaptureModeRelaxed;
+      cudaThreadExchangeStreamCaptureMode(&mode);
+      if (cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;
+      cudaThreadExchangeStreamCaptureMode(&mode);
+    }
     return table;
   }
 #endif
