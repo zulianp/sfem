@@ -395,12 +395,9 @@ dirichlet_conditions:
   - {type: sideset, format: name, name: left, component: [0, 1, 2], value: [0, 0, 0]}
   - {type: sideset, format: name, name: right, component: 0, value: 0.2}
 regime: steady
-solver: {newton: {verbose: false, rtol: 1e-12}}
+solver: {newton: {verbose: false}}
 )";
-    // Each run's displacement in the file's numbering. Both converge well below the comparison's
-    // 1e-10: at the default rtol 1e-8 the last Newton step's merit decrease, ~|r|^2, is below the
-    // energy's rounding, and the plain layout's atomic sums then decide between the full step
-    // (|r|/|r0| 6.7e-12) and half of it (6.2e-9, 1e-9 from the packed solution) in ~4% of runs.
+    // Each run's displacement in the file's numbering.
     std::vector<real_t> u[2];
     for (const bool packed : {true, false}) {
         auto pg = assemble(yaml.c_str(), {std::string("mesh.packed=") + (packed ? "true" : "false")});
@@ -422,7 +419,11 @@ solver: {newton: {verbose: false, rtol: 1e-12}}
         scale = std::max(scale, std::abs(u[0][i]));
     }
     printf("  packed against plain (%s): %.3g of %.3g\n", split ? "two blocks" : "one block", (double)worst, (double)scale);
-    SFEM_TEST_ASSERT(scale > 0.1 && worst <= 1e-10 * scale);
+    // Compared at what rtol 1e-8 guarantees, not below: near it the last Newton step's merit
+    // decrease, ~|r|^2, is below the energy's rounding, and the plain layout's atomic sums decide
+    // between the full step (|r|/|r0| 6.7e-12) and half of it (6.2e-9). Measured on MI300A, 200 plain
+    // solves against the packed one: at most 5.0e-9 of the largest displacement.
+    SFEM_TEST_ASSERT(scale > 0.1 && worst <= 1e-7 * scale);
     std::filesystem::remove_all(dir);
     return SFEM_TEST_SUCCESS;
 }
