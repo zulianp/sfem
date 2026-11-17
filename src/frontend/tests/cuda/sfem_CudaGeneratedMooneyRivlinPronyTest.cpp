@@ -78,8 +78,9 @@ namespace {
     void configure(OpType                      &op,
                    const std::shared_ptr<Mesh> &mesh,
                    const HistoryStorage         storage,
-                   const HistoryStorage         stress  = HistoryStorage::FULL,
-                   const real_t                 horizon = 0) {
+                   const HistoryStorage         stress   = HistoryStorage::FULL,
+                   const real_t                 horizon  = 0,
+                   const HistoryRounding        rounding = HistoryRounding::NEAREST) {
         for (const auto &block : mesh->blocks()) {
             op.set_value_in_block(block->name(), "C10", test_C10);
             op.set_value_in_block(block->name(), "C01", test_C01);
@@ -89,14 +90,16 @@ namespace {
         options.history_storage = storage;
         options.stress_storage    = stress;
         options.remainder_horizon = horizon;
+        options.history_rounding  = rounding;
         op.relaxation_groups().set_series("", "iso", PronySeries({0.40, 0.30}, {1.0, 10.0}), options);
     }
 
     int host_vs_device(const HistoryStorage  storage,
                        const real_t          tolerance,
                        const smesh::ElemType element = smesh::HEX8,
-                       const HistoryStorage  stress  = HistoryStorage::FULL,
-                       const real_t          horizon = 0) {
+                       const HistoryStorage  stress   = HistoryStorage::FULL,
+                       const real_t          horizon  = 0,
+                       const HistoryRounding rounding = HistoryRounding::NEAREST) {
         const int n = 6;
         std::shared_ptr<Mesh> mesh;
         if (element == smesh::HEX8) {
@@ -115,12 +118,13 @@ namespace {
                 create_op(fs, "GeneratedMooneyRivlinProny", EXECUTION_SPACE_DEVICE));
         SFEM_TEST_ASSERT(host_op != nullptr);
         SFEM_TEST_ASSERT(device_op != nullptr);
-        configure(*host_op, mesh, storage, stress, horizon);
-        configure(*device_op, mesh, storage, stress, horizon);
+        configure(*host_op, mesh, storage, stress, horizon, rounding);
+        configure(*device_op, mesh, storage, stress, horizon, rounding);
 
         const ptrdiff_t ndofs = fs->n_dofs();
         auto            u_h   = create_host_buffer<real_t>(ndofs);
         auto            d_h   = create_host_buffer<real_t>(ndofs);
+        auto            un_h  = create_host_buffer<real_t>(ndofs);
         // Random nodal noise grown by 1.15 a step: the six tetrahedra of each cube, and TET10's
         // midside nodes, invert where a hexahedron does not, so the simplices take a fifth of it.
         // TET10 a tenth: at a fifth one of its elements turns inside out at step 6 (host value NaN).
@@ -137,12 +141,15 @@ namespace {
         real_t worst = 0;
         real_t t     = 0;
         for (int step = 1; step <= 6; step++) {
+            // The step starts from the last committed displacement.
+            std::copy(u_h->data(), u_h->data() + ndofs, un_h->data());
             for (ptrdiff_t i = 0; i < ndofs; i++) u_h->data()[i] *= real_t(1.15);
-            auto u_d = smesh::to_device(u_h);
+            auto u_d  = smesh::to_device(u_h);
+            auto un_d = smesh::to_device(un_h);
             t += test_dt;
 
-            host_op->begin_step(t, test_dt);
-            device_op->begin_step(t, test_dt);
+            host_op->begin_step(t, test_dt, un_h->data());
+            device_op->begin_step(t, test_dt, un_d->data());
 
             real_t v_h = 0, v_d = 0;
             SFEM_TEST_ASSERT(host_op->value(u_h->data(), &v_h) == SFEM_SUCCESS);
@@ -173,8 +180,8 @@ namespace {
                    (double)apply_error);
             worst = std::max({worst, value_error, gradient_error, apply_error});
 
-            host_op->advance(u_h->data());
-            device_op->advance(u_d->data());
+            host_op->advance(un_h->data(), u_h->data());
+            device_op->advance(un_d->data(), u_d->data());
         }
 
         SFEM_TEST_ASSERT(worst < tolerance);
@@ -236,6 +243,37 @@ int test_device_matches_host_remainder_form() {
     return SFEM_TEST_SUCCESS;
 }
 
+// Stochastic rounding draws the same numbers on both sides (prony::uniform of the write and the
+// value's position), so the codes agree but where the arithmetic before the rounding differs in
+// its last bit: within the format's own tolerance, for the scaled and the mean-deviation loops.
+int test_device_matches_host_stochastic_rounding() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::INT16_SCALED, real_t(1e-6), element, HistoryStorage::FULL, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::INT8_MD, real_t(5e-3), element, HistoryStorage::FLOAT32, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// The packed store: the device plans and packs each write itself, the host sums the offsets.
+// The codes agree but where the arithmetic before the rounding differs in its last bit, by one
+// step, 1e-5 of the term's largest value (history_tolerance's default); nearest and stochastic.
+int test_device_matches_host_packed() {
+    const smesh::ElemType elements[] = {smesh::HEX8, smesh::TET4, smesh::TET10};
+    for (const auto element : elements) {
+        if (host_vs_device(HistoryStorage::QUANT_BLOCK, real_t(1e-5), element, HistoryStorage::FULL, 5) != SFEM_TEST_SUCCESS ||
+            host_vs_device(HistoryStorage::QUANT_BLOCK, real_t(1e-5), element, HistoryStorage::FLOAT32, 5, HistoryRounding::STOCHASTIC) !=
+                    SFEM_TEST_SUCCESS) {
+            return SFEM_TEST_FAILURE;
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // Any generated energy material on HEX8 goes through the same HEX8 -> PROTEUS_HEX8 forwarding
 // as this one, so the existing modified Mooney-Rivlin is checked on the device too: its gradient
 // against the host's.  If this fails as well, a failure above is the forwarding's, not Prony's.
@@ -276,7 +314,8 @@ int device_squared_norms_match(const int n_qp) {
                                       HistoryStorage::INT16_SCALED,
                                       HistoryStorage::INT8_SCALED,
                                       HistoryStorage::FLOAT16_MD,
-                                      HistoryStorage::INT8_MD};
+                                      HistoryStorage::INT8_MD,
+                                      HistoryStorage::QUANT_BLOCK};
     const int            n_components = 6, n_diagonal = 3;
     const ptrdiff_t      n_elements = 3001;
     const ptrdiff_t      n          = n_components * n_qp * n_elements;
@@ -354,6 +393,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_device_matches_host_tet4);
     SFEM_RUN_TEST(test_device_matches_host_tet10);
     SFEM_RUN_TEST(test_device_matches_host_remainder_form);
+    SFEM_RUN_TEST(test_device_matches_host_stochastic_rounding);
+    SFEM_RUN_TEST(test_device_matches_host_packed);
     SFEM_RUN_TEST(test_device_squared_norms_match_the_decoded_history);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();

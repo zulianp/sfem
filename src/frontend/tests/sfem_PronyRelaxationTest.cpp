@@ -16,10 +16,13 @@
 #include "sfem_HistoryStorage.hpp"
 #include "sfem_PronyRelaxation.hpp"
 #include "sfem_QuadratureState.hpp"
+#include "sfem_prony_kernels.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <filesystem>
 #include <vector>
 
 #ifdef _OPENMP
@@ -339,6 +342,299 @@ int test_every_codec_round_trips_within_its_bound() {
     return SFEM_TEST_SUCCESS;
 }
 
+
+// The grid format: every value of a tensor on one power-of-two grid from the tolerance and the
+// tensor's largest magnitude, so the error is absolute, the same for every entry.
+int test_grid_round_trips_within_its_tolerance() {
+    const auto   a   = amplitudes();
+    const real_t tol = real_t(1e-6);
+    real_t       M   = 0;
+    for (const real_t v : a) M = std::max(M, std::abs(v));
+
+    sfem::QuadratureState state(2, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    state.encode(1, a.data());
+    std::vector<real_t> back(N_ENTRIES);
+    state.decode(1, back.data());
+    real_t worst = 0;
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) worst = std::max(worst, std::abs(back[k] - a[k]));
+    printf("  quant_grid: worst error %.3e of max %.3e (tolerance %.0e), step %.3e\n",
+           (double)worst,
+           (double)M,
+           (double)tol,
+           (double)state.scales()[2]);
+    SFEM_TEST_ASSERT(worst <= tol * M);
+    // The step is a power of two no larger than twice the tolerance.
+    const real_t step = state.scales()[2];
+    int exponent = 0;
+    SFEM_TEST_ASSERT(step <= 2 * tol * M && step > tol * M && std::frexp(step, &exponent) == real_t(0.5));
+
+    state.decode(0, back.data());
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) SFEM_TEST_ASSERT(back[k] == 0);
+    SFEM_TEST_ASSERT(state.bytes() == size_t(2 * N_ENTRIES) * 4 + 4 * sizeof(scaling_t));
+    return SFEM_TEST_SUCCESS;
+}
+
+namespace {
+    // `steps` writes of tensor 0 of a grid store holding `a`, each adding `delta` (b = 1, alpha = 1):
+    // returns the decoded tensor.
+    std::vector<real_t> grid_accumulate(const std::vector<real_t> &a,
+                                        const real_t               tol,
+                                        const real_t               delta,
+                                        const int                  steps,
+                                        const sfem::HistoryRounding rounding) {
+        sfem::QuadratureState state(1, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+        state.encode(0, a.data());
+        const std::vector<real_t> S_n(N_ENTRIES, 0), S_new(N_ENTRIES, delta);
+        const real_t              one = 1;
+        for (int n = 0; n < steps; n++) {
+            sfem::prony::advance<sfem::GridCodec, real_t>(1,
+                                                  N_COMPONENTS * N_QP,
+                                                  N_ELEMENTS,
+                                                  &one,
+                                                  &one,
+                                                  S_n.data(),
+                                                  S_new.data(),
+                                                  state.data<sfem::GridCodec>(),
+                                                  state.scales(),
+                                                  sfem::prony::Means{},
+                                                  nullptr,
+                                                  nullptr,
+                                                  tol,
+                                                  rounding,
+                                                  0x5851f42d4c957f2dull * (n + 1));
+        }
+        std::vector<real_t> back(N_ENTRIES);
+        state.decode(0, back.data());
+        return back;
+    }
+}  // namespace
+
+int test_stochastic_rounding_keeps_increments_below_a_step() {
+    // An increment of a tenth of a step, a thousand times: rounded to the nearest every write
+    // loses it entirely; rounded stochastically it arrives on average, with an error that walks
+    // (about step sqrt(steps) / 3 per value), and the same on any thread count.
+    const auto   a     = amplitudes();
+    const real_t tol   = real_t(1e-6);
+    real_t       M     = 0;
+    for (const real_t v : a) M = std::max(M, std::abs(v));
+    const real_t step  = sfem::prony::grid_step(M, tol);
+    const real_t delta = step / 10;
+    const int    steps = 1000;
+
+    sfem::QuadratureState coded(1, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    coded.encode(0, a.data());
+    std::vector<real_t> start(N_ENTRIES);
+    coded.decode(0, start.data());
+
+    const auto nearest = grid_accumulate(a, tol, delta, steps, sfem::HistoryRounding::NEAREST);
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) SFEM_TEST_ASSERT(nearest[k] == start[k]);
+
+    const auto stochastic = grid_accumulate(a, tol, delta, steps, sfem::HistoryRounding::STOCHASTIC);
+    real_t     mean = 0, worst = 0;
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) {
+        const real_t e = stochastic[k] - (start[k] + steps * delta);
+        mean += e;
+        worst = std::max(worst, std::abs(e));
+    }
+    mean /= N_ENTRIES;
+    printf("  %d increments of step/10: nearest kept 0; stochastic mean error %.3f steps, worst %.1f steps\n",
+           steps,
+           (double)(mean / step),
+           (double)(worst / step));
+    SFEM_TEST_ASSERT(std::abs(mean) < step);
+    SFEM_TEST_ASSERT(worst < 10 * step * std::sqrt(real_t(steps)) / 3);
+
+#ifdef _OPENMP
+    const int max_threads = omp_get_max_threads();
+    omp_set_num_threads(1);
+    const auto serial = grid_accumulate(a, tol, delta, 20, sfem::HistoryRounding::STOCHASTIC);
+    omp_set_num_threads(7);
+    const auto threaded = grid_accumulate(a, tol, delta, 20, sfem::HistoryRounding::STOCHASTIC);
+    omp_set_num_threads(max_threads);
+    SFEM_TEST_ASSERT(std::memcmp(serial.data(), threaded.data(), N_ENTRIES * sizeof(real_t)) == 0);
+#endif
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_an_unchanged_value_keeps_its_code() {
+    // The grid is stable: an update that changes nothing (alpha = 1, no increment) leaves every
+    // code as it was, where a per-element scale would re-round it.
+    const auto   a   = amplitudes();
+    const real_t tol = real_t(1e-6);
+    sfem::QuadratureState state(1, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    state.encode(0, a.data());
+    const std::vector<int32_t> before(state.data<sfem::GridCodec>(), state.data<sfem::GridCodec>() + N_ENTRIES);
+    const std::vector<real_t>  S(N_ENTRIES, real_t(3));
+    const real_t               one = 1, zero = 0;
+    for (int n = 0; n < 5; n++) {
+        sfem::prony::advance<sfem::GridCodec, real_t>(
+                1, N_COMPONENTS * N_QP, N_ELEMENTS, &one, &zero, S.data(), S.data(), state.data<sfem::GridCodec>(), state.scales(),
+                sfem::prony::Means{}, nullptr, nullptr, tol);
+    }
+    SFEM_TEST_ASSERT(std::memcmp(before.data(), state.data<sfem::GridCodec>(), N_ENTRIES * sizeof(int32_t)) == 0);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_quant_grid_tracks_full_storage() {
+    // Each write rounds a term by at most tol M_i, M_i its largest magnitude over the run, and the
+    // recursion carries that forward with weight alpha_i: at most tol M_i / (1 - alpha_i), the
+    // same absolute bound for every entry, small or large.
+    const real_t tol    = real_t(1e-6);
+    const real_t t_ramp = real_t(0.9), dt = real_t(0.3);
+    const auto   grid   = uniform_grid(30, 100);
+    const auto   a      = amplitudes();
+    real_t       a_max  = 0;
+    for (const real_t v : a) a_max = std::max(a_max, std::abs(v));
+
+    sfem::PronyRelaxation full(series(), N_COMPONENTS, N_QP, N_ELEMENTS);
+    sfem::PronyRelaxation::Options options;
+    options.history_storage   = sfem::HistoryStorage::QUANT_GRID;
+    options.history_tolerance = tol;
+    sfem::PronyRelaxation coded(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    drive(full, grid, t_ramp);
+    drive(coded, grid, t_ramp);
+
+    const auto S_n = stress_at(grid.back(), t_ramp), S_prev = stress_at(grid[grid.size() - 2], t_ramp);
+    std::vector<real_t> h_full(N_ENTRIES), h_coded(N_ENTRIES);
+    for (int i = 0; i < series().n_terms(); i++) {
+        full.decode_history(i, h_full.data(), S_n.data(), S_prev.data());
+        coded.decode_history(i, h_coded.data(), S_n.data(), S_prev.data());
+        real_t worst = 0;
+        for (ptrdiff_t k = 0; k < N_ENTRIES; k++) worst = std::max(worst, std::abs(h_coded[k] - h_full[k]));
+        const real_t M     = a_max * exact_H(series(), i, t_ramp, t_ramp);
+        const real_t bound = tol * M / (1 - std::exp(-dt / series().tau(i)));
+        printf("  quant_grid term %d: worst %.3e, bound %.3e\n", i, (double)worst, (double)bound);
+        SFEM_TEST_ASSERT(worst <= bound);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_packed_bytes_follow_the_spread_of_the_codes() {
+    // Constant runs pack to their headers; the full spread of int16 codes to 16 bits a value. As a
+    // quant_block store holds them: a 9-byte header a block (base, width, offset), each block's
+    // codes in whole 64-bit words, and the code area's slack.
+    const ptrdiff_t       ne = 3 * sfem::prony::PACKED_BLOCK + 5;
+    const int             nc = 2, nq = 1;
+    const size_t          header = 9, slack = smesh::compression::kSlack;
+    sfem::QuadratureState state(1, nc, nq, ne, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, real_t(1e-3));
+    std::vector<real_t>   v(nc * ne, real_t(7));
+    state.encode(0, v.data());
+    const size_t blocks = nc * 4;
+    SFEM_TEST_ASSERT(state.packed_bytes() == blocks * header + slack + 2 * sizeof(scaling_t));
+
+    sfem::QuadratureState wide(1, nc, nq, ne, sfem::HistoryStorage::INT16_SCALED);
+    for (ptrdiff_t k = 0; k < nc * ne; k++) v[k] = (k % 2) ? real_t(1) : real_t(-1);
+    wide.encode(0, v.data());
+    // Codes -32767 and 32767: a width of 16 bits; the last block's 5 codes, 10 bytes, take 16.
+    const size_t packed = nc * (3 * (header + 128 * 2) + (header + 16)) + slack + ne * sizeof(scaling_t);
+    SFEM_TEST_ASSERT(wide.packed_bytes() == packed);
+    return SFEM_TEST_SUCCESS;
+}
+
+
+// The packed store holds the grid's codes, packed per block of elements: the same values as
+// quant_grid, to the bit, in fewer bytes.
+int test_packed_decodes_as_the_grid() {
+    const auto   a   = amplitudes();
+    const real_t tol = real_t(1e-6);
+    sfem::QuadratureState grid(2, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_GRID, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    sfem::QuadratureState packed(2, N_COMPONENTS, N_QP, N_ELEMENTS, sfem::HistoryStorage::QUANT_BLOCK, sfem::EXECUTION_SPACE_HOST, 0, tol);
+    grid.encode(1, a.data());
+    packed.encode(1, a.data());
+    std::vector<real_t> g(N_ENTRIES), p(N_ENTRIES);
+    grid.decode(1, g.data());
+    packed.decode(1, p.data());
+    SFEM_TEST_ASSERT(std::memcmp(g.data(), p.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    packed.decode(0, p.data());
+    for (ptrdiff_t k = 0; k < N_ENTRIES; k++) SFEM_TEST_ASSERT(p[k] == 0);
+    printf("  quant_block holds %zu bytes, quant_grid %zu, for %td values\n", packed.bytes(), grid.bytes(), 2 * N_ENTRIES);
+    SFEM_TEST_ASSERT(packed.bytes() < grid.bytes());
+
+    // Driven through a run, nearest rounding: the same history as the grid's, to the bit.
+    sfem::PronyRelaxation::Options options;
+    options.history_tolerance = tol;
+    options.history_storage   = sfem::HistoryStorage::QUANT_GRID;
+    sfem::PronyRelaxation on_grid(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    options.history_storage = sfem::HistoryStorage::QUANT_BLOCK;
+    sfem::PronyRelaxation on_blocks(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    const auto grid_times = uniform_grid(5, 17);
+    drive(on_grid, grid_times, real_t(0.9));
+    drive(on_blocks, grid_times, real_t(0.9));
+    const auto S_n = stress_at(grid_times.back(), real_t(0.9)), S_prev = stress_at(grid_times[grid_times.size() - 2], real_t(0.9));
+    for (int i = 0; i < series().n_terms(); i++) {
+        on_grid.decode_history(i, g.data(), S_n.data(), S_prev.data());
+        on_blocks.decode_history(i, p.data(), S_n.data(), S_prev.data());
+        SFEM_TEST_ASSERT(std::memcmp(g.data(), p.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// Values that vary little over neighbouring elements pack to few bits: a smooth field on a fine
+// grid takes a fraction of the 4 bytes the grid's own codes hold.
+int test_packed_bytes_follow_the_variation() {
+    const ptrdiff_t ne = 4096;
+    const int       nc = 6;
+    std::vector<real_t> v(nc * ne);
+    for (int c = 0; c < nc; c++) {
+        for (ptrdiff_t e = 0; e < ne; e++) v[c * ne + e] = (c + 1) * std::sin(real_t(6.283185307179586) * e / ne);
+    }
+    sfem::QuadratureState packed(1, nc, 1, ne, sfem::HistoryStorage::QUANT_BLOCK, sfem::EXECUTION_SPACE_HOST, 0, real_t(1e-6));
+    packed.encode(0, v.data());
+    std::vector<real_t> back(nc * ne);
+    packed.decode(0, back.data());
+    real_t worst = 0;
+    for (ptrdiff_t k = 0; k < nc * ne; k++) worst = std::max(worst, std::abs(back[k] - v[k]));
+    const double per_value = double(packed.bytes()) / double(nc * ne);
+    printf("  a sine over %td elements, tolerance 1e-6: %.3f bytes a value, worst error %.2e of 6\n", ne, per_value, (double)worst);
+    SFEM_TEST_ASSERT(worst <= real_t(6e-6));
+    SFEM_TEST_ASSERT(per_value < 2.5);
+    return SFEM_TEST_SUCCESS;
+}
+
+// A packed store restarts as it was: written, read into a new relaxation, and both driven on
+// with stochastic rounding, the histories agree to the bit.
+int test_packed_restart_continues_the_run() {
+    const auto dir = (std::filesystem::temp_directory_path() /
+                      ("sfem_packed_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())))
+                             .string();
+    std::filesystem::create_directories(dir);
+    sfem::PronyRelaxation::Options options;
+    options.history_storage   = sfem::HistoryStorage::QUANT_BLOCK;
+    options.history_tolerance = real_t(1e-6);
+    options.history_rounding  = sfem::HistoryRounding::STOCHASTIC;
+    sfem::PronyRelaxation first(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    const auto            head = uniform_grid(3, 10);
+    drive(first, head, real_t(5));
+    SFEM_TEST_ASSERT(first.write_state(dir + "/prony") == SFEM_SUCCESS);
+    sfem::PronyRelaxation second(series(), N_COMPONENTS, N_QP, N_ELEMENTS, options);
+    SFEM_TEST_ASSERT(second.read_state(dir + "/prony") == SFEM_SUCCESS);
+
+    // Both on from t = 3: the same steps, the same stresses.
+    std::vector<real_t> tail{0};
+    for (int k = 1; k <= 10; k++) tail.push_back(real_t(3) + real_t(0.3) * k);
+    const auto a = amplitudes();
+    std::vector<real_t> S_n(N_ENTRIES), S(N_ENTRIES);
+    for (size_t k = 1; k < tail.size(); k++) {
+        const real_t t0 = k == 1 ? real_t(3) : tail[k - 1], t1 = tail[k];
+        for (ptrdiff_t j = 0; j < N_ENTRIES; j++) {
+            S_n[j] = a[j] * ramp(t0, 5);
+            S[j]   = a[j] * ramp(t1, 5);
+        }
+        for (auto *r : {&first, &second}) {
+            r->begin_step(t1, t1 - t0, S_n.data());
+            r->advance(S_n.data(), S.data());
+        }
+    }
+    std::vector<real_t> h0(N_ENTRIES), h1(N_ENTRIES);
+    for (int i = 0; i < series().n_terms(); i++) {
+        first.decode_history(i, h0.data(), S.data(), S_n.data());
+        second.decode_history(i, h1.data(), S.data(), S_n.data());
+        SFEM_TEST_ASSERT(std::memcmp(h0.data(), h1.data(), N_ENTRIES * sizeof(real_t)) == 0);
+    }
+    std::filesystem::remove_all(dir);
+    return SFEM_TEST_SUCCESS;
+}
+
 int test_unscaled_float16_round_trips_below_its_range() {
     // No scale, so the values have to sit inside binary16's range on their own;
     // above 65504 it overflows, which is what the scaled format is for.
@@ -649,7 +945,9 @@ int test_squared_norms_match_the_decoded_history() {
                                             sfem::HistoryStorage::INT16_SCALED,
                                             sfem::HistoryStorage::INT8_SCALED,
                                             sfem::HistoryStorage::FLOAT16_MD,
-                                            sfem::HistoryStorage::INT8_MD};
+                                            sfem::HistoryStorage::INT8_MD,
+                                            sfem::HistoryStorage::QUANT_GRID,
+                                            sfem::HistoryStorage::QUANT_BLOCK};
     const int                  n_diagonal = 3;
     const real_t               prestress  = 2;
     std::vector<real_t>        grid{0};
@@ -695,6 +993,14 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_wlf_shifts_time_and_nothing_else);
     SFEM_RUN_TEST(test_every_codec_round_trips_within_its_bound);
     SFEM_RUN_TEST(test_unscaled_float16_round_trips_below_its_range);
+    SFEM_RUN_TEST(test_grid_round_trips_within_its_tolerance);
+    SFEM_RUN_TEST(test_stochastic_rounding_keeps_increments_below_a_step);
+    SFEM_RUN_TEST(test_an_unchanged_value_keeps_its_code);
+    SFEM_RUN_TEST(test_quant_grid_tracks_full_storage);
+    SFEM_RUN_TEST(test_packed_bytes_follow_the_spread_of_the_codes);
+    SFEM_RUN_TEST(test_packed_decodes_as_the_grid);
+    SFEM_RUN_TEST(test_packed_bytes_follow_the_variation);
+    SFEM_RUN_TEST(test_packed_restart_continues_the_run);
     SFEM_RUN_TEST(test_reduced_storage_tracks_full_storage);
     SFEM_RUN_TEST(test_mean_deviation_codes_the_variation);
     SFEM_RUN_TEST(test_mean_over_one_point_elements);

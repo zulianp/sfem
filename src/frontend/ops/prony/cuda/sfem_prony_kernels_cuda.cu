@@ -1,13 +1,22 @@
+// CUB's own NVTX ranges are NVTX 3, which cannot share a translation unit with the older NVTX
+// SFEM's trace scopes include: they are turned off for CUB alone.
+#define NVTX_DISABLE
+#include <cub/device/device_scan.cuh>
+#undef NVTX_DISABLE
+
 #include "sfem_prony_kernels_cuda.hpp"
 
 #include <cuda_fp16.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstdint>
+#include <cstring>
 #include <type_traits>
 
 #include "sfem_cuda_base.hpp"
 #include "sfem_cuda_HistoryCodecs.cuh"
+#include "sfem_prony_buffers.hpp"
 
 namespace sfem {
 
@@ -70,6 +79,9 @@ namespace sfem {
                     return f(device_codecs::DeviceMeanDeviation<device_codecs::DeviceScaledHalf>{});
                 case HistoryStorage::INT8_MD:
                     return f(device_codecs::DeviceMeanDeviation<device_codecs::DeviceScaledInteger<int8_t, 127>>{});
+                case HistoryStorage::QUANT_GRID:
+                    // Host only for now: PronyRelaxation refuses it on the device.
+                    return SFEM_FAILURE;
             }
             return SFEM_FAILURE;
         }
@@ -126,7 +138,9 @@ namespace sfem {
                                                       typename Codec::storage_t *const               H,
                                                       scaling_t *const                               H_scales,
                                                       const prony::Means                              m,
-                                                      const S_t *const SFEM_RESTRICT                 ref) {
+                                                      const S_t *const SFEM_RESTRICT                 ref,
+                                                      const bool                                      stochastic,
+                                                      const uint64_t                                  seed) {
             __shared__ real_t         sum[MD_MAX_COMPONENTS][MD_BLOCK];
             __shared__ history_mean_t group_mean[MD_MAX_COMPONENTS][MD_BLOCK];
 
@@ -180,7 +194,8 @@ namespace sfem {
                         const real_t inv = 1 / static_cast<real_t>(scale);
                         for (ptrdiff_t r = 0; r < rows; r++) {
                             const real_t v = z(r);
-                            h[r * n + e]   = Codec::encode(v - static_cast<real_t>(group_mean[r / m.n_qp][gl]), inv);
+                            h[r * n + e]   = device_codecs::encode_rounded<Codec>(
+                                    v - static_cast<real_t>(group_mean[r / m.n_qp][gl]), inv, stochastic, seed, (i * rows + r) * n + e);
                         }
                     }
                     __syncthreads();
@@ -207,7 +222,9 @@ namespace sfem {
                                        const S_t *const SFEM_RESTRICT                 S_new,
                                        typename Codec::storage_t *const SFEM_RESTRICT H,
                                        scaling_t *const SFEM_RESTRICT                 H_scales,
-                                       const S_t *const SFEM_RESTRICT                 ref) {
+                                       const S_t *const SFEM_RESTRICT                 ref,
+                                       const bool                                     stochastic,
+                                       const uint64_t                                 seed) {
             for (ptrdiff_t e = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; e < n;
                  e += (ptrdiff_t)blockDim.x * gridDim.x) {
                 for (int i = 0; i < n_terms; i++) {
@@ -231,7 +248,7 @@ namespace sfem {
                     for (ptrdiff_t r = 0; r < rows; r++) {
                         const ptrdiff_t k = r * n + e;
                         const real_t    v = a * Codec::decode(h[k], old_scale) + increment(w, i, S_n, S_new, ref, k);
-                        h[k]              = Codec::encode(v, inv);
+                        h[k]              = device_codecs::encode_rounded<Codec>(v, inv, stochastic, seed, (i * rows + r) * n + e);
                     }
                 }
             }
@@ -314,6 +331,205 @@ namespace sfem {
             add_block_sum(s, out);
         }
 
+
+        // The packed store (sfem_PackedHistory.hpp).
+
+        /// The new value (r, e) of a packed tensor's write.
+        template <typename S_t>
+        __device__ inline real_t packed_new(const prony::PackedTensor &old,
+                                            const PackedUpdate         u,
+                                            const S_t *const           S_n,
+                                            const S_t *const           S_new,
+                                            const S_t *const           ref,
+                                            const ptrdiff_t            r,
+                                            const ptrdiff_t            e) {
+            const ptrdiff_t k  = r * old.n + e;
+            const real_t    sp = static_cast<real_t>(S_n[k]), sn = static_cast<real_t>(S_new[k]);
+            real_t          inc;
+            if (u.beta == 0) {
+                inc = u.b * (sn - sp);
+            } else {
+                const real_t R = static_cast<real_t>(ref[k]);
+                inc            = (u.alpha * u.beta - u.b) * (sp - R) + (u.b - u.beta) * (sn - R);
+            }
+            return u.alpha * old.value(r, e) + inc;
+        }
+
+        constexpr int PACK_THREADS = (int)prony::PACKED_BLOCK;
+
+        /// A write's plan as the device computes it: the largest |new value| (as the bits of a
+        /// non-negative double, which order as integers), the running maximum and the step that
+        /// follow from it, and the code area's size in 8-byte units.
+        struct DevicePlan {
+            unsigned long long max_bits;
+            real_t             max_abs;
+            real_t             step;
+            unsigned long long units;
+        };
+
+        /// The running maximum and the step, as QuadratureState computes them on the host.
+        __global__ void packed_step_kernel(DevicePlan *const plan, const real_t running_max, const real_t tolerance) {
+            const real_t m = fmax((real_t)__longlong_as_double((long long)plan->max_bits), running_max);
+            plan->max_abs  = m;
+            plan->step     = prony::grid_step(m, tolerance);
+        }
+
+        /// The code area's size: the last block's offset and size.
+        __global__ void packed_units_kernel(DevicePlan *const     plan,
+                                            const uint32_t *const offset,
+                                            const uint32_t *const sizes,
+                                            const ptrdiff_t       headers) {
+            plan->units = headers > 0 ? (unsigned long long)offset[headers - 1] + sizes[headers - 1] : 0;
+        }
+
+        /// The largest |new value|, as the bits of a non-negative double (which order as integers).
+        template <typename S_t>
+        __global__ void packed_max_kernel(const prony::PackedTensor old,
+                                          const PackedUpdate        u,
+                                          const S_t *const          S_n,
+                                          const S_t *const          S_new,
+                                          const S_t *const          ref,
+                                          unsigned long long *const out) {
+            __shared__ double part[NORM_BLOCK];
+            const ptrdiff_t   total = old.rows * old.n;
+            double            m     = 0;
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const ptrdiff_t r = k / old.n;
+                m                 = fmax(m, fabs((double)packed_new(old, u, S_n, S_new, ref, r, k - r * old.n)));
+            }
+            part[threadIdx.x] = m;
+            __syncthreads();
+            for (int half = NORM_BLOCK / 2; half > 0; half /= 2) {
+                if ((int)threadIdx.x < half) part[threadIdx.x] = fmax(part[threadIdx.x], part[threadIdx.x + half]);
+                __syncthreads();
+            }
+            if (threadIdx.x == 0) atomicMax(out, (unsigned long long)__double_as_longlong(part[0]));
+        }
+
+        /// One thread block per (row, block of elements), one thread per element: the block's
+        /// least code and width, and its size in 8-byte units.
+        template <typename S_t>
+        __global__ void packed_plan_kernel(const prony::PackedTensor old,
+                                           const PackedUpdate        u,
+                                           const S_t *const          S_n,
+                                           const S_t *const          S_new,
+                                           const S_t *const          ref,
+                                           const DevicePlan *const   plan,
+                                           const bool                stochastic,
+                                           const uint64_t            seed,
+                                           const uint64_t            k0,
+                                           int32_t *const            base,
+                                           uint8_t *const            width,
+                                           uint32_t *const           sizes) {
+            __shared__ long long lo[PACK_THREADS], hi[PACK_THREADS];
+            const ptrdiff_t      nb  = old.n_blocks();
+            const real_t         inv = 1 / plan->step;
+            for (ptrdiff_t h = blockIdx.x; h < old.rows * nb; h += gridDim.x) {
+                const ptrdiff_t r = h / nb, e0 = (h - r * nb) * prony::PACKED_BLOCK;
+                const ptrdiff_t e = e0 + threadIdx.x;
+                long long       q_lo = LLONG_MAX, q_hi = LLONG_MIN;
+                if (e < old.n) {
+                    const long long q = prony::grid_code(packed_new(old, u, S_n, S_new, ref, r, e), inv, stochastic, seed, k0 + r * old.n + e);
+                    q_lo = q_hi = q;
+                }
+                lo[threadIdx.x] = q_lo;
+                hi[threadIdx.x] = q_hi;
+                __syncthreads();
+                for (int half = PACK_THREADS / 2; half > 0; half /= 2) {
+                    if ((int)threadIdx.x < half) {
+                        lo[threadIdx.x] = min(lo[threadIdx.x], lo[threadIdx.x + half]);
+                        hi[threadIdx.x] = max(hi[threadIdx.x], hi[threadIdx.x + half]);
+                    }
+                    __syncthreads();
+                }
+                if (threadIdx.x == 0) {
+                    const ptrdiff_t count = min((ptrdiff_t)prony::PACKED_BLOCK, old.n - e0);
+                    // Beyond 32 bits the width saturates and the codes are wrong: refused on the
+                    // host before (plan_packed) and checked by the tests; here kept in bounds.
+                    const int w = min(32, smesh::compression::bit_width((uint64_t)(hi[0] - lo[0])));
+                    base[h]     = (int32_t)lo[0];
+                    width[h]    = (uint8_t)w;
+                    sizes[h]    = (uint32_t)(prony::packed_block_bytes(count, w) / 8);
+                }
+                __syncthreads();
+            }
+        }
+
+        /// The codes of each block, as the plan rounded them, ORed into the zeroed code area: a
+        /// code of w <= 32 bits spans at most two 32-bit words, and blocks start on 8 bytes.
+        template <typename S_t>
+        __global__ void packed_pack_kernel(const prony::PackedTensor old,
+                                           const PackedUpdate        u,
+                                           const S_t *const          S_n,
+                                           const S_t *const          S_new,
+                                           const S_t *const          ref,
+                                           const real_t              inv,
+                                           const bool                stochastic,
+                                           const uint64_t            seed,
+                                           const uint64_t            k0,
+                                           const int32_t *const      base,
+                                           const uint8_t *const      width,
+                                           const uint32_t *const     offset,
+                                           uint8_t *const            codes) {
+            const ptrdiff_t nb = old.n_blocks();
+            for (ptrdiff_t h = blockIdx.x; h < old.rows * nb; h += gridDim.x) {
+                const ptrdiff_t r = h / nb, e = (h - r * nb) * prony::PACKED_BLOCK + threadIdx.x;
+                const int       w = width[h];
+                if (w == 0 || e >= old.n) continue;
+                const long long q    = prony::grid_code(packed_new(old, u, S_n, S_new, ref, r, e), inv, stochastic, seed, k0 + r * old.n + e);
+                const uint64_t  code = (uint64_t)(q - base[h]);
+                const uint64_t  bit  = (uint64_t)threadIdx.x * w;
+                uint32_t *const word = reinterpret_cast<uint32_t *>(codes + (uint64_t)offset[h] * 8) + bit / 32;
+                const int       sh   = (int)(bit % 32);
+                atomicOr(word, (uint32_t)(code << sh));
+                if (sh + w > 32) atomicOr(word + 1, (uint32_t)(code >> (32 - sh)));
+            }
+        }
+
+        /// out = -b_sum S_n + ab (S_n - R): the frozen history's part that is not a stored code,
+        /// ab = sum_i alpha_i beta_i.
+        template <typename S_t>
+        __global__ void packed_frozen_init_kernel(const ptrdiff_t  total,
+                                                  const real_t     b_sum,
+                                                  const real_t     ab,
+                                                  const S_t *const S_n,
+                                                  const S_t *const ref,
+                                                  real_t *const    out) {
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const real_t s = static_cast<real_t>(S_n[k]);
+                out[k]         = -b_sum * s + (ab != 0 ? ab * (s - static_cast<real_t>(ref[k])) : real_t(0));
+            }
+        }
+
+        /// out += alpha H.
+        __global__ void packed_frozen_add_kernel(const prony::PackedTensor H, const real_t alpha, real_t *const out) {
+            const ptrdiff_t total = H.rows * H.n;
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const ptrdiff_t r = k / H.n;
+                out[k] += alpha * H.value(r, k - r * H.n);
+            }
+        }
+
+        /// The weighted sum of squares of H + beta (S_n - R) into *out.
+        template <typename S_t>
+        __global__ void packed_squared_norm_kernel(const prony::PackedTensor H,
+                                                   const int                 n_qp,
+                                                   const int                 n_diagonal,
+                                                   const real_t              beta,
+                                                   const S_t *const          S_n,
+                                                   const S_t *const          ref,
+                                                   real_t *const             out) {
+            const ptrdiff_t total = H.rows * H.n;
+            real_t          s     = 0;
+            for (ptrdiff_t k = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; k < total; k += (ptrdiff_t)blockDim.x * gridDim.x) {
+                const ptrdiff_t r = k / H.n;
+                real_t          v = H.value(r, k - r * H.n);
+                if (beta != 0) v += beta * (static_cast<real_t>(S_n[k]) - static_cast<real_t>(ref[k]));
+                s += (r / n_qp < n_diagonal ? real_t(1) : real_t(2)) * v * v;
+            }
+            add_block_sum(s, out);
+        }
+
         /// Call `f` with a null pointer of the stress type `stress_bytes` names.
         template <class F>
         int dispatch_stress(const int stress_bytes, F &&f) {
@@ -390,6 +606,8 @@ namespace sfem {
                          const prony::Means  &means,
                          const real_t *const  beta,
                          const void *const    ref,
+                         const int            stochastic,
+                         const uint64_t       seed,
                          void *const          stream) {
         if (n_terms > MAX_TERMS) return SFEM_FAILURE;
         SFEM_DEBUG_SYNCHRONIZE(stream);
@@ -403,10 +621,10 @@ namespace sfem {
                 if constexpr (Codec::mean_deviation) {
                     if (rows / means.n_qp > MD_MAX_COMPONENTS) return SFEM_FAILURE;
                     advance_mean_deviation_kernel<Codec, S_t><<<grid_for(n, MD_BLOCK), MD_BLOCK, 0, (cudaStream_t)stream>>>(
-                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, means, R);
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, means, R, stochastic != 0, seed);
                 } else {
                     advance_kernel<Codec, S_t><<<grid_for(n, block), block, 0, (cudaStream_t)stream>>>(
-                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, R);
+                            n_terms, rows, n, w, sp, sn, static_cast<typename Codec::storage_t *>(H), H_scales, R, stochastic != 0, seed);
                 }
                 return launched();
             });
@@ -526,6 +744,216 @@ namespace sfem {
         }
         SFEM_DEBUG_SYNCHRONIZE(stream);
         return ret;
+    }
+
+    namespace {
+        /// The pool of a call's work buffers, apart from the default pool where the packed
+        /// store's code areas live from one step to the next: emptied after every call, so it is
+        /// trimmed whole rather than around the codes. One per device, made at first use.
+        cudaMemPool_t work_pool() {
+            static cudaMemPool_t pools[64] = {};
+            int                  device    = 0;
+            if (cudaGetDevice(&device) != cudaSuccess || device >= 64) SFEM_ERROR("cu_prony: no usable device\n");
+            if (!pools[device]) {
+                cudaMemPoolProps props = {};
+                props.allocType        = cudaMemAllocationTypePinned;
+                props.location.type    = cudaMemLocationTypeDevice;
+                props.location.id      = device;
+                if (cudaMemPoolCreate(&pools[device], &props) != cudaSuccess) SFEM_ERROR("cu_prony: creating the work pool failed\n");
+            }
+            return pools[device];
+        }
+    }  // namespace
+
+    void *cu_prony_pool_allocate(const std::size_t bytes, void *const stream, const bool persistent) {
+        const cudaStream_t s    = (cudaStream_t)stream;
+        void              *data = nullptr;
+        // A zero-sized request still yields a distinct pointer to release.
+        const std::size_t n  = bytes > 0 ? bytes : 1;
+        const cudaError_t ok = persistent ? cudaMallocAsync(&data, n, s) : cudaMallocFromPoolAsync(&data, n, work_pool(), s);
+        if (ok != cudaSuccess || cudaMemsetAsync(data, 0, n, s) != cudaSuccess) {
+            SFEM_ERROR("cu_prony_pool_allocate: allocating %zu bytes failed\n", bytes);
+        }
+        return data;
+    }
+
+    void cu_prony_pool_release(void *const data, void *const stream) { cudaFreeAsync(data, (cudaStream_t)stream); }
+
+    std::size_t cu_prony_work_pool_peak() {
+        cuuint64_t high = 0;
+        if (cudaMemPoolGetAttribute(work_pool(), cudaMemPoolAttrUsedMemHigh, &high) != cudaSuccess) return 0;
+        return (std::size_t)high;
+    }
+
+    void cu_prony_stream_synchronize(void *const stream) {
+        if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess) SFEM_ERROR("cu_prony_stream_synchronize failed\n");
+    }
+
+    void cu_prony_pool_trim(void *const stream) {
+        if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess || cudaMemPoolTrimTo(work_pool(), 0) != cudaSuccess) {
+            SFEM_ERROR("cu_prony_pool_trim: returning the work pool's memory failed\n");
+        }
+    }
+
+    int cu_prony_packed_plan(const prony::PackedTensor &old,
+                             const PackedUpdate         u,
+                             const int                  stress_bytes,
+                             const void *const          S_n,
+                             const void *const          S_new,
+                             const void *const          ref,
+                             const real_t               running_max,
+                             const real_t               tolerance,
+                             const int                  stochastic,
+                             const uint64_t             seed,
+                             const uint64_t             k0,
+                             int32_t *const             base,
+                             uint8_t *const             width,
+                             uint32_t *const            offset,
+                             PackedPlan *const          plan,
+                             void *const                stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        const cudaStream_t s       = (cudaStream_t)stream;
+        const ptrdiff_t    headers = old.rows * old.n_blocks();
+        auto *const        d_plan  = static_cast<DevicePlan *>(cu_prony_pool_allocate(sizeof(DevicePlan), stream, false));
+        auto *const        sizes   = static_cast<uint32_t *>(cu_prony_pool_allocate(headers * sizeof(uint32_t), stream, false));
+        const int          ret     = dispatch_stress(stress_bytes, [&](auto stress) {
+            using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+            packed_max_kernel<S_t><<<grid_for(old.rows * old.n, NORM_BLOCK), NORM_BLOCK, 0, s>>>(
+                    old, u, (const S_t *)S_n, (const S_t *)S_new, (const S_t *)ref, &d_plan->max_bits);
+            packed_step_kernel<<<1, 1, 0, s>>>(d_plan, running_max, tolerance);
+            packed_plan_kernel<S_t><<<grid_for(headers, 1), PACK_THREADS, 0, s>>>(
+                    old, u, (const S_t *)S_n, (const S_t *)S_new, (const S_t *)ref, d_plan, stochastic != 0, seed, k0, base, width, sizes);
+            return launched();
+        });
+        // The offsets: an exclusive sum of the sizes, on the device.
+        std::size_t temp_bytes = 0;
+        int         status     = ret;
+        if (status == SFEM_SUCCESS &&
+            cub::DeviceScan::ExclusiveSum(nullptr, temp_bytes, sizes, offset, (int)headers, s) != cudaSuccess) {
+            status = SFEM_FAILURE;
+        }
+        if (status == SFEM_SUCCESS) {
+            void *const temp = cu_prony_pool_allocate(temp_bytes, stream, false);
+            if (cub::DeviceScan::ExclusiveSum(temp, temp_bytes, sizes, offset, (int)headers, s) != cudaSuccess) status = SFEM_FAILURE;
+            cu_prony_pool_release(temp, stream);
+        }
+        if (status == SFEM_SUCCESS) {
+            packed_units_kernel<<<1, 1, 0, s>>>(d_plan, offset, sizes, headers);
+            status = launched();
+        }
+        // The one wait of a write: the host allocates the code area from its size.
+        DevicePlan host{};
+        if (status == SFEM_SUCCESS && (cudaMemcpyAsync(&host, d_plan, sizeof(host), cudaMemcpyDeviceToHost, s) != cudaSuccess ||
+                                       cudaStreamSynchronize(s) != cudaSuccess)) {
+            status = SFEM_FAILURE;
+        }
+        cu_prony_pool_release(sizes, stream);
+        cu_prony_pool_release(d_plan, stream);
+        if (status != SFEM_SUCCESS) return status;
+        plan->max_abs = host.max_abs;
+        plan->step    = host.step;
+        plan->units   = host.units;
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return SFEM_SUCCESS;
+    }
+
+    int cu_prony_packed_pack(const prony::PackedTensor &old,
+                             const PackedUpdate         u,
+                             const int                  stress_bytes,
+                             const void *const          S_n,
+                             const void *const          S_new,
+                             const void *const          ref,
+                             const real_t               step,
+                             const int                  stochastic,
+                             const uint64_t             seed,
+                             const uint64_t             k0,
+                             const int32_t *const       base,
+                             const uint8_t *const       width,
+                             const uint32_t *const      offset,
+                             uint8_t *const             codes,
+                             void *const                stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        const ptrdiff_t headers = old.rows * old.n_blocks();
+        const int       ret     = dispatch_stress(stress_bytes, [&](auto stress) {
+            using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+            packed_pack_kernel<S_t><<<grid_for(headers, 1), PACK_THREADS, 0, (cudaStream_t)stream>>>(old,
+                                                                                                      u,
+                                                                                                      (const S_t *)S_n,
+                                                                                                      (const S_t *)S_new,
+                                                                                                      (const S_t *)ref,
+                                                                                                      1 / step,
+                                                                                                      stochastic != 0,
+                                                                                                      seed,
+                                                                                                      k0,
+                                                                                                      base,
+                                                                                                      width,
+                                                                                                      offset,
+                                                                                                      codes);
+            return launched();
+        });
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return ret;
+    }
+
+    int cu_prony_packed_frozen_history(const ptrdiff_t                  rows,
+                                       const ptrdiff_t                  n,
+                                       const int                        n_terms,
+                                       const prony::PackedTensor *const H,
+                                       const real_t *const              alpha,
+                                       const real_t                     b_sum,
+                                       const real_t *const              beta,
+                                       const int                        stress_bytes,
+                                       const void *const                S_n,
+                                       const void *const                ref,
+                                       real_t *const                    out,
+                                       void *const                      stream) {
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        const cudaStream_t s     = (cudaStream_t)stream;
+        const int          block = 128;
+        real_t             ab    = 0;
+        for (int i = 0; i < n_terms; i++) ab += beta ? alpha[i] * beta[i] : real_t(0);
+        const ptrdiff_t total = rows * n;
+        int             ret   = dispatch_stress(stress_bytes, [&](auto stress) {
+            using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+            packed_frozen_init_kernel<S_t><<<grid_for(total, block), block, 0, s>>>(total, b_sum, ab, (const S_t *)S_n, (const S_t *)ref, out);
+            return launched();
+        });
+        for (int i = 0; i < n_terms && ret == SFEM_SUCCESS; i++) {
+            packed_frozen_add_kernel<<<grid_for(total, block), block, 0, s>>>(H[i], alpha[i], out);
+            ret = launched();
+        }
+        SFEM_DEBUG_SYNCHRONIZE(stream);
+        return ret;
+    }
+
+    int cu_prony_packed_squared_norms(const int                        n_terms,
+                                      const prony::PackedTensor *const H,
+                                      const int                        n_qp,
+                                      const int                        n_diagonal,
+                                      const real_t *const              beta,
+                                      const int                        stress_bytes,
+                                      const void *const                S_n,
+                                      const void *const                ref,
+                                      real_t *const                    scratch,
+                                      real_t *const                    out,
+                                      void *const                      stream) {
+        const cudaStream_t s = (cudaStream_t)stream;
+        if (cudaMemsetAsync(scratch, 0, n_terms * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
+        int ret = SFEM_SUCCESS;
+        for (int i = 0; i < n_terms && ret == SFEM_SUCCESS; i++) {
+            ret = dispatch_stress(stress_bytes, [&](auto stress) {
+                using S_t = std::remove_const_t<std::remove_pointer_t<decltype(stress)>>;
+                packed_squared_norm_kernel<S_t><<<grid_for(H[i].rows * H[i].n, NORM_BLOCK), NORM_BLOCK, 0, s>>>(
+                        H[i], n_qp, n_diagonal, beta ? beta[i] : real_t(0), (const S_t *)S_n, (const S_t *)ref, &scratch[i]);
+                return launched();
+            });
+        }
+        if (ret != SFEM_SUCCESS) return ret;
+        if (cudaMemcpyAsync(out, scratch, n_terms * sizeof(real_t), cudaMemcpyDeviceToHost, s) != cudaSuccess ||
+            cudaStreamSynchronize(s) != cudaSuccess) {
+            return SFEM_FAILURE;
+        }
+        return SFEM_SUCCESS;
     }
 
 }  // namespace sfem

@@ -25,6 +25,7 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_BLAS_cuda.hpp"
+#include "sfem_prony_buffers.hpp"
 #endif
 
 namespace sfem {
@@ -576,6 +577,8 @@ namespace sfem {
             PronyProbe(RelaxationGroups &relaxations, const std::shared_ptr<Communicator> &comm)
                 : relaxations_(relaxations), comm_(comm), blocks_(relaxations.block_names()) {
                 if (blocks_.empty()) SFEM_ERROR("Prony probe: the material has no blocks\n");
+                // Sampled after every step: the norms come from the step's commit.
+                relaxations.track_squared_norms();
                 for (const auto &d : relaxations.declarations()) {
                     const auto &series = relaxations.relaxation(blocks_[0], d.group).series();
                     for (const auto &b : blocks_) {
@@ -610,7 +613,11 @@ namespace sfem {
                     names.push_back(d.group + "_stored");
                 }
                 // Persistent bytes over every rank, by what holds them (RelaxationGroups::Bytes).
-                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_stress"}) names.push_back(what);
+                // bytes_history_packed: what the history's integer codes would take packed by frame
+                // of reference (QuadratureState::packed_bytes), host stores only.
+                for (const char *what : {"bytes_history", "bytes_reference", "bytes_frozen", "bytes_previous", "bytes_history_packed"}) {
+                    names.push_back(what);
+                }
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
                 // Cumulative over the run, host loops only (sfem_prony_diagnostics.hpp).
                 names.push_back("updates");
@@ -619,7 +626,7 @@ namespace sfem {
                 return names;
             }
 
-            int sample(const StepRecord &, real_t *const values) override {
+            int sample(const StepRecord &record, real_t *const values) override {
                 SFEM_TRACE_SCOPE("PronyProbe::sample");
                 int c = 0;
                 for (const auto &d : relaxations_.declarations()) {
@@ -634,7 +641,7 @@ namespace sfem {
                     block_.resize(n);
                     for (const auto &b : blocks_) {
                         const auto &r = relaxations_.relaxation(b, d.group);
-                        relaxations_.squared_norms(b, d.group, n_diagonal, block_.data());
+                        relaxations_.squared_norms(b, d.group, n_diagonal, record.x, block_.data());
                         for (int k = 0; k < n; ++k) sums_[k] += block_[k];
                         sums_[n] += static_cast<real_t>(r.n_qp()) * r.n_elements();
                     }
@@ -644,9 +651,13 @@ namespace sfem {
                     values[c++] = relaxations_.relaxation(blocks_[0], d.group).n_stored_terms();
                 }
                 const auto bytes   = relaxations_.bytes_breakdown();
-                real_t     held[4] = {real_t(bytes.history), real_t(bytes.reference), real_t(bytes.frozen), real_t(bytes.stress)};
-                if (comm_->size() > 1) comm_->sum(held, 4, smesh::TypeToEnum<real_t>::value());
-                for (int k = 0; k < 4; ++k) values[c++] = held[k];
+                real_t     held[5] = {real_t(bytes.history),
+                                      real_t(bytes.reference),
+                                      real_t(bytes.frozen),
+                                      real_t(bytes.previous),
+                                      real_t(bytes.history_packed)};
+                if (comm_->size() > 1) comm_->sum(held, 5, smesh::TypeToEnum<real_t>::value());
+                for (int k = 0; k < 5; ++k) values[c++] = held[k];
 #ifdef SFEM_ENABLE_PRONY_DIAGNOSTICS
                 real_t counts[2] = {real_t(prony::update_counts().updated), real_t(prony::update_counts().lost)};
                 if (comm_->size() > 1) comm_->sum(counts, 2, smesh::TypeToEnum<real_t>::value());
@@ -670,8 +681,9 @@ namespace sfem {
                 : comm_(comm), account_(account) {}
 
             std::vector<std::string> columns() const override {
-                // device_used_* are sampled at step ends; device_pool_peak is the stream-ordered pool's
-                // high-water mark, buffers an update held while it ran (a stored tangent's window).
+                // device_used_* are sampled at step ends; device_pool_peak is the stream-ordered pools'
+                // high-water marks, buffers an update held while it ran (a stored tangent's window, the
+                // Prony history's relaxed stresses).
                 std::vector<std::string> names{"host_peak_rss", "device_used_peak", "device_used_now", "device_pool_peak"};
                 if (!account_) return names;
                 for (int c = 0; c < MemoryLedger::N_CATEGORIES; ++c) {
@@ -694,7 +706,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
                 device_now   = real_t(d_memory_in_use());
                 device_peak_ = std::max(device_peak_, device_now);
-                pool_peak    = real_t(d_memory_pool_peak());
+                pool_peak    = real_t(d_memory_pool_peak() + cu_prony_work_pool_peak());
 #endif
                 sums_.assign({rss, device_peak_, device_now, pool_peak});
                 if (account_) {
@@ -749,7 +761,7 @@ namespace sfem {
                 for (size_t k = 0; k < times_.size(); ++k) {
                     // The grid's times are reached exactly (a cut-back finishes its interval).
                     if (std::abs(record.t - times_[k]) > real_t(1e-6) * record.dt) continue;
-                    if (write(k) != SFEM_SUCCESS) return SFEM_FAILURE;
+                    if (write(k, record.x) != SFEM_SUCCESS) return SFEM_FAILURE;
                 }
                 return SFEM_SUCCESS;
             }
@@ -770,7 +782,7 @@ namespace sfem {
                 return smesh::array_write(path, mean_.data(), (ptrdiff_t)mean_.size());
             }
 
-            int write(const size_t k) {
+            int write(const size_t k, const real_t *const x) {
                 SFEM_TRACE_SCOPE("HistorySnapshots::write");
                 const smesh::Path dir = dir_ / std::to_string(k);
                 if (smesh::create_directory(dir_) != SFEM_SUCCESS || smesh::create_directory(dir) != SFEM_SUCCESS) return SFEM_FAILURE;
@@ -779,18 +791,23 @@ namespace sfem {
                         const auto     &r  = relaxations_.relaxation(block, group.group);
                         const int       nc = r.n_components(), nq = r.n_qp();
                         const ptrdiff_t ne = r.n_elements(), n = (ptrdiff_t)nc * nq * ne;
-                        const std::string stem = block + "." + group.group + ".";
                         values_.resize(n);
                         copy_to_host(es_, relaxations_.history(block, group.history), n, values_.data());
-                        if (write_mean(dir / (stem + "Shist.float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
-                        for (int i = 0; i < r.series().n_terms(); ++i) {
-                            if (!r.stored(i)) continue;
-                            relaxations_.decode_history(block, group.group, i, values_.data());
-                            if (write_mean(dir / (stem + "H" + std::to_string(i) + ".float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
-                        }
+                        if (write_mean(dir / (block + "." + group.group + ".Shist.float64"), nc, nq, ne) != SFEM_SUCCESS) return SFEM_FAILURE;
                     }
                 }
-                return SFEM_SUCCESS;
+                // Every stored term from one evaluation of the relaxed stresses at x.
+                int status = SFEM_SUCCESS;
+                relaxations_.decode_stored_histories(
+                        x, [&](const std::string &block, const std::string &group, const int i, const real_t *const values) {
+                            if (status != SFEM_SUCCESS) return;
+                            const auto     &r  = relaxations_.relaxation(block, group);
+                            const int       nc = r.n_components(), nq = r.n_qp();
+                            const ptrdiff_t ne = r.n_elements();
+                            values_.assign(values, values + (ptrdiff_t)nc * nq * ne);
+                            status = write_mean(dir / (block + "." + group + ".H" + std::to_string(i) + ".float64"), nc, nq, ne);
+                        });
+                return status;
             }
         };
     }  // namespace

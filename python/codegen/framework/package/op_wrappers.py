@@ -6782,8 +6782,8 @@ _HEADER_RELAXATION_BASE = {False: "", True: ", public HistoryDependent"}
 _HEADER_RELAXATION_DECLARATIONS = {
     False: "",
     True: """
-    void begin_step(const real_t t, const real_t dt) override;
-    void advance(const real_t *const x) override;
+    void begin_step(const real_t t, const real_t dt, const real_t *const x_n) override;
+    void advance(const real_t *const x_n, const real_t *const x) override;
     void reset_history(const real_t *const x) override;
     //! The relaxation state: spectra, time-temperature shift, storage.
     RelaxationGroups &relaxation_groups();
@@ -7151,6 +7151,8 @@ def _relaxation_fragments(
                                    entry.second.block->n_elements(),
                                    quadrature_points(entry.second.element_type));
     }
+    impl_->relaxation->set_stress_evaluation(
+        [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
 """
     methods = """
   // Null until `initialize`, which every factory route calls; an operator
@@ -7162,25 +7164,22 @@ def _relaxation_fragments(
 %(stream_binding)s    return *impl_->relaxation;
   }
 
-  // The relaxed stress the step starts from is the one the last `advance`
-  // evaluated at the converged state, kept by the relaxation: each stress is
-  // evaluated once, and with no spectrum anywhere not at all.
-  void %(op)s::begin_step(const real_t t, const real_t dt) {
+  // The relaxed stresses are evaluated by the relaxation, from the displacements
+  // the caller holds, through `quadrature_output` (set at `initialize`): with no
+  // spectrum anywhere not at all.
+  void %(op)s::begin_step(const real_t t, const real_t dt, const real_t *const x_n) {
     SFEM_TRACE_SCOPE("%(op)s::begin_step");
-    relaxation_groups().begin_step(
-        t, dt, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().begin_step(t, dt, x_n);
   }
 
-  void %(op)s::advance(const real_t *const x) {
+  void %(op)s::advance(const real_t *const x_n, const real_t *const x) {
     SFEM_TRACE_SCOPE("%(op)s::advance");
-    relaxation_groups().advance(
-        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().advance(x_n, x);
   }
 
   void %(op)s::reset_history(const real_t *const x) {
     SFEM_TRACE_SCOPE("%(op)s::reset_history");
-    relaxation_groups().reset(
-        x, [this](const real_t *const state, const int slot) { return quadrature_output(state, slot); });
+    relaxation_groups().reset(x);
   }
 
   int %(op)s::quadrature_output(const real_t *const x, const int slot) {

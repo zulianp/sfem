@@ -3,11 +3,13 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 
 #include "sfem_base.hpp"
 #include "sfem_config.h"
 #include "sfem_logger.hpp"
+#include "smesh_codec_quant.hpp"
 
 namespace sfem {
 
@@ -30,6 +32,14 @@ namespace sfem {
     /// of consecutive elements (`QuadratureState`).  The rounding is then
     /// relative to how much the history varies over a group rather than to its
     /// size: the quantized tangent's mean+deviation, applied to the history.
+    ///
+    /// The grid format codes every value of a stored tensor on one power-of-two
+    /// grid, x = q 2^L (smesh's quantisation grid), whose step follows a
+    /// tolerance relative to the tensor's running maximum over the store: the
+    /// same absolute accuracy everywhere, rather than relative to each element.
+    /// The running maximum only grows, so the step only coarsens, and only when
+    /// the maximum crosses a power of two: a value that does not change keeps
+    /// its code from one step to the next.
     enum class HistoryStorage {
         FULL,            ///< real_t
         FLOAT32,         ///< float
@@ -38,8 +48,21 @@ namespace sfem {
         INT16_SCALED,    ///< symmetric 16-bit quantisation, one scale per tensor and element
         INT8_SCALED,     ///< symmetric 8-bit quantisation, one scale per tensor and element
         FLOAT16_MD,      ///< a mean per group, the deviations as FLOAT16_SCALED
-        INT8_MD          ///< a mean per group, the deviations as INT8_SCALED
+        INT8_MD,         ///< a mean per group, the deviations as INT8_SCALED
+        QUANT_GRID,      ///< int32 codes on one power-of-two grid per tensor (history_tolerance)
+        QUANT_BLOCK      ///< QUANT_GRID's codes packed per block of elements (sfem_PackedHistory.hpp)
     };
+
+    /// How an integer code is rounded when the history is written: to the
+    /// nearest code, or stochastically, up with the probability of the
+    /// remainder.  Stochastic rounding is unbiased, so an increment below half a
+    /// step is not lost on average: the rounding error of a slowly relaxing term
+    /// walks rather than drifts.  Its random numbers are a hash of the write and
+    /// the value's position, so runs repeat bit for bit, on any thread count.
+    enum class HistoryRounding { NEAREST, STOCHASTIC };
+
+    HistoryRounding history_rounding_from_string(const std::string &name);
+    const char     *to_string(const HistoryRounding rounding);
 
     /// The type a mean-deviation store holds its means in.
     using history_mean_t = float;
@@ -68,7 +91,42 @@ namespace sfem {
     std::size_t    bytes_per_value(const HistoryStorage storage);
     bool           is_scaled(const HistoryStorage storage);
     bool           is_mean_deviation(const HistoryStorage storage);
+    bool           is_grid(const HistoryStorage storage);
+    bool           is_integer(const HistoryStorage storage);
+    /// Whether the store packs its codes (QUANT_BLOCK): its tensors are not arrays of a codec's
+    /// storage_t, so the pointwise loops and `dispatch_history_codec` do not apply to it.
+    bool           is_packed(const HistoryStorage storage);
 
+    namespace prony {
+        /// A uniform number in [0, 1) from a write's seed and a value's position: splitmix64.
+        /// One definition for the host and the device loops, so both draw the same numbers.
+        SFEM_DEVICE_INLINE real_t uniform(const uint64_t seed, const uint64_t k) {
+            uint64_t z = seed + (k + 1) * 0x9e3779b97f4a7c15ull;
+            z          = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+            z          = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+            z          = z ^ (z >> 31);
+            return static_cast<real_t>(z >> 11) * real_t(1.0 / 9007199254740992.0);
+        }
+
+        /// The step of a grid store: the largest power of two 2^L with 2^(L-1) <= tolerance *
+        /// max_abs (smesh's level_for_bound), so the rounding error is at most that; one while
+        /// the tensor is zero.
+        SFEM_DEVICE_INLINE real_t grid_step(const real_t max_abs, const real_t tolerance) {
+            const int L = smesh::compression::level_for_bound(static_cast<double>(tolerance) * static_cast<double>(max_abs));
+            if (L == INT32_MIN) return 1;
+            return static_cast<real_t>(smesh::compression::pow2i(L));
+        }
+
+        /// The running maximum as a grid store keeps it, in a scaling_t: rounded up, never below
+        /// the value, so the step taken from it at the next write is never finer than this
+        /// write's (rounded to nearest, it could fall below a power of two that `max_abs` was
+        /// above, halving the step and re-coding every unchanged value).
+        inline scaling_t grid_max(const real_t max_abs) {
+            scaling_t m = static_cast<scaling_t>(max_abs);
+            if (static_cast<real_t>(m) < max_abs) m = std::nextafter(m, std::numeric_limits<scaling_t>::infinity());
+            return m;
+        }
+    }  // namespace prony
     /// A codec is a compile-time policy for the pointwise loops: the loops are
     /// templated on it and the runtime `HistoryStorage` picks one once, at the
     /// boundary, in `dispatch_history_codec` -- never per value.
@@ -80,6 +138,8 @@ namespace sfem {
         using storage_t                        = T;
         static constexpr bool   scaled         = false;
         static constexpr bool   mean_deviation = false;
+        static constexpr bool   grid           = false;
+        static constexpr bool   integer        = false;
         static inline real_t    decode(const T s, const real_t) { return static_cast<real_t>(s); }
         static inline T         encode(const real_t v, const real_t) { return static_cast<T>(v); }
         static inline scaling_t scale_for(const real_t) { return 1; }
@@ -93,6 +153,8 @@ namespace sfem {
         using storage_t                      = half_t;
         static constexpr bool scaled         = true;
         static constexpr bool mean_deviation = false;
+        static constexpr bool grid           = false;
+        static constexpr bool integer        = false;
 
         static inline real_t decode(const half_t s, const real_t scale) { return static_cast<real_t>(s) * scale; }
         static inline half_t encode(const real_t v, const real_t inv_scale) { return static_cast<half_t>(v * inv_scale); }
@@ -111,12 +173,20 @@ namespace sfem {
         using storage_t                      = T;
         static constexpr bool scaled         = true;
         static constexpr bool mean_deviation = false;
+        static constexpr bool grid           = false;
+        static constexpr bool integer        = true;
 
         static inline real_t decode(const T s, const real_t scale) { return static_cast<real_t>(s) * scale; }
 
-        static inline T encode(const real_t v, const real_t inv_scale) {
-            real_t code = std::nearbyint(v * inv_scale);
-            code        = code > LARGEST_CODE ? LARGEST_CODE : (code < -LARGEST_CODE ? -LARGEST_CODE : code);
+        static inline T encode(const real_t v, const real_t inv_scale) { return clamp(std::nearbyint(v * inv_scale)); }
+
+        /// Rounded up with the probability of the remainder: u uniform in [0, 1).
+        static inline T encode(const real_t v, const real_t inv_scale, const real_t u) {
+            return clamp(std::floor(v * inv_scale + u));
+        }
+
+        static inline T clamp(real_t code) {
+            code = code > LARGEST_CODE ? LARGEST_CODE : (code < -LARGEST_CODE ? -LARGEST_CODE : code);
             return static_cast<T>(code);
         }
 
@@ -124,6 +194,13 @@ namespace sfem {
             if (!(max_abs > 0)) return 1;
             return static_cast<scaling_t>(max_abs / LARGEST_CODE);
         }
+    };
+
+    /// int32 codes on a power-of-two grid per tensor (`HistoryStorage::QUANT_GRID`): the scale
+    /// the loops hand it is the tensor's step, one for the whole tensor.
+    struct GridCodec : ScaledIntegerCodec<int32_t, 2147483647> {
+        static constexpr bool scaled = false;
+        static constexpr bool grid   = true;
     };
 
     /// A scaled codec for the deviations from a mean the loops keep beside
@@ -161,6 +238,10 @@ namespace sfem {
                 return f(Float16MeanDeviationCodec{});
             case HistoryStorage::INT8_MD:
                 return f(Int8MeanDeviationCodec{});
+            case HistoryStorage::QUANT_GRID:
+                return f(GridCodec{});
+            case HistoryStorage::QUANT_BLOCK:
+                break;
         }
 
         SFEM_ERROR("dispatch_history_codec: unknown storage %d\n", static_cast<int>(storage));

@@ -336,6 +336,10 @@ int test_mooney_rivlin_visco_relaxation() {
     // Time counting
     double total_hessian_time = 0;
 
+    // The displacement each step starts from: the last committed one.
+    auto x_n = sfem::create_buffer<real_t>(ndofs, es);
+    blas->copy(ndofs, x->data(), x_n->data());
+
     while (t < SFEM_T) {
         printf("Step %zu: t=%.3f\n", steps, t);
 
@@ -359,7 +363,7 @@ int test_mooney_rivlin_visco_relaxation() {
         }
 
         // The step being solved ends at t + dt; its history is fixed here.
-        op->begin_step(t + dt, dt);
+        op->begin_step(t + dt, dt, x_n->data());
 
         // Newton Loop with Inertia
         for (int iter = 0; iter < 20; ++iter) {
@@ -420,8 +424,9 @@ int test_mooney_rivlin_visco_relaxation() {
         }
 
         // Update history
-        op->advance(x->data());
+        op->advance(x_n->data(), x->data());
         newmark->advance(x->data());
+        blas->copy(ndofs, x->data(), x_n->data());
 
         t += dt;
         steps++;

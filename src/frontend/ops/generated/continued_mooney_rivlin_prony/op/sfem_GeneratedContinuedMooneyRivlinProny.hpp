@@ -75,8 +75,8 @@ namespace sfem {
     bool tangent_projection_supported() const override;
     void set_tangent_projection(const bool on) override;
     std::size_t geometry_bytes() const override;
-    void begin_step(const real_t t, const real_t dt) override;
-    void advance(const real_t *const x) override;
+    void begin_step(const real_t t, const real_t dt, const real_t *const x_n) override;
+    void advance(const real_t *const x_n, const real_t *const x) override;
     void reset_history(const real_t *const x) override;
     //! The relaxation state: spectra, time-temperature shift, storage.
     RelaxationGroups &relaxation_groups();

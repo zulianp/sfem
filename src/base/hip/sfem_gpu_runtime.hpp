@@ -49,6 +49,12 @@
 #define cudaMemPoolSetAttribute hipMemPoolSetAttribute
 #define cudaMemPoolAttrReleaseThreshold hipMemPoolAttrReleaseThreshold
 #define cudaMemPoolAttrUsedMemHigh hipMemPoolAttrUsedMemHigh
+#define cudaMemPoolProps hipMemPoolProps
+#define cudaMemPoolCreate hipMemPoolCreate
+#define cudaMemPoolTrimTo hipMemPoolTrimTo
+#define cudaMallocFromPoolAsync hipMallocFromPoolAsync
+#define cudaMemAllocationTypePinned hipMemAllocationTypePinned
+#define cudaMemLocationTypeDevice hipMemLocationTypeDevice
 
 // cuda.h's (driver API) integer types.
 typedef unsigned long long cuuint64_t;

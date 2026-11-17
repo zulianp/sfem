@@ -31,6 +31,13 @@
 // Only a scaled codec's store has scales (`QuadratureState::scales`); for the
 // others the scales pointer is null, and the loops neither read it nor offset
 // it: an unscaled code is decoded under scale one, which its codec ignores.
+// A grid store's "scales" are two per tensor, its step and its running maximum
+// ([2 t] and [2 t + 1]); the loops read the step for every value of the tensor.
+//
+// An integer codec's code is rounded to the nearest, or stochastically
+// (`HistoryRounding`), with u = uniform(seed, k), k the value's position in the
+// tensors written ((t * rows + r) * n + e): the same numbers on any thread
+// count.
 
 namespace sfem {
     namespace prony {
@@ -41,6 +48,23 @@ namespace sfem {
 
         namespace detail {
             static constexpr int MAX_COMPONENTS = 9;
+
+            /// The code of v, rounded as `stochastic` says for an integer codec; a float codec
+            /// rounds its own way.
+            template <class Codec>
+            inline typename Codec::storage_t encode_rounded(const real_t   v,
+                                                            const real_t   inv,
+                                                            const bool     stochastic,
+                                                            const uint64_t seed,
+                                                            const ptrdiff_t k) {
+                if constexpr (Codec::integer) {
+                    if (stochastic) return Codec::encode(v, inv, uniform(seed, static_cast<uint64_t>(k)));
+                }
+                (void)stochastic;
+                (void)seed;
+                (void)k;
+                return Codec::encode(v, inv);
+            }
 
             /// Store the values z(r, l) of one tensor (row r, element e0 + l) on the block of
             /// elements [e0, e0 + nb) as means and deviations: per component and group the mean
@@ -59,7 +83,10 @@ namespace sfem {
                                       Old                                    &&old,
                                       typename Codec::storage_t *const H,  // read by z: not restrict
                                       scaling_t *const                 scales,
-                                      history_mean_t *const            means) {
+                                      history_mean_t *const            means,
+                                      const bool                       stochastic = false,
+                                      const uint64_t                   seed       = 0,
+                                      const ptrdiff_t                  k0         = 0) {
                 (void)old;
                 const ptrdiff_t nc  = rows / m.n_qp;
                 const ptrdiff_t g0  = e0 / m.elements;
@@ -105,10 +132,10 @@ namespace sfem {
                         if constexpr (COUNT) {
                             SFEM_PRONY_DIAGNOSTIC(const real_t before = old(r, l));
                             const real_t v = z(r, l);
-                            h[l]           = Codec::encode(v - mc[l], inv[l]);
+                            h[l]           = encode_rounded<Codec>(v - mc[l], inv[l], stochastic, seed, k0 + r * n + e0 + l);
                             SFEM_PRONY_COUNT(before, v, mc[l] + Codec::decode(h[l], scale[l]));
                         } else {
-                            h[l] = Codec::encode(z(r, l) - mc[l], inv[l]);
+                            h[l] = encode_rounded<Codec>(z(r, l) - mc[l], inv[l], stochastic, seed, k0 + r * n + e0 + l);
                         }
                     }
                 }
@@ -123,7 +150,10 @@ namespace sfem {
             /// The scale at `scales[k]`, or one for an unscaled codec, whose `scales` is null.
             template <class Codec>
             inline scaling_t scale_at(const scaling_t *const scales, const ptrdiff_t k) {
-                if constexpr (Codec::scaled) {
+                if constexpr (Codec::grid) {
+                    (void)k;
+                    return scales[0];
+                } else if constexpr (Codec::scaled) {
                     return scales[k];
                 } else {
                     (void)scales;
@@ -132,14 +162,21 @@ namespace sfem {
                 }
             }
 
-            /// `scales + offset` for a scaled codec; null for an unscaled one, which has no scales.
+            /// The scales of tensor i on the elements from e0: per element for a scaled codec,
+            /// the tensor's step for a grid one, null for an unscaled one, which has no scales.
             template <class Codec, class T>
-            inline T *scales_from(T *const scales, const ptrdiff_t offset) {
-                if constexpr (Codec::scaled) {
-                    return scales + offset;
+            inline T *term_scales(T *const scales, const int i, const ptrdiff_t n, const ptrdiff_t e0) {
+                if constexpr (Codec::grid) {
+                    (void)n;
+                    (void)e0;
+                    return scales + 2 * i;
+                } else if constexpr (Codec::scaled) {
+                    return scales + i * n + e0;
                 } else {
                     (void)scales;
-                    (void)offset;
+                    (void)i;
+                    (void)n;
+                    (void)e0;
                     return nullptr;
                 }
             }
@@ -174,14 +211,29 @@ namespace sfem {
             }
         }  // namespace detail
 
-        /// Encode `rows` rows of real_t values into one tensor of a store.
+        /// Encode `rows` rows of real_t values into one tensor of a store.  A grid store
+        /// (`scales` = its step and running maximum) takes its step from `tolerance`.
         template <class Codec>
         void encode(const ptrdiff_t                  rows,
                     const ptrdiff_t                  n,
                     const real_t *const SFEM_RESTRICT values,
                     typename Codec::storage_t *const SFEM_RESTRICT out,
                     scaling_t *const SFEM_RESTRICT    scales,
-                    const Means                      &m = Means{}) {
+                    const Means                      &m         = Means{},
+                    const real_t                      tolerance = 0) {
+            if constexpr (Codec::grid) {
+                real_t max_abs = scales[1];
+#pragma omp parallel for reduction(max : max_abs)
+                for (ptrdiff_t k = 0; k < rows * n; k++) max_abs = std::max(max_abs, std::abs(values[k]));
+                const real_t step = grid_step(max_abs, tolerance);
+                scales[0]         = static_cast<scaling_t>(step);
+                scales[1]         = grid_max(max_abs);
+                const real_t inv  = 1 / step;
+#pragma omp parallel for
+                for (ptrdiff_t k = 0; k < rows * n; k++) out[k] = Codec::encode(values[k], inv);
+                return;
+            }
+            (void)tolerance;
             if constexpr (Codec::mean_deviation) {
 #pragma omp parallel for
                 for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
@@ -290,7 +342,7 @@ namespace sfem {
 
                     for (int i = 0; i < n_terms; i++) {
                         const typename HCodec::storage_t *const h  = &H[(i * rows + r) * n + e0];
-                        const scaling_t *const                  hs = detail::scales_from<HCodec>(H_scales, i * n + e0);
+                        const scaling_t *const                  hs = detail::term_scales<HCodec>(H_scales, i, n, e0);
                         const real_t                            a  = alpha[i];
                         if constexpr (HCodec::mean_deviation) {
                             const history_mean_t *const row = m.tensor(i, rows) + (r / m.n_qp) * m.n_groups;
@@ -335,9 +387,13 @@ namespace sfem {
                      const S_t *const SFEM_RESTRICT             S_new,
                      typename HCodec::storage_t *const SFEM_RESTRICT H,
                      scaling_t *const SFEM_RESTRICT             H_scales,
-                     const Means                               &m    = Means{},
-                     const real_t *const SFEM_RESTRICT          beta = nullptr,
-                     const S_t *const SFEM_RESTRICT             ref  = nullptr) {
+                     const Means                               &m         = Means{},
+                     const real_t *const SFEM_RESTRICT          beta      = nullptr,
+                     const S_t *const SFEM_RESTRICT             ref       = nullptr,
+                     const real_t                               tolerance = 0,
+                     const HistoryRounding                      rounding  = HistoryRounding::NEAREST,
+                     const uint64_t                             seed      = 0) {
+            const bool stochastic = rounding == HistoryRounding::STOCHASTIC;
             // The increment of term i at value k.
             const auto increment = [&](const int i, const ptrdiff_t k) {
                 const real_t sp = static_cast<real_t>(S_n[k]), sn = static_cast<real_t>(S_new[k]);
@@ -346,6 +402,48 @@ namespace sfem {
                 const real_t R = static_cast<real_t>(ref[k]);
                 return (alpha[i] * be - b[i]) * (sp - R) + (b[i] - be) * (sn - R);
             };
+            if constexpr (HCodec::grid) {
+                // A grid's step follows the running maximum over the whole tensor, so the new
+                // values' maximum is taken first; the step changes only when it crosses a power
+                // of two, and the values are then coded on it.
+                for (int i = 0; i < n_terms; i++) {
+                    typename HCodec::storage_t *const h_i      = &H[i * rows * n];
+                    scaling_t *const                  grid     = H_scales + 2 * i;
+                    const real_t                      a        = alpha[i];
+                    const real_t                      old_step = grid[0];
+                    real_t                            max_abs  = grid[1];
+#pragma omp parallel for reduction(max : max_abs)
+                    for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                        const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                        for (ptrdiff_t r = 0; r < rows; r++) {
+                            const typename HCodec::storage_t *const h = &h_i[r * n + e0];
+                            for (ptrdiff_t l = 0; l < nb; l++) {
+                                max_abs = std::max(max_abs, std::abs(a * HCodec::decode(h[l], old_step) + increment(i, r * n + e0 + l)));
+                            }
+                        }
+                    }
+                    const real_t step = grid_step(max_abs, tolerance);
+                    const real_t inv  = 1 / step;
+#pragma omp parallel for
+                    for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
+                        const ptrdiff_t nb = std::min(BLOCK, n - e0);
+                        SFEM_PRONY_COUNTERS;
+                        for (ptrdiff_t r = 0; r < rows; r++) {
+                            typename HCodec::storage_t *const h = &h_i[r * n + e0];
+                            for (ptrdiff_t l = 0; l < nb; l++) {
+                                SFEM_PRONY_DIAGNOSTIC(const real_t before = HCodec::decode(h[l], old_step));
+                                const real_t v = a * HCodec::decode(h[l], old_step) + increment(i, r * n + e0 + l);
+                                h[l] = detail::encode_rounded<HCodec>(v, inv, stochastic, seed, (i * rows + r) * n + e0 + l);
+                                SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], step));
+                            }
+                        }
+                        SFEM_PRONY_COMMIT_COUNTS;
+                    }
+                    grid[0] = static_cast<scaling_t>(step);
+                    grid[1] = grid_max(max_abs);
+                }
+                return;
+            }
             if constexpr (HCodec::mean_deviation) {
 #pragma omp parallel for
                 for (ptrdiff_t e0 = 0; e0 < n; e0 += BLOCK) {
@@ -374,7 +472,10 @@ namespace sfem {
                                 stored,
                                 h_i,
                                 hs_i,
-                                m_i);
+                                m_i,
+                                stochastic,
+                                seed,
+                                i * rows * n);
                     }
                 }
                 return;
@@ -387,7 +488,7 @@ namespace sfem {
 
                 for (int i = 0; i < n_terms; i++) {
                     typename HCodec::storage_t *const h_i  = &H[i * rows * n];
-                    scaling_t *const                  hs_i = detail::scales_from<HCodec>(H_scales, i * n + e0);
+                    scaling_t *const                  hs_i = detail::term_scales<HCodec>(H_scales, i, n, e0);
                     const real_t                      a    = alpha[i];
 
                     real_t old_scale[BLOCK];
@@ -419,7 +520,7 @@ namespace sfem {
                         for (ptrdiff_t l = 0; l < nb; l++) {
                             SFEM_PRONY_DIAGNOSTIC(const real_t before = HCodec::decode(h[l], old_scale[l]));
                             const real_t v = a * HCodec::decode(h[l], old_scale[l]) + increment(i, r * n + e0 + l);
-                            h[l]           = HCodec::encode(v, inv[l]);
+                            h[l] = detail::encode_rounded<HCodec>(v, inv[l], stochastic, seed, (i * rows + r) * n + e0 + l);
                             SFEM_PRONY_COUNT(before, v, HCodec::decode(h[l], detail::scale_at<HCodec>(hs_i, l)));
                         }
                     }
@@ -455,7 +556,7 @@ namespace sfem {
                     if constexpr (HCodec::mean_deviation) detail::lane_groups(e0, nb, m, groups);
                     for (ptrdiff_t r = 0; r < rows; r++) {
                         const typename HCodec::storage_t *const h      = &H[(i * rows + r) * n + e0];
-                        const scaling_t *const                  hs     = detail::scales_from<HCodec>(H_scales, i * n + e0);
+                        const scaling_t *const                  hs     = detail::term_scales<HCodec>(H_scales, i, n, e0);
                         const real_t                            weight = r / n_qp < n_diagonal ? 1 : 2;
                         real_t                                  row    = 0;
                         for (ptrdiff_t l = 0; l < nb; l++) {

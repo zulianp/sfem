@@ -75,7 +75,11 @@ namespace {
         if (!host || !dev) return 1;
 
         for (auto &op : {host, dev}) {
-            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(op)) history->begin_step(real_t(0.1), real_t(0.1));
+            if (auto history = std::dynamic_pointer_cast<HistoryDependent>(op)) {
+                // The first step, from the reference configuration, in the operator's space.
+                auto x0 = create_buffer<real_t>(fs->n_dofs(), op == host ? EXECUTION_SPACE_HOST : EXECUTION_SPACE_DEVICE);
+                history->begin_step(real_t(0.1), real_t(0.1), x0->data());
+            }
         }
 
         const ptrdiff_t ndofs = fs->n_dofs();

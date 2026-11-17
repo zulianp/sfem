@@ -54,7 +54,7 @@ namespace sfem {
     /// H_i^{n+1} = b_i (S_r^{n+1} - S_r^n): the same tensor for every such
     /// term, up to a scalar.  Those terms are therefore not stored: they hold
     /// a coefficient c_i on the last step's increment, H_i = c_i (S_r^n -
-    /// S_r^{n-1}), which the caller's two stress slots hold, and it is
+    /// S_r^{n-1}), the caller's two relaxed stresses, and it is
     /// materialised into a slot only if a shorter step brings the term back
     /// (`begin_step`'s `relaxed_stress_prev`).  Every term starts this way, at
     /// c_i = 0.  A spectrum fitted over many decades -- most of whose terms
@@ -84,14 +84,19 @@ namespace sfem {
             real_t                                temperature{0};     ///< read through `shift` at every begin_step
             HistoryStorage                        history_storage{HistoryStorage::FULL};  ///< for H_i
             int history_elements_per_mean{0};  ///< mean-deviation storage: QuadratureState's elements_per_mean
-            //! The relaxed-stress slots `RelaxationGroups` keeps for this group: FULL (real_t) or
-            //! FLOAT32. A float32 slot holds the stress rounded once, and both ends of every
-            //! step read the rounded values, so the increments still telescope.
+            //! The relaxed-stress slots `RelaxationGroups` evaluates for this group, and R: FULL
+            //! (real_t) or FLOAT32. A float32 slot holds the stress rounded once, the same way at
+            //! both ends of every step, so the increments still telescope.
             HistoryStorage stress_storage{HistoryStorage::FULL};
             //! The remainder form's horizon, in seconds: the terms with tau_i a_T above it are
             //! stored as remainders when `history_storage` is not FULL. 0: none; negative: not
             //! set (none here; `RelaxationGroups::set_default_remainder_horizon` sets it).
             real_t remainder_horizon{-1};
+            //! The grid format's tolerance (`HistoryStorage::QUANT_GRID`): its rounding error is at
+            //! most this times each stored term's running maximum.
+            real_t history_tolerance{1e-5};
+            //! How integer codes are rounded when H_i is written (`HistoryRounding`).
+            HistoryRounding history_rounding{HistoryRounding::NEAREST};
             ExecutionSpace                        execution_space{EXECUTION_SPACE_HOST};  ///< where the state lives
             void                                 *stream{nullptr};  ///< the device loops' stream
         };
@@ -153,7 +158,10 @@ namespace sfem {
 
         const PronySeries          &series() const { return series_; }
         const Options              &options() const { return options_; }
-        void                        set_stream(void *const stream) { options_.stream = stream; }
+        void                        set_stream(void *const stream) {
+            options_.stream = stream;
+            if (H_) H_->set_stream(stream);
+        }
         const RelaxationIntegrator &integrator() const { return *options_.integrator; }
         int                         n_components() const { return n_components_; }
         int                         n_qp() const { return n_qp_; }
@@ -199,11 +207,22 @@ namespace sfem {
         /// Whether term `i` holds a stored tensor (the open or last step's choice).
         bool stored(const int i) const { return slot_[i] >= 0; }
 
+        /// Whether a term is held as a coefficient on the last committed step's increment, so that
+        /// reading it, or bringing it back, needs the relaxed stress that step started from.
+        bool holds_coefficients() const;
+
+        /// Whether `begin_step` with a step of `dt` would bring such a term back, and so read
+        /// `relaxed_stress_prev`: a shorter step than the one it relaxed completely in.
+        bool needs_previous_stress(const real_t dt) const;
+
         /// Bytes of state held, frozen history included: the sum of the three below.
         std::size_t bytes() const;
 
         /// The stored terms H_i, scales included.
         std::size_t history_bytes() const;
+        /// What H_i's integer codes would take packed (`QuadratureState::packed_bytes`); 0 for a
+        /// format that is not integer, or on the device.
+        std::size_t history_packed_bytes() const;
         /// The remainder form's reference stress R.
         std::size_t reference_bytes() const;
         /// The frozen history the kernels read.
@@ -277,6 +296,8 @@ namespace sfem {
         std::vector<real_t>              b_;
         real_t                           gamma_{1};
         bool                             step_open_{false};
+        //! Writes of H_i so far: the seed of stochastic rounding, saved with the state.
+        uint64_t                         writes_{0};
     };
 
 }  // namespace sfem

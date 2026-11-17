@@ -326,13 +326,15 @@ if(SFEM_ENABLE_HIP)
     target_include_directories(sfem BEFORE PUBLIC
         $<BUILD_INTERFACE:${SFEM_SRC_DIR}/base/hip/compat>
         $<INSTALL_INTERFACE:include/hip_compat>)
-    # rocThrust and rocPRIM headers, for the .cu files only (see SFEMDependencies.cmake).
+    # hipCUB, rocThrust and rocPRIM headers, for the .cu files only (see SFEMDependencies.cmake).
+    set(_SFEM_HIP_HEADER_TARGETS hip::hipcub roc::rocprim)
     if(SFEM_ENABLE_AMG)
-        foreach(hdr_target roc::rocthrust roc::rocprim)
-            target_include_directories(sfem PRIVATE
-                "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
-        endforeach()
+        list(APPEND _SFEM_HIP_HEADER_TARGETS roc::rocthrust)
     endif()
+    foreach(hdr_target ${_SFEM_HIP_HEADER_TARGETS})
+        target_include_directories(sfem PRIVATE
+            "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
+    endforeach()
     # The HIP build keeps IEEE arithmetic: division and square root correctly rounded (the compiler's
     # default) and subnormals kept (stated here, flushing being a per-target choice). The CUDA build
     # differs: -use_fast_math (SFEMBuildTypes.cmake) takes approximate division and square root and

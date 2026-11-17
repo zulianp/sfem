@@ -238,17 +238,19 @@ int equals_original(const smesh::ElemType element) {
     fill_pseudo_random(ndofs, 1, d->data(), 0x2545f4914f6cdd1dull);
 
     // The same committed history in both, so the relaxation terms are not zero.
-    real_t t = 0;
+    auto   u_n = sfem::create_host_buffer<real_t>(ndofs);
+    real_t t   = 0;
     for (int i = 0; i < 5; ++i) {
+        std::copy(u->data(), u->data() + ndofs, u_n->data());
         for (ptrdiff_t k = 0; k < ndofs; ++k) u->data()[k] *= real_t(1.1);
         t += test_dt;
-        cont->begin_step(t, test_dt);
-        orig->begin_step(t, test_dt);
-        cont->advance(u->data());
-        orig->advance(u->data());
+        cont->begin_step(t, test_dt, u_n->data());
+        orig->begin_step(t, test_dt, u_n->data());
+        cont->advance(u_n->data(), u->data());
+        orig->advance(u_n->data(), u->data());
     }
-    cont->begin_step(t + test_dt, test_dt);
-    orig->begin_step(t + test_dt, test_dt);
+    cont->begin_step(t + test_dt, test_dt, u->data());
+    orig->begin_step(t + test_dt, test_dt, u->data());
 
     Evaluation a, b;
     SFEM_TEST_ASSERT(evaluate(*cont, fs, u->data(), d->data(), a) == SFEM_SUCCESS);
@@ -284,8 +286,10 @@ int test_consistent_through_inversion() {
     auto cont = make_continued(fs, 2);
     auto orig = make_original(fs, 2);
     SFEM_TEST_ASSERT(cont && orig);
-    cont->begin_step(test_dt, test_dt);
-    orig->begin_step(test_dt, test_dt);
+    // The first step: from the reference configuration.
+    auto x0 = sfem::create_host_buffer<real_t>(fs->n_dofs());
+    cont->begin_step(test_dt, test_dt, x0->data());
+    orig->begin_step(test_dt, test_dt, x0->data());
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            u     = sfem::create_host_buffer<real_t>(ndofs);
@@ -361,7 +365,9 @@ int test_inverted_start_recovers() {
     auto cont = make_continued(fs, 0);
     auto orig = make_original(fs, 0);
     SFEM_TEST_ASSERT(cont && orig);
-    cont->begin_step(test_dt, test_dt);
+    // The first step: from the reference configuration.
+    auto x0 = sfem::create_host_buffer<real_t>(fs->n_dofs());
+    cont->begin_step(test_dt, test_dt, x0->data());
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            X     = mesh->points()->data();

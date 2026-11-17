@@ -22,16 +22,21 @@ namespace sfem {
     /// the iterate for the whole step -- a line search that re-assembles at
     /// every trial step, or a rejected trial, leaves no trace.  `advance` is
     /// the one call that mutates the history, and only at a converged `x`.
+    ///
+    /// The displacement a step starts from, `x_n`, is the caller's: a stepper
+    /// holds it anyway (to start Newton from, and to return to after a failed
+    /// attempt), so the history keeps no copy of it and evaluates what it needs
+    /// from it.  After `reset_history(x)`, the next step starts from that `x`.
     class HistoryDependent {
     public:
         virtual ~HistoryDependent() = default;
 
-        /// Open a step of length `dt` at time `t`.  May be called again to
-        /// retry the same step with another `dt`.
-        virtual void begin_step(const real_t t, const real_t dt) = 0;
+        /// Open a step of length `dt` at time `t` from the converged displacement
+        /// `x_n`.  May be called again to retry the same step with another `dt`.
+        virtual void begin_step(const real_t t, const real_t dt, const real_t *const x_n) = 0;
 
-        /// Commit the open step at the converged solution `x`.
-        virtual void advance(const real_t *const x) = 0;
+        /// Commit the open step from `x_n` at the converged solution `x`.
+        virtual void advance(const real_t *const x_n, const real_t *const x) = 0;
 
         /// Restart the history from rest at the configuration `x`.  Needed only
         /// when the initial configuration is not stress free.

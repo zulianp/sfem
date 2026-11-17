@@ -17,9 +17,10 @@
 #   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16 (stored: bsr f16), em32, em16, em8p
 #            (element_matrix f32/f16/i8pair), pt32, pt16, pt8md (points f32/f16/i8md); -np: the
 #            tangent projection off
-#   history  full, float32, float16, int16_scaled, float16_md; _p<P> elements per
-#            mean (TET4), _plain no remainder form, _s32 float32
-#            stress slots
+#   history  full, float32, float16, int16_scaled, int8_scaled, float16_md, int8_md, qblock5, qblock6,
+#            qblock7 (quant_block at history_tolerance 1e-5, 1e-6, 1e-7); _p<P>
+#            elements per mean (TET4), _plain no remainder form, _sr stochastic rounding (integer
+#            formats), _s32 float32 stress slots
 # SNAP_RUNS also write the history at the times SNAP (output.history_snapshots). EXTRA: further
 # options for every run (a smoke run: EXTRA="--set time.t_end=3e-4"). PREFIX names the folders
 # instead of tp9_{s0|p2}, PLAYGROUND another build's binary (an A/B gate, qp_window.sbatch). NO_IC=1
@@ -63,13 +64,23 @@ tangent_args() {  # <tangent>
   echo "$a"
 }
 
-history_args() {  # <history>[_p<P>][_plain][_s32]
-  local h=$1 a="" p=0 horizon=-1 stress=full
+history_args() {  # <history>[_p<P>][_sr][_plain][_s32], _sr and _plain in either order (quant_study.sbatch: grid6_sr_plain)
+  local h=$1 a="" p=0 horizon=-1 stress=full rounding=nearest
   case $h in *_s32) stress=float32; h=${h%_s32} ;; esac
-  case $h in *_plain) horizon=0; h=${h%_plain} ;; esac
+  while :; do
+    case $h in
+      *_sr) rounding=stochastic; h=${h%_sr} ;;
+      *_plain) horizon=0; h=${h%_plain} ;;
+      *) break ;;
+    esac
+  done
   case $h in *_p[0-9]*) p=${h##*_p}; h=${h%_p*} ;; esac
-  case $h in full | float32 | float16 | int16_scaled | float16_md) ;; *) return 1 ;; esac
+  local tol=""
+  case $h in qblock[0-9]) tol=1e-${h#qblock}; h=quant_block ;; esac
+  case $h in full | float32 | float16 | int16_scaled | int8_scaled | float16_md | int8_md | quant_block) ;; *) return 1 ;; esac
   a="--set material.relaxation.iso.history_storage=$h --set material.relaxation.iso.stress_storage=$stress"
+  [ -n "$tol" ] && a="$a --set material.relaxation.iso.history_tolerance=$tol"
+  [ $rounding = stochastic ] && a="$a --set material.relaxation.iso.history_rounding=stochastic"
   a="$a --set material.relaxation.iso.history_elements_per_mean=$p"
   [ $horizon = 0 ] && a="$a --set material.relaxation.iso.remainder_horizon=0"
   echo "$a"
