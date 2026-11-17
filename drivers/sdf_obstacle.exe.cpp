@@ -106,6 +106,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     f->add_operator(op);
 
     auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS, es);
+    if (!contact_conds) return EXIT_FAILURE;
 
     ptrdiff_t ndofs = fs->n_dofs();
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -159,7 +160,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
         f->hessian_block_diag_sym(nullptr, diag->data());
         f->constraints_mask(mask->data());
 
-        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        auto sj = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
         cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);

@@ -1655,7 +1655,22 @@ namespace sfem {
 
     MaMAL::~MaMAL() = default;
 
+    namespace {
+        // MaMAL's contact set-up (the block diagonals' packing, the masks, the active set's
+        // restriction) loops over its buffers on the host, which cannot read device memory (cudaMalloc;
+        // the host faults reading it on x86 H100, GH200 and MI300A alike): refused on the device until
+        // those passes have device kernels.
+        bool mamal_refuses(const Function& f) {
+            if (f.execution_space() == EXECUTION_SPACE_DEVICE) {
+                fprintf(stderr, "MaMAL: runs on the host only (its contact set-up loops read its buffers there)\n");
+                return true;
+            }
+            return false;
+        }
+    }  // namespace
+
     std::shared_ptr<MaMAL> MaMAL::create(const std::shared_ptr<Function>& f) {
+        if (mamal_refuses(*f)) return nullptr;
         auto ret = std::make_shared<MaMAL>(f);
         ret->impl_->init();
         return ret;
@@ -1663,6 +1678,7 @@ namespace sfem {
 
 #ifdef SFEM_ENABLE_RYAML
     std::shared_ptr<MaMAL> MaMAL::create(const std::shared_ptr<Function>& f, const ryml::ConstNodeRef& node) {
+        if (mamal_refuses(*f)) return nullptr;
         auto ret = std::make_shared<MaMAL>(f);
         ret->impl_->init(node);
         return ret;
