@@ -7,23 +7,24 @@
 #SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/collect_scale_%j.out
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
-# The storage at about ten times the size: the pump's mesh refined once (db/solid_r1: LDP24A's
-# prepare.sbatch, FF200's scale_mesh.sbatch), TET4 and its TET10 promotion, ten steps from rest per
+# The storage at about ten times the size: the pump's mesh refined once (db/solid_r1: FF200's
+# scale_mesh.sbatch, LDP24A's prepare.sbatch), TET4 and its TET10 promotion, ten steps from rest per
 # configuration of the memory figure (tangent9_valves.sbatch, NO_IC=1, PREFIX <TAG>_s0 and <TAG>_p2).
 # Every run's measured bytes into OUT (a new folder; the script stops if it exists), sets TET4x8 and
 # TET10x8, against bsr32__full_a. TAG4/TAG10 and T_END4/T_END10 take each mesh's runs from their own
-# folders and span (LDP24A's TET10x8: one step, sc1_p2; the storage is the same after one step as
-# after ten, as TET4x8's runs show).
-#   [CASE=ldp_cases/LDP24A_r100] [TAG=sc] [TAG4=TAG] [TAG10=TAG] [T_END4=1e-3] [T_END10=1e-3]
-#   [OUT=runs/paper_scale_<TAG>]
+# folders and span. The defaults are FF200's campaign (sc10); LDP24A's (collect_la_studies.sbatch) is
+# CASE=ldp_cases/LDP24A_r100 TAG=sc TAG10=sc1 T_END10=1e-4: its TET10x8 runs take one step, the
+# storage being the same after one step as after ten, as TET4x8's runs show.
+#   [CASE=ldp_cases/FF200_ExodusMesh] [TAG=sc10] [TAG4=TAG] [TAG10=TAG] [T_END4=1e-3] [T_END10=1e-3]
+#   [OUT=runs/paper_scale for sc10, runs/paper_scale_<TAG> otherwise]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100}
-TAG=${TAG:-sc}
+CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh}
+TAG=${TAG:-sc10}
 TAG4=${TAG4:-$TAG}; TAG10=${TAG10:-$TAG}
-P=${OUT:-$D/runs/paper_scale_$TAG}
+if [ $TAG = sc10 ]; then P=${OUT:-$D/runs/paper_scale}; else P=${OUT:-$D/runs/paper_scale_$TAG}; fi
 [ -e $P ] && { echo "collect_scale: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 for spec in TET4x8:${TAG4}_s0_:${T_END4:-1e-3} TET10x8:${TAG10}_p2_:${T_END10:-1e-3}; do

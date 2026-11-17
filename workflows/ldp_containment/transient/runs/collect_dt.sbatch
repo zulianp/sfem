@@ -16,17 +16,20 @@
 # reference (set dt_TET4), every run of a step against that step's reference (sets dt_own_<us>:
 # the repeat's floor and each storage's error at that step), and the valve events of every run.
 # Runs a step lacks are left out.
-# MESH names the folders' mesh part, s0 (TET4) or p2 (TET10).
-#   [CASE=ldp_cases/LDP24A_r100] [TAGS="la dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625"]
-#   [MESH=s0] [OUT=runs/paper_dt_<finest tag>] [CHECK=runs/paper_la/valve_runs.csv]
+# MESH names the folders' mesh part, s0 (TET4) or p2 (TET10). The defaults are FF200's campaign;
+# LDP24A's (collect_la_studies.sbatch) passes CASE, TAGS (first la) and CHECK, the campaign
+# collection's valve_runs.csv (collect9.sbatch PUMP=LDP24A), which a TET4 study needs to exist.
+#   [CASE=ldp_cases/FF200_ExodusMesh] [TAGS="tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625"]
+#   [MESH=s0] [OUT=runs/paper_dt_<finest tag>] [CHECK=runs/paper_data10/valve_runs.csv]
 set -u
 D=/ritom/scratch/cscs/zulianp/sfem-prony-md
 PY=$D/venv/bin/python
 COL=${PAPER_PY:-/ritom/scratch/cscs/zulianp/xsesfsi_papers/ldp_containment/python}/collect_prony.py
-CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/LDP24A_r100}
-TAGS=${TAGS:-la dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625}
-CHECK=${CHECK:-$D/runs/paper_la/valve_runs.csv}
+CASE=${CASE:-/ritom/scratch/cscs/zulianp/ldp_cases/FF200_ExodusMesh}
+TAGS=${TAGS:-tp10 dt050 dt025 dt010 dt005 dt0025 dt00125 dt000625 dt0003125 dt00015625}
+CHECK=${CHECK:-$D/runs/paper_data10/valve_runs.csv}
 MESH=${MESH:-s0}
+[ $MESH = s0 ] && [ ! -f "$CHECK" ] && { echo "collect_dt: no $CHECK to check the campaign's repeat against; give CHECK"; exit 1; }
 SET=dt_TET4; [ $MESH = p2 ] && SET=dt_TET10
 finest=${TAGS##* }
 P=${OUT:-$D/runs/paper_dt_$finest}

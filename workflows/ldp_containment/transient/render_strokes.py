@@ -70,14 +70,15 @@ from vtk.util import numpy_support
 
 # Per pump (--pump): the valves' centres in x (m), where each section is centred; the sections'
 # height and half-height, the top view's half-height and the overview's distance (m); the colour
-# range of u_y (mm).
+# range of u_y (mm); the height and half-height of render_history.py's views of the valves from above.
 PUMPS = {
     "FF200": {"valves": (("pressure valve", -0.011), ("suction valve", 0.011)), "section_y": -0.0008,
-              "section_scale": 0.0055, "top_scale": 0.0145, "distance": 0.065, "range": (-1.4, 1.1)},
+              "section_scale": 0.0055, "top_scale": 0.0145, "distance": 0.065, "range": (-1.4, 1.1),
+              "history_y": -0.0012, "history_scale": 0.0042},
     "LDP24A": {"valves": (("pressure valve", -0.012), ("suction valve", 0.012)), "section_y": 0.0025,
-               "section_scale": 0.009, "top_scale": 0.019, "distance": 0.08, "range": (-2.2, 2.2)},
+               "section_scale": 0.009, "top_scale": 0.019, "distance": 0.08, "range": (-2.2, 2.2),
+               "history_y": 0.0032, "history_scale": 0.0085},
 }
-VALVES = PUMPS["FF200"]["valves"]
 
 
 def read(path_glob, dtype):

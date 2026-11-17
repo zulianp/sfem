@@ -29,9 +29,6 @@ from vtk.util import numpy_support
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from render_strokes import PUMPS, plain, valve_grid  # noqa: E402
 
-# Per pump: the height (m) the views look at and their half-height (parallel scale, m), the valve's
-# disc or canopy filling the image.
-VIEWS = {"FF200": (-0.0012, 0.0042), "LDP24A": (0.0032, 0.0085)}
 
 
 def blocks(mesh):
@@ -55,7 +52,8 @@ def error(sim, k, field, order):
 
 def place(view, x, pump):
     """The valve centred at x (m) from above and in front, 40 degrees down, its disc filling the image."""
-    y, scale = VIEWS[pump]
+    # The height the view looks at and its half-height (m), the valve's disc or canopy filling the image.
+    y, scale = PUMPS[pump]["history_y"], PUMPS[pump]["history_scale"]
     view.CameraFocalPoint = [x, y, 0]
     view.CameraPosition = [x, y + 0.05 * 0.643, 0.05 * 0.766]
     view.CameraViewUp = [0, 0.766, -0.643]
