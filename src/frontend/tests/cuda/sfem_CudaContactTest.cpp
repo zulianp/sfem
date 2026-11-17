@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 
 #include "sfem_test.hpp"
@@ -87,7 +88,7 @@ struct TestOutput {
     std::shared_ptr<Buffer<real_t>> normal_prod;
     std::shared_ptr<Buffer<real_t>> cc_op_x;
     std::shared_ptr<Buffer<real_t>> cc_op_t_r;
-    std::shared_ptr<Buffer<real_t>> stress;  // full_apply_boundary_mass_inverse of the gradient
+    std::shared_ptr<Buffer<real_t>> stress;  // full_apply_boundary_mass_inverse of a ramp
     std::shared_ptr<Buffer<real_t>> rpen;
     std::shared_ptr<Buffer<real_t>> Jpen;
     std::shared_ptr<Buffer<real_t>> restricted;
@@ -141,6 +142,7 @@ struct TestOutput {
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_x->size(), cc_op_x->data(), other.cc_op_x->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(cc_op_t_r->size(), cc_op_t_r->data(), other.cc_op_t_r->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(stress->size(), stress->data(), other.stress->data(), tol);
+        SFEM_TEST_ASSERT(std::any_of(stress->data(), stress->data() + stress->size(), [](const real_t v) { return v != 0; }));
         SFEM_ASSERT_ARRAY_APPROX_EQ(rpen->size(), rpen->data(), other.rpen->data(), tol);
         SFEM_ASSERT_ARRAY_APPROX_EQ(Jpen->size(), Jpen->data(), other.Jpen->data(), tol);
         SFEM_TEST_APPROXEQ(e_pen, other.e_pen, tol);
@@ -236,10 +238,14 @@ struct TestOutput gen_test_data(enum ExecutionSpace es) {
     auto cc_op_t_r = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     cc_op_t->apply(cc_op_x->data(), cc_op_t_r->data());
 
-    // The contact stress of the gradient: the contact nodes' indices on the device too.
+    // The contact stress of a ramp, nonzero at every contact node (the gradient is zero at the
+    // undisplaced ones): the contact nodes' indices on the device too.
+    auto ramp = create_host_buffer<real_t>(fs->n_dofs());
+    for (ptrdiff_t i = 0; i < fs->n_dofs(); ++i) ramp->data()[i] = real_t(1) + real_t(1e-3) * real_t(i % 1000);
     auto stress = sfem::create_buffer<real_t>(fs->n_dofs(), es);
     sfem::blas<real_t>(es)->zeros(fs->n_dofs(), stress->data());
-    contact_conds->full_apply_boundary_mass_inverse(g->data(), stress->data());
+    if (EXECUTION_SPACE_DEVICE == es) ramp = smesh::to_device(ramp);
+    contact_conds->full_apply_boundary_mass_inverse(ramp->data(), stress->data());
 
     ShiftedPenaltyKernels<real_t> impl;
     if (EXECUTION_SPACE_DEVICE == es) {

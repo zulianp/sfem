@@ -287,6 +287,24 @@ namespace sfem {
             auto mesh = space.mesh();
             return mesh && mesh->is_distributed() && mesh->comm() && mesh->comm()->size() > 1 && mesh->distributed();
         }
+
+        // The SDF contact surface on the device on several ranks: its cross-rank sums (normals, gap,
+        // surface mass) are formed on the host, which cannot read device memory (cudaMalloc; the host
+        // faults reading it on x86 H100, GH200 and MI300A alike). Said, and refused: the caller gets
+        // no conditions. The node_sdf obstacle (NodeObstacleContact) runs on the device across ranks.
+        bool refuse_device_across_ranks(const FunctionSpace &space, const enum ExecutionSpace es) {
+#ifdef SFEM_ENABLE_CUDA
+            if (EXECUTION_SPACE_DEVICE == es && spans_ranks(space)) {
+                fprintf(stderr,
+                        "ContactConditions: the SDF contact surface on the device runs on one rank only; "
+                        "use the node_sdf obstacle with several ranks\n");
+                return true;
+            }
+#endif
+            SFEM_UNUSED(space);
+            SFEM_UNUSED(es);
+            return false;
+        }
     }  // namespace
 
     class ContactConditions::Impl {
@@ -406,14 +424,17 @@ namespace sfem {
             return err;
         }
 
-        // The contact nodes' volume indices in the memory the kernels run in: the device copy on the
-        // device, where the host buffer is not readable.
-        const idx_t *node_indices() const {
+        // The contact nodes' volume indices in `es`'s memory: the device copy on the device, where
+        // the host buffer is not readable.
+        std::shared_ptr<Buffer<idx_t>> node_mapping(const enum ExecutionSpace es) const {
 #ifdef SFEM_ENABLE_CUDA
-            if (EXECUTION_SPACE_DEVICE == execution_space) return contact_surface->node_mapping_device()->data();
+            if (EXECUTION_SPACE_DEVICE == es) return contact_surface->node_mapping_device();
 #endif
-            return contact_surface->node_mapping()->data();
+            return contact_surface->node_mapping();
         }
+
+        // ... in the memory the kernels run in.
+        const idx_t *node_indices() const { return node_mapping(execution_space)->data(); }
 
         // The row pointers of a two-level buffer, readable on the host (a device buffer keeps its
         // row pointers in device memory). Rows beyond the buffer's are null.
@@ -518,12 +539,7 @@ namespace sfem {
 
     const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping() { return impl_->contact_surface->node_mapping(); }
 
-    const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping(const enum ExecutionSpace es) {
-#ifdef SFEM_ENABLE_CUDA
-        if (EXECUTION_SPACE_DEVICE == es) return impl_->contact_surface->node_mapping_device();
-#endif
-        return impl_->contact_surface->node_mapping();
-    }
+    const std::shared_ptr<Buffer<idx_t>> ContactConditions::node_mapping(const enum ExecutionSpace es) { return impl_->node_mapping(es); }
 
     SharedBuffer<real_t *> ContactConditions::normals() const { return impl_->normals; }
 
@@ -550,17 +566,8 @@ namespace sfem {
                                                                  const std::shared_ptr<smesh::Grid<geom_t>>  &sdf,
                                                                  const std::vector<std::shared_ptr<Sideset>> &sidesets,
                                                                  const enum ExecutionSpace                    es) {
+        if (refuse_device_across_ranks(*space, es)) return nullptr;
         auto cc = std::make_unique<ContactConditions>(space);
-#ifdef SFEM_ENABLE_CUDA
-        // On the device the obstacle is sampled at the rank's own surface nodes only, and the sums
-        // across ranks (normals, gap, surface mass) are formed on the host over device memory: refuse
-        // the combination rather than read device pointers on the host. The node_sdf obstacle
-        // (NodeObstacleContact) runs on the device across ranks.
-        if (EXECUTION_SPACE_DEVICE == es && cc->impl_->is_mpi()) {
-            SFEM_ERROR("ContactConditions: the SDF contact surface on the device runs on one rank only; "
-                       "use the node_sdf obstacle with several ranks\n");
-        }
-#endif
         {
 #ifdef SFEM_ENABLE_SRESAMPLE
             // The mesh's z-range bounds where the contact surface samples the obstacle
@@ -625,13 +632,8 @@ namespace sfem {
             path_sdf = path + "/" + path_sdf;
         }
 
-#ifdef SFEM_ENABLE_CUDA
-        // create refuses this combination; refused here, before the grid is read.
-        if (EXECUTION_SPACE_DEVICE == es && spans_ranks(*space)) {
-            SFEM_ERROR("ContactConditions: the SDF contact surface on the device runs on one rank only; "
-                       "use the node_sdf obstacle with several ranks\n");
-        }
-#endif
+        // As create, before the grid is read.
+        if (refuse_device_across_ranks(*space, es)) return nullptr;
         auto sdf = smesh::Grid<geom_t>::create_from_file(mesh->comm(), path_sdf.c_str());
 
         return create(space, std::move(sdf), {sideset}, es);
