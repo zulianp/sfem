@@ -423,11 +423,15 @@ endif()
 
 # After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
 # created here first (a subdirectory sees its parent's imported targets).
-if(SFEM_ENABLE_HIP AND SFEM_ENABLE_AMG)
-    # rocThrust (amg/cuda, its only user) and the rocPRIM under it are header-only and used by the .cu
-    # files only; CMakeLists.txt adds their include directories to the HIP sources. Their targets are
-    # not linked, because through rocPRIM they bring hip::device, which compiles every C++ source as HIP.
-    if(NOT TARGET roc::rocthrust)
+if(SFEM_ENABLE_HIP)
+    # hipCUB (the Prony store's device scan, through base/hip/compat/cub), rocThrust (amg/cuda) and the
+    # rocPRIM under both are header-only and used by the .cu files only; CMakeLists.txt adds their
+    # include directories to the HIP sources. Their targets are not linked, because through rocPRIM
+    # they bring hip::device, which compiles every C++ source as HIP.
+    if(NOT TARGET hip::hipcub)
+        find_package(hipcub REQUIRED)
+    endif()
+    if(SFEM_ENABLE_AMG AND NOT TARGET roc::rocthrust)
         find_package(rocthrust REQUIRED)
     endif()
 elseif(SFEM_ENABLE_CUDA)
