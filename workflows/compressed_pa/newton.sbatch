@@ -13,8 +13,10 @@
 # cube (12 tetrahedra and a centre node per cell, the paper's), made once into SFEM_RUNS/cpa_meshes.
 #   CASES     stretch_1M stretch_10M twist (default all)
 #   ELEMENTS  TET4 TET10 HEX8 PROTEUS_HEX27 (default all)
-#   FORMATS   the paper's names: bsr64 bsr32 mf f64 f16 i8md ead16 eadi8p bsro16 bsroi8, and on the
-#             device sell16 selli8 (SELL; bsro* there are the node graph's rows); default all
+#   FORMATS   the paper's formats, by the paper's names: bsr64 bsr32 (BSR in double and single precision),
+#             bsro16 bsroi8 (the quantized matrix, SELL-C-sigma on both machines), ead16 eadi8p (the
+#             element matrix, fp16 difference form and int8 with a scale per node pair), f16 i8md (the
+#             point store, fp16 and int8 mean and deviation); default all eight
 #   SPACE     host | device
 #   OUT       a new folder (default SFEM_RUNS/cpa_newton_<space>); each case's log OUT/<case>_<element>.out
 #             has a section "== <format> <options>" per run with its steps and its trace totals, the run
@@ -70,14 +72,11 @@ options() {  # <format>: the playground options
   case $1 in
     bsr64) echo "--set solver.linear.format=BSR" ;;
     bsr32) echo "--set solver.linear.format=BSR --set solver.linear.storage_bytes=4" ;;
-    mf) echo "--set solver.linear.format=MF" ;;
-    f64 | f16 | i8md) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=points --set solver.linear.inexact.encoding=$1" ;;
+    f16 | i8md) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=points --set solver.linear.inexact.encoding=$1" ;;
     ead16) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=element_matrix --set solver.linear.inexact.encoding=f16" ;;
     eadi8p) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=element_matrix --set solver.linear.inexact.encoding=i8pair" ;;
-    bsro16) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=bsr --set solver.linear.inexact.encoding=f16" ;;
-    bsroi8) echo "--set solver.linear.format=INEXACT --set solver.linear.inexact.store=bsr --set solver.linear.inexact.encoding=i8" ;;
-    sell16) echo "--set solver.linear.format=SELL --set solver.linear.sell.encoding=f16" ;;
-    selli8) echo "--set solver.linear.format=SELL --set solver.linear.sell.encoding=i8" ;;
+    bsro16) echo "--set solver.linear.format=SELL --set solver.linear.sell.encoding=f16" ;;
+    bsroi8) echo "--set solver.linear.format=SELL --set solver.linear.sell.encoding=i8" ;;
     *) return 1 ;;
   esac
 }
@@ -90,7 +89,7 @@ pack() {  # <mesh option>: the paper's pack size, max(16, min(8192, elements/144
   p=$((ne / 1440 / 16 * 16)); [ $p -gt 8192 ] && p=8192; [ $p -lt 16 ] && p=16
   echo $p
 }
-FORMATS=${FORMATS:-bsr64 bsr32 mf f64 f16 i8md ead16 eadi8p bsro16 bsroi8 $([ "$SPACE" = device ] && echo sell16 selli8)}
+FORMATS=${FORMATS:-bsr64 bsr32 bsro16 bsroi8 ead16 eadi8p f16 i8md}
 
 go() {  # <case> <element> <format>: one run into its folder, its section into a part log
   local k=$1 e=$2 f=$3 s m dt y o d p

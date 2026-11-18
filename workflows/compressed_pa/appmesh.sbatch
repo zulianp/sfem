@@ -27,6 +27,9 @@ OUT=${OUT:-$SFEM_RUNS/cpa_appmesh_$SPACE}
 [ -e "$OUT" ] && { echo "appmesh: $OUT exists; give a new OUT"; exit 1; }
 mkdir -p "$OUT"
 export SFEM_PACKED_TWO_PASS=1
+# The paper's formats (and the double-precision point store of its correctness check); ROWS overrides
+# them (bench_inexact's row names, comma-separated).
+export SFEM_BENCH_ROWS=${ROWS:-BSR f64,BSR f32,SELL f16,SELL i8,element_matrix f16,element_matrix i8pair,points f64,points f16,points i8md}
 tag=$([ "$SPACE" = device ] && echo gpu || echo cpu)
 go() {  # <mesh folder>
   local m=$1 name ne p rep

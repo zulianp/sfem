@@ -8,7 +8,7 @@
 #SBATCH --uenv=prgenv-gnu/24.11:v2
 #SBATCH --view=default
 # The compressed partial assembly paper's operator throughput (drivers/bench/bench_inexact): per element,
-# the matrix-free apply, BSR f64 and f32 and every stored-tangent format, set-up and apply, MDOF/s, bytes
+# the paper's formats (BSR f64 and f32, the quantized matrix, the element matrix, the point store), set-up and apply, MDOF/s, bytes
 # per dof and the distance to the exact apply, on the host (one Grace chip per run, four elements at
 # once) or the device (one GPU per run). The paper's sizes in dof (HEX8 n=150 and PROTEUS_HEX27 n=75:
 # 10,328,853 dof; TET4 n=119 and TET10 n=60, about 10.2M and 10.5M: the library's cube has 12 tetrahedra
@@ -27,6 +27,9 @@ OUT=${OUT:-$SFEM_RUNS/cpa_throughput_$SPACE}
 [ -e "$OUT" ] && { echo "throughput: $OUT exists; give a new OUT"; exit 1; }
 mkdir -p "$OUT"
 export SFEM_PACKED_TWO_PASS=1
+# The paper's formats (and the double-precision point store of its correctness check); ROWS overrides
+# them (bench_inexact's row names, comma-separated).
+export SFEM_BENCH_ROWS=${ROWS:-BSR f64,BSR f32,SELL f16,SELL i8,element_matrix f16,element_matrix i8pair,points f64,points f16,points i8md}
 sizes() {  # <element>: the paper's size, or its sweep
   case $1 in
     HEX8) [ "${SWEEP:-0}" = 1 ] && echo 16 24 36 50 70 100 150 200 || echo 150 ;;
