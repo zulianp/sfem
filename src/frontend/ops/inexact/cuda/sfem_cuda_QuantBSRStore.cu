@@ -145,11 +145,15 @@ namespace sfem {
                     if ((threadIdx.x & 31) == 0) atomicMax(top, __float_as_int(m));
                 }
 
-                /// The window's rows' sums A_i = sum_j K_ij, one block per node (in a dynamic step the inertia
-                /// makes every row's nonzero); with f16 codes each row's scale, the window's.
+                /// The window's rows' sums R_i = sum_j K_ij: a row whose sum is a term of the operator
+                /// (row_sum_is_a_term; none for a material, the inertia being kept beside the store) gets the next correction,
+                /// corr_of[i] its index and sums[c] its block; any other row annihilates translations and
+                /// the difference form alone is its product (corr_of[i] = -1), the paper's form. With f16
+                /// codes each row's scale, the window's.
                 template <typename T>
                 __global__ void rows_kernel(const ptrdiff_t r0, const ptrdiff_t r1, const count_t *const RSTR rp, const float *const RSTR v,
-                                            float *const RSTR blocks, const int *const RSTR top, float *const RSTR row_scale) {
+                                            float *const RSTR sums, idx_t *const RSTR corr_of, int *const RSTR count,
+                                            const int *const RSTR top, float *const RSTR row_scale) {
                     const ptrdiff_t i = r0 + (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     if (i >= r1) return;
                     if constexpr (scaled_by_row<T>) {
@@ -157,10 +161,21 @@ namespace sfem {
                         row_scale[i]  = t > 0 ? (float)Code<__half>::scale_for((double)t) : 1.0f;
                     }
                     const count_t k0 = rp[r0];
-                    double        A[9] = {0};
+                    double        A[9] = {0}, largest = 0, sum = 0;
                     for (int64_t k = rp[i]; k < rp[i + 1]; ++k)
-                        for (int x = 0; x < 9; ++x) A[x] += (double)v[(size_t)(k - k0) * 9 + x];
-                    for (int x = 0; x < 9; ++x) blocks[(size_t)i * 9 + x] = (float)A[x];
+                        for (int x = 0; x < 9; ++x) {
+                            const double e = (double)v[(size_t)(k - k0) * 9 + x];
+                            A[x] += e;
+                            largest = fmax(largest, fabs(e));
+                        }
+                    for (int x = 0; x < 9; ++x) sum = fmax(sum, fabs(A[x]));
+                    if (!row_sum_is_a_term(sum, largest)) {
+                        corr_of[i] = -1;
+                        return;
+                    }
+                    const int c = atomicAdd(count, 1);
+                    corr_of[i]  = (idx_t)c;
+                    for (int x = 0; x < 9; ++x) sums[(size_t)c * 9 + x] = (float)A[x];
                 }
 
                 template <typename T>
@@ -248,13 +263,15 @@ namespace sfem {
                 // BSR's 87% and 82%); on the FF200 valves this layout applies 1.4 to 1.8 times as fast.
                 // On a mesh of regular rows (the structured cubes) SELL is the faster one (sell_kernel).
 
-                /// Row i's output from its off-diagonal sum (a0, a1, a2): y_i (+)= a ms + A_i x_i, and with
+                /// Row i's output from its off-diagonal sum (a0, a1, a2): y_i (+)= a ms (+ R_i x_i with CORR, where
+                /// row i has a correction), and with
                 /// FUSED the extra blocks, the composed tangent's passes (zero y, product, correction,
                 /// curvature, shift) in one, in their order.
-                template <typename T, bool FUSED>
+                template <typename T, bool FUSED, bool CORR, bool DIAG>
                 __device__ __forceinline__ void finish(const ptrdiff_t i, const float a0, const float a1, const float a2,
                                                        const float *const RSTR row_scale, const real_t *const RSTR x, real_t *const RSTR y,
-                                                       const float *const RSTR ablocks, const DiagonalExtra &extra) {
+                                                       const idx_t *const RSTR corr_of, const float *const RSTR corr,
+                                                       const real_t *const RSTR diag, const DiagonalExtra &extra) {
                     const float  ms     = scaled_by_row<T> ? row_scale[i] : 1.0f;
                     const real_t xi[3]  = {x[(size_t)i * 3 + 0], x[(size_t)i * 3 + 1], x[(size_t)i * 3 + 2]};
                     real_t       out[3] = {FUSED ? real_t(0) : y[(size_t)i * 3 + 0], FUSED ? real_t(0) : y[(size_t)i * 3 + 1],
@@ -262,8 +279,15 @@ namespace sfem {
                     out[0] += (real_t)(a0 * ms);
                     out[1] += (real_t)(a1 * ms);
                     out[2] += (real_t)(a2 * ms);
-                    const float *const A = &ablocks[(size_t)i * 9];
-                    for (int a = 0; a < 3; ++a) out[a] += A[a * 3 + 0] * xi[0] + A[a * 3 + 1] * xi[1] + A[a * 3 + 2] * xi[2];
+                    if constexpr (DIAG)
+                        for (int a = 0; a < 3; ++a) out[a] += diag[(size_t)i * 3 + a] * xi[a];
+                    if constexpr (CORR) {
+                        const idx_t c = corr_of[i];
+                        if (c >= 0) {
+                            const float *const R = &corr[(size_t)c * 9];
+                            for (int a = 0; a < 3; ++a) out[a] += R[a * 3 + 0] * xi[0] + R[a * 3 + 1] * xi[1] + R[a * 3 + 2] * xi[2];
+                        }
+                    }
                     if constexpr (FUSED) {
                         if (extra.contact_of) {
                             const idx_t b = extra.contact_of[i];
@@ -275,13 +299,14 @@ namespace sfem {
                     for (int a = 0; a < 3; ++a) y[(size_t)i * 3 + a] = out[a];
                 }
 
-                /// y_i += sum_{j != i} K_ij (x_j - x_i) + A_i x_i, G threads per row, the records in the
+                /// y_i += sum_{j != i} K_ij (x_j - x_i) (+ R_i x_i), G threads per row, the records in the
                 /// graph's order.
-                template <typename T, int G, bool FUSED>
+                template <typename T, int G, bool FUSED, bool CORR, bool DIAG>
                 __global__ void __launch_bounds__(THREADS) apply_kernel(const ptrdiff_t n, const count_t *const RSTR rp,
                                                                            const idx_t *const RSTR ci, const void *const RSTR records,
                                                                            const float *const RSTR row_scale, const real_t *const RSTR x,
-                                                                           real_t *const RSTR y, const float *const RSTR ablocks,
+                                                                           real_t *const RSTR y, const idx_t *const RSTR corr_of,
+                                                                           const float *const RSTR corr, const real_t *const RSTR diag,
                                                                            const DiagonalExtra extra) {
                     using rec_t       = typename Records<T>::rec_t;
                     const ptrdiff_t t      = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
@@ -311,18 +336,19 @@ namespace sfem {
                             a2 += __shfl_down_sync(0xffffffffu, a2, o, G);
                         }
                     }
-                    if (active && lane == 0) finish<T, FUSED>(i, a0, a1, a2, row_scale, x, y, ablocks, extra);
+                    if (active && lane == 0) finish<T, FUSED, CORR, DIAG>(i, a0, a1, a2, row_scale, x, y, corr_of, corr, diag, extra);
                 }
 
                 /// The same product in SELL-C-sigma: a thread per row, lane l of a group reading step s's
                 /// record and column at s C + l, so a warp's loads are contiguous. A padding slot holds the
                 /// row's own column (zero codes) and is skipped.
-                template <typename T, bool FUSED>
+                template <typename T, bool FUSED, bool CORR, bool DIAG>
                 __global__ void __launch_bounds__(THREADS) sell_kernel(const ptrdiff_t n_groups, const idx_t *const RSTR rows,
                                                                           const int64_t *const RSTR gp, const idx_t *const RSTR cols,
                                                                           const void *const RSTR records, const float *const RSTR row_scale,
                                                                           const real_t *const RSTR x, real_t *const RSTR y,
-                                                                          const float *const RSTR ablocks, const DiagonalExtra extra) {
+                                                                          const idx_t *const RSTR corr_of, const float *const RSTR corr,
+                                                                          const real_t *const RSTR diag, const DiagonalExtra extra) {
                     using rec_t       = typename Records<T>::rec_t;
                     const ptrdiff_t t = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     const ptrdiff_t g = t / SELL_C;
@@ -344,14 +370,15 @@ namespace sfem {
                         a1 += K[3] * d0 + K[4] * d1 + K[5] * d2;
                         a2 += K[6] * d0 + K[7] * d1 + K[8] * d2;
                     }
-                    finish<T, FUSED>(i, a0, a1, a2, row_scale, x, y, ablocks, extra);
+                    finish<T, FUSED, CORR, DIAG>(i, a0, a1, a2, row_scale, x, y, corr_of, corr, diag, extra);
                 }
 
-                /// The diagonal: minus the stored blocks' diagonals of each row, plus A_i's.
+                /// The diagonal: minus the stored blocks' diagonals of each row, plus R_i's where it has a correction.
                 template <typename T, class L>
                 __global__ void diagonal_kernel(const ptrdiff_t n, const count_t *const RSTR rp, const idx_t *const RSTR ci,
                                                 const void *const RSTR records, const float *const RSTR row_scale,
-                                                const float *const RSTR ablocks, real_t *const RSTR diag, const L at) {
+                                                const idx_t *const RSTR corr_of, const float *const RSTR corr, real_t *const RSTR diag,
+                                                const L at) {
                     using rec_t       = typename Records<T>::rec_t;
                     const ptrdiff_t i = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x;
                     if (i >= n) return;
@@ -365,7 +392,10 @@ namespace sfem {
                         const double f = (double)sc * ms;
                         for (int q = 0; q < 3; ++q) d[q] -= f * (double)K[q * 3 + q];
                     }
-                    for (int q = 0; q < 3; ++q) diag[(size_t)i * 3 + q] += (real_t)d[q] + ablocks[(size_t)i * 9 + q * 3 + q];
+                    const idx_t c = corr_of[i];
+                    if (c >= 0)
+                        for (int q = 0; q < 3; ++q) d[q] += (double)corr[(size_t)c * 9 + q * 3 + q];
+                    for (int q = 0; q < 3; ++q) diag[(size_t)i * 3 + q] += (real_t)d[q];
                 }
 
                 /// y += E x, E the extra diagonal blocks (curvature, then shift).
@@ -428,7 +458,8 @@ namespace sfem {
                         rp_      = DeviceArray<count_t>::from(rp, (std::size_t)n_ + 1);
                         ci_      = DeviceArray<idx_t>::from(ci, (std::size_t)rp[n_]);
                         largest_ = (size_t)largest;
-                        ablocks_ = DeviceArray<float>((size_t)n_ * 9);
+                        corr_of_ = DeviceArray<idx_t>((size_t)n_);
+                        count_   = DeviceArray<int>(1);
                         if constexpr (scaled_by_row<T>) {
                             row_scale_ = DeviceArray<float>((size_t)n_);
                             top_       = DeviceArray<int>(1);
@@ -437,7 +468,8 @@ namespace sfem {
 
                     /// Window by window: its graph, the assembly into its values (both stream-ordered, freed at
                     /// the end), the rows' sums and scales, the records; then, symmetric, the copies left of
-                    /// the diagonal. No synchronization.
+                    /// the diagonal. One synchronization at the end: the count of the rows with a correction,
+                    /// which sizes their blocks and chooses the product (none: the difference form alone).
                     int update(const AssembleBSR &assemble) override {
                         SFEM_TRACE_SCOPE("inexact::cuda::BsrStore::update");
                         if (n_ == 0) return SFEM_SUCCESS;
@@ -445,6 +477,9 @@ namespace sfem {
                         count_t *window_rp = nullptr;
                         check(cudaMallocAsync((void **)&values, largest_ * 9 * sizeof(float), stream_), "bsr values");
                         check(cudaMallocAsync((void **)&window_rp, ((size_t)n_ + 1) * sizeof(count_t), stream_), "bsr window rowptr");
+                        float *sums = nullptr;  // the corrections' blocks, at most one per row
+                        check(cudaMallocAsync((void **)&sums, (size_t)n_ * 9 * sizeof(float), stream_), "bsr row sums");
+                        check(cudaMemsetAsync(count_.data, 0, sizeof(int), stream_), "bsr corrections");
                         int        status = SFEM_SUCCESS;
                         const auto at     = layout();
                         for (size_t w = 0; w + 1 < bounds_.size() && status == SFEM_SUCCESS; ++w) {
@@ -460,8 +495,8 @@ namespace sfem {
                                 check(cudaMemsetAsync(top_.data, 0, sizeof(int), stream_), "bsr scale");
                                 max_kernel<<<1024, 256, 0, stream_>>>(r0, r1, rp_.data, ci_.data, values, top_.data);
                             }
-                            rows_kernel<T><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, values, ablocks_.data, top_.data,
-                                                                                           row_scale_.data);
+                            rows_kernel<T><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, values, sums, corr_of_.data,
+                                                                                           count_.data, top_.data, row_scale_.data);
                             encode_kernel<T, SYM><<<grid(r1 - r0, THREADS), THREADS, 0, stream_>>>(r0, r1, rp_.data, ci_.data, values,
                                                                                                   row_scale_.data, records_.data, at);
                             if constexpr (SYM)
@@ -470,6 +505,15 @@ namespace sfem {
                         }
                         check(cudaFreeAsync(values, stream_), "bsr values");
                         check(cudaFreeAsync(window_rp, stream_), "bsr window rowptr");
+                        int count = 0;
+                        check(cudaMemcpyAsync(&count, count_.data, sizeof(int), cudaMemcpyDeviceToHost, stream_), "bsr corrections");
+                        check(cudaStreamSynchronize(stream_), "bsr corrections");
+                        n_corr_ = status == SFEM_SUCCESS ? (ptrdiff_t)count : 0;
+                        if ((size_t)n_corr_ * 9 > corr_.size) corr_ = DeviceArray<float>((size_t)n_corr_ * 9);
+                        if (n_corr_ > 0)
+                            check(cudaMemcpyAsync(corr_.data, sums, (size_t)n_corr_ * 9 * sizeof(float), cudaMemcpyDeviceToDevice, stream_),
+                                  "bsr corrections");
+                        check(cudaFreeAsync(sums, stream_), "bsr row sums");
                         check(cudaGetLastError(), "bsr encode");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                         return status;
@@ -493,20 +537,23 @@ namespace sfem {
                     void add_diagonal(real_t *const diag) const override {
                         if (n_ > 0)
                             diagonal_kernel<T><<<grid(n_, THREADS), THREADS, 0, stream_>>>(n_, rp_.data, ci_.data, records_.data, row_scale_.data,
-                                                                                           ablocks_.data, diag, layout());
+                                                                                           corr_of_.data, corr_.data, diag, layout());
                         check(cudaGetLastError(), "bsr diagonal");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);
                     }
 
                     /// The records, their structure (the node graph's device copy; SELL: its rows, steps,
-                    /// columns and the rows' positions), the rows' sums and scales. A window's
-                    /// single-precision values and row pointers exist during the update only.
+                    /// columns and the rows' positions), the corrections (an index per row, a block per
+                    /// corrected row) and the scales. A window's single-precision values and row pointers,
+                    /// and the rows' sums, exist during the update only.
                     std::size_t bytes() const override {
-                        return records_.bytes() + rp_.bytes() + ci_.bytes() + ablocks_.bytes() + row_scale_.bytes() + top_.bytes() +
-                               rows_.bytes() + gp_.bytes() + cols_.bytes() + pos_.bytes();
+                        return records_.bytes() + rp_.bytes() + ci_.bytes() + corr_of_.bytes() + (size_t)n_corr_ * 9 * sizeof(float) +
+                               row_scale_.bytes() + top_.bytes() + count_.bytes() + rows_.bytes() + gp_.bytes() + cols_.bytes() + pos_.bytes();
                     }
 
-                    std::string describe() const override { return name_; }
+                    std::string describe() const override { return name_ + ", " + std::to_string(n_corr_) + " corrected rows"; }
+
+                    void set_diagonal(const real_t *const d) override { diag_ = d; }
 
                 private:
                     std::string            name_;
@@ -520,7 +567,11 @@ namespace sfem {
                     DeviceArray<count_t>   rp_;
                     DeviceArray<idx_t>     ci_;
                     DeviceArray<int>       top_;
-                    DeviceArray<float>     ablocks_;    // per node: A_i, the row's sum
+                    DeviceArray<idx_t>     corr_of_;    // per node: its correction's index, -1 for none
+                    DeviceArray<float>     corr_;       // the corrections' blocks R_i (capacity; n_corr_ used)
+                    DeviceArray<int>       count_;      // the update's count of corrections
+                    ptrdiff_t              n_corr_{0};
+                    const real_t          *diag_{nullptr};  // set_diagonal's, per dof
                     DeviceArray<float>     row_scale_;  // f16: per node, its window's scale
                     // SELL: [group][lane] rows (-1 past the last), the groups' first steps, [step][lane]
                     // columns (padding: the row itself), each row's position group * C + lane.
@@ -584,18 +635,32 @@ namespace sfem {
                         return slots;
                     }
 
+                    /// The product: the difference form alone where no row has a correction (an operator
+                    /// that annihilates translations), the corrections read where some do; the diagonal
+                    /// (set_diagonal) in the same pass.
                     template <bool FUSED>
                     void launch(const real_t *const x, real_t *const y, const DiagonalExtra &extra) const {
                         if (n_ == 0) return;
+                        if (n_corr_ > 0)
+                            diag_ ? launch<FUSED, true, true>(x, y, extra) : launch<FUSED, true, false>(x, y, extra);
+                        else
+                            diag_ ? launch<FUSED, false, true>(x, y, extra) : launch<FUSED, false, false>(x, y, extra);
+                    }
+
+                    template <bool FUSED, bool CORR, bool DIAG>
+                    void launch(const real_t *const x, real_t *const y, const DiagonalExtra &extra) const {
+                        const idx_t *const  co = corr_of_.data;
+                        const float *const  cb = corr_.data;
+                        const real_t *const dg = diag_;
                         if constexpr (SELL) {
-                            sell_kernel<T, FUSED><<<grid(n_groups_ * SELL_C, THREADS), THREADS, 0, stream_>>>(
-                                    n_groups_, rows_.data, gp_.data, cols_.data, records_.data, row_scale_.data, x, y, ablocks_.data, extra);
+                            sell_kernel<T, FUSED, CORR, DIAG><<<grid(n_groups_ * SELL_C, THREADS), THREADS, 0, stream_>>>(
+                                    n_groups_, rows_.data, gp_.data, cols_.data, records_.data, row_scale_.data, x, y, co, cb, dg, extra);
                         } else if (g_ == 4) {
-                            apply_kernel<T, 4, FUSED><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(
-                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, ablocks_.data, extra);
+                            apply_kernel<T, 4, FUSED, CORR, DIAG><<<grid(n_ * 4, THREADS), THREADS, 0, stream_>>>(
+                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, co, cb, dg, extra);
                         } else {
-                            apply_kernel<T, 8, FUSED><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(
-                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, ablocks_.data, extra);
+                            apply_kernel<T, 8, FUSED, CORR, DIAG><<<grid(n_ * 8, THREADS), THREADS, 0, stream_>>>(
+                                    n_, rp_.data, ci_.data, records_.data, row_scale_.data, x, y, co, cb, dg, extra);
                         }
                         check(cudaGetLastError(), "bsr apply");
                         SFEM_DEBUG_SYNCHRONIZE(stream_);

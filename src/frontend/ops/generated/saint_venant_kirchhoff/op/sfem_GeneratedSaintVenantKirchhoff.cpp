@@ -31,7 +31,7 @@ namespace sfem {
     //! merit and the residual have to describe the same problem, or a line
     //! search minimises something the Newton step is not solving.
     std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
-      return scheme ? scheme->inertia_op() : nullptr;
+      return scheme && !InertiaLeftOut::active() ? scheme->inertia_op() : nullptr;
     }
 
         struct AffineOption {

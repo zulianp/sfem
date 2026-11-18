@@ -360,6 +360,10 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        /// Whether the Hessian is its diagonal (hessian_diag is the whole operator): a lumped mass.
+        /// A stored tangent then applies it in its own pass (InexactOptions::Inertia).
+        virtual bool hessian_is_diagonal() const { return false; }
+
         /**
          * @brief Compute the gradient of the operator
          * @param x Current solution vector

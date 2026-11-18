@@ -93,9 +93,13 @@ updating is an error.
 
 ## Options
 
-`solver.linear.format: INEXACT` with `solver.linear.inexact: {store, encoding, fold, traversal, layout}`:
+`solver.linear.format: INEXACT` with `solver.linear.inexact: {store, encoding, fold, traversal, layout, inertia}`:
 `points` (f64, f32, f16, i8md), `element_matrix` (f64, f32, f16, i8pair) or `bsr` (f32, f16, i8;
 `layout: auto|sell|rows`, the host SELL-16-512 only); `fold: auto|on|off`;
+`inertia: auto|fused|separate`: every store holds the material's tangent alone and a time scheme's
+inertia is applied beside it (the generated `inexact_update` assembles under `InertiaLeftOut`); `bsr`
+adds a lumped inertia in its own pass (auto, fused) or as a pass of its own (separate, and always for
+a consistent mass), so its difference form is exact for the material;
 `traversal: auto|packed|atomic` (the device chooses its own: `auto` only). int8 with one scale per element is not offered: it is not a
 usable Newton operator.
 

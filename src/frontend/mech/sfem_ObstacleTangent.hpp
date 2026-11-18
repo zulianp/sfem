@@ -33,6 +33,7 @@ namespace sfem {
             InexactOptions inexact;
             /// SELL only: its values, f32, f16 or i8 (SELLTangent).
             InexactOptions::Encoding sell_encoding{InexactOptions::Encoding::F32};
+            InexactOptions::Inertia  sell_inertia{InexactOptions::Inertia::AUTO};
             /// BSR only: bytes per stored value, sizeof(real_t) or 4 (BSRTangent::create).
             int storage_bytes{(int)sizeof(real_t)};
         };

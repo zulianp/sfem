@@ -5,22 +5,24 @@
 
 namespace sfem {
 
-    InexactOptions SELLTangent::options(const InexactOptions::Encoding encoding) {
+    InexactOptions SELLTangent::options(const InexactOptions::Encoding encoding, const InexactOptions::Inertia inertia) {
         InexactOptions ret;
         ret.store    = InexactOptions::Store::BSR;
         ret.encoding = encoding;
         ret.layout   = InexactOptions::Layout::SELL;
+        ret.inertia  = inertia;
         ret.validate();
         return ret;
     }
 
     std::shared_ptr<SELLTangent> SELLTangent::create(const std::shared_ptr<Function> &f,
                                                      const ExecutionSpace             es,
-                                                     const InexactOptions::Encoding   encoding) {
+                                                     const InexactOptions::Encoding   encoding,
+                                                     const InexactOptions::Inertia    inertia) {
         std::shared_ptr<SELLTangent> ret(new SELLTangent());
         ret->f_       = f;
         ret->es_      = es;
-        ret->options_ = options(encoding);
+        ret->options_ = options(encoding, inertia);
         return ret;
     }
 

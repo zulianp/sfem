@@ -38,7 +38,7 @@ namespace sfem {
     //! merit and the residual have to describe the same problem, or a line
     //! search minimises something the Newton step is not solving.
     std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
-      return scheme ? scheme->inertia_op() : nullptr;
+      return scheme && !InertiaLeftOut::active() ? scheme->inertia_op() : nullptr;
     }
 
         struct AffineOption {
@@ -1320,12 +1320,12 @@ namespace sfem {
 
   int GeneratedNeoHookeanOgden::inexact_diag(real_t *const diag) {
     SFEM_TRACE_SCOPE("GeneratedNeoHookeanOgden::inexact_diag");
-    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
     if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_diag(impl_->inexact.state, diag) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
+    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
@@ -1346,12 +1346,19 @@ namespace sfem {
     auto mesh = impl_->space->mesh();
     impl_->inexact.state = x;
     if (impl_->inexact.assembled()) {
+      // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      inexact::OpState::Inertia inertia;
+      if (auto term = time_scheme_term(impl_->time_scheme)) {
+        inertia.diagonal = term->hessian_is_diagonal();
+        inertia.add_diagonal = [term, x](real_t *const d) { return term->hessian_diag(x, d); };
+      }
       return impl_->inexact.update_bsr(
           impl_->space->element_node_graph(),
           tangent_is_symmetric(),
           [&](const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values) {
+            const InertiaLeftOut material_only;
             return hessian_bsr_typed(x, rowptr, colidx, type, values);
-          });
+          }, inertia);
     }
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto &store = impl_->inexact.stores[domain.block.get()];
@@ -1387,10 +1394,19 @@ namespace sfem {
                       const real_t *const h,
                       real_t *const out,
                       const ElementScope scope) {
-    // The assembled store holds the whole tangent, inertia included. Its rows read every
+    // The assembled store holds the material's tangent, a diagonal inertia in its pass
+    // (inertia_fused); any other inertia goes first, as in the stores' order. Its rows read every
     // column, so the halves of a distributed product take it with the interface, once the
     // halo is in.
     if (impl_->inexact.assembled()) {
+      if (!impl_->inexact.inertia_fused) {
+      if (auto term = time_scheme_term(impl_->time_scheme); term && scope != ElementScope::SHARED_AND_AURA) {
+        if (term->team_apply(team, impl_->inexact.state, h, out, scope) != SFEM_SUCCESS) {
+          return SFEM_FAILURE;
+        }
+        team.barrier();
+      }
+      }
       if (scope != ElementScope::OWNED_NOT_SHARED) impl_->inexact.team_apply_bsr(team, h, out);
       return SFEM_SUCCESS;
     }

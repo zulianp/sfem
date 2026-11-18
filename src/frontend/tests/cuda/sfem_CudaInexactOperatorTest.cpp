@@ -159,7 +159,9 @@ namespace {
             SFEM_TEST_ASSERT(agreement < c.agreement);
             if (!strcmp(c.store, "bsr")) {
                 // The paper's footprint (eq:tangent-footprint): a record per off-diagonal block, the node
-                // graph, A_i per node, and with f16 codes a scale per node and the window's maximum.
+                // graph, a correction index per node (elasticity annihilates translations: no row is
+                // corrected, the difference form alone) and the corrections' count, and with f16 codes a
+                // scale per node and the window's maximum.
                 // SELL: a record per slot (padding included), and its rows, steps, columns and the
                 // rows' positions.
                 const auto      g    = fs->element_node_graph();
@@ -167,7 +169,7 @@ namespace {
                 const bool      sell = !strcmp(c.layout, "sell");
                 const ptrdiff_t rec  = !strcmp(c.encoding, "f32") ? 36 : (f16 ? 20 : 16);
                 const ptrdiff_t n = g->n_nodes(), nb = g->nnz(), ng = (n + 31) / 32, slots = sell ? sell_slots(g) : 0;
-                const ptrdiff_t formula = rec * (sell ? slots : nb - n) + 4 * nb + 4 * (n + 1) + 36 * n + (f16 ? 4 * (n + 1) : 0) +
+                const ptrdiff_t formula = rec * (sell ? slots : nb - n) + 4 * nb + 4 * (n + 1) + 4 * n + 4 + (f16 ? 4 * (n + 1) : 0) +
                                           (sell ? 4 * 32 * ng + 8 * (ng + 1) + 4 * slots + 4 * n : 0);
                 printf("%-14s %-15s %-7s %-4s footprint %zu bytes, formula %ld\n", label, c.store, c.encoding, c.layout,
                        device->inexact_bytes(), (long)formula);

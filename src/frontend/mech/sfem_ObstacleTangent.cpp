@@ -243,7 +243,7 @@ namespace sfem {
             // The stored tangent in the SELL layout (SELLTangent::options), composed as INEXACT's is.
             Options stored = options;
             stored.format  = op_type::INEXACT;
-            stored.inexact = SELLTangent::options(options.sell_encoding);
+            stored.inexact = SELLTangent::options(options.sell_encoding, options.sell_inertia);
             return create(f, contact, stored);
         }
         if (options.format == op_type::BSR) {

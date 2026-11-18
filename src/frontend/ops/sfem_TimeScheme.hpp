@@ -53,6 +53,25 @@ namespace sfem {
     /// term to the caller instead would let it be forgotten, and a forgotten
     /// inertia is worse than a forgotten load: the shift and the history are
     /// still in the residual, so the scheme would be half applied.
+    /// While one is alive on the calling thread, an operator's scheme term (its inertia) is left out of
+    /// what the operator assembles: the assembled stored tangent (InexactOptions bsr, the SELL format)
+    /// holds the material alone, whose rows sum to zero, so its difference form is exact; the inertia
+    /// is applied beside it (Op::inexact_apply), fused into the store's pass when it is diagonal.
+    class InertiaLeftOut {
+    public:
+        InertiaLeftOut() { ++depth(); }
+        ~InertiaLeftOut() { --depth(); }
+        InertiaLeftOut(const InertiaLeftOut &)            = delete;
+        InertiaLeftOut &operator=(const InertiaLeftOut &) = delete;
+        static bool active() { return depth() > 0; }
+
+    private:
+        static int &depth() {
+            static thread_local int d = 0;
+            return d;
+        }
+    };
+
     class TimeScheme {
     public:
         virtual ~TimeScheme() = default;
