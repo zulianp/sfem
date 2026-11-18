@@ -1,6 +1,6 @@
 # Compressed quadrature-point partial assembly: results
 
-The spike behind the compressed partial assembly paper (`xsesfsi_papers/compressed_partial_assembly`, private). Every comparison is against BSR, with
+The spike behind the compressed partial assembly paper (`xsesfsi_papers/quantized_ops`, private). Every comparison is against BSR, with
 double- and single-precision values; the exact matrix-free and the projected (P0) operators are
 secondary rows. Material: neo-Hookean Ogden, lambda = 2.2, mu = 2.3333, unless a Poisson ratio is
 given (then E = 1).
@@ -17,7 +17,7 @@ at commit 0644f59ac.
 |---|---|
 | `cases/*.yaml` | The Newton study: a box stretched by 50% and sheared, 4 quasi-static steps. Run with the playground, `solver.linear.format: INEXACT` and `solver.linear.inexact: {store, encoding}`. |
 | `ab_library.sbatch`, `ab_library_gpu.sbatch` | The library against the spike's drivers on one Grace node or one H100, A B B A per store. |
-| `cost_model.py`, `results_tables.py`, `paper_figures.py`, `plot_results.py`, `real_meshes.py` | Moved to the paper (`xsesfsi_papers/compressed_partial_assembly/python`, with `measured*/` as its `data/`). |
+| `cost_model.py`, `results_tables.py`, `paper_figures.py`, `plot_results.py`, `real_meshes.py` | Moved to the paper (`xsesfsi_papers/quantized_ops/python`, with `measured*/` as its `data/`). |
 
 The format rows: `drivers/bench/bench_inexact.exe.cpp` (`bench_inexact <element> <n>`, host or
 `SFEM_EXECUTION_SPACE=device`).
@@ -179,7 +179,7 @@ benchmarks and in Newton (`SMESH_ELEMENTS_PER_PACK` = max(16, min(8192, elements
 down to 16). The earlier logs, including those the tables above quote, are in `measured/pre_opt/`.
 The paper's tables, macros and figures are generated from `measured/`:
 
-    make tables figures    # in xsesfsi_papers/compressed_partial_assembly
+    make tables figures    # in xsesfsi_papers/quantized_ops
 
 Newton at 10M dof is split over several logs per element (one per group of operators); the
 scripts merge them. On TET4 at 10M every operator meets a diverging load step, and the iterations
@@ -377,7 +377,7 @@ BSR kernel, is in `measured_gpu/v1/`): the bench, the application sweep, Newton 
 10M dof, the twist and the Newton sweep, every format, against the G = 16 library BSR, with
 cuSPARSE `bsrmv` f64 and f32 rows beside it in the bench.  The paper's tables, macros and figures:
 
-    make tables figures    # in xsesfsi_papers/compressed_partial_assembly
+    make tables figures    # in xsesfsi_papers/quantized_ops
 
 - The library BSR runs at 3.0-3.5 TB/s and 1.9-3.8x the speed of cuSPARSE at the same precision.
   cuSPARSE's f32 product takes f32 vectors only.

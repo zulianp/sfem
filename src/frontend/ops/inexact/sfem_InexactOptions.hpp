@@ -38,7 +38,7 @@ namespace sfem {
     /// solution for the element and the execution space (`resolve`).
     ///
     /// int8 with one scale per element is not offered: it is not a usable Newton operator
-    /// (xsesfsi_papers/compressed_partial_assembly, RESULTS_QP.md).
+    /// (xsesfsi_papers/quantized_ops, RESULTS_QP.md).
     struct InexactOptions {
         enum class Store { AUTO, POINTS, ELEMENT_MATRIX, BSR };
         enum class Encoding { AUTO, F64, F32, F16, I8_MEAN_DEVIATION, I8_PAIR_SCALE, I8_BLOCK };
@@ -57,7 +57,7 @@ namespace sfem {
 
         bool is_auto() const { return store == Store::AUTO; }
         /// `auto` made concrete for an element and an execution space: the fastest format to a
-        /// Newton solution at about 1e7 dof (xsesfsi_papers/compressed_partial_assembly, tables/summary*.tex):
+        /// Newton solution at about 1e7 dof (xsesfsi_papers/quantized_ops, tables/summary*.tex):
         ///
         ///                  host (Grace)          device (H100)
         ///   TET4           bsr f16               bsr f16

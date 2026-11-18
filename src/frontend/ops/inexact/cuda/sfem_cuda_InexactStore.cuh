@@ -1,6 +1,6 @@
 #pragma once
 
-// The stored-tangent operator on the device (xsesfsi_papers/compressed_partial_assembly): the host stores'
+// The stored-tangent operator on the device (xsesfsi_papers/quantized_ops): the host stores'
 // encodings (sfem_PointStore.hpp, sfem_ElementMatrixStore.hpp) in the layouts and kernel shapes the
 // GPU measurements chose (spikes/inexact_apply_compare/qp/RESULTS_QP.md):
 //
