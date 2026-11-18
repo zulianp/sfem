@@ -15,6 +15,7 @@
 #include "sfem_PointStore.hpp"
 #include "sfem_QuantBSRStore.hpp"
 #include "sfem_aliases.hpp"
+#include "sfem_blas_factory.hpp"
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_cuda_QuantBSRStore.hpp"
@@ -191,35 +192,71 @@ namespace sfem {
             /// null: the plain y += A x.
             const inexact::DiagonalExtra                              *extra{nullptr};
             bool                                                       overwrite{false};
+            /// The time scheme's inertia beside the `bsr` store, when it is diagonal and fused: its
+            /// diagonal, which the store adds in its pass (BsrStore::set_diagonal).
+            SharedBuffer<real_t>                                       inertia_diagonal;
+            bool                                                       inertia_fused{false};
 
             std::size_t bytes() const {
                 std::size_t ret = bsr ? bsr->bytes() : 0;
+                if (inertia_fused && inertia_diagonal) ret += inertia_diagonal->size() * sizeof(real_t);
                 for (const auto &entry : stores) ret += entry.second ? entry.second->bytes() : 0;
                 return ret;
             }
 
             bool assembled() const { return options.store == InexactOptions::Store::BSR; }
 
-            /// The `bsr` store: the operator's whole tangent on the space's node graph, its inertia
-            /// term included, so the caller adds nothing to its apply.
+            /// What update_bsr is told of the time scheme's inertia: whether it is its diagonal (a lumped
+            /// mass, Op::hessian_is_diagonal) and how to add that diagonal to a vector; empty: none.
+            struct Inertia {
+                bool                              diagonal{false};
+                std::function<int(real_t *const)> add_diagonal;
+            };
+
+            /// The `bsr` store: the operator's tangent on the space's node graph without its inertia
+            /// (`assemble` leaves it out, InertiaLeftOut): the material's, whose rows sum to zero, so
+            /// its difference form is exact. A diagonal inertia goes into the store's pass (inertia
+            /// auto or fused; inertia_fused); any other the caller applies beside the store.
             int update_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const AssembleBSR &assemble) {
+                return update_bsr(graph, symmetric, assemble, Inertia{});
+            }
+
+            int update_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const AssembleBSR &assemble,
+                           const Inertia &inertia) {
                 SFEM_TRACE_SCOPE("inexact::update_bsr");
                 if (!bsr) {
                     SFEM_TRACE_SCOPE("inexact::make_bsr");
-                    bsr = make_bsr(graph, options.encoding == InexactOptions::Encoding::I8_BLOCK, symmetric);
+                    bsr = make_bsr(graph, symmetric);
                 }
-                return bsr->update(assemble);
+                if (bsr->update(assemble) != SFEM_SUCCESS) return SFEM_FAILURE;
+                inertia_fused = inertia.add_diagonal && inertia.diagonal && options.inertia != InexactOptions::Inertia::SEPARATE;
+                if (!inertia_fused) {
+                    bsr->set_diagonal(nullptr);
+                    return SFEM_SUCCESS;
+                }
+                const ptrdiff_t n = graph->n_nodes() * 3;
+                if (!inertia_diagonal || (ptrdiff_t)inertia_diagonal->size() != n) inertia_diagonal = create_buffer<real_t>(n, space);
+                sfem::blas<real_t>(space)->zeros(n, inertia_diagonal->data());
+                if (inertia.add_diagonal(inertia_diagonal->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+                bsr->set_diagonal(inertia_diagonal->data());
+                return SFEM_SUCCESS;
             }
 
-            std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool int8, const bool symmetric) const {
+            /// The layout: SELL-C-sigma on the host; on the device the node graph's rows (auto, rows) or
+            /// SELL-C-sigma (sell).
+            std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric) const {
                 if (space == EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-                    return cuda::create_bsr_store(graph, int8, symmetric, stream);
+                    return cuda::create_bsr_store(graph, options.encoding, symmetric, stream,
+                                                  options.layout == InexactOptions::Layout::SELL);
 #else
                     SFEM_ERROR("inexact: a device bsr store in a build without CUDA\n");
 #endif
                 }
-                return create_bsr_store(graph, int8, symmetric);
+                if (options.layout == InexactOptions::Layout::ROWS) {
+                    SFEM_ERROR("inexact: the host's bsr store is SELL-C-sigma only (layout auto or sell)\n");
+                }
+                return create_bsr_store(graph, options.encoding, symmetric);
             }
 
             int diagonal_bsr(real_t *const diag) const {

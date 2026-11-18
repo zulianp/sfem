@@ -34,6 +34,11 @@ namespace sfem {
         int storage_bytes{(int)sizeof(real_t)};
         /// What format INEXACT stores (`solver.linear.inexact`).
         InexactOptions inexact;
+        /// The values of format SELL on a vector problem (`solver.linear.sell.encoding`): f32, f16, i8
+        /// (SELLTangent).
+        InexactOptions::Encoding sell_encoding{InexactOptions::Encoding::F32};
+        /// Its time scheme's inertia (`solver.linear.sell.inertia`): auto, fused, separate.
+        InexactOptions::Inertia sell_inertia{InexactOptions::Inertia::AUTO};
     };
 
     /// The linearised step without constraints beyond the Dirichlet rows: K dx = -r by a Krylov

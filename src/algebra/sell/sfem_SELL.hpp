@@ -1,6 +1,9 @@
-// Assembled block matrices (BSR, 3x3 blocks) with quantized values: an operator's own tangent,
-// assembled in single precision from its element matrices and encoded after it (the `bsr` store of
-// the INEXACT operator, sfem_InexactStore.hpp).  Two forms:
+// Sparse matrices of 3x3 blocks in SELL-C-sigma (Kreutzer et al. 2014), in difference form: the
+// assembled tangent of an operator whose state enters only through its gradient, stored without its
+// diagonal blocks.  The values are double, float, or quantized: int8 with one f32 scale per block or
+// f16 with one power-of-two scale for the whole matrix.  The format behind `solver.linear.format: SELL`
+// (SELLTangent) and the host side of the INEXACT operator's `bsr` store (sfem_QuantBSRStore.hpp);
+// the device matrix is cuda/sfem_SELL_cuda.hpp.  Two forms:
 //
 //   Difference  only the off-diagonal blocks.  An operator that depends on the state only through
 //               its gradient annihilates rigid translations, K_ii = -sum_{j != i} K_ij, so
@@ -23,8 +26,8 @@
 // (RESULTS_QP.md).  Rows whose blocks do not sum to zero -- an inertia term, which a mass matrix
 // adds -- are corrected exactly by `QuantBsrStore` (sfem_QuantBSRStore.hpp).
 //
-// Codes: int8 with one f32 scale per block (the block's largest entry maps to 127), or f16 with one
-// power-of-two scale for the whole matrix.
+// Codes: int8 with one f32 scale per block (the block's largest entry maps to 127), f16 with one
+// power-of-two scale for the whole matrix, or the values themselves (float, double).
 //
 // Layout: VS rows side by side (SELL-C-sigma).  The rows are sorted by length, longest first, within
 // windows of SIGMA rows, cut into groups of VS, and each group is padded to its longest row; a step
@@ -56,23 +59,25 @@
 
 #include "sfem_InexactCodecs.hpp"
 #include "sfem_Team.hpp"
+#include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 
 namespace sfem {
-namespace inexact {
 
-enum class BsrForm { Difference, Upper };
+enum class SellForm { Difference, Upper };
 
-template <typename code_t, BsrForm F, int VS_, typename col_t = idx_t, bool SYM = true>
-struct QuantBsr {
+template <typename code_t, SellForm F, int VS_, typename col_t = idx_t, bool SYM = true>
+struct SellMatrix {
     static constexpr int VS = VS_;
     static constexpr ptrdiff_t SIGMA = 32 * VS_;
-    static constexpr bool per_block = std::is_same<code_t, int8_t>::value;
+    static constexpr bool per_block = std::is_same<code_t, int8_t>::value;      // a scale per block
+    static constexpr bool matrix_scaled = std::is_same<code_t, half_t>::value;  // one scale per matrix
     static constexpr bool difference = true;
-    static constexpr bool upper = F == BsrForm::Upper;
+    static constexpr bool upper = F == SellForm::Upper;
     static constexpr bool offsets = !std::is_same<col_t, idx_t>::value;
     static constexpr ptrdiff_t reach = offsets ? (ptrdiff_t)std::numeric_limits<col_t>::max() : PTRDIFF_MAX;
-    static_assert(per_block || std::is_same<code_t, half_t>::value, "int8 or f16 codes");
+    static_assert(per_block || matrix_scaled || std::is_same<code_t, float>::value || std::is_same<code_t, double>::value,
+                  "int8 or f16 codes, or float or double values");
     static_assert(!offsets || (upper && std::is_unsigned<col_t>::value), "offset columns: upper form, unsigned type");
     static_assert(!upper || SYM, "the upper form stores each pair once, so only a symmetric operator");
 
@@ -86,7 +91,7 @@ struct QuantBsr {
     static constexpr size_t R = CODE_BYTES + (per_block ? (size_t)VS_ * sizeof(float) : 0);
     std::vector<uint8_t> own;
     uint8_t *rec = nullptr;
-    float scale = 1;                // the matrix's (f16)
+    float scale = 1;                // the matrix's (f16; 1 otherwise)
     // Upper: part p owns groups [part_group[p], part_group[p+1]) and rows [part_row[p], part_row[p+1]);
     // its remainder blocks are [rem_ptr[p], rem_ptr[p+1]) and its halo slots [halo_ptr[p], halo_ptr[p+1]),
     // slot s standing for row halo_row[s]; the slots that point into part p's rows are
@@ -118,7 +123,7 @@ struct QuantBsr {
     }
 
     // The structure from a node graph with sorted rows.
-    QuantBsr(const ptrdiff_t n, const count_t *const rp, const idx_t *const ci) : n_rows(n) {
+    SellMatrix(const ptrdiff_t n, const count_t *const rp, const idx_t *const ci) : n_rows(n) {
         n_groups = (n + VS - 1) / VS;
 #ifdef _OPENMP
         const ptrdiff_t parts = upper ? omp_get_max_threads() : 0;
@@ -261,27 +266,30 @@ struct QuantBsr {
 
     template <typename V>
     void encode_into(const count_t *const rp, const idx_t *const ci, const V *const values, uint8_t *const dest) {
-        if constexpr (!per_block) {
+        if constexpr (matrix_scaled) {
             double top = 0;
 #pragma omp parallel for reduction(max : top)
             for (ptrdiff_t i = 0; i < n_rows; ++i)
                 for (count_t k = rp[i]; k < rp[i + 1]; ++k)
                     if (upper ? ci[k] > i : (!difference || ci[k] != i))
                         for (int x = 0; x < 9; ++x) top = std::max(top, std::fabs((double)values[(size_t)k * 9 + x]));
-            scale = (float)CodeTraits<half_t>::scale_for(top);
+            scale = (float)inexact::CodeTraits<half_t>::scale_for(top);
         }
         const double matrix_inv = 1.0 / (double)scale;
-        // One block's codes (and scale) from S, int8 with a per-block scale or f16 with the matrix's.
+        // One block's codes (and scale) from S, int8 with a per-block scale, f16 with the matrix's, or the
+        // values themselves.
         auto put = [&](const double *const S, code_t *const c, const size_t stride, float *const sc) {
             if constexpr (per_block) {
                 double top = 0;
                 for (int x = 0; x < 9; ++x) top = std::max(top, std::fabs(S[x]));
-                const double s = CodeTraits<int8_t>::scale_for(top);
+                const double s = inexact::CodeTraits<int8_t>::scale_for(top);
                 *sc = (float)s;
                 const double inv = 1.0 / (double)(float)s;
-                for (int x = 0; x < 9; ++x) c[x * stride] = CodeTraits<int8_t>::encode(S[x], inv);
+                for (int x = 0; x < 9; ++x) c[x * stride] = inexact::CodeTraits<int8_t>::encode(S[x], inv);
+            } else if constexpr (matrix_scaled) {
+                for (int x = 0; x < 9; ++x) c[x * stride] = inexact::CodeTraits<half_t>::encode(S[x], matrix_inv);
             } else {
-                for (int x = 0; x < 9; ++x) c[x * stride] = CodeTraits<half_t>::encode(S[x], matrix_inv);
+                for (int x = 0; x < 9; ++x) c[x * stride] = (code_t)S[x];
             }
         };
         // The remainder first: in place, its values may lie under the records.
@@ -353,7 +361,7 @@ struct QuantBsr {
             if (b == a) {
                 // Window a alone, through a scratch: its records overlap its own values.
                 if (rec_begin(a + 1) > val_begin(a + 1)) {
-                    SFEM_ERROR("QuantBsr::encode_in_place: the records of window %td outgrow its values\n", a);
+                    SFEM_ERROR("SellMatrix::encode_in_place: the records of window %td outgrow its values\n", a);
                 }
                 std::vector<uint8_t> scratch(rec_begin(a + 1) - rec_begin(a));
                 window(a, scratch.data(), (size_t)group_ptr[(size_t)(a * GW)]);
@@ -370,8 +378,8 @@ struct QuantBsr {
     // diag += the diagonal of the encoded operator: the diagonal blocks are minus the off-diagonal
     // blocks of their row, which in the upper form are the stored blocks of the row and the
     // transposes of those stored in the rows above.  Serial: it is taken once per linearisation.
-    void add_diagonal(double *const RSTR diag) const {
-        const double matrix_scale = per_block ? 1.0 : (double)scale;
+    void add_diagonal(double *const SFEM_RESTRICT diag) const {
+        const double matrix_scale = matrix_scaled ? (double)scale : 1.0;
         for (ptrdiff_t g = 0; g < n_groups; ++g)
             for (int l = 0; l < VS; ++l) {
                 const idx_t i = rows[(size_t)g * VS + l];
@@ -403,7 +411,7 @@ struct QuantBsr {
     // y = A x, or y += A x with ADD; components interleaved, arithmetic in tau. One region around
     // team_apply.
     template <typename tau, bool ADD>
-    void apply(const double *const RSTR x, double *const RSTR y) const {
+    void apply(const double *const SFEM_RESTRICT x, double *const SFEM_RESTRICT y) const {
 #pragma omp parallel
         team_apply<tau, ADD>(Team::current(n_rows * 3), x, y, [](const ptrdiff_t, const ptrdiff_t) {});
     }
@@ -413,7 +421,7 @@ struct QuantBsr {
     // then it adds what else it has for those rows (the store's corrections). The rows a thread
     // writes are not its team share, so it ends on a barrier.
     template <typename tau, bool ADD, typename Done>
-    void team_apply(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
+    void team_apply(const Team &team, const double *const SFEM_RESTRICT x, double *const SFEM_RESTRICT y, Done rows_done) const {
         if constexpr (upper) {
             team_apply_upper<tau, ADD>(team, x, y, rows_done);
         } else {
@@ -423,15 +431,15 @@ struct QuantBsr {
     }
 
     template <typename tau, bool ADD, typename Done>
-    void team_apply_difference(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
-        const idx_t *const RSTR rw = rows.data();
-        const count_t *const RSTR gp = group_ptr.data();
-        const col_t *const RSTR ci = colidx.data();
-        const tau out_scale = per_block ? tau(1) : tau(scale);
+    void team_apply_difference(const Team &team, const double *const SFEM_RESTRICT x, double *const SFEM_RESTRICT y, Done rows_done) const {
+        const idx_t *const SFEM_RESTRICT rw = rows.data();
+        const count_t *const SFEM_RESTRICT gp = group_ptr.data();
+        const col_t *const SFEM_RESTRICT ci = colidx.data();
+        const tau out_scale = matrix_scaled ? tau(scale) : tau(1);
         ptrdiff_t first, last;
         team.share(n_groups, 1, &first, &last);
         for (ptrdiff_t g = first; g < last; ++g) {
-            const idx_t *const RSTR r = &rw[(size_t)g * VS];
+            const idx_t *const SFEM_RESTRICT r = &rw[(size_t)g * VS];
             double xi0[VS], xi1[VS], xi2[VS];
             tau a0[VS], a1[VS], a2[VS];
             for (int l = 0; l < VS; ++l) {
@@ -442,9 +450,9 @@ struct QuantBsr {
                 a0[l] = a1[l] = a2[l] = 0;
             }
             for (count_t step = gp[g]; step < gp[g + 1]; ++step) {
-                const col_t *const RSTR cj = &ci[(size_t)step * VS];
-                const code_t *const RSTR b = step_codes((size_t)step);
-                const float *const RSTR s = per_block ? step_scales((size_t)step) : nullptr;
+                const col_t *const SFEM_RESTRICT cj = &ci[(size_t)step * VS];
+                const code_t *const SFEM_RESTRICT b = step_codes((size_t)step);
+                const float *const SFEM_RESTRICT s = per_block ? step_scales((size_t)step) : nullptr;
 #pragma omp simd
                 for (int l = 0; l < VS; ++l) {
                     const double *const xj = &x[(size_t)cj[l] * 3];
@@ -481,14 +489,14 @@ struct QuantBsr {
     }
 
     template <typename tau, bool ADD, typename Done>
-    void team_apply_upper(const Team &team, const double *const RSTR x, double *const RSTR y, Done rows_done) const {
-        const idx_t *const RSTR rw = rows.data();
-        const count_t *const RSTR gp = group_ptr.data();
-        const col_t *const RSTR ci = colidx.data();
-        const tau out_scale = per_block ? tau(1) : tau(scale);
+    void team_apply_upper(const Team &team, const double *const SFEM_RESTRICT x, double *const SFEM_RESTRICT y, Done rows_done) const {
+        const idx_t *const SFEM_RESTRICT rw = rows.data();
+        const count_t *const SFEM_RESTRICT gp = group_ptr.data();
+        const col_t *const SFEM_RESTRICT ci = colidx.data();
+        const tau out_scale = matrix_scaled ? tau(scale) : tau(1);
         const ptrdiff_t parts = (ptrdiff_t)part_row.size() - 1;
-        const idx_t *const RSTR hr = halo_row.data();
-        double *const RSTR hy = halo_y.data();
+        const idx_t *const SFEM_RESTRICT hr = halo_row.data();
+        double *const SFEM_RESTRICT hy = halo_y.data();
         // A part's rows and its halo slots are its own, and parts were cut one per thread: the
         // calling thread's share of them.
         ptrdiff_t first_part, last_part;
@@ -500,7 +508,7 @@ struct QuantBsr {
                     for (ptrdiff_t v = part_row[(size_t)p] * 3; v < end * 3; ++v) y[v] = 0;
                 for (ptrdiff_t v = (ptrdiff_t)halo_ptr[(size_t)p] * 3; v < (ptrdiff_t)halo_ptr[(size_t)p + 1] * 3; ++v) hy[v] = 0;
                 for (ptrdiff_t g = part_group[(size_t)p]; g < part_group[(size_t)p + 1]; ++g) {
-                    const idx_t *const RSTR r = &rw[(size_t)g * VS];
+                    const idx_t *const SFEM_RESTRICT r = &rw[(size_t)g * VS];
                     idx_t base[VS];
                     double xi0[VS], xi1[VS], xi2[VS];
                     tau a0[VS], a1[VS], a2[VS], t0[VS], t1[VS], t2[VS];
@@ -513,9 +521,9 @@ struct QuantBsr {
                         a0[l] = a1[l] = a2[l] = 0;
                     }
                     for (count_t step = gp[g]; step < gp[g + 1]; ++step) {
-                        const col_t *const RSTR cj = &ci[(size_t)step * VS];
-                        const code_t *const RSTR b = step_codes((size_t)step);
-                        const float *const RSTR s = per_block ? step_scales((size_t)step) : nullptr;
+                        const col_t *const SFEM_RESTRICT cj = &ci[(size_t)step * VS];
+                        const code_t *const SFEM_RESTRICT b = step_codes((size_t)step);
+                        const float *const SFEM_RESTRICT s = per_block ? step_scales((size_t)step) : nullptr;
                         idx_t jl[VS];
 #pragma omp simd
                         for (int l = 0; l < VS; ++l) {
@@ -586,5 +594,4 @@ struct QuantBsr {
     }
 };
 
-}  // namespace inexact
 }  // namespace sfem

@@ -5,6 +5,7 @@
 #include "sfem_DIA.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_SELLTangent.hpp"
 #include "sfem_ShiftableJacobi.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_blas_factory.hpp"
@@ -24,6 +25,7 @@ namespace sfem {
         ptrdiff_t                     ndofs{0};
 
         std::shared_ptr<BSRTangent>                       tangent;  // format BSR
+        std::shared_ptr<SELLTangent>                      sell;     // format SELL on a vector problem
         SharedBuffer<real_t>                              state;    // the iterate the formats that read one see
         std::shared_ptr<Operator<real_t>>                 op;
         std::shared_ptr<MatrixFreeLinearSolver<real_t>>   solver;
@@ -34,6 +36,7 @@ namespace sfem {
         bool                                              negative_curvature{false};
 
         bool is_bsr() const { return options.format == op_type::BSR && f->space()->block_size() > 1; }
+        bool is_sell() const { return options.format == op_type::SELL && f->space()->block_size() > 1; }
 
         int create_solver() {
             if (options.type == "cg") {
@@ -119,6 +122,8 @@ namespace sfem {
         if (impl.is_bsr()) {
             impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
             if (!impl.tangent) return nullptr;
+        } else if (impl.is_sell()) {
+            impl.sell = SELLTangent::create(f, es, options.sell_encoding, options.sell_inertia);
         } else if (options.format == op_type::MATRIX_FREE) {
             // Reads the iterate the Newton loop handed to `Function::update`; built once.
             impl.op = create_linear_operator(op_type::MATRIX_FREE, f, impl.state, es);
@@ -130,7 +135,7 @@ namespace sfem {
     }
 
     bool UnconstrainedStep::tangent_projection_supported() const {
-        const bool stored = impl_->options.format == op_type::INEXACT && impl_->f->inexact_stores_every_tangent();
+        const bool stored = (impl_->options.format == op_type::INEXACT || impl_->sell) && impl_->f->inexact_stores_every_tangent();
         return (impl_->tangent || stored) && impl_->f->tangent_projection_supported();
     }
 
@@ -153,6 +158,18 @@ namespace sfem {
             if (impl.tangent->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
             impl.op = impl.tangent->op();
             if (impl.jacobi && impl.tangent->diagonal(impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+        } else if (impl.sell) {
+            if (!impl.op && impl.options.type == "cg" && !impl.f->tangent_is_symmetric()) {
+                fprintf(stderr, "UnconstrainedStep: the tangent is not symmetric and CG needs a symmetric operator; use solver.linear.type bcgs\n");
+                return SFEM_FAILURE;
+            }
+            if (impl.sell->assemble(x) != SFEM_SUCCESS) return SFEM_FAILURE;
+            if (!impl.op) impl.op = impl.sell->op(impl.state);
+            if (impl.jacobi) {
+                // The diagonal of the encoded operator, the one the Krylov method applies.
+                impl.blas->zeros(impl.ndofs, impl.diag->data());
+                if (impl.sell->diagonal(x, impl.diag->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+            }
         } else {
             if (impl.options.format == op_type::INEXACT) {
                 if (impl.f->inexact_supported()) {

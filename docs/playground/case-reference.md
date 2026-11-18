@@ -281,15 +281,19 @@ obstacle:
 | `newton.line_search.batched` | `true` | |
 | `newton.line_search.rule` | `armijo` | Or `damped`: `damping` (in (0, 1]) times the step, shortened only past an inverted element. |
 | `linear.type` | `cg` | Or `bcgs`. |
-| `linear.format` | `BSR` | The tangent's format: `MF` (matrix-free), `BSR`, `BSR_SYM`, `CRS`, `CRS_SYM`, `SPLITCRS`, `ALIGNEDCRS`, `DIA`, `COO_SYM`, `SPLITDACRS`, `SELL`, `INEXACT`. |
+| `linear.format` | `BSR` | The tangent's format: `MF` (matrix-free), `BSR`, `BSR_SYM`, `CRS`, `CRS_SYM`, `SPLITCRS`, `ALIGNEDCRS`, `DIA`, `COO_SYM`, `SPLITDACRS`, `SELL`, `INEXACT`. `SELL` on a vector problem is the assembled tangent in SELL-C-σ of 3×3 blocks (`linear.sell`), in the difference form: host C = 16, σ = 512 (a symmetric tangent's pairs stored once), device C = 32, σ = 1024; on a scalar problem the scalar SELL-C. |
 | `linear.preconditioner` | `jacobi` | Or `none`. |
 | `linear.rtol` | `1e-3` (nonlinear), `newton.rtol` (linear) | |
 | `linear.atol` | `1e-16` | |
 | `linear.max_it` | `2000` | |
 | `linear.storage_bytes` | `8` | `4` stores the BSR tangent in single precision (`node_sdf`'s too); `2` in half precision (host, without constraints or obstacle). |
+| `linear.sell.encoding` | `f32` | With `format: SELL` on a vector problem: `f32`, `f16` (one power-of-two scale per row's window), `i8` (a scale per block). The same matrix as `inexact.store: bsr` with `inexact.layout: sell`, so contact, the obstacle QP and the tangent projection take it as they take the stored tangent. |
+| `linear.sell.inertia` | `auto` | With `format: SELL`: where a time scheme's inertia goes, as `linear.inexact.inertia`. |
 | `linear.inexact.store` | `points` | With `format: INEXACT`, what the material's operator stores of its tangent: `points` (the tangent at every quadrature point, moments on TET10), `element_matrix` (element matrices in difference form), or `bsr` (its assembled tangent, quantized). `auto` (with `encoding: auto`) takes the format measured fastest to a Newton solution for the element and the execution space: `bsr f16` on TET4 and on host TET10, `bsr i8` on device TET10 and on HEX8, `element_matrix f16` on host HEX27, `points f16` on device HEX27; it is printed at the first linearisation. |
-| `linear.inexact.encoding` | `f32` | `auto` with `store: auto`. `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f16`, `i8` (a scale per block). |
+| `linear.inexact.encoding` | `f32` | `auto` with `store: auto`. `points`: `f64`, `f32`, `f16`, `i8md` (int8 deviations from an f32 element mean). `element_matrix`: `f64`, `f32`, `f16`, `i8pair` (int8 with a factor per node pair). `bsr`: `f32`, `f16`, `i8` (a scale per block). |
 | `linear.inexact.fold` | `auto` | The folded point store of the hexahedra (exact, fewer numbers): `auto`, `on`, `off`. On the device only HEX8 folds. |
+| `linear.inexact.layout` | `auto` | `store: bsr` only: `sell` (SELL-C-σ, a thread per row on the device: the faster on meshes of regular rows) or `rows` (the node graph's rows, a few threads each, device only: the faster on unstructured meshes, FF200 valves 1.4–1.8×); `auto` is SELL on the host and the rows on the device. |
+| `linear.inexact.inertia` | `auto` | `store: bsr`: the stored tangent holds the material's tangent alone, whose rows sum to zero, so its difference form is exact; a time scheme's inertia is applied beside it. `auto`, `fused`: a lumped inertia (a vector) is added in the store's own pass; `separate`: the inertia is a pass of its own (always for a consistent mass). The other stores apply it as a pass of their own. |
 | `linear.inexact.traversal` | `auto` | `packed` (the packed mesh, deterministic) when the space has one, `atomic` otherwise. On the device the store chooses (`auto` only). |
 
 With an obstacle, the obstacle's step replaces the linear solver; of `linear` it reads `format`,

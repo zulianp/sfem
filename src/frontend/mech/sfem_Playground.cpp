@@ -1075,6 +1075,17 @@ namespace sfem {
             linear.max_it         = read<int>(ln, "max_it", linear.max_it);
             linear.storage_bytes  = read<int>(ln, "storage_bytes", linear.storage_bytes);
             if (has(ln, "inexact")) linear.inexact = inexact_options_from_yaml(ln["inexact"]);
+            // Format SELL's values (SELLTangent): the bsr store's encodings.
+            {
+                const InexactOptions sell = InexactOptions::from_strings("bsr",
+                                                                         read_string(child(ln, "sell"), "encoding", "f32"),
+                                                                         "auto",
+                                                                         "auto",
+                                                                         "sell",
+                                                                         read_string(child(ln, "sell"), "inertia", "auto"));
+                linear.sell_encoding = sell.encoding;
+                linear.sell_inertia  = sell.inertia;
+            }
             // A truncated direction needs the line search to scale it.
             linear.stop_on_negative_curvature = newton_options.line_search.enabled;
             // A linear problem is solved by one Newton step, so its linear solve goes as far as
@@ -1098,6 +1109,8 @@ namespace sfem {
                 // The step's tangent, in the format an unconstrained step's would take.
                 obstacle.tangent.format        = linear.format;
                 obstacle.tangent.inexact       = linear.inexact;
+                obstacle.tangent.sell_encoding = linear.sell_encoding;
+                obstacle.tangent.sell_inertia  = linear.sell_inertia;
                 obstacle.tangent.storage_bytes = linear.storage_bytes;
                 step               = NodeObstacleStep::create(f, contact, scheme, obstacle);
             } else if (ssmgc_step) {

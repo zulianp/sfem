@@ -167,20 +167,31 @@ int test_single_precision_tangent() {
 int test_composed_tangent() {
     struct Run {
         const char *name;
-        const char *inexact;
+        const char *inexact;  // INEXACT's options, or SELL's (`solver.linear.sell`)
         double      tol;
         const char *space;
+        const char *format = "INEXACT";
     };
     std::vector<Run> runs = {{"BSR", "", 0, "host"},
                              {"points f64", "{store: points, encoding: f64}", 1e-6, "host"},
                              {"element_matrix f64", "{store: element_matrix, encoding: f64}", 1e-6, "host"},
                              {"points f16", "{store: points, encoding: f16}", 1e-3, "host"},
-                             {"bsr f16", "{store: bsr, encoding: f16}", 1e-3, "host"}};
+                             {"bsr f16", "{store: bsr, encoding: f16}", 1e-3, "host"},
+                             {"SELL f32", "{encoding: f32}", 1e-5, "host", "SELL"},
+                             {"SELL f16", "{encoding: f16}", 1e-3, "host", "SELL"},
+                             // The inertia beside the stored material tangent: fused into its pass (the
+                             // default, above) or a pass of its own.
+                             {"bsr f16 separate", "{store: bsr, encoding: f16, inertia: separate}", 1e-3, "host"},
+                             {"SELL f16 separate", "{encoding: f16, inertia: separate}", 1e-3, "host", "SELL"}};
 #ifdef SFEM_ENABLE_CUDA
     runs.push_back({"device points f64", "{store: points, encoding: f64}", 1e-6, "device"});
     runs.push_back({"device element_matrix f64", "{store: element_matrix, encoding: f64}", 1e-6, "device"});
     runs.push_back({"device points i8md", "{store: points, encoding: i8md}", 1e-2, "device"});
     runs.push_back({"device bsr f16", "{store: bsr, encoding: f16}", 1e-3, "device"});
+    runs.push_back({"device SELL f32", "{encoding: f32}", 1e-5, "device", "SELL"});
+    runs.push_back({"device SELL f16", "{encoding: f16}", 1e-3, "device", "SELL"});
+    runs.push_back({"device bsr f16 separate", "{store: bsr, encoding: f16, inertia: separate}", 1e-3, "device"});
+    runs.push_back({"device SELL f16 separate", "{encoding: f16, inertia: separate}", 1e-3, "device", "SELL"});
 #endif
     std::vector<double> first(runs.size(), -1), impulse(runs.size(), 0);
     std::vector<int>    newton(runs.size(), 0), qp(runs.size(), 0);
@@ -188,8 +199,9 @@ int test_composed_tangent() {
         const std::string        csv       = "test_composed_tangent.csv";
         std::vector<std::string> overrides = {"output.history_csv=" + csv, std::string("execution_space=") + runs[k].space};
         if (k > 0) {
-            overrides.push_back("solver.linear.format=INEXACT");
-            overrides.push_back(std::string("solver.linear.inexact=") + runs[k].inexact);
+            const bool sell = std::string(runs[k].format) == "SELL";
+            overrides.push_back(std::string("solver.linear.format=") + runs[k].format);
+            overrides.push_back(std::string(sell ? "solver.linear.sell=" : "solver.linear.inexact=") + runs[k].inexact);
         }
         auto pg = assemble(DROP, overrides);
         SFEM_TEST_ASSERT(pg != nullptr);

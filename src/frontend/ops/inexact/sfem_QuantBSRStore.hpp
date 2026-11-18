@@ -12,7 +12,8 @@
 #endif
 
 #include "sfem_InexactInterface.hpp"
-#include "sfem_QuantBSR.hpp"
+#include "sfem_InexactOptions.hpp"
+#include "sfem_SELL.hpp"
 #include "sfem_aliases.hpp"
 #include "smesh_crs_graph.hpp"
 #include "smesh_types.hpp"
@@ -79,11 +80,17 @@ namespace sfem {
                 }
             }
 
-            /// The quantized product, each row's correction added by the thread that completed it.
+            void set_diagonal(const real_t *const d) override { diagonal_ = d; }
+
+            /// The quantized product, each row's correction and diagonal added by the thread that
+            /// completed it.
             void team_apply(const Team &team, const real_t *const x, real_t *const y) const override {
-                const idx_t *const rows = rows_.data();
-                const ptrdiff_t    n    = (ptrdiff_t)rows_.size();
+                const idx_t *const  rows = rows_.data();
+                const ptrdiff_t     n    = (ptrdiff_t)rows_.size();
+                const real_t *const d    = diagonal_;
                 quant_.template team_apply<float, true>(team, x, y, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    if (d)
+                        for (ptrdiff_t k = b * 3; k < e * 3; ++k) y[k] += d[k] * x[k];
                     // The corrected rows are in row order.
                     const ptrdiff_t first = std::lower_bound(rows, rows + n, (idx_t)b) - rows;
                     const ptrdiff_t last  = std::lower_bound(rows, rows + n, (idx_t)e) - rows;
@@ -121,6 +128,7 @@ namespace sfem {
             SharedBuffer<float>              values_;
             std::vector<idx_t>               rows_;
             std::vector<float>               blocks_;
+            const real_t                    *diagonal_{nullptr};
 
             /// The rows whose blocks do not sum to zero beyond the assembly's rounding, in row order:
             /// each thread collects its own rows' sums, then they are joined in thread order.
@@ -154,7 +162,7 @@ namespace sfem {
                         // Single-precision sums of a row's few dozen blocks round to about 1e-6 of
                         // its largest entry; anything above that is a term that does not annihilate
                         // translations.
-                        if (!(sum > 64 * FLT_EPSILON * top)) continue;
+                        if (!row_sum_is_a_term(sum, top)) continue;
                         rows[(size_t)t].push_back((idx_t)i);
                         for (int x = 0; x < 9; ++x) blocks[(size_t)t].push_back((float)R[x]);
                     }
@@ -166,26 +174,35 @@ namespace sfem {
             }
         };
 
-        /// The store for a symmetric or an unsymmetric operator on `graph`: int8 codes with a scale
-        /// per block or f16 codes with one scale; the upper form with 16-bit column offsets for a
-        /// symmetric one (about 10% smaller at the same speed on Grace), the full difference form
-        /// otherwise.
-        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph,
-                                                          const bool                              int8,
-                                                          const bool                              symmetric) {
+        /// The store for a symmetric or an unsymmetric operator on `graph`, SELL-C-sigma (C = 16): int8
+        /// codes with a scale per block, f16 codes with one scale, or f32 values; the upper form with
+        /// 16-bit column offsets for a symmetric one (about 10% smaller at the same speed on Grace),
+        /// the full difference form otherwise.
+        template <typename code_t>
+        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const char *const enc) {
             constexpr int VS = 16;
             if (symmetric) {
-                if (int8) {
-                    return std::make_unique<BsrStoreImpl<QuantBsr<int8_t, BsrForm::Upper, VS, uint16_t>>>(graph, "bsr i8 upper");
-                }
-                return std::make_unique<BsrStoreImpl<QuantBsr<half_t, BsrForm::Upper, VS, uint16_t>>>(graph, "bsr f16 upper");
+                return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Upper, VS, uint16_t>>>(
+                        graph, std::string("bsr ") + enc + " upper");
             }
-            if (int8) {
-                return std::make_unique<BsrStoreImpl<QuantBsr<int8_t, BsrForm::Difference, VS, idx_t, false>>>(
-                        graph, "bsr i8 difference");
+            return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Difference, VS, idx_t, false>>>(
+                    graph, std::string("bsr ") + enc + " difference");
+        }
+
+        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph,
+                                                          const InexactOptions::Encoding   encoding,
+                                                          const bool                       symmetric) {
+            switch (encoding) {
+                case InexactOptions::Encoding::I8_BLOCK:
+                    return create_bsr_store<int8_t>(graph, symmetric, "i8");
+                case InexactOptions::Encoding::F16:
+                    return create_bsr_store<half_t>(graph, symmetric, "f16");
+                case InexactOptions::Encoding::F32:
+                    return create_bsr_store<float>(graph, symmetric, "f32");
+                default:
+                    SFEM_ERROR("inexact: the bsr store takes f32, f16 or i8\n");
+                    return nullptr;
             }
-            return std::make_unique<BsrStoreImpl<QuantBsr<half_t, BsrForm::Difference, VS, idx_t, false>>>(
-                    graph, "bsr f16 difference");
         }
 
     }  // namespace inexact

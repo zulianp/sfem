@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cfloat>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -67,13 +68,14 @@ namespace sfem {
         using AssembleBSR = std::function<int(const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values)>;
 
         /// The quantized assembled operator (`store: bsr`): the operator's own tangent, assembled in
-        /// single precision on the space's node graph and encoded in place (sfem_QuantBSR.hpp).
+        /// single precision on the space's node graph and encoded in place (sfem_SELL.hpp).
         ///
-        /// The difference form is exact for an operator that annihilates translations.  One that
-        /// does not -- a time scheme's inertia, whose mass matrix rows sum to the lumped mass --
-        /// keeps the rows whose blocks do not sum to zero as a correction, `y_i += R_i x_i` with
-        /// `R_i = sum_j K_ij` in single precision: exact for any operator, and empty in a
-        /// quasi-static solve, where the sums are the assembly's rounding.
+        /// The difference form is exact for an operator that annihilates translations, as a material
+        /// does; a time scheme's inertia (whose mass matrix rows sum to the lumped mass) is kept out of
+        /// the store and applied beside it (InertiaLeftOut, InexactOptions::Inertia).  An operator
+        /// whose own rows do not sum to zero keeps them as a correction, `y_i += R_i x_i` with
+        /// `R_i = sum_j K_ij` in single precision: exact for any operator, and empty for a material,
+        /// where the sums are the assembly's rounding.
         /// What a contact step adds to the stored tangent's diagonal blocks, applied in the store's
         /// own pass: the obstacle's curvature, a symmetric 3x3 block per contact node (packed
         /// [xx, xy, xz, yy, yz, zz], node_obstacle_pack_sym), and a shift times |reference| per
@@ -84,6 +86,14 @@ namespace sfem {
             real_t         shift{0};
             const real_t  *reference{nullptr};   // per dof, read where shift != 0
         };
+
+        /// Whether a row's block sum R_i = sum_j K_ij (its largest entry `sum`) is a term of the operator
+        /// rather than the single-precision assembly's rounding, against the row's largest entry `top`:
+        /// a row of a few dozen blocks rounds to about 1e-6 of it. Below, the row annihilates translations
+        /// and the difference form alone is its product (a material's; a time scheme's inertia is kept
+        /// beside the store, InertiaLeftOut); above, it needs y_i += R_i x_i. The host's and the device's
+        /// stores decide alike.
+        SFEM_HOST_DEVICE SFEM_INLINE bool row_sum_is_a_term(const double sum, const double top) { return sum > 64 * FLT_EPSILON * top; }
 
         /// out += B in, B packed as DiagonalExtra's blocks (node_obstacle_packed_sym_apply's arithmetic).
         SFEM_HOST_DEVICE SFEM_INLINE void packed_sym_apply(const real_t *const B, const real_t *const in, real_t *const out) {
@@ -107,6 +117,10 @@ namespace sfem {
                 SFEM_ERROR("inexact: this bsr store has no team apply\n");
             }
             virtual void        add_diagonal(real_t *const diag) const                 = 0;
+            /// A diagonal added in the store's own pass, y_i += d_i x_i per dof (a lumped inertia beside
+            /// the material's tangent), where the store's vectors live; null: none. Kept by pointer and
+            /// read at every apply; not in add_diagonal (its owner adds it).
+            virtual void        set_diagonal(const real_t *const d)                    = 0;
             virtual std::size_t bytes() const                                          = 0;
             virtual std::string describe() const                                       = 0;
         };

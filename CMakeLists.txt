@@ -60,6 +60,7 @@ set(SFEM_MODULES
     algebra/dia
     algebra/crs_x_bsr
     algebra/ell
+    algebra/sell
     algebra/mg
     algebra/openmp
     algebra/parallel
@@ -487,6 +488,7 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND SFEM_UNIT_TESTS
         algebra/crs/tests
         algebra/bsr/tests
+        algebra/sell/tests
         algebra/crs_x_bsr/tests
         operators/stencil/tests
         frontend/tests

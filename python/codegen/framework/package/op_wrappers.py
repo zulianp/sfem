@@ -1224,8 +1224,8 @@ def _inexact_definitions(
 
   int %(op)s::inexact_diag(real_t *const diag) {
     SFEM_TRACE_SCOPE("%(op)s::inexact_diag");
-    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
-%(inertia_diagonal)s    return impl_->domains->iterate([&](const OpDomain &domain) {
+%(inertia_diagonal)s    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
         SFEM_ERROR("%(op)s::inexact_diag requires inexact_update first\\n");
@@ -1245,12 +1245,14 @@ def _inexact_definitions(
     auto mesh = impl_->space->mesh();
     impl_->inexact.state = x;
 %(stream_binding)s    if (impl_->inexact.assembled()) {
-      return impl_->inexact.update_bsr(
+      // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+%(bsr_inertia)s      return impl_->inexact.update_bsr(
           impl_->space->element_node_graph(),
           tangent_is_symmetric(),
           [&](const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values) {
+            const InertiaLeftOut material_only;
             return hessian_bsr_typed(x, rowptr, colidx, type, values);
-          });
+          }%(bsr_inertia_argument)s);
     }
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto &store = impl_->inexact.stores[domain.block.get()];
@@ -1292,6 +1294,8 @@ def _inexact_definitions(
         "projection": "      input.project = impl_->project_tangent;\n" if projects else "",
         "inertia": inertia,
         "inertia_diagonal": inertia_diagonal,
+        "bsr_inertia": _INEXACT_BSR_INERTIA[bool(holds_scheme)],
+        "bsr_inertia_argument": ", inertia" if holds_scheme else "",
         "stream_parameter": _INEXACT_STREAM_PARAMETER[device],
         "stream_argument": _INEXACT_STREAM_ARGUMENT[device],
         "stream_binding": _INEXACT_STREAM_BINDING[device],
@@ -1300,6 +1304,8 @@ def _inexact_definitions(
             "op": op,
             "inertia": inertia,
             "team_inertia": _INEXACT_TEAM_INERTIA[bool(holds_scheme)],
+            "inertia_after_bsr": "".join("  " + line + "\n" for line in inertia.splitlines()),
+            "team_inertia_before_bsr": "".join("  " + line + "\n" for line in _INEXACT_TEAM_INERTIA[bool(holds_scheme)].splitlines()),
             "packed_view": _INEXACT_PACKED_VIEW[device],
         },
     }
@@ -1312,8 +1318,13 @@ def _inexact_definitions(
 _INEXACT_APPLY_METHODS = {
     False: """  int %(op)s::inexact_apply(const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::inexact_apply");
-    // The assembled store holds the whole tangent, inertia included.
-    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
+    // The assembled store holds the material's tangent, a diagonal inertia in its pass
+    // (inertia_fused); any other inertia comes after it, as the store may overwrite out.
+    if (impl_->inexact.assembled()) {
+      if (impl_->inexact.apply_bsr(h, out) != SFEM_SUCCESS) return SFEM_FAILURE;
+      if (impl_->inexact.inertia_fused) return SFEM_SUCCESS;
+%(inertia_after_bsr)s      return SFEM_SUCCESS;
+    }
 %(inertia)s    return impl_->domains->iterate([&](const OpDomain &domain) {
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
@@ -1328,10 +1339,13 @@ _INEXACT_APPLY_METHODS = {
                       const real_t *const h,
                       real_t *const out,
                       const ElementScope scope) {
-    // The assembled store holds the whole tangent, inertia included. Its rows read every
+    // The assembled store holds the material's tangent, a diagonal inertia in its pass
+    // (inertia_fused); any other inertia goes first, as in the stores' order. Its rows read every
     // column, so the halves of a distributed product take it with the interface, once the
     // halo is in.
     if (impl_->inexact.assembled()) {
+      if (!impl_->inexact.inertia_fused) {
+%(team_inertia_before_bsr)s      }
       if (scope != ElementScope::OWNED_NOT_SHARED) impl_->inexact.team_apply_bsr(team, h, out);
       return SFEM_SUCCESS;
     }
@@ -1357,6 +1371,18 @@ _INEXACT_APPLY_METHODS = {
       return team_inexact_apply(team, h, out, ElementScope::ALL);
     });
   }""",
+}
+
+#: The `bsr` store's view of the scheme's inertia (OpState::Inertia): whether it is its diagonal
+#: (fused into the store's pass) and how to add that diagonal.
+_INEXACT_BSR_INERTIA = {
+    False: "",
+    True: """      inexact::OpState::Inertia inertia;
+      if (auto term = time_scheme_term(impl_->time_scheme)) {
+        inertia.diagonal = term->hessian_is_diagonal();
+        inertia.add_diagonal = [term, x](real_t *const d) { return term->hessian_diag(x, d); };
+      }
+""",
 }
 
 _INEXACT_TEAM_INERTIA = {
@@ -1815,7 +1841,7 @@ namespace sfem {
     //! merit and the residual have to describe the same problem, or a line
     //! search minimises something the Newton step is not solving.
     std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
-      return scheme ? scheme->inertia_op() : nullptr;
+      return scheme && !InertiaLeftOut::active() ? scheme->inertia_op() : nullptr;
     }
 
 %(yaml_helpers)s
@@ -6535,7 +6561,7 @@ _COUPLED_SCHEME_TERM_HELPER = {
     False: "",
     True: """
     std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
-      return scheme ? scheme->inertia_op() : nullptr;
+      return scheme && !InertiaLeftOut::active() ? scheme->inertia_op() : nullptr;
     }
 """,
 }
