@@ -48,7 +48,9 @@ extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
         const int scalar_bytes,
@@ -161,7 +163,9 @@ extern "C" int laplace_quad4_hessian_bsr_i_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[4] = {
         elements[0],
@@ -169,7 +173,7 @@ extern "C" int laplace_quad4_hessian_bsr_i_msoa(
         elements[3],
         elements[2]
     };
-    return laplace_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+    return laplace_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int laplace_quad4_hessian_crs_i_msoa(

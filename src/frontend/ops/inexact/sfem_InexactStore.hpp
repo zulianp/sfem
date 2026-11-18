@@ -196,6 +196,9 @@ namespace sfem {
             /// diagonal, which the store adds in its pass (BsrStore::set_diagonal).
             SharedBuffer<real_t>                                       inertia_diagonal;
             bool                                                       inertia_fused{false};
+            /// Whether the operator's BSR assembly visits only the rows of a window's graph (owner computes on
+            /// the host, set by the generated inexact_update): the host's `bsr` store then assembles by windows.
+            bool                                                       assembles_window_rows{false};
 
             std::size_t bytes() const {
                 std::size_t ret = bsr ? bsr->bytes() : 0;
@@ -264,7 +267,7 @@ namespace sfem {
                 if (options.layout == InexactOptions::Layout::ROWS) {
                     SFEM_ERROR("inexact: the host's bsr store is SELL-C-sigma only (layout auto or sell)\n");
                 }
-                return create_bsr_store(graph, options.encoding, symmetric);
+                return create_bsr_store(graph, options.encoding, symmetric, assembles_window_rows);
             }
 
             int diagonal_bsr(real_t *const diag) const {

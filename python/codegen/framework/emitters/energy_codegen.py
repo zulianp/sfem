@@ -255,6 +255,77 @@ def _sfem_packed_thread_scratch_header_source():
     )
 
 
+def _sfem_owner_computes_header_source():
+    """The host BSR assembly's traversal: owner computes over the node-to-element map.
+
+    A thread owns a range of rows (about equal blocks) and visits the elements of its rows' patches,
+    each once, at its first node in the range; it adds the block rows of the element's nodes it owns.
+    No two threads write a row, so there are no atomics, and a row's contributions come in a fixed
+    order for a given number of threads.  Rows without blocks -- the rows outside a window of a
+    stored tangent's graph -- are nobody's, so a window assembles its own rows only, and costs its
+    share of the elements (bench_patch_assembly: HEX8 and TET10 at 1e7 dof on Grace, 0.63x and
+    0.76x of the atomic element loop, 8 windows 4-12% more than one).
+    """
+    return "\n".join(
+        [
+            "#pragma once",
+            "",
+            "#include <algorithm>",
+            "#include <cstddef>",
+            "#include <cstdint>",
+            "#ifdef _OPENMP",
+            "#include <omp.h>",
+            "#endif",
+            "",
+            *restrict_prelude(),
+            "",
+            "namespace sfem {",
+            "namespace codegen {",
+            "",
+            "// body(element, owned): owned has bit a set where node a of the element is a row of the calling thread.",
+            "template <int NS, typename C, typename I, typename E, typename Body>",
+            "inline void owner_computes(const ptrdiff_t nnodes, I **const RSTR elements, const C *const RSTR rowptr,",
+            "                           const C *const RSTR n2e_ptr, const E *const RSTR n2e_idx, Body &&body) {",
+            "  static_assert(NS <= 64, \"an element's nodes as the bits of one word\");",
+            "#pragma omp parallel",
+            "  {",
+            "    int nt = 1, t = 0;",
+            "#ifdef _OPENMP",
+            "    nt = omp_get_num_threads();",
+            "    t = omp_get_thread_num();",
+            "#endif",
+            "    const double per = (double)(rowptr[nnodes] - rowptr[0]) / nt;",
+            "    auto cut = [&](const int k) -> ptrdiff_t {",
+            "      if (k <= 0) return 0;",
+            "      if (k >= nt) return nnodes;",
+            "      return std::lower_bound(rowptr, rowptr + nnodes, (C)(rowptr[0] + per * k)) - rowptr;",
+            "    };",
+            "    const ptrdiff_t a0 = cut(t), a1 = cut(t + 1);",
+            "    for (ptrdiff_t i = a0; i < a1; ++i) {",
+            "      if (rowptr[i] == rowptr[i + 1]) continue;",
+            "      for (C p = n2e_ptr[i]; p < n2e_ptr[i + 1]; ++p) {",
+            "        const ptrdiff_t e = (ptrdiff_t)n2e_idx[p];",
+            "        uint64_t owned = 0;",
+            "        bool first = true;",
+            "        for (int a = 0; a < NS; ++a) {",
+            "          const ptrdiff_t n = (ptrdiff_t)elements[a][e];",
+            "          if (n < a0 || n >= a1 || rowptr[n] == rowptr[n + 1]) continue;",
+            "          owned |= uint64_t(1) << a;",
+            "          first = first && n >= i;",
+            "        }",
+            "        if (first) body(e, owned);",
+            "      }",
+            "    }",
+            "  }",
+            "}",
+            "",
+            "}  // namespace codegen",
+            "}  // namespace sfem",
+            "",
+        ]
+    )
+
+
 def _element_index(source_builder):
     """The element this work item holds: `evb + lane`, or `evb` itself."""
     target = getattr(source_builder, "target", None)
@@ -4477,6 +4548,7 @@ def _sfem_soa_operator_source(
     ]
     if getattr(source_builder, "operator_extension", "cpp") == "cpp":
         lines.append('#include "packed_thread_scratch.hpp"')
+        lines.append('#include "owner_computes.hpp"')
     lines = [line for line in lines if line != ""]
     lines.append("")
     lines.extend(
@@ -8239,6 +8311,7 @@ def shared_primitive_files(source_builder, basis_family):
                 _sfem_packed_thread_scratch_header_source(),
             )
         )
+        files.append(GeneratedKernelFile("owner_computes.hpp", _sfem_owner_computes_header_source()))
     if source_builder.emits_tensor_product_header(basis_family):
         files.append(
             GeneratedKernelFile(
@@ -9705,6 +9778,10 @@ def _holding_one_element_hessian_matrix_assembly_function(
             ),
         ]
     implementation_name = "%s_assemble_impl" % function_base
+    # The host assembles BSR owner-computes (`owner_computes.hpp`): a thread owns a range of rows,
+    # visits its rows' elements through the node-to-element map and adds only its rows, without
+    # atomics and in a fixed order; the device keeps its atomic and cooperative assemblies.
+    owner = not current_target().supports_device_kernels and "bsr" in formats
     reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
     tensor_grad_name = "%sgrad_1d" % reference_prefix
@@ -9712,7 +9789,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
     scalar_weight_name = "%sq_weight" % reference_prefix
 
     lines = []
-    lines.extend(_sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=n_field_components))
+    lines.extend(
+        _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=n_field_components, owner=owner)
+    )
     if crs_passes:
         lines.extend(
             _sfem_soa_hessian_packed_crs_helper_lines(
@@ -9776,6 +9855,14 @@ def _holding_one_element_hessian_matrix_assembly_function(
             "    const count_t *const RSTR rowptr,",
             "    const idx_t *const RSTR colidx,",
             "    v_t *const RSTR values,",
+            *(
+                [
+                    "    const count_t *const RSTR n2e_ptr,",
+                    "    const element_idx_t *const RSTR n2e_idx,",
+                ]
+                if owner
+                else []
+            ),
             "    const int *const RSTR diag_offsets,",
             "    const ptrdiff_t ndiag,",
             "    const ptrdiff_t coo_nnz,",
@@ -9800,6 +9887,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
                 for parameter in (
                     "rowptr",
                     "colidx",
+                    *(("n2e_ptr", "n2e_idx") if owner else ()),
                     "diag_offsets",
                     "ndiag",
                     "coo_nnz",
@@ -9862,7 +9950,13 @@ def _holding_one_element_hessian_matrix_assembly_function(
             [
                 "",
                 *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
-                *source_builder.element_loop_lines(),
+                *(
+                    # One element's assembly, run by the owner walk for BSR and by the element loop
+                    # for the other formats (below).
+                    ["  auto assemble_element = [&](const ptrdiff_t element, [[maybe_unused]] const uint64_t owned) {"]
+                    if owner
+                    else source_builder.element_loop_lines()
+                ),
                 "    idx_t ev[NS];",
                 "    s_t element_matrix[NDOFS * NDOFS];",
                 *(
@@ -10077,8 +10171,22 @@ def _holding_one_element_hessian_matrix_assembly_function(
                 )
             )
         lines.append("")
-        lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
-        lines.append("  }")
+        lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    ", owner=owner))
+        if owner:
+            lines.extend(
+                [
+                    "  };",
+                    "  if constexpr (FORMAT == %d) {" % dict(_MATRIX_FORMAT_IDS)["bsr"],
+                    "    sfem::codegen::owner_computes<NS>(nnodes, elements, rowptr, n2e_ptr, n2e_idx, assemble_element);",
+                    "  } else {",
+                    *source_builder.element_loop_lines(),
+                    "    assemble_element(element, ~uint64_t(0));",
+                    "  }",
+                    "  }",
+                ]
+            )
+        else:
+            lines.append("  }")
     lines.extend(
         [
             "",
@@ -10136,8 +10244,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
             crs_passes,
             geometry_mode=geometry_mode,
             quadrature_streams=quadrature_fields.quadrature_field_streams(form),
-            projected=projected,
+                        projected=projected,
             cooperative_points=n_qp if cooperative else None,
+            owner=owner,
         )
     )
     return lines
@@ -10226,7 +10335,7 @@ def _sfem_soa_cooperative_assembly_body_lines(
     ]
 
 
-def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
+def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent, owner=False):
     """Call the scatter for the format this kernel was instantiated with.
 
     None of the scatters can fail any more.  They used to: each re-established
@@ -10248,10 +10357,10 @@ def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
             continue
         keyword = "if" if first else "} else if"
         lines.append("%s%s constexpr (FORMAT == %d) {" % (indent, keyword, format_id))
-        lines.append(
-            "%s  %s"
-            % (indent, _MATRIX_FORMAT_SCATTERS[matrix_format] % function_base)
-        )
+        call = _MATRIX_FORMAT_SCATTERS[matrix_format] % function_base
+        if owner and matrix_format == "bsr":
+            call = call.replace("(ev, element_matrix, ", "(ev, element_matrix, owned, ")
+        lines.append("%s  %s" % (indent, call))
         first = False
     if not first:
         lines.append("%s}" % indent)
@@ -10387,7 +10496,7 @@ def _adjugate_input(dim):
     return sfem_soa_reference_input("adj", 1, 1, dim * dim)
 
 
-def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=None):
+def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_field_components=None, owner=False):
     n_field_components = dim if n_field_components is None else n_field_components
     lines = ["namespace sfem {", "namespace codegen {", ""]
     if pattern_scattered_formats(formats):
@@ -10424,7 +10533,8 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
     for matrix_format in [f for f in _SCATTER_LINES_BY_FORMAT if f in formats]:
         lines.extend(
             _SCATTER_LINES_BY_FORMAT[matrix_format](
-                function_base, dim, n_nodes, n_field_components=n_field_components
+                function_base, dim, n_nodes, n_field_components=n_field_components,
+                **({"owner": True} if owner and matrix_format == "bsr" else {}),
             )
         )
     return lines
@@ -10489,7 +10599,7 @@ def _assembly_reduction_is_atomic(reduction_policy, format_name):
     return True
 
 
-def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None):
+def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=None, n_field_components=None, owner=False):
     """Scatter one element block into a BSR matrix.
 
     The stream names and the reduction come from ``BSRAssemblyPlan``, which is
@@ -10532,6 +10642,9 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     one window at a time -- takes only the blocks of the rows it has. Every row
     of a full node graph holds at least its diagonal block, so on it nothing
     is skipped.
+
+    With ``owner`` (the host, `owner_computes.hpp`) the scatter adds the rows the calling thread
+    owns -- the bits of ``owned`` -- and no other thread writes them, so it adds without atomics.
     """
     # The block is the field's components, not the spatial dimension.
     n_field_components = dim if n_field_components is None else n_field_components
@@ -10539,7 +10652,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     row_pointer = assembly.row_pointer
     column_index = assembly.column_index
     value_stream = assembly.value_stream
-    atomic = _assembly_reduction_is_atomic(assembly.reduction_policy, "BSR")
+    atomic = not owner and _assembly_reduction_is_atomic(assembly.reduction_policy, "BSR")
 
     locate = _counting_loop(
         "j",
@@ -10588,7 +10701,10 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                     (),
                     expr_ref("&%s[row_begin]" % column_index),
                 ),
-                AssignmentNode(expr_ref("has_row[i]"), expr_ref("lenrow > 0")),
+                AssignmentNode(
+                    expr_ref("has_row[i]"),
+                    expr_ref("lenrow > 0 && ((owned >> i) & 1u)" if owner else "lenrow > 0"),
+                ),
                 CallNode(
                     "%s_find_cols" % function_base, ("ev", "cols", "lenrow", "ks")
                 ),
@@ -10638,6 +10754,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
             params=(
                 "const idx_t *const RSTR ev",
                 "const s_t *const RSTR element_matrix",
+                *(("const uint64_t owned",) if owner else ()),
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
                 "v_t *const RSTR values",
@@ -10860,7 +10977,8 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
-    tensor_product_launch=None,
+        tensor_product_launch=None,
+    owner=False,
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -10885,8 +11003,9 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     uses_current,
                     geometry_mode=geometry_mode,
                     quadrature_streams=quadrature_streams,
-                    cooperative_points=cooperative_points,
+                                        cooperative_points=cooperative_points,
                     tensor_product_launch=tensor_product_launch,
+                    owner=owner,
                 )
             )
     if projected:
@@ -10904,8 +11023,9 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                 uses_current,
                 geometry_mode=geometry_mode,
                 quadrature_streams=quadrature_streams,
-                projected=True,
+                                projected=True,
                 cooperative_points=cooperative_points,
+                owner=owner,
             )
         )
     if "crs" in formats:
@@ -11026,8 +11146,11 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     quadrature_streams=(),
     projected=False,
     cooperative_points=None,
-    tensor_product_launch=None,
+        tensor_product_launch=None,
+    owner=False,
 ):
+    # An owner-computes kernel (`owner`) takes the node-to-element map after the values: the BSR
+    # entry point passes it on, the other formats' entry points pass nothing.
     params = _hessian_matrix_public_params(
         matrix_format,
         dim,
@@ -11036,6 +11159,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         uses_current,
         geometry_mode=geometry_mode,
         quadrature_streams=quadrature_streams,
+        n2e=owner and matrix_format == "bsr",
     )
     impl_args = _hessian_matrix_impl_args(
         matrix_format,
@@ -11044,6 +11168,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         uses_current,
         geometry_mode=geometry_mode,
         quadrature_streams=quadrature_streams,
+        n2e=(("n2e_ptr", "n2e_idx") if matrix_format == "bsr" else ("nullptr", "nullptr")) if owner else None,
     )
     return runtime_typed_entry_point_lines(
         public_name,
@@ -11080,8 +11205,9 @@ def _hessian_matrix_public_params(
     scalar_type,
     material_parameter_names,
     uses_current,
-    geometry_mode="isoparametric",
+        geometry_mode="isoparametric",
     quadrature_streams=(),
+    n2e=False,
 ):
     params = [
         "const ptrdiff_t nelements",
@@ -11106,7 +11232,12 @@ def _hessian_matrix_public_params(
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
                 # A BSR tangent's values are a type of their own (v_t).
-                "%s *const RSTR values" % ("v_t" if matrix_format == "bsr" else scalar_type),
+                                "%s *const RSTR values" % ("v_t" if matrix_format == "bsr" else scalar_type),
+                *(
+                    ["const count_t *const RSTR n2e_ptr", "const element_idx_t *const RSTR n2e_idx"]
+                    if n2e
+                    else []
+                ),
             ]
         )
     elif matrix_format == "dia":
@@ -11208,8 +11339,9 @@ def _hessian_matrix_impl_args(
     dim,
     material_parameter_names,
     uses_current,
-    geometry_mode="isoparametric",
+        geometry_mode="isoparametric",
     quadrature_streams=(),
+    n2e=None,
 ):
     n_field_components = dim
     args = [
@@ -11318,6 +11450,11 @@ def _hessian_matrix_impl_args(
         )
     else:
         raise ValueError("unsupported matrix format '%s'" % matrix_format)
+    if n2e is not None:
+        # The sparse arguments start after the mesh, geometry, material and state ones; the kernel
+        # takes the map after its values, the third of them.
+        sparse = len(args) - 10
+        args[sparse + 3 : sparse + 3] = list(n2e)
     return tuple(args)
 
 

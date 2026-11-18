@@ -1113,6 +1113,7 @@ namespace sfem {
     impl_->inexact.stream = stream;
     if (impl_->inexact.assembled()) {
       // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      impl_->inexact.assembles_window_rows = false;
       inexact::OpState::Inertia inertia;
       if (auto term = time_scheme_term(impl_->time_scheme)) {
         inertia.diagonal = term->hessian_is_diagonal();

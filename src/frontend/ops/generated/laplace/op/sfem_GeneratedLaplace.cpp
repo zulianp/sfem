@@ -7,6 +7,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -384,6 +385,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
   };
 
   std::unique_ptr<Op> GeneratedLaplace::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -1127,15 +1129,15 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
-          return laplace_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+          return laplace_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("kappa"), rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
-        return laplace_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
-          return laplace_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+          return laplace_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("kappa"), rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
-        return laplace_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values);
+        return laplace_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
       }
       SFEM_ERROR("laplace hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;

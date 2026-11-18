@@ -62,6 +62,15 @@ node graph's rows applied by 4 or 8 threads each (`layout: rows`) or in SELL-32-
 columns, a thread per row (`layout: sell`, `solver.linear.format: SELL`); `layout: auto` takes SELL
 from 2^20 block rows and the rows below (`sell_min_block_rows`).
 
+On the host, `store: bsr` (SELL-16-512, the upper form for a symmetric tangent) is assembled and
+encoded a window of rows at a time (4 windows, `qbsr_window_count`; `SFEM_QBSR_WINDOWS` overrides),
+so the single-precision matrix never exists in full: the generated host BSR assembly is
+owner-computes (`owner_computes.hpp`) -- a thread owns a range of rows, visits its rows' elements
+through the node-to-element map (`sfem_NodeToElementMaps.hpp`, built once per block) and adds only
+its rows, without atomics and in a fixed order -- so a window's graph costs its own elements only.
+An operator whose assembly is not owner-computes (the residual-form emitter's) assembles the store
+in one piece (`assembles_window_rows`).
+
 ## Symmetry
 
 `symmetric` is asserted only when the flux's tangent difference expands to exactly zero. An

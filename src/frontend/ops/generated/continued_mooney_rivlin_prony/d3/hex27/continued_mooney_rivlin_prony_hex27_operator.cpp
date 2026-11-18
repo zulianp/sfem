@@ -96,7 +96,9 @@ extern "C" int continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_psd_i_msoa(
         const int scalar_bytes,
@@ -118,7 +120,9 @@ extern "C" int continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_psd_i_mso
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int continued_mooney_rivlin_prony_proteus_hex27_objective_steps_i_msoa(
         const int scalar_bytes,
@@ -1071,7 +1075,9 @@ extern "C" int continued_mooney_rivlin_prony_hex27_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[27] = {
         elements[0],
@@ -1102,7 +1108,7 @@ extern "C" int continued_mooney_rivlin_prony_hex27_hessian_bsr_i_msoa(
         elements[14],
         elements[6]
     };
-    return continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, Jc, Jmin, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, Jc, Jmin, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int continued_mooney_rivlin_prony_hex27_hessian_bsr_psd_i_msoa(
@@ -1125,7 +1131,9 @@ extern "C" int continued_mooney_rivlin_prony_hex27_hessian_bsr_psd_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[27] = {
         elements[0],
@@ -1156,7 +1164,7 @@ extern "C" int continued_mooney_rivlin_prony_hex27_hessian_bsr_psd_i_msoa(
         elements[14],
         elements[6]
     };
-    return continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_psd_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, Jc, Jmin, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return continued_mooney_rivlin_prony_proteus_hex27_hessian_bsr_psd_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, Jc, Jmin, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int continued_mooney_rivlin_prony_hex27_objective_steps_i_msoa(
