@@ -1,0 +1,27 @@
+# File       : pasc27.mplstyle
+# Created    : Tue Nov 17 2026 20:10:20 (+0100)
+# Author     : Fabian Wermelinger
+# Description: PASC27 Matplotlib style
+
+# colors
+# \definecolor{PackA}{HTML}{4C72B0}
+# \definecolor{PackB}{HTML}{DD8452}
+# \definecolor{PackC}{HTML}{55A868}
+# \definecolor{PackD}{HTML}{C44E52}
+# \definecolor{PackE}{HTML}{8172B3}
+# \definecolor{PackF}{HTML}{937860}
+
+patch.antialiased   : True
+
+lines.solid_capstyle:  round
+lines.solid_joinstyle: round
+lines.dash_capstyle:   round
+lines.dash_joinstyle:  round
+
+lines.dashed_pattern : 3.7, 1.6
+lines.dashdot_pattern : 3.7, 2.0, 0.5, 2.0
+lines.dotted_pattern :  0.5, 1.6
+
+axes.prop_cycle     : cycler('color', ['4C72B0', 'DD8452', '55A868', 'C44E52', '8172B3', '937860']) + cycler('linestyle', ('-', '--', '-.', ':', (0, (3.7, 2.0, 0.5, 1.6, 0.5, 2.0)), (0, (3.7, 2.0, 0.5, 1.6, 0.5, 1.6, 0.5, 2.0))))
+
+grid.linewidth      : 0.6  # in points
