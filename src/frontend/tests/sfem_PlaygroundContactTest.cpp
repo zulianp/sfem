@@ -178,7 +178,11 @@ int test_composed_tangent() {
                              {"points f16", "{store: points, encoding: f16}", 1e-3, "host"},
                              {"bsr f16", "{store: bsr, encoding: f16}", 1e-3, "host"},
                              {"SELL f32", "{encoding: f32}", 1e-5, "host", "SELL"},
-                             {"SELL f16", "{encoding: f16}", 1e-3, "host", "SELL"}};
+                             {"SELL f16", "{encoding: f16}", 1e-3, "host", "SELL"},
+                             // The inertia beside the stored material tangent: fused into its pass (the
+                             // default, above) or a pass of its own.
+                             {"bsr f16 separate", "{store: bsr, encoding: f16, inertia: separate}", 1e-3, "host"},
+                             {"SELL f16 separate", "{encoding: f16, inertia: separate}", 1e-3, "host", "SELL"}};
 #ifdef SFEM_ENABLE_CUDA
     runs.push_back({"device points f64", "{store: points, encoding: f64}", 1e-6, "device"});
     runs.push_back({"device element_matrix f64", "{store: element_matrix, encoding: f64}", 1e-6, "device"});
@@ -186,6 +190,8 @@ int test_composed_tangent() {
     runs.push_back({"device bsr f16", "{store: bsr, encoding: f16}", 1e-3, "device"});
     runs.push_back({"device SELL f32", "{encoding: f32}", 1e-5, "device", "SELL"});
     runs.push_back({"device SELL f16", "{encoding: f16}", 1e-3, "device", "SELL"});
+    runs.push_back({"device bsr f16 separate", "{store: bsr, encoding: f16, inertia: separate}", 1e-3, "device"});
+    runs.push_back({"device SELL f16 separate", "{encoding: f16, inertia: separate}", 1e-3, "device", "SELL"});
 #endif
     std::vector<double> first(runs.size(), -1), impulse(runs.size(), 0);
     std::vector<int>    newton(runs.size(), 0), qp(runs.size(), 0);

@@ -246,6 +246,8 @@ namespace sfem {
         });
     }
 
+    bool InertiaPotential::hessian_is_diagonal() const { return !impl_->consistent_mass; }
+
     int InertiaPotential::hessian_diag(const real_t *const, real_t *const SFEM_RESTRICT values) {
         SFEM_TRACE_SCOPE("InertiaPotential::hessian_diag");
 

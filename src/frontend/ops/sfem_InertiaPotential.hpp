@@ -44,6 +44,8 @@ namespace sfem {
                               const smesh::PrimitiveType values_type,
                               void *const                  values) override;
         int hessian_diag(const real_t *const x, real_t *const values) override;
+        /// The lumped mass: alpha m per dof; the consistent one is a matrix.
+        bool hessian_is_diagonal() const override;
 
         /// The block-diagonal, upper-triangle-packed format.
         ///

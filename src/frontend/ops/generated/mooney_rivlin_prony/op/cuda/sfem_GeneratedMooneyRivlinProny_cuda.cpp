@@ -90,7 +90,7 @@ namespace sfem {
     //! merit and the residual have to describe the same problem, or a line
     //! search minimises something the Newton step is not solving.
     std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
-      return scheme ? scheme->inertia_op() : nullptr;
+      return scheme && !InertiaLeftOut::active() ? scheme->inertia_op() : nullptr;
     }
 
         struct AffineOption {
@@ -1299,12 +1299,12 @@ namespace sfem {
 
   int GPUGeneratedMooneyRivlinProny::inexact_diag(real_t *const diag) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::inexact_diag");
-    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
     if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->hessian_diag(impl_->inexact.state, diag) != SFEM_SUCCESS) {
         return SFEM_FAILURE;
       }
     }
+    if (impl_->inexact.assembled()) return impl_->inexact.diagonal_bsr(diag);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto store = impl_->inexact.stores.find(domain.block.get());
       if (store == impl_->inexact.stores.end() || !store->second) {
@@ -1326,12 +1326,19 @@ namespace sfem {
     impl_->inexact.state = x;
     impl_->inexact.stream = stream;
     if (impl_->inexact.assembled()) {
+      // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      inexact::OpState::Inertia inertia;
+      if (auto term = time_scheme_term(impl_->time_scheme)) {
+        inertia.diagonal = term->hessian_is_diagonal();
+        inertia.add_diagonal = [term, x](real_t *const d) { return term->hessian_diag(x, d); };
+      }
       return impl_->inexact.update_bsr(
           impl_->space->element_node_graph(),
           tangent_is_symmetric(),
           [&](const count_t *rowptr, const idx_t *colidx, smesh::PrimitiveType type, void *values) {
+            const InertiaLeftOut material_only;
             return hessian_bsr_typed(x, rowptr, colidx, type, values);
-          });
+          }, inertia);
     }
     return impl_->domains->iterate([&](const OpDomain &domain) {
       auto &store = impl_->inexact.stores[domain.block.get()];
@@ -1371,8 +1378,18 @@ namespace sfem {
 
   int GPUGeneratedMooneyRivlinProny::inexact_apply(const real_t *const h, real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinProny::inexact_apply");
-    // The assembled store holds the whole tangent, inertia included.
-    if (impl_->inexact.assembled()) return impl_->inexact.apply_bsr(h, out);
+    // The assembled store holds the material's tangent, a diagonal inertia in its pass
+    // (inertia_fused); any other inertia comes after it, as the store may overwrite out.
+    if (impl_->inexact.assembled()) {
+      if (impl_->inexact.apply_bsr(h, out) != SFEM_SUCCESS) return SFEM_FAILURE;
+      if (impl_->inexact.inertia_fused) return SFEM_SUCCESS;
+      if (auto term = time_scheme_term(impl_->time_scheme)) {
+        if (term->apply(impl_->inexact.state, h, out) != SFEM_SUCCESS) {
+          return SFEM_FAILURE;
+        }
+      }
+      return SFEM_SUCCESS;
+    }
     if (auto term = time_scheme_term(impl_->time_scheme)) {
       if (term->apply(impl_->inexact.state, h, out) != SFEM_SUCCESS) {
         return SFEM_FAILURE;

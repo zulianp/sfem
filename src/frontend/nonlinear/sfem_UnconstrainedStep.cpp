@@ -123,7 +123,7 @@ namespace sfem {
             impl.tangent = BSRTangent::create(f, es, options.storage_bytes);
             if (!impl.tangent) return nullptr;
         } else if (impl.is_sell()) {
-            impl.sell = SELLTangent::create(f, es, options.sell_encoding);
+            impl.sell = SELLTangent::create(f, es, options.sell_encoding, options.sell_inertia);
         } else if (options.format == op_type::MATRIX_FREE) {
             // Reads the iterate the Newton loop handed to `Function::update`; built once.
             impl.op = create_linear_operator(op_type::MATRIX_FREE, f, impl.state, es);

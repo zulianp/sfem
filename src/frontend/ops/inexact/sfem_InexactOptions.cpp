@@ -50,6 +50,14 @@ namespace sfem {
             return InexactOptions::Layout::AUTO;
         }
 
+        InexactOptions::Inertia inertia_from_string(const std::string &name) {
+            if (name == "auto") return InexactOptions::Inertia::AUTO;
+            if (name == "fused") return InexactOptions::Inertia::FUSED;
+            if (name == "separate") return InexactOptions::Inertia::SEPARATE;
+            SFEM_ERROR("inexact: unknown inertia \"%s\" (auto, fused, separate)\n", name.c_str());
+            return InexactOptions::Inertia::AUTO;
+        }
+
         const char *to_string(const InexactOptions::Store store) {
             switch (store) {
                 case InexactOptions::Store::AUTO:
@@ -119,6 +127,18 @@ namespace sfem {
             }
             return "?";
         }
+
+        const char *to_string(const InexactOptions::Inertia value) {
+            switch (value) {
+                case InexactOptions::Inertia::AUTO:
+                    return "auto";
+                case InexactOptions::Inertia::FUSED:
+                    return "fused";
+                case InexactOptions::Inertia::SEPARATE:
+                    return "separate";
+            }
+            return "?";
+        }
     }  // namespace
 
     void InexactOptions::validate() const {
@@ -151,6 +171,9 @@ namespace sfem {
         }
         if (store != Store::BSR && layout != Layout::AUTO) {
             SFEM_ERROR("inexact: the layout is a property of the bsr store\n");
+        }
+        if (store != Store::BSR && inertia == Inertia::FUSED) {
+            SFEM_ERROR("inexact: only the bsr store fuses the inertia into its pass\n");
         }
     }
 
@@ -195,13 +218,15 @@ namespace sfem {
                                                 const std::string &encoding,
                                                 const std::string &fold,
                                                 const std::string &traversal,
-                                                const std::string &layout) {
+                                                const std::string &layout,
+                                                const std::string &inertia) {
         InexactOptions ret;
         ret.store     = store_from_string(store);
         ret.encoding  = encoding_from_string(encoding);
         ret.fold      = switch_from_string(fold);
         ret.traversal = traversal_from_string(traversal);
         ret.layout    = layout_from_string(layout);
+        ret.inertia   = inertia_from_string(inertia);
         ret.validate();
         return ret;
     }
@@ -218,13 +243,15 @@ namespace sfem {
                             read("encoding", to_string(defaults.encoding)),
                             read("fold", to_string(defaults.fold)),
                             read("traversal", to_string(defaults.traversal)),
-                            read("layout", to_string(defaults.layout)));
+                            read("layout", to_string(defaults.layout)),
+                            read("inertia", to_string(defaults.inertia)));
     }
 #endif
 
     std::string InexactOptions::describe() const {
         return std::string(to_string(store)) + " " + to_string(encoding) + " fold=" + to_string(fold) +
-               " traversal=" + to_string(traversal) + (store == Store::BSR ? std::string(" layout=") + to_string(layout) : "");
+               " traversal=" + to_string(traversal) +
+               (store == Store::BSR ? std::string(" layout=") + to_string(layout) + " inertia=" + to_string(inertia) : "");
     }
 
 }  // namespace sfem

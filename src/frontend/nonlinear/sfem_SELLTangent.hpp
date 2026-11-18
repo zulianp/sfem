@@ -23,12 +23,16 @@ namespace sfem {
     /// projection -- takes it too.
     class SELLTangent final {
     public:
-        /// The INEXACT options this format is: store bsr, layout sell, `encoding` (f32, f16 or i8).
-        static InexactOptions options(const InexactOptions::Encoding encoding);
+        /// The INEXACT options this format is: store bsr, layout sell, `encoding` (f32, f16 or i8), and
+        /// the time scheme's inertia beside it (`inertia`: auto and fused add a lumped one in the store's
+        /// pass, separate applies it as a pass of its own).
+        static InexactOptions options(const InexactOptions::Encoding encoding,
+                                      const InexactOptions::Inertia  inertia = InexactOptions::Inertia::AUTO);
 
         static std::shared_ptr<SELLTangent> create(const std::shared_ptr<Function> &f,
                                                    const ExecutionSpace             es,
-                                                   const InexactOptions::Encoding   encoding = InexactOptions::Encoding::F32);
+                                                   const InexactOptions::Encoding   encoding = InexactOptions::Encoding::F32,
+                                                   const InexactOptions::Inertia    inertia  = InexactOptions::Inertia::AUTO);
 
         /// Assembles and encodes the tangent at x (the first call sets the operators' format).
         int assemble(const real_t *const x);

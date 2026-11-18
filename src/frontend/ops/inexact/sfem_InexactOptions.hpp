@@ -33,6 +33,11 @@ namespace sfem {
     ///   layout    bsr:            auto, sell, rows -- SELL-C-sigma (the host's, and the device's with
     ///                             sell) or the node graph's rows, a few threads each (the device's
     ///                             with auto or rows); `solver.linear.format: SELL` is this store with sell
+    ///   inertia   auto, fused, separate -- a time scheme's inertia beside the stored tangent, which holds
+    ///                             the material alone (its difference form exact): bsr adds a diagonal
+    ///                             (lumped) inertia in its own pass (auto, fused) or applies it as a pass
+    ///                             of its own (separate; always for a consistent mass); the other stores
+    ///                             apply it as a pass of their own
     ///
     /// store and encoding `auto` (both or neither) take the format measured fastest to a Newton
     /// solution for the element and the execution space (`resolve`).
@@ -45,12 +50,14 @@ namespace sfem {
         enum class Switch { AUTO, ON, OFF };
         enum class Traversal { AUTO, PACKED, ATOMIC };
         enum class Layout { AUTO, ROWS, SELL };
+        enum class Inertia { AUTO, FUSED, SEPARATE };
 
         Store     store{Store::POINTS};
         Encoding  encoding{Encoding::F32};
         Switch    fold{Switch::AUTO};
         Traversal traversal{Traversal::AUTO};
         Layout    layout{Layout::AUTO};
+        Inertia   inertia{Inertia::AUTO};
 
         /// Refuses a combination the stores do not offer.
         void validate() const;
@@ -75,12 +82,13 @@ namespace sfem {
                                            const std::string &encoding,
                                            const std::string &fold      = "auto",
                                            const std::string &traversal = "auto",
-                                           const std::string &layout    = "auto");
+                                           const std::string &layout    = "auto",
+                                           const std::string &inertia   = "auto");
         std::string describe() const;
     };
 
 #ifdef SFEM_INEXACT_OPTIONS_YAML
-    /// `solver.linear.inexact: {store, encoding, fold, traversal, layout}`; absent keys keep the defaults.
+    /// `solver.linear.inexact: {store, encoding, fold, traversal, layout, inertia}`; absent keys keep the defaults.
     InexactOptions inexact_options_from_yaml(const ryml::ConstNodeRef &node);
 #endif
 

@@ -80,11 +80,17 @@ namespace sfem {
                 }
             }
 
-            /// The quantized product, each row's correction added by the thread that completed it.
+            void set_diagonal(const real_t *const d) override { diagonal_ = d; }
+
+            /// The quantized product, each row's correction and diagonal added by the thread that
+            /// completed it.
             void team_apply(const Team &team, const real_t *const x, real_t *const y) const override {
-                const idx_t *const rows = rows_.data();
-                const ptrdiff_t    n    = (ptrdiff_t)rows_.size();
+                const idx_t *const  rows = rows_.data();
+                const ptrdiff_t     n    = (ptrdiff_t)rows_.size();
+                const real_t *const d    = diagonal_;
                 quant_.template team_apply<float, true>(team, x, y, [=](const ptrdiff_t b, const ptrdiff_t e) {
+                    if (d)
+                        for (ptrdiff_t k = b * 3; k < e * 3; ++k) y[k] += d[k] * x[k];
                     // The corrected rows are in row order.
                     const ptrdiff_t first = std::lower_bound(rows, rows + n, (idx_t)b) - rows;
                     const ptrdiff_t last  = std::lower_bound(rows, rows + n, (idx_t)e) - rows;
@@ -122,6 +128,7 @@ namespace sfem {
             SharedBuffer<float>              values_;
             std::vector<idx_t>               rows_;
             std::vector<float>               blocks_;
+            const real_t                    *diagonal_{nullptr};
 
             /// The rows whose blocks do not sum to zero beyond the assembly's rounding, in row order:
             /// each thread collects its own rows' sums, then they are joined in thread order.
@@ -155,7 +162,7 @@ namespace sfem {
                         // Single-precision sums of a row's few dozen blocks round to about 1e-6 of
                         // its largest entry; anything above that is a term that does not annihilate
                         // translations.
-                        if (!(sum > 64 * FLT_EPSILON * top)) continue;
+                        if (!row_sum_is_a_term(sum, top)) continue;
                         rows[(size_t)t].push_back((idx_t)i);
                         for (int x = 0; x < 9; ++x) blocks[(size_t)t].push_back((float)R[x]);
                     }
