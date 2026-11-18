@@ -10,7 +10,8 @@
 // every row runs.  The exact apply is the reference of every row's distance and always runs.
 // The mesh is the unit cube: n^3 hexahedra, n^3 cubes of tetrahedra (TET10 promoted), or n^3 macro
 // elements of degree 2.  The state is a smooth deformation (no element inverts), the increment white
-// noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call,
+// noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call (the
+// best of three averages of `repeats` calls),
 // MDOF/s, the bytes the operator accounts for per dof (BSR: its values, column indices and row
 // pointers; a store: its bytes()), on the device also the bytes it holds per dof as the device
 // reports them (free memory before its creation less after its first set-up, 2 MiB granules), its
@@ -99,6 +100,14 @@ namespace {
         for (int r = 0; r < repeats; ++r) f();
         synchronize(es);
         return std::chrono::duration<double>(clock_type::now() - t0).count() / repeats;
+    }
+
+    /// The best of three averages of `repeats` calls: the paper's protocol for an application.
+    template <class F>
+    double best_seconds(const sfem::ExecutionSpace es, const int repeats, F &&f) {
+        double best = seconds(es, repeats, f);
+        for (int k = 1; k < 3; ++k) best = std::min(best, seconds(es, repeats, f));
+        return best;
     }
 
     sfem::SharedBuffer<real_t> in_space(const std::vector<real_t> &v, const sfem::ExecutionSpace es) {
@@ -237,7 +246,7 @@ int main(int argc, char *argv[]) {
     f->apply(U, H, Y);
     const std::vector<real_t> exact = on_host(y, es);
     if (wanted("matrix-free")) {
-        const double t_mf = seconds(es, repeats, [&] { f->apply(U, H, Y); });
+        const double t_mf = best_seconds(es, repeats, [&] { f->apply(U, H, Y); });
         row("matrix-free", 0, t_mf, 0, 0, exact, {});
     }
 
@@ -252,7 +261,7 @@ int main(int argc, char *argv[]) {
         blas->zeros(ndofs, Y);
         K->apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
-        const double t = seconds(es, repeats, [&] { K->apply(H, Y); });
+        const double t = best_seconds(es, repeats, [&] { K->apply(H, Y); });
         // Its values, column indices and row pointers, as the memory ledger counts them where they live.
         sfem::MemoryLedger ledger;
         tangent->account(ledger);
@@ -284,7 +293,7 @@ int main(int argc, char *argv[]) {
         blas->zeros(ndofs, Y);
         op->inexact_apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
-        const double t = seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
+        const double t = best_seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
         row(name.c_str(), setup, t, (double)op->inexact_bytes(), held, out, exact);
     }
     return EXIT_SUCCESS;
