@@ -124,6 +124,7 @@ namespace sfem {
                 "solver.linear.atol",
                 "solver.linear.max_it",
                 "solver.linear.storage_bytes",
+                "solver.linear.error_probe",
                 "solver.linear.inexact.store",
                 "solver.linear.inexact.encoding",
                 "solver.linear.inexact.fold",

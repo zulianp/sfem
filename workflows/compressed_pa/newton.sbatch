@@ -18,6 +18,10 @@
 #             element matrix, fp16 difference form and int8 with a scale per node pair), f16 i8md (the
 #             point store, fp16 and int8 mean and deviation); default all eight
 #   SPACE     host | device
+#   (each run's section: its steps, the error probe's lines if on, rc, its peak memory, its trace totals)
+#   SET       further playground settings, key=value separated by spaces, for every run (e.g.
+#             "material.poisson_ratio=0.45 solver.linear.preconditioner=jacobi solver.linear.error_probe=true")
+#   DT        one step for every case instead of the paper's (e.g. the baseline's, for the robustness runs)
 #   OUT       a new folder (default SFEM_RUNS/cpa_newton_<space>); each case's log OUT/<case>_<element>.out
 #             has a section "== <format> <options>" per run with its steps and its trace totals, the run
 #             itself in OUT/<case>_<element>/<format>
@@ -90,24 +94,34 @@ pack() {  # <mesh option>: the paper's pack size, max(16, min(8192, elements/144
   echo $p
 }
 FORMATS=${FORMATS:-bsr64 bsr32 bsro16 bsroi8 ead16 eadi8p f16 i8md}
+# Every run records its memory at each step's end (the playground's memory probe; host_peak_rss is the
+# process's high-water mark, device_pool_peak the stream-ordered pools'), its section ends with the peaks.
+EXTRA=()
+for kv in ${SET:-}; do EXTRA+=(--set "$kv"); done
 
 go() {  # <case> <element> <format>: one run into its folder, its section into a part log
   local k=$1 e=$2 f=$3 s m dt y o d p
   s=$(setup "$k" "$e") || return 0
   read -r m dt y <<< "$s"
+  dt=${DT:-$dt}
   o=$(options "$f") || { echo "newton: no format $f" >&2; return 0; }
   d=$OUT/${k}_$e/$f
   mkdir -p "$d"
   p=$(pack "$m")
+  # The playground resolves output paths against the case file's folder: the run's own, absolute.
+  local mem=(--set "output.history_csv=$d/history.csv" --set "output.probes=[{type: memory}]")
   {
-    echo "== $f $o"
+    echo "== $f $o ${EXTRA[*]}"
     # shellcheck disable=SC2086
     if [ "$SPACE" = device ]; then
-      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_GPU "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=device $o 2>&1)
+      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_GPU "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=device $o "${mem[@]}" "${EXTRA[@]}" 2>&1)
     else
-      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_HOST "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=host $o 2>&1)
-    fi | grep -E "^Playground|^step [0-9]|Abort|rror"
+      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_HOST "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=host $o "${mem[@]}" "${EXTRA[@]}" 2>&1)
+    fi | grep -E "^Playground|^step [0-9]|^error_probe|Abort|rror"
     echo "rc=${PIPESTATUS[0]}"
+    [ -f "$d/history.csv" ] && awk -F, 'NR == 1 { for (i = 1; i <= NF; i++) c[$i] = i; next }
+      { for (k in c) if (k ~ /peak|_now$/ && $c[k] + 0 > m[k]) m[k] = $c[k] + 0 }
+      END { printf "memory"; for (k in m) printf " %s %.0f", k, m[k]; printf "\n" }' "$d/history.csv"
     [ -f "$d/smesh.trace.csv" ] && grep -E "^(NewtonSolver::(solve|step)|Function::inexact_(update|apply)|ConjugateGradient::apply|BSRTangent::assemble|SELLTangent::assemble)," "$d/smesh.trace.csv" | sed 's/^/  trace /'
   } > "$d.part" 2>&1
 }
@@ -127,8 +141,9 @@ for k in ${CASES:-stretch_1M stretch_10M twist}; do
   for e in ${ELEMENTS:-TET4 TET10 HEX8 PROTEUS_HEX27}; do
     s=$(setup "$k" "$e") || continue
     read -r m dt y <<< "$s"
+    dt=${DT:-$dt}
     {
-      echo "node $(hostname) $e $y $m dt=$dt space=$SPACE"
+      echo "node $(hostname) $e $y $m dt=$dt space=$SPACE ${SET:-}"
       for f in $FORMATS; do [ -f "$OUT/${k}_$e/$f.part" ] && cat "$OUT/${k}_$e/$f.part"; done
     } > "$OUT/${k}_$e.out"
     echo "${k}_$e: $(grep -c '^rc=0' "$OUT/${k}_$e.out") runs ok of $(grep -c '^== ' "$OUT/${k}_$e.out")"

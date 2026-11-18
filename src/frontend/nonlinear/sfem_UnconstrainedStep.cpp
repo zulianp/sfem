@@ -14,7 +14,69 @@
 #include "sfem_bcgs.hpp"
 #include "sfem_cg.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+
 namespace sfem {
+
+    namespace {
+        /// The operator the Krylov method applies, with the exact tangent applied beside it: the
+        /// encoding's error in the energy on each vector the method applies it to, |x'(K~ - K)x| / x'Kx.
+        class ErrorProbe final : public Operator<real_t> {
+        public:
+            ErrorProbe(const std::shared_ptr<Operator<real_t>> &exact,
+                       const std::shared_ptr<BLAS<real_t>>     &blas,
+                       const ptrdiff_t                          n,
+                       const ExecutionSpace                     es)
+                : exact_(exact), blas_(blas), n_(n), w_(create_buffer<real_t>(n, es)), z_(create_buffer<real_t>(n, es)) {}
+
+            void set_encoded(const std::shared_ptr<Operator<real_t>> &encoded) { encoded_ = encoded; }
+            void reset() {
+                max_ratio_ = 0;
+                count_     = 0;
+            }
+
+            /// |x'(K~ - K)x| / x'Kx for x, or -1 where x'Kx is not positive (x zero off the
+            /// constrained rows).
+            real_t ratio(const real_t *const x) {
+                blas_->zeros(n_, w_->data());
+                blas_->zeros(n_, z_->data());
+                encoded_->apply(x, w_->data());
+                exact_->apply(x, z_->data());
+                const real_t xKx = blas_->dot(n_, x, z_->data());
+                const real_t xDx = blas_->dot(n_, x, w_->data()) - xKx;
+                return xKx > 0 ? std::abs(xDx) / xKx : real_t(-1);
+            }
+
+            int apply(const real_t *const x, real_t *const y) override {
+                const real_t r = ratio(x);
+                if (r >= 0) {
+                    max_ratio_ = std::max(max_ratio_, r);
+                    count_++;
+                }
+                blas_->axpy(n_, 1, w_->data(), y);
+                return SFEM_SUCCESS;
+            }
+
+            std::ptrdiff_t   rows() const override { return encoded_->rows(); }
+            std::ptrdiff_t   cols() const override { return encoded_->cols(); }
+            ExecutionContext execution_context() const override { return encoded_->execution_context(); }
+
+            const std::shared_ptr<Operator<real_t>> &exact() const { return exact_; }
+            real_t                                   max_ratio() const { return max_ratio_; }
+            int                                      count() const { return count_; }
+
+        private:
+            std::shared_ptr<Operator<real_t>> encoded_;
+            std::shared_ptr<Operator<real_t>> exact_;
+            std::shared_ptr<BLAS<real_t>>     blas_;
+            ptrdiff_t                         n_;
+            SharedBuffer<real_t>              w_, z_;
+            real_t                            max_ratio_{0};
+            int                               count_{0};
+        };
+    }  // namespace
 
     class UnconstrainedStep::Impl {
     public:
@@ -32,15 +94,47 @@ namespace sfem {
         SharedBuffer<real_t>                              diag;
         std::shared_ptr<ShiftableJacobi<real_t>>          jacobi;
         SharedBuffer<real_t>                              rhs;
+        std::shared_ptr<ErrorProbe>                       probe;  // solver.linear.error_probe
+        SharedBuffer<real_t>                              probe_w, probe_e;
         int                                               iterations{0};
         bool                                              negative_curvature{false};
+
+        /// The probe's line for this solve: the largest ratio over the Krylov directions, the ratio on
+        /// the step's free part, and ||b - K d|| / ||b - K d0|| on the exact tangent K (d0 the start,
+        /// the constrained values only), the forcing the step meets on the exact Newton system.
+        void report_probe(const real_t *const dx) {
+            const auto &w = probe_w;
+            const auto &e = probe_e;
+            const auto &K = probe->exact();
+            blas->copy(ndofs, dx, w->data());
+            f->set_value_to_constrained_dofs(0, w->data());
+            const real_t step = probe->ratio(w->data());
+
+            blas->zeros(ndofs, e->data());
+            K->apply(dx, e->data());
+            blas->axpby(ndofs, 1, rhs->data(), -1, e->data());
+            const real_t res = blas->norm2(ndofs, e->data());
+            blas->zeros(ndofs, w->data());
+            f->copy_constrained_dofs(rhs->data(), w->data());
+            blas->zeros(ndofs, e->data());
+            K->apply(w->data(), e->data());
+            blas->axpby(ndofs, 1, rhs->data(), -1, e->data());
+            const real_t res0 = blas->norm2(ndofs, e->data());
+            printf("error_probe: iterations %d directions %d max_ratio %.6e step_ratio %.6e exact_forcing %.6e\n",
+                   iterations,
+                   probe->count(),
+                   (double)probe->max_ratio(),
+                   (double)step,
+                   (double)(res0 > 0 ? res / res0 : 0));
+            fflush(stdout);
+        }
 
         bool is_bsr() const { return options.format == op_type::BSR && f->space()->block_size() > 1; }
         bool is_sell() const { return options.format == op_type::SELL && f->space()->block_size() > 1; }
 
-        int create_solver() {
+        int create_solver(const std::shared_ptr<Operator<real_t>> &applied) {
             if (options.type == "cg") {
-                auto cg     = create_cg<real_t>(op, es);
+                auto cg     = create_cg<real_t>(applied, es);
                 cg->verbose = false;
                 // The tangent away from the solution can be indefinite: the step is then the
                 // descent direction CG has built before it met negative curvature.
@@ -49,7 +143,7 @@ namespace sfem {
                 cg->set_atol(options.atol);
                 solver = cg;
             } else if (options.type == "bcgs") {
-                auto bcgs     = create_bcgs<real_t>(op, es);
+                auto bcgs     = create_bcgs<real_t>(applied, es);
                 bcgs->verbose = false;
                 bcgs->set_rtol(options.rtol);
                 bcgs->set_atol(options.atol);
@@ -213,8 +307,22 @@ namespace sfem {
             impl.jacobi->set_diag(impl.diag);
         }
 
-        if (!impl.solver) return impl.create_solver();
-        impl.solver->set_op(impl.op);
+        std::shared_ptr<Operator<real_t>> applied = impl.op;
+        if (impl.options.error_probe) {
+            if (!impl.probe) {
+                // Reads the iterate in impl.state, as the formats that read one do.
+                auto exact = create_linear_operator(op_type::MATRIX_FREE, impl.f, impl.state, impl.es);
+                if (!exact) return SFEM_FAILURE;
+                impl.probe   = std::make_shared<ErrorProbe>(exact, impl.blas, impl.ndofs, impl.es);
+                impl.probe_w = create_buffer<real_t>(impl.ndofs, impl.es);
+                impl.probe_e = create_buffer<real_t>(impl.ndofs, impl.es);
+            }
+            impl.probe->set_encoded(impl.op);
+            applied = impl.probe;
+        }
+
+        if (!impl.solver) return impl.create_solver(applied);
+        impl.solver->set_op(applied);
         return SFEM_SUCCESS;
     }
 
@@ -229,8 +337,10 @@ namespace sfem {
         impl.f->copy_constrained_dofs(dx, impl.rhs->data());
         impl.blas->zeros(impl.ndofs, dx);
         impl.f->copy_constrained_dofs(impl.rhs->data(), dx);
+        if (impl.probe) impl.probe->reset();
         const int status = impl.solver->apply(impl.rhs->data(), dx);
         impl.iterations  = impl.solver->iterations();
+        if (impl.probe) impl.report_probe(dx);
         auto cg          = std::dynamic_pointer_cast<ConjugateGradient<real_t>>(impl.solver);
         impl.negative_curvature = cg && cg->negative_curvature();
         return status;

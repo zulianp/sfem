@@ -58,8 +58,9 @@ store), a thread per point for HEX27's point store and a warp per element for it
 matrices. HEX8 folds; HEX27 does not on the device. The set-up runs a thread per element and point
 in double and encodes in the host's order, so the device codes are the host's up to the rounding of
 the arithmetic. `store: bsr` is the full difference form, a record per off-diagonal block, in the
-node graph's rows applied by 4 or 8 threads each (`layout: auto|rows`) or in SELL-32-1024 with int32
-columns, a thread per row (`layout: sell`, `solver.linear.format: SELL`).
+node graph's rows applied by 4 or 8 threads each (`layout: rows`) or in SELL-32-1024 with int32
+columns, a thread per row (`layout: sell`, `solver.linear.format: SELL`); `layout: auto` takes SELL
+from 2^20 block rows and the rows below (`sell_min_block_rows`).
 
 ## Symmetry
 

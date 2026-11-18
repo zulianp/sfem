@@ -242,13 +242,21 @@ namespace sfem {
                 return SFEM_SUCCESS;
             }
 
-            /// The layout: SELL-C-sigma on the host; on the device the node graph's rows (auto, rows) or
-            /// SELL-C-sigma (sell).
+            /// From this many block rows `auto` takes SELL-C-sigma on the device. SELL runs a thread per
+            /// block row and the rows layout 4-8, so below it SELL does not fill an H100: on the cubes and
+            /// the valve meshes (locality order) the rows layout is up to 5x faster under 4e5 dof, SELL
+            /// 3-36% faster on the cubes from 3e6 dof, and the two within 4% on the valves at 4e6-7e6 dof
+            /// (bench_inexact, 2026-11-18).
+            static constexpr ptrdiff_t sell_min_block_rows = ptrdiff_t(1) << 20;
+
+            /// The layout: SELL-C-sigma on the host; on the device the node graph's rows (rows), SELL-C-sigma
+            /// (sell), or by the number of block rows (auto, sell_min_block_rows).
             std::unique_ptr<BsrStore> make_bsr(const std::shared_ptr<CRSGraph> &graph, const bool symmetric) const {
                 if (space == EXECUTION_SPACE_DEVICE) {
 #ifdef SFEM_ENABLE_CUDA
-                    return cuda::create_bsr_store(graph, options.encoding, symmetric, stream,
-                                                  options.layout == InexactOptions::Layout::SELL);
+                    const bool sell = options.layout == InexactOptions::Layout::SELL ||
+                                      (options.layout == InexactOptions::Layout::AUTO && graph->n_nodes() >= sell_min_block_rows);
+                    return cuda::create_bsr_store(graph, options.encoding, symmetric, stream, sell);
 #else
                     SFEM_ERROR("inexact: a device bsr store in a build without CUDA\n");
 #endif
