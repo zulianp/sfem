@@ -165,7 +165,7 @@ rechecked locally. With pack256 at 72 threads, packed residual speedups are
 1.392x and 1.510x. Pack1024 on the medium mesh is also retained: the Jacobian is
 about 8.3% slower than atomic. This is evidence that the pack choice matters.
 
-The [saved result and replay instructions](../../../wip/paper/README.md)
+The saved result and replay instructions (xsesfsi_papers `packed_format/README.md`)
 include the complete one-/72-thread table, sample ranges, setup measurements,
 explicit storage ledger and limits. The current manuscript replaces this
 historical table with the two-scheme comparison below; the historical study remains in the original external archive.

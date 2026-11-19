@@ -20,7 +20,7 @@ Finest-interval velocity-L2 rates are approximately 2.04, 2.07, 1.49 and 1.36
 for the reconstructed schemes, and 0.73 for first-order upwind. They are
 observations, not a common asymptotic-order guarantee.
 
-The [paper README](../../../wip/paper/README.md#irregular-meshes-and-affine-refinement)
+The paper README (xsesfsi_papers `packed_format/README.md`, "Irregular meshes and affine refinement")
 identifies the external archive and complete replay. The archive preserves
 the actual wrapper, settings, source hashes and binary identity. Use those
 recorded inputs to reproduce the historical study; applying the wrapper to a
