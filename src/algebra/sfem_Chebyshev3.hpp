@@ -1,0 +1,277 @@
+#ifndef SFEM_CHEB3_HPP
+#define SFEM_CHEB3_HPP
+
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <vector>
+
+#include "sfem_PowerMethod.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_SolverExec.hpp"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+// 3-term Chebyshev iteration (smoother / polynomial preconditioner)
+namespace sfem {
+
+
+    /// As a smoother or a preconditioner it is a team operator where its operator is one (host):
+    /// its iterations then run on the threads of the caller's region (sfem_TeamOperator.hpp).
+    template <typename T>
+    class Chebyshev3 : public MatrixFreeLinearSolver<T>, public TeamOperator<T> {
+    public:
+        /// Built for the execution space es, on op.
+        static std::shared_ptr<Chebyshev3<T>> create(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es);
+        // Operator
+        std::function<void(const T* const, T* const)> apply_op;
+        std::function<void(const T* const, T* const)> preconditioner_op;
+
+        std::shared_ptr<BLAS<T>>        blas;
+        std::shared_ptr<PowerMethod<T>> power_method;
+
+        SharedBuffer<T> p_, temp_;
+
+        // Solver parameters
+        T   atol{1e-10};
+        T   rtol{1e-10};
+        T   eigen_solver_tol{1e-6};
+        int eigen_solver_max_it{1000};
+        int max_it{3};
+        mutable int iterations_{0};
+
+        T         eig_max{0};
+        T         scale_eig_max{1};
+        T         scale_eig_min{0.06};
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
+        bool      is_initial_guess_zero{false};
+        bool      verbose{true};
+        // If true, apply_op overwrites its output (e.g. BSR SpMV with scale_output==0).
+        // Default false: most ops accumulate (y += Ax); zeros() before each apply_op.
+        bool apply_overwrites_output{false};
+
+
+        int iterations() const override { return iterations_; }
+
+        void set_atol(const T val) { atol = val; }
+        void set_rtol(const T val) { rtol = val; }
+
+        void set_verbose(const bool val) { verbose = val; }
+        void set_apply_overwrites_output(const bool val) { apply_overwrites_output = val; }
+
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
+
+        void set_initial_guess_zero(const bool val) override { is_initial_guess_zero = val; }
+
+        /// A distributed operator makes the smoother distributed (SolveSpan): its power method's
+        /// norms are over the ranks.
+        void set_op(const std::shared_ptr<Operator<T>>& op) override {
+            n_dofs         = op->rows();
+            span_          = SolveSpan<T>::of(*op);
+            this->apply_op = [=](const T* const x, T* const y) { op->apply(x, y); };
+            op_            = op;
+            team_op_       = std::dynamic_pointer_cast<TeamOperator<T>>(op);
+        }
+
+        // As a team operator: the operator's rows, ready where the operator is (host).
+        Team team() const override { return team_op_->team(); }
+        bool team_capable() const override {
+            return team_op_ && team_op_->team_capable() && this->execution_space() == EXECUTION_SPACE_HOST;
+        }
+        int prepare() override {
+            team_reduction_buffer(team_sums_, n_dofs);
+            return team_op_ ? team_op_->prepare() : SFEM_SUCCESS;
+        }
+        void team_apply(const Team& team, const T* const rhs, T* const x) const override {
+            team_solve(team, rhs, x, is_initial_guess_zero);
+        }
+        void team_solve(const Team& team, const T* const rhs, T* const x, const bool zero_guess) const override {
+            TeamReduction<T, 1> sums(team_sums_.data(), team_chunk_count(n_dofs), span_.ranks());
+            TeamExec<T>         e(team, sums);
+            run(e, *team_op_, rhs, x, p_->data(), temp_->data(), zero_guess);
+        }
+
+        void set_preconditioner_op(const std::shared_ptr<Operator<T>>&) override { assert(false); }
+
+        void set_preconditioner(std::function<void(const T* const, T* const)>&& in) { preconditioner_op = in; }
+
+        void default_init() {
+            this->blas = OpenMPBLAS<T>::create();
+            ensure_power_method();
+        }
+
+        void ensure_power_method() {
+            if (!power_method) {
+                auto blas_impl           = this->blas;
+                power_method             = std::make_shared<PowerMethod<T>>();
+                const SolveSpan<T>* span = &span_;
+                power_method->norm2      = [blas_impl, span](const std::ptrdiff_t n, const T* const x) {
+                    return std::sqrt(span->sum(blas_impl->dot(n, x, x)));
+                };
+                power_method->scal  = [blas_impl](const std::ptrdiff_t n, const T alpha, T* const x) {
+                    blas_impl->scal(n, alpha, x);
+                };
+                power_method->zeros = [blas_impl](const std::size_t n, T* const x) { blas_impl->zeros(n, x); };
+            }
+        }
+
+        bool good() const { return blas->good() && apply_op; }
+
+        void monitor(const int iter, const T residual) {
+            if (!span_.root()) return;
+            if (iter == max_it || iter % 100 == 0 || residual < atol) {
+                std::cout << iter << ": " << residual << "\n";
+            }
+        }
+
+        T max_eigen_value(T* const guess_eigenvector, T* const work) {
+            assert(power_method);
+            return power_method->max_eigen_value(
+                    apply_op, eigen_solver_max_it, this->eigen_solver_tol, this->rows(), guess_eigenvector, work);
+        }
+
+        void init_with_ones() {
+            SFEM_TRACE_SCOPE("Chebyshev3::init_with_ones");
+            T*   work      = blas->allocate(this->rows());
+            auto blas_impl = blas;
+            auto ones      = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            this->blas->values(n_dofs, 1, ones->data());
+            init(ones->data());
+        }
+
+        void init_with_random() {
+            SFEM_TRACE_SCOPE("Chebyshev3::init_with_random");
+            T*   work          = blas->allocate(this->rows());
+            auto blas_impl     = blas;
+            auto random_vector = Buffer<T>::own(this->rows(), work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            assert(this->execution_space() == EXECUTION_SPACE_HOST);
+
+            auto v = random_vector->data();
+            for (ptrdiff_t i = 0; i < this->rows(); i++) {
+                v[i] = -0.5 + rand() * 1.0 / RAND_MAX;
+            }
+
+            init(random_vector->data());
+        }
+
+        void init(const T* const guess_eigenvector) {
+            // The products' vectors: a distributed operator's allocation, zero beyond the rows.
+            const ptrdiff_t n           = span_.size(this->rows());
+            T*              eigenvector = blas->allocate(n);
+            T*              work        = blas->allocate(n);
+            blas->zeros(n, eigenvector);
+            blas->zeros(n, work);
+            blas->copy(this->rows(), guess_eigenvector, eigenvector);
+
+            eig_max = max_eigen_value(eigenvector, work);
+
+            auto blas_impl = blas;
+            p_             = Buffer<T>::own(n, work, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+            temp_          = Buffer<T>::own(n, eigenvector, [blas_impl](void* ptr) { blas_impl->destroy(ptr); });
+        }
+
+        int apply(const T* const b, T* const x) override {
+            SFEM_TRACE_SCOPE("Chebyshev3::apply");
+            if (!good()) return SFEM_FAILURE;
+            if (team_capable()) return team_region_apply<T>(*this, b, x);
+            BlasExec<T> e(*blas, n_dofs, span_.allocation, span_.ranks());
+            run(e, *op_, b, x, p_->data(), temp_->data(), is_initial_guess_zero);
+            return 0;
+        }
+
+        void                  set_n_dofs(const ptrdiff_t n) override { this->n_dofs = n; }
+        void                  set_max_it(const int it) override { max_it = it; }
+        inline std::ptrdiff_t rows() const override { return n_dofs; }
+        inline std::ptrdiff_t cols() const override { return n_dofs; }
+
+    private:
+        std::shared_ptr<Operator<T>>     op_;
+        std::shared_ptr<TeamOperator<T>> team_op_;
+        SolveSpan<T>                     span_;
+        // The executor's sums (Chebyshev takes none; TeamExec is built over them).
+        mutable std::vector<T> team_sums_;
+
+        // p <- beta p - rhs + Ax; x <- x - alpha p: the BLAS's three calls or, in a region, one pass
+        // over the thread's entries.
+        static void update(BlasExec<T>& e, const T alpha, const T beta, const T* const rhs, const T* const Ax, T* const p, T* const x) {
+            auto& blas = e.blas();
+            blas.axpby(e.size(), T(-1), rhs, beta, p);
+            blas.axpy(e.size(), T(1), Ax, p);
+            blas.axpy(e.size(), -alpha, p, x);
+        }
+
+        static void update(TeamExec<T>& e, const T alpha, const T beta, const T* const rhs, const T* const Ax, T* const p, T* const x) {
+            const Team& team = e.team();
+            for (ptrdiff_t i = team.begin; i < team.end; i++) {
+                const T pi = beta * p[i] - rhs[i] + Ax[i];
+                p[i]       = pi;
+                x[i] -= alpha * pi;
+            }
+        }
+
+        // x <- x - alpha p
+        static void step_x(BlasExec<T>& e, const T alpha, const T* const p, T* const x) { e.blas().axpy(e.size(), -alpha, p, x); }
+        static void step_x(TeamExec<T>& e, const T alpha, const T* const p, T* const x) { e.axpby(-alpha, p, T(1), x); }
+
+        /// The iterations, written once for their executor (sfem_SolverExec.hpp); x zero on entry
+        /// with zero_guess.
+        template <class E, class Op>
+        void run(E& e, Op& A, const T* const rhs, T* const x, T* const p, T* const temp, const bool zero_guess) const {
+            if (max_it <= 0) {
+                if (e.leader()) iterations_ = 0;
+                return;
+            }
+
+            const T eig_max  = this->eig_max * scale_eig_max;
+            const T eig_min  = scale_eig_min * eig_max;
+            const T eig_avg  = (eig_min + eig_max) / 2;
+            const T eig_diff = (eig_min - eig_max) / 2;
+
+            T alpha = T(1) / eig_avg;
+            T beta  = 0;
+            T dea   = 0;
+
+            // Iteration 0: p = A x - rhs (or p = -rhs if x==0), then x -= alpha p
+            if (zero_guess) {
+                e.scale_into(T(-1), rhs, p);
+            } else {
+                e.apply(A, x, p, apply_overwrites_output);
+                e.axpby(T(-1), rhs, T(1), p);
+            }
+            step_x(e, alpha, p, x);
+
+            int it = 1;
+            for (; it < max_it; it++) {
+                // Iteration 1, then i >= 2: the SpMV first (independent of p), then the update.
+                dea   = eig_diff * alpha;
+                beta  = (it == 1 ? T(0.5) : T(0.25)) * dea * dea;
+                alpha = T(1) / (eig_avg - (beta / alpha));
+                e.apply(A, x, temp, apply_overwrites_output);
+                update(e, alpha, beta, rhs, temp, p, x);
+            }
+            if (e.leader()) iterations_ = it;
+        }
+    };
+
+    template <typename T>
+    std::shared_ptr<Chebyshev3<T>> h_cheb3(const std::shared_ptr<Operator<T>>& op) {
+        auto ret    = std::make_shared<Chebyshev3<T>>();
+        ret->n_dofs = op->rows();
+        ret->set_op(op);
+        ret->default_init();
+        return ret;
+    }
+    template <typename T>
+    std::shared_ptr<Chebyshev3<T>> create_cheb3(const std::shared_ptr<Operator<T>> &op, const ExecutionSpace es) {
+        return Chebyshev3<T>::create(op, es);
+    }
+
+}  // namespace sfem
+
+#endif  // SFEM_CHEB3_HPP

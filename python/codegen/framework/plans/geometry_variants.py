@@ -159,6 +159,22 @@ def packed_is_worth_emitting(dim):
 PACKED_KERNEL_FORMS = ("jacobian_action",)
 
 
+#: The forms a solver applies inside its Krylov loop: the operator's product,
+#: `apply` on the energy path and `jacobian_action` on the residual path
+#: (CONVENTIONS.md).  The loop runs on the threads of one region the solver
+#: opened (sfem_TeamOperator.hpp), so these forms' mesh kernels are team bodies
+#: with region-opening entry points and `_team` twins; the others -- a residual
+#: once per Newton step, an objective, an assembly -- open their own regions.
+TEAM_KERNEL_FORMS = ("apply", "jacobian_action")
+
+
+def kernel_target(form, target):
+    """The target a form's mesh kernels are printed for: `target` in a team
+    (`TargetPlatform.running_in_a_team`) for the forms of `TEAM_KERNEL_FORMS`."""
+    name = str(getattr(form, "name", form))
+    return target.running_in_a_team() if name in TEAM_KERNEL_FORMS else target
+
+
 def packed_kernel_forms(form):
     """That form's packed kernels, as a sequence: one entry or none.
 

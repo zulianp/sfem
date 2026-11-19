@@ -152,9 +152,11 @@ def _wrapper_compile_include_dirs(out_dir, manifest):
     root = _repo_root()
     include_dirs = [
         Path(out_dir),
-        root / "frontend",
-        root / "frontend" / "ops",
-        root / "base",
+        root / "src" / "frontend",
+        root / "src" / "frontend" / "ops",
+        root / "src" / "frontend" / "ops" / "inexact",
+        root / "src" / "frontend" / "ops" / "prony",
+        root / "src" / "base",
         root / "external" / "smesh" / "src",
         root / "external" / "smesh" / "src" / "base",
         root / "external" / "smesh" / "src" / "frontend",

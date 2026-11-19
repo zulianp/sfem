@@ -28,7 +28,7 @@
 #include "sfem_base.hpp"
 #include "sfem_bcgs.hpp"
 #include "sfem_context.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_buffer.hpp"
 #include "smesh_context.hpp"
 #include "smesh_env.hpp"

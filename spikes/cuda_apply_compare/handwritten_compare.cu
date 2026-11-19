@@ -21,8 +21,8 @@
 
 #include <cuda_runtime.h>
 
-#include "cu_tet4_laplacian.hpp"
-#include "cu_tet4_linear_elasticity.hpp"
+#include "tet4_laplacian_cuda.hpp"
+#include "tet4_linear_elasticity_cuda.hpp"
 
 extern "C" int cu_laplace_tet4_gradient_a_msoa(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,

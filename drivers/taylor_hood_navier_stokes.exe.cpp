@@ -10,7 +10,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "mass.hpp"
 
@@ -40,7 +40,7 @@
 // 583.669 / 10001 = 0.0583669 (seconds) per time-step
 
 ptrdiff_t remove_p2_nodes(const ptrdiff_t n, const idx_t bound_p1, idx_t *idx) {
-    ptrdiff_t nret = sortreduce(idx, n);
+    ptrdiff_t nret = sfem::sortreduce(idx, n);
 
     for (ptrdiff_t i = 0; i < n; i++) {
         if (idx[i] >= bound_p1) {
@@ -69,47 +69,47 @@ static ptrdiff_t count_nan(const ptrdiff_t n, const real_t *const v) {
     return ret;
 }
 
-static void make_matrix_nonsingular(const real_t                       factor,
-                                    const ptrdiff_t                    n,
-                                    const count_t *const SFEM_RESTRICT rowptr,
-                                    const idx_t *const SFEM_RESTRICT   colidx,
-                                    real_t *const SFEM_RESTRICT        values) {
-    count_t            rstart  = rowptr[n - 1];
-    count_t            rextent = rowptr[n] - rstart;
-    const idx_t *const cols    = &colidx[rstart];
-    real_t *const      vals    = &values[rstart];
+// static void make_matrix_nonsingular(const real_t                       factor,
+//                                     const ptrdiff_t                    n,
+//                                     const count_t *const SFEM_RESTRICT rowptr,
+//                                     const idx_t *const SFEM_RESTRICT   colidx,
+//                                     real_t *const SFEM_RESTRICT        values) {
+//     count_t            rstart  = rowptr[n - 1];
+//     count_t            rextent = rowptr[n] - rstart;
+//     const idx_t *const cols    = &colidx[rstart];
+//     real_t *const      vals    = &values[rstart];
 
-    for (count_t i = 0; i < rextent; ++i) {
-        if (cols[i] == n - 1) {
-            vals[i] *= (1 + factor);
+//     for (count_t i = 0; i < rextent; ++i) {
+//         if (cols[i] == n - 1) {
+//             vals[i] *= (1 + factor);
 
-            // vals[i] += factor;
-            break;
-        }
-    }
-}
+//             // vals[i] += factor;
+//             break;
+//         }
+//     }
+// }
 
-static void shift_diag(const ptrdiff_t                    n,
-                       const real_t                       factor,
-                       const real_t *const SFEM_RESTRICT  vector,
-                       const count_t *const SFEM_RESTRICT rowptr,
-                       const idx_t *const SFEM_RESTRICT   colidx,
-                       real_t *const SFEM_RESTRICT        values) {
-    for (ptrdiff_t i = 0; i < n; ++i) {
-        // ptrdiff_t i = n - 1;
-        count_t            rstart  = rowptr[i];
-        count_t            rextent = rowptr[i + 1] - rstart;
-        const idx_t *const cols    = &colidx[rstart];
-        real_t *const      vals    = &values[rstart];
+// static void shift_diag(const ptrdiff_t                    n,
+//                        const real_t                       factor,
+//                        const real_t *const SFEM_RESTRICT  vector,
+//                        const count_t *const SFEM_RESTRICT rowptr,
+//                        const idx_t *const SFEM_RESTRICT   colidx,
+//                        real_t *const SFEM_RESTRICT        values) {
+//     for (ptrdiff_t i = 0; i < n; ++i) {
+//         // ptrdiff_t i = n - 1;
+//         count_t            rstart  = rowptr[i];
+//         count_t            rextent = rowptr[i + 1] - rstart;
+//         const idx_t *const cols    = &colidx[rstart];
+//         real_t *const      vals    = &values[rstart];
 
-        for (count_t k = 0; k < rextent; ++k) {
-            if (cols[k] == i) {
-                vals[k] += factor * vector[i];
-                break;
-            }
-        }
-    }
-}
+//         for (count_t k = 0; k < rextent; ++k) {
+//             if (cols[k] == i) {
+//                 vals[k] += factor * vector[i];
+//                 break;
+//             }
+//         }
+//     }
+// }
 
 //////////////////////////////////////////////
 
@@ -366,7 +366,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
     const int    SFEM_LUMPED_MASS      = smesh::Env::read("SFEM_LUMPED_MASS", 0);
 
     const int    SFEM_AVG_PRESSURE_CONSTRAINT = smesh::Env::read("SFEM_AVG_PRESSURE_CONSTRAINT", 0);
-    const real_t SFEM_REGULARIZATION_FACTOR   = smesh::Env::read("SFEM_REGULARIZATION_FACTOR", real_t(1e-8));
+    // const real_t SFEM_REGULARIZATION_FACTOR = smesh::Env::read("SFEM_REGULARIZATION_FACTOR", real_t(1e-8));
 
     const std::string SFEM_RESTART_FOLDER_str = smesh::Env::read_string("SFEM_RESTART_FOLDER", "");
     const char       *SFEM_RESTART_FOLDER     = SFEM_RESTART_FOLDER_str.empty() ? nullptr : SFEM_RESTART_FOLDER_str.c_str();
@@ -617,8 +617,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
 
     int      export_counter   = 0;
     real_t   next_check_point = SFEM_EXPORT_FREQUENCY;
-    logger_t time_logger;
-    log_init(&time_logger);
+    sfem::Logger time_logger;
 
     if (SFEM_RESTART_FOLDER) {
         for (int d = 0; d < sdim; d++) {
@@ -633,7 +632,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
         }
 
         // Read current time file and start from offset
-        // log_write_double()
+        // time_logger.write()
 
         export_counter = SFEM_RESTART_ID + 1;
 
@@ -649,8 +648,8 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
         write_output_step(pressure_output, "div_pre", export_counter, p);
 
         snprintf(path, sizeof(path), "%s/time.txt", output_folder);
-        log_create_file(&time_logger, path, "w");
-        log_write_double(&time_logger, 0);
+        time_logger.open_file(path, "w");
+        time_logger.write(0);
         export_counter++;
     }
 
@@ -874,7 +873,7 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
                 apply_inv_lumped_mass(p1_type, mesh_nelements, p1_nnodes, mesh_elements, mesh_points, buff, p);
                 write_output_step(pressure_output, "div", export_counter, p);
 
-                log_write_double(&time_logger, t);
+                time_logger.write(t);
             }
 
             next_check_point += SFEM_EXPORT_FREQUENCY;
@@ -911,7 +910,6 @@ int solve_taylor_hood_navier_stokes(const std::shared_ptr<sfem::Communicator> &c
     destroy_conditions(n_pressure_dirichlet_conditions, pressure_dirichlet_conditions);
     // destroy_conditions(n_neumann_conditions, neumann_conditions);
 
-    log_destroy(&time_logger);
 
     const double tock = smesh::time_seconds();
     if (!comm->rank()) {

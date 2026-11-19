@@ -37,8 +37,10 @@ class KernelConstant(str):
     liveness pass covers both rather than each shape carrying its own predicate.
     """
 
-    def __new__(cls, name, value, indent="  ", declaration="static constexpr int"):
-        line = "%s%s %s = %s;" % (indent, declaration, name, value)
+    def __new__(
+        cls, name, value, indent="  ", declaration="static constexpr int", declarator=None
+    ):
+        line = "%s%s %s = %s;" % (indent, declaration, declarator or name, value)
         constant = super(KernelConstant, cls).__new__(cls, line)
         constant.constant_name = name
         constant.constant_value = str(value)
@@ -49,9 +51,14 @@ def kernel_constant(name, value, indent="  "):
     return KernelConstant(name, value, indent)
 
 
-def kernel_local(name, value, declaration, indent="  "):
-    """A local alias, dropped where its own scope never mentions it."""
-    return KernelConstant(name, value, indent, declaration)
+def kernel_local(name, value, declaration, indent="  ", declarator=None):
+    """A local alias, dropped where its own scope never mentions it.
+
+    `declarator` is what the declaration spells in place of the bare name, for
+    a local whose declarator carries more than its name -- an array extent or a
+    pointer -- while liveness is still asked of the name alone.
+    """
+    return KernelConstant(name, value, indent, declaration, declarator)
 
 
 class KernelDiscard(str):

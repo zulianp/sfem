@@ -260,8 +260,8 @@ class HardcodedPragmaRatchetTest(unittest.TestCase):
     #: loop, the parallel-region pairs and the three non-BSR matrix scatters
     #: described above.
     BUDGET = {
-        "residual_codegen.py": 8,
-        "energy_codegen.py": 9,
+        "residual_codegen.py": 3,
+        "energy_codegen.py": 7,
     }
 
     def _literal_pragmas(self, name):
@@ -333,6 +333,35 @@ class MeshLoweringAccessorTest(unittest.TestCase):
             target.mesh_launch_lines("k", "double, geom_t", ("a", "b")),
             ("  return sfem::codegen::k<double, geom_t>(a, b);",),
         )
+
+    def test_a_team_body_walks_its_callers_element_range(self):
+        # The `_team` twin of a kernel walking the mesh is given the elements to walk; the
+        # plain name passes the whole mesh (`runtime_typed_entry_point_lines`).
+        from codegen.framework.plans.conventions import with_team_element_range
+
+        target = OpenMPTarget().running_in_a_team()
+        loop, extent = mesh_loop_lines(target)
+        self.assertEqual(loop, "  for (ptrdiff_t evb = element_begin; evb < element_end; evb += VS) {")
+        self.assertEqual(
+            extent, "    const int ne = (int)MIN((ptrdiff_t)VS, element_end - evb);"
+        )
+        params = ["const ptrdiff_t nelements", "const ptrdiff_t nnodes"]
+        self.assertEqual(
+            with_team_element_range(params, target),
+            [
+                "const ptrdiff_t nelements",
+                "const ptrdiff_t element_begin",
+                "const ptrdiff_t element_end",
+                "const ptrdiff_t nnodes",
+            ],
+        )
+        # A kernel walking packs, and every kernel outside a team, keeps its parameters.
+        packed = ["const ptrdiff_t n_packs", "const ptrdiff_t nelements"]
+        self.assertEqual(with_team_element_range(packed, target), packed)
+        self.assertEqual(with_team_element_range(params, OpenMPTarget()), params)
+        # A target without regions has no twin: its team body walks the mesh.
+        cuda = CUDATarget().running_in_a_team()
+        self.assertEqual(with_team_element_range(params, cuda), params)
 
     def test_cuda_walks_the_mesh_with_a_grid_of_threads(self):
         target = CUDATarget()
@@ -525,31 +554,22 @@ class WorkItemAccessorTest(unittest.TestCase):
 
 
 class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
-    """The narrow, true claim about CUDA -- and it is worth stating narrowly.
+    """The stored-tangent family under a CUDA target.
 
-    `backends/cuda.py` refuses an emitted file that contains the substring
-    `lane`, and `CUDASoABackend.emit_inexact` returned nothing because of it.
-    That rule is what this conversion is about, so it is what gets asserted:
-    emitted under a bound `CUDATarget`, the inexact family no longer spells a
-    work item or an OpenMP pragma.
-
-    It does *not* assert that the backend accepts the family, and it should not.
-    `_validate_cuda_source_contract` also wants a file whose name ends
-    `_operator.cu` containing `__global__ void`, and this emitter writes
-    `%s_operator.cpp` with host `extern "C"` functions around an OpenMP mesh
-    loop.  Reaching that needs the mesh-loop lowering -- `.cu` naming, a
-    grid-stride kernel, a host launcher, atomic scatters -- which the energy
-    family already has and this one does not.
-
-    This is also the only thing in the repository that evaluates the SIMT arm of
-    the work-item accessors through a real emitter rather than in isolation.
+    The family's generated half is per-element headers -- the material at one
+    point, the element's stages and tables, the contraction -- and its stores
+    and traversals are library code (`src/frontend/ops/inexact/`, and `cuda/`
+    for the device).  Under CUDA the same emitters print the device twins: the
+    work item is the element, so nothing spells a lane, and a source per unit
+    instantiates the library's device stores for it.
     """
 
-    def test_it_spells_no_work_item_and_no_openmp_pragma(self):
+    @staticmethod
+    def _emit(target):
         import dataclasses
 
         from sfem import gen
-        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
+        from codegen.framework.emitters.inexact_codegen import inexact_unit_files
         from codegen.framework.materials.linear_elasticity import material
 
         unit_material = dataclasses.replace(material, inexact_apply=True)
@@ -558,34 +578,28 @@ class InexactFamilyUnderACudaTargetTest(unittest.TestCase):
         plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
         context = user_input.element_contexts[0]
         unit = list(plan.emission_kernels_for_context(context))[0]
+        with use_target(target):
+            return dict(inexact_unit_files(unit_material, unit, context)), unit_material, unit, context
 
-        with use_target(CUDATarget()):
-            emitted = dict(inexact_apply_files(unit_material, unit, context))
+    def test_the_cuda_backend_publishes_the_device_twins(self):
+        from codegen.framework.backends.cuda import CUDASoABackend
 
-        self.assertTrue(emitted)
-        for path, source in sorted(emitted.items()):
-            with self.subTest(generated=os.path.basename(path)):
-                self.assertNotIn("lane", source)
-                self.assertNotIn("#pragma omp", source)
+        _emitted, material, unit, context = self._emit(OpenMPTarget())
+        files = CUDASoABackend(CUDATarget()).emit_inexact(material, unit, context)
+        paths = sorted(generated.path for generated in files)
+        self.assertEqual(
+            [p.rsplit(".", 1)[-1] for p in paths], ["cuh", "cu", "cuh", "cuh"],
+            "the unit, its store source, and the shared contraction and element: %s" % paths,
+        )
+        for generated in files:
+            self.assertNotIn("lane", generated.source, generated.path)
+            self.assertNotIn("SFEM_INLINE", generated.source, generated.path)
+        store = [g for g in files if g.path.endswith("_store.cu")]
+        self.assertEqual(len(store), 1)
+        self.assertIn("inexact::cuda::create_store<", store[0].source)
 
-    def test_the_same_emitter_still_spells_lanes_for_a_cpu_target(self):
-        """The conversion is a lowering, not a deletion."""
-        import dataclasses
-
-        from sfem import gen
-        from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
-        from codegen.framework.materials.linear_elasticity import material
-
-        unit_material = dataclasses.replace(material, inexact_apply=True)
-        user_input = gen.UserInputStage.create(unit_material, ("TET4",), 8, None)
-        form_evaluation = gen._evaluate_forms(user_input)
-        plan = gen.SpecializedFormManipulationStage(user_input, form_evaluation).run()
-        context = user_input.element_contexts[0]
-        unit = list(plan.emission_kernels_for_context(context))[0]
-
-        with use_target(OpenMPTarget()):
-            emitted = dict(inexact_apply_files(unit_material, unit, context))
-
+    def test_the_cpu_emission_spells_lanes(self):
+        emitted, _material, _unit, _context = self._emit(OpenMPTarget())
         self.assertTrue(any("lane" in source for source in emitted.values()))
 
 

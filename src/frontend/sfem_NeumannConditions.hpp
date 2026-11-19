@@ -1,0 +1,146 @@
+#ifndef SFEM_NEUMANN_CONDITIONS_HPP
+#define SFEM_NEUMANN_CONDITIONS_HPP
+
+#include <mpi.h>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_LoadProfile.hpp"
+#include "sfem_SidesetLookup.hpp"
+#include "sfem_aliases.hpp"
+#include "sfem_base.hpp"
+#include "sfem_defs.hpp"
+#include "smesh_mesh.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#include <ryml_std.hpp>
+#endif
+
+// Operator includes
+#include "sfem_Op.hpp"
+
+namespace sfem {
+
+    class NeumannConditions final : public Op {
+    public:
+        struct Condition {
+            smesh::ElemType                       element_type{smesh::INVALID};
+            std::vector<std::shared_ptr<Sideset>> sidesets;  /// Maybe empty in certain cases
+            SharedBuffer<idx_t *>                 surface;
+            SharedBuffer<real_t>                  values;
+            SharedBuffer<real_t>                  base_values;
+            real_t                                value{0};
+            real_t                                base_value{0};
+            int                                   component{0};
+            bool                                  follower_pressure{false};
+            LoadProfile                           profile;
+            bool                                  profile_initialized{false};
+            /// A dead load on a distributed mesh at value 1, complete on the owned rows: each
+            /// face is on one rank, so its share at another rank's node is added there once.
+            SharedBuffer<real_t>                  owned_load;
+        };
+
+        static std::shared_ptr<NeumannConditions> create_from_env(const std::shared_ptr<FunctionSpace> &space);
+
+        static std::shared_ptr<NeumannConditions> create(const std::shared_ptr<FunctionSpace> &space,
+                                                         const std::vector<struct Condition>  &conditions);
+
+        /// create, moved to the device for EXECUTION_SPACE_DEVICE.
+        static std::shared_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::vector<struct Condition>  &conditions,
+                                          const ExecutionSpace                  es);
+
+        static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space, std::string yaml);
+
+#ifdef SFEM_ENABLE_RYAML
+        /// The list under `neumann_conditions`; `lookup` resolves `format: name` sidesets and
+        /// relative paths.
+        static std::shared_ptr<NeumannConditions> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const ryml::ConstNodeRef             &conditions,
+                                                                   const SidesetLookup                  &lookup = SidesetLookup());
+#endif
+
+        static std::shared_ptr<NeumannConditions> create_from_file(const std::shared_ptr<FunctionSpace> &space,
+                                                                   const smesh::Path                    &path);
+
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> &derefined_space) override;
+
+        const char *name() const override;
+        //! The work a traction does, `-g . x`, is linear in the state and so a
+        //! potential like any other.
+        bool energy_or_potential_based() const override { return true; }
+        //! Its `gradient` ignores `x` -- the traction is integrated over the
+        //! sideset and does not move with the state -- so it is assembled once
+        //! into the accumulator rather than at every trial step.  This promise
+        //! is what takes the forcing out of the line search.  A follower
+        //! pressure turns with the surface and reads the state.
+        bool residual_depends_on_state() const override { return !is_linear(); }
+
+        NeumannConditions(const std::shared_ptr<FunctionSpace> &space);
+        ~NeumannConditions();
+
+        int hessian_crs(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        int hessian_bsr(const real_t *const  x,
+                        const count_t *const rowptr,
+                        const idx_t *const   colidx,
+                        real_t *const        values) override;
+
+        int gradient(const real_t *const x, real_t *const out) override;
+
+        int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+        bool team_supported() const override;
+        int  team_prepare() override;
+        int  team_apply(const Team         &team,
+                        const real_t *const x,
+                        const real_t *const h,
+                        real_t *const       out,
+                        const ElementScope  scope) override;
+
+        int value(const real_t *x, real_t *const out) override;
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
+
+        int hessian_diag(const real_t *const x, real_t *const values) override;
+        int hessian_block_diag_sym(const real_t *const, real_t *const) override { return SFEM_SUCCESS; }
+
+        bool      is_linear() const override;
+        ptrdiff_t n_dofs_domain() const override;
+        ptrdiff_t n_dofs_image() const override;
+
+        int                            n_conditions() const;
+        int                            set_time(real_t time, real_t global_scale = 1);
+        std::shared_ptr<FunctionSpace> space();
+        std::vector<struct Condition> &conditions();
+
+    private:
+        /// out += the follower pressures' H(x) h, by the threads of the caller's region.
+        int apply_follower_pressure(const real_t *const x, const real_t *const h, real_t *const out);
+
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
+    std::shared_ptr<Op> to_device(const std::shared_ptr<NeumannConditions> &nc);
+
+    /// NeumannConditions::create, moved to the device for EXECUTION_SPACE_DEVICE.
+    inline std::shared_ptr<Op> create_neumann_conditions(const std::shared_ptr<FunctionSpace>            &space,
+                                                         const std::vector<NeumannConditions::Condition> &conditions,
+                                                         const ExecutionSpace                             es) {
+        return NeumannConditions::create(space, conditions, es);
+    }
+
+}  // namespace sfem
+
+#endif  // SFEM_NEUMANN_CONDITIONS_HPP

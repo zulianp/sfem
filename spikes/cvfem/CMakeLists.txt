@@ -110,9 +110,9 @@ endforeach()
 # The SFEM source tree, for the two headers that are reached in place rather than through
 # the install. Kept explicit so it is obvious which targets pay for the coupling.
 set(CVFEM_SFEM_ALGEBRA_INCLUDES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../algebra/openmp)
-set(CVFEM_SFEM_OPERATORS_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../operators)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/algebra
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/algebra/openmp)
+set(CVFEM_SFEM_OPERATORS_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../src/operators)
 
 # ---------------------------------------------------------------------- library
 # The sfem::Op face of the kernels, for the semi-structured GMG work. Kept as a library so

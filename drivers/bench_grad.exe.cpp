@@ -1,4 +1,5 @@
 #include "sfem_API.hpp"
+#include "smesh_base.hpp"
 
 #include "sfem_aliases.hpp"
 #include "smesh_env.hpp"
@@ -32,9 +33,9 @@ int main(int argc, char *argv[]) {
 
     auto op = create_op(fs, "Gradient", EXECUTION_SPACE_HOST);
 
-    const double setup_t0 = MPI_Wtime();
+    const double setup_t0 = smesh::time_seconds();
     op->initialize();
-    const double setup_t1 = MPI_Wtime();
+    const double setup_t1 = smesh::time_seconds();
 
     const ptrdiff_t n_in  = op->n_dofs_domain();
     const ptrdiff_t n_out = op->n_dofs_image();
@@ -55,14 +56,14 @@ int main(int argc, char *argv[]) {
     }
 
     device_synchronize();
-    const double t0 = MPI_Wtime();
+    const double t0 = smesh::time_seconds();
 
     for (int r = 0; r < repeat; r++) {
         op->apply(nullptr, h, out);
     }
 
     device_synchronize();
-    const double t1 = MPI_Wtime();
+    const double t1 = smesh::time_seconds();
 
     const double elapsed = (t1 - t0) / repeat;
 

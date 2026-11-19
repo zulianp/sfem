@@ -821,6 +821,12 @@ class CoupledResidualSystemTest(unittest.TestCase):
                         tmpdir,
                         "coupled_diffusion_%s_operator.cpp" % element.lower(),
                     ),
+                    *(
+                        "-I%s" % include_dir
+                        for include_dir in gen.generated_include_dirs(
+                            os.path.join(tmpdir, generated.path) for generated in files
+                        )
+                    ),
                     "-o",
                     library_path,
                 ]
@@ -1015,6 +1021,12 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 "-fPIC",
                 "-dynamiclib" if os.uname().sysname == "Darwin" else "-shared",
                 os.path.join(tmpdir, "coupled_diffusion_%s_operator.cpp" % element.lower()),
+                *(
+                    "-I%s" % include_dir
+                    for include_dir in gen.generated_include_dirs(
+                        os.path.join(tmpdir, generated.path) for generated in files
+                    )
+                ),
                 "-o",
                 library_path,
             ],

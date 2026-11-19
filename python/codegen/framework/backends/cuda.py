@@ -62,17 +62,6 @@ class CUDASoABackend(SoABackend):
             return
         _validate_cuda_source_contract(files)
 
-    def emit_inexact(self, material, unit, context):
-        """No device lowering for the inexact-apply family yet.
-
-        The backend is asked rather than the driver testing the target, so the
-        answer lives where the target's capabilities do.  The residual family
-        reached CUDA when the mesh-kernel lowering moved onto the target; this
-        one has not been measured under a device target yet, and an untested
-        `()` is a more honest answer than an untested file.
-        """
-        return ()
-
 
 def _kind_value(kind):
     return getattr(kind, "value", str(kind))

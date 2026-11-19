@@ -115,7 +115,7 @@ def _compile_include_only(test_case, compiler, out_dir, source, object_name):
     root = _repo_root()
     include_dirs = [
         out_dir,
-        os.path.join(root, "base"),
+        os.path.join(root, "src", "base"),
         os.path.join(root, "external", "smesh", "src", "base"),
         os.path.join(root, "external", "smesh", "src", "mesh"),
     ]
@@ -173,7 +173,7 @@ def _assert_source_reports_vectorized_loops(
     compiler,
     source_path,
     object_path,
-    include_dir,
+    include_dirs,
     expected_report_source,
     minimum_matches=1,
 ):
@@ -188,8 +188,7 @@ def _assert_source_reports_vectorized_loops(
             *flags,
             "-c",
             source_path,
-            "-I",
-            include_dir,
+            *("-I%s" % include_dir for include_dir in include_dirs),
             "-o",
             object_path,
         ],
@@ -1250,7 +1249,7 @@ class GenApiTest(unittest.TestCase):
                 encoding="utf-8",
             ) as stream:
                 registration = stream.read()
-            self.assertIn('Factory::register_op("GeneratedNeoHookeanOgden"', registration)
+            self.assertIn('OpFactory::register_op("GeneratedNeoHookeanOgden"', registration)
 
     def test_generated_op_dispatch_sources_split_by_geometry_layout(self):
         class Material:
@@ -1776,7 +1775,7 @@ int main() {
 
     def test_frontend_factory_consumes_generated_op_registration_aggregate(self):
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
-        factory_path = os.path.join(repo_root, "frontend", "ops", "sfem_OpFactory.cpp")
+        factory_path = os.path.join(repo_root, "src", "frontend", "ops", "sfem_OpFactory.cpp")
         with open(factory_path, encoding="utf-8") as input_file:
             factory_source = input_file.read()
 
@@ -2707,6 +2706,52 @@ int main() {
                 self.assertNotIn("const ptrdiff_t thread = 0", source)
                 self.assertNotIn("SFEM_INLINE", source)
 
+    def test_cuda_backend_assembles_an_energy_hessian_in_bsr(self):
+        # An energy material's tangent assembles on the device too: the direct
+        # element-matrix kernel under a grid-stride loop, scattered into the BSR
+        # blocks with `atomicAdd` -- a plain `+=` there is a race between the
+        # threads of elements sharing a node -- and launched on the caller's
+        # stream.  The device used to drop the matrix-format plan altogether.
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(neohookean_ogden, out_dir, elements=("QUAD4",), target="cuda")
+            operator_path = os.path.join(
+                out_dir, "d2", "proteus_quad4", "cuda", "neohookean_ogden_proteus_quad4_operator.cu"
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+            self.assertIn("__global__ void neohookean_ogden_proteus_quad4_hessian_i_msoa_assemble_impl", source)
+            self.assertIn("atomicAdd(&(block[bi * NC + bj])", source)
+            self.assertIn('extern "C" int cu_neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa(', source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            # A double state assembled into single-precision values, on the device too.
+            self.assertIn("hessian_i_msoa_assemble_impl<double, float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertNotIn("#pragma omp", source)
+            self.assertNotIn("SFEM_INLINE", source)
+            # The scatters that still spell OpenMP pragmas stay off the device.
+            self.assertNotIn("hessian_crs", source)
+
+    def test_cuda_backend_assembles_the_symmetric_block_diagonal(self):
+        # The block-Jacobi smoothers of SSMGC read the symmetric block diagonal, so a
+        # material that plans it assembles it on the device too: the same direct
+        # element-matrix kernel, its scatter a device function adding with
+        # `atomicAdd`, launched on the caller's stream.
+        with tempfile.TemporaryDirectory() as out_dir:
+            gen.generate(linear_elasticity, out_dir, elements=("HEX8",), target="cuda")
+            operator_path = os.path.join(
+                out_dir, "d3", "proteus_hex8", "cuda", "linear_elasticity_proteus_hex8_operator.cu"
+            )
+            with open(operator_path, encoding="utf-8") as input_file:
+                source = input_file.read()
+            self.assertIn(
+                "__host__ __device__ __forceinline__ void linear_elasticity_proteus_hex8_hessian_i_msoa_scatter_block_diag_sym(",
+                source,
+            )
+            self.assertIn("atomicAdd(&(block[sym++])", source)
+            self.assertIn('extern "C" int cu_linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa(', source)
+            self.assertIn("hessian_i_msoa_assemble_impl<double, double, geom_t, 6><<<grid_size, block_size, 0, (cudaStream_t)stream>>>", source)
+            self.assertNotIn("#pragma omp", source)
+            self.assertNotIn("SFEM_INLINE", source)
+
     def test_hip_backend_emits_material_energy_kernels_from_plan(self):
         with tempfile.TemporaryDirectory() as out_dir:
             result = gen.generate(
@@ -2937,7 +2982,7 @@ int main() {
                     compiler,
                     source_path,
                     os.path.join(out_dir, "%s.o" % label),
-                    out_dir,
+                    result.include_dirs,
                     report_source,
                     minimum_matches=minimum_matches,
                 )
@@ -2979,13 +3024,11 @@ int main() {
                 "packed_thread_scratch.hpp",
                 "tensor_product_kernels.hpp",
                 "geometry_kernels.hpp",
+                "matrix_formats.hpp",
             ):
                 self.assertIn(os.path.join("..", header), source_names)
                 self.assertTrue(os.path.exists(os.path.join(generated_root, header)))
                 self.assertFalse(os.path.exists(os.path.join(out_dir, header)))
-
-            self.assertIn("matrix_formats.hpp", source_names)
-            self.assertTrue(os.path.exists(os.path.join(out_dir, "matrix_formats.hpp")))
 
             local_header = os.path.join(
                 out_dir,
@@ -2994,8 +3037,8 @@ int main() {
             )
             with open(local_header, encoding="utf-8") as input_file:
                 local_source = input_file.read()
-            self.assertIn('#include "../../kernel_math.hpp"', local_source)
-            self.assertIn('#include "../../tensor_product_kernels.hpp"', local_source)
+            self.assertIn('#include "kernel_math.hpp"', local_source)
+            self.assertIn('#include "tensor_product_kernels.hpp"', local_source)
 
             operator_source = os.path.join(
                 out_dir,
@@ -3005,7 +3048,7 @@ int main() {
             )
             with open(operator_source, encoding="utf-8") as input_file:
                 operator_contents = input_file.read()
-            self.assertIn('#include "../../op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp"', operator_contents)
+            self.assertIn('#include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"', operator_contents)
             self.assertIn(
                 "neohookean_ogden_proteus_hex8_apply_soa_diagnostics",
                 operator_contents,
@@ -3020,9 +3063,9 @@ int main() {
             )
             with open(proteus_operator, encoding="utf-8") as input_file:
                 proteus_contents = input_file.read()
-            self.assertIn('#include "../../../kernel_diagnostics.hpp"', proteus_contents)
-            self.assertIn('#include "../../../geometry_kernels.hpp"', proteus_contents)
-            self.assertIn('#include "../neohookean_ogden_d3_tensor_product_local.hpp"', proteus_contents)
+            self.assertIn('#include "kernel_diagnostics.hpp"', proteus_contents)
+            self.assertIn('#include "geometry_kernels.hpp"', proteus_contents)
+            self.assertIn('#include "neohookean_ogden_d3_tensor_product_local.hpp"', proteus_contents)
 
     def test_openmp_backend_plans_common_local_kernel_signatures(self):
         energy_input = gen.UserInputStage.create(neohookean_ogden, ("HEX8",), 16, None)
@@ -3894,7 +3937,7 @@ int main() {
             )
             with open(source) as input_file:
                 contents = input_file.read()
-            self.assertIn('#include "../stokes_d2_simplex_mixed_local.hpp"', contents)
+            self.assertIn('#include "stokes_d2_simplex_mixed_local.hpp"', contents)
             self.assertIn("stokes_tri6_tri3_residual_i_msoa", contents)
             self.assertIn("stokes_tri6_tri3_jacobian_action_i_msoa", contents)
             self.assertIn(
@@ -4048,9 +4091,9 @@ int main() {
             # Two bases at one rule: two headers, and one rule header between
             # them.  That is what dedup means now -- there is no per-kernel struct
             # left for the two to share.
-            self.assertIn('#include "../../reference/line_p2_q4.hpp"', contents)
-            self.assertIn('#include "../../reference/line_p1_q4.hpp"', contents)
-            self.assertIn('#include "../../reference/quad_line_q4.hpp"', contents)
+            self.assertIn('#include "line_p2_q4.hpp"', contents)
+            self.assertIn('#include "line_p1_q4.hpp"', contents)
+            self.assertIn('#include "quad_line_q4.hpp"', contents)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -4138,9 +4181,9 @@ int main() {
                 tet_local = input_file.read()
 
             self.assertNotIn("struct stokes_isoparametric_reference_data", tri)
-            self.assertIn('#include "../../reference/tri6_q6.hpp"', tri)
-            self.assertIn('#include "../../reference/tri3_q6.hpp"', tri)
-            self.assertIn('#include "../../reference/quad_tri_q6.hpp"', tri)
+            self.assertIn('#include "tri6_q6.hpp"', tri)
+            self.assertIn('#include "tri3_q6.hpp"', tri)
+            self.assertIn('#include "quad_tri_q6.hpp"', tri)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -4158,9 +4201,9 @@ int main() {
             )
 
             self.assertNotIn("struct stokes_isoparametric_reference_data", tet)
-            self.assertIn('#include "../../reference/tet10_q11.hpp"', tet)
-            self.assertIn('#include "../../reference/tet4_q11.hpp"', tet)
-            self.assertIn('#include "../../reference/quad_tet_q11.hpp"', tet)
+            self.assertIn('#include "tet10_q11.hpp"', tet)
+            self.assertIn('#include "tet4_q11.hpp"', tet)
+            self.assertIn('#include "quad_tet_q11.hpp"', tet)
             # The numbers are no longer here.  Deduplication used to mean "one
             # table per element type inside this struct"; it now means one table
             # in the whole tree, so what this source should show is the forward
@@ -4195,7 +4238,7 @@ int main() {
         if compiler is None:
             self.skipTest("c++ compiler is not available")
         with tempfile.TemporaryDirectory() as out_dir:
-            gen.generate(
+            result = gen.generate(
                 stokes,
                 out_dir,
                 elements=("TRI6_TRI3",),
@@ -4232,8 +4275,7 @@ int main() {
                     "-Werror",
                     "-c",
                     source,
-                    "-I",
-                    out_dir,
+                    *("-I%s" % include_dir for include_dir in result.include_dirs),
                     "-o",
                     os.path.join(out_dir, "stokes.o"),
                 ],
@@ -4245,7 +4287,7 @@ int main() {
         if compiler is None:
             self.skipTest("c++ compiler is not available")
         with tempfile.TemporaryDirectory() as out_dir:
-            gen.generate(
+            result = gen.generate(
                 poro_hyperelasticity,
                 out_dir,
                 elements=("TRI6_TRI3",),
@@ -4265,8 +4307,7 @@ int main() {
                     "-Werror",
                     "-c",
                     source,
-                    "-I",
-                    out_dir,
+                    *("-I%s" % include_dir for include_dir in result.include_dirs),
                     "-o",
                     os.path.join(out_dir, "poro_residual.o"),
                 ],
@@ -4757,7 +4798,7 @@ int main() {
             self.skipTest("c++ compiler is not available")
 
         with tempfile.TemporaryDirectory() as out_dir:
-            gen.generate(
+            result = gen.generate(
                 linear_elasticity,
                 out_dir,
                 elements=("TRI3",),
@@ -4836,8 +4877,7 @@ int main() {
                     "-Werror",
                     "-c",
                     operator,
-                    "-I",
-                    out_dir,
+                    *("-I%s" % include_dir for include_dir in result.include_dirs),
                     "-o",
                     os.path.join(out_dir, "linear_elasticity_tri3.o"),
                 ],
@@ -4849,7 +4889,7 @@ int main() {
         if compiler is None:
             self.skipTest("c++ compiler is not available")
         with tempfile.TemporaryDirectory() as out_dir:
-            gen.generate(
+            result = gen.generate(
                 laplace,
                 out_dir,
                 elements=("TET4",),
@@ -4869,8 +4909,7 @@ int main() {
                     "-Werror",
                     "-c",
                     source,
-                    "-I",
-                    out_dir,
+                    *("-I%s" % include_dir for include_dir in result.include_dirs),
                     "-o",
                     os.path.join(out_dir, "laplace_tet4.o"),
                 ],
@@ -5065,7 +5104,7 @@ int main() {
             self.assertIn("static const s_t *grad_1d()", source)
             self.assertIn("static const s_t *weight_1d()", source)
             self.assertIn("static const s_t *shape_1d()", proteus_source)
-            self.assertIn('#include "../../kernel_math.hpp"', source)
+            self.assertIn('#include "kernel_math.hpp"', source)
             self.assertIn("for (int qy = 0; qy < NQ1; ++qy)", source)
             self.assertIn("for (int qx = 0; qx < NQ1; ++qx)", source)
             self.assertIn("const element_idx_t *const RSTR parent", source)
@@ -5170,7 +5209,7 @@ int main() {
 
         self.assertIn("x0 += s_t(points[0][node]) * phi;", source)
         self.assertIn("x1 += s_t(points[1][node]) * phi;", source)
-        self.assertIn('#include "../../kernel_math.hpp"', source)
+        self.assertIn('#include "kernel_math.hpp"', source)
         self.assertIn("const s_t coeff0 = -pow_2(x0);", source)
         self.assertIn("const s_t coeff1 = -x1;", source)
         self.assertNotIn("static SFEM_INLINE T pow_2", source)

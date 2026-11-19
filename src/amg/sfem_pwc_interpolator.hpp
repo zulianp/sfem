@@ -1,0 +1,93 @@
+#ifndef SFEM_PWC_INTERPOLATOR_HPP
+#define SFEM_PWC_INTERPOLATOR_HPP
+
+#include <cstddef>
+#include <memory>
+
+#include "sfem_aliases.hpp"
+#include "sfem_CooSym.hpp"
+#include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_BLAS_openmp.hpp"
+
+// This class might be better off as just a sparse matrix, but the coarsen method is an optimized
+// version of the matrix triple product ptap and transposing is basically a NOP
+namespace sfem {
+    template <typename R, typename T>
+    class PiecewiseConstantInterpolator final : public Operator<T> {
+    public:
+        ptrdiff_t fine_dim{SFEM_PTRDIFF_INVALID};
+        ptrdiff_t coarse_dim{SFEM_PTRDIFF_INVALID};
+        bool transposed{false};
+        std::shared_ptr<BLAS<T>> blas;
+
+        void default_init() {
+            blas = OpenMPBLAS<T>::create();
+        }
+
+        void transpose() { transposed = !transposed; }
+        bool is_transposed() { return transposed; }
+        void set_weights(const SharedBuffer<T>& weights) { weights_ = weights; }
+        void set_partition(const SharedBuffer<R>& partition) { partition_ = partition; }
+
+        // Internally allocates a workspace with same memory requirement as `a`
+        // (this could be passed in as arg...)
+        std::shared_ptr<CooSym<R, T>> coarsen(const std::shared_ptr<CooSym<R, T>>& a);
+
+        void pwc_interpolate(const T* const v_coarse, T* const v) {
+            R* partition = partition_->data();
+            T* weights = weights_->data();
+            // Only OMP impl for now
+#pragma omp parallel for
+            for (R k = 0; k < fine_dim; k++) {
+                R coarse_idx = partition[k];
+                if (coarse_idx >= 0) {
+                    v[k] += v_coarse[coarse_idx] * weights[k];
+                }
+            }
+        }
+
+        void pwc_restrict(const T* const v, T* const v_coarse) {
+            R* partition = partition_->data();
+            T* weights = weights_->data();
+
+#pragma omp parallel for
+            for (R k = 0; k < fine_dim; k++) {
+                R coarse_idx = partition[k];
+                if (coarse_idx >= 0) {
+#pragma omp atomic update
+                    v_coarse[coarse_idx] += v[k] * weights[k];
+                }
+            }
+        }
+
+        /* Operator */
+        int apply(const T* const b, T* const x) override {
+            transposed ? pwc_restrict(b, x) : pwc_interpolate(b, x);
+            return 0;
+        }
+        inline std::ptrdiff_t rows() const override { return transposed ? fine_dim : coarse_dim; }
+        inline std::ptrdiff_t cols() const override { return transposed ? coarse_dim : fine_dim; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
+
+    private:
+        // Length of `fine_dim` and values indicate coarse grid indices
+        SharedBuffer<R> partition_;
+        // Length of `fine_dim` and values weight the PWC gridfunction
+        SharedBuffer<T> weights_;
+    };
+
+    template <typename R, typename T>
+    std::shared_ptr<PiecewiseConstantInterpolator<R, T>> h_pwc_interp(
+            const SharedBuffer<T>& weights, const SharedBuffer<R>& partition,
+            const ptrdiff_t coarse_dim) {
+        auto ret = std::make_shared<PiecewiseConstantInterpolator<R, T>>();
+        ret->coarse_dim = coarse_dim;
+        ret->fine_dim = weights->size();
+        ret->set_weights(weights);
+        ret->set_partition(partition);
+        ret->default_init();
+        return ret;
+    }
+}  // namespace sfem
+
+#endif  // SFEM_PWC_INTERPOLATOR_HPP

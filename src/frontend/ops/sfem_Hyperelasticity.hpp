@@ -1,0 +1,54 @@
+#pragma once
+#include "sfem_Op.hpp"
+
+namespace sfem {
+    class Hyperelasticity final : public Op {
+    public:
+        static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
+        std::shared_ptr<Op>        lor(const std::shared_ptr<FunctionSpace> &space) override;
+        std::shared_ptr<Op>        derefine(const std::shared_ptr<FunctionSpace> &space) override;
+        const char                *name() const override { return "Hyperelasticity"; }
+        //! a stored energy density
+        bool energy_or_potential_based() const override { return true; }
+        inline bool                is_linear() const override { return false; }
+        ptrdiff_t                  n_dofs_domain() const override;
+        ptrdiff_t                  n_dofs_image() const override;
+        int                        initialize(const std::vector<std::string> &block_names = {}) override;
+        Hyperelasticity(const std::shared_ptr<FunctionSpace> &space);
+        int                 hessian_crs(const real_t *const  x,
+                                        const count_t *const rowptr,
+                                        const idx_t *const   colidx,
+                                        real_t *const        values) override;
+        int                 hessian_diag(const real_t *const x, real_t *const out) override;
+        int                 gradient(const real_t *const x, real_t *const out) override;
+        int                 apply(const real_t *const x, const real_t *const h, real_t *const out) override;
+        bool                team_supported() const override;
+        int                 team_prepare() override;
+        int                 team_apply(const Team         &team,
+                                       const real_t *const x,
+                                       const real_t *const h,
+                                       real_t *const       out,
+                                       const ElementScope  scope) override;
+        int                 value(const real_t *x, real_t *const out) override;
+        int                 report(const real_t *const) override;
+        std::shared_ptr<Op> clone() const override;
+        ~Hyperelasticity() override;
+
+        int update(const real_t *const x) override;
+        int value_steps(const real_t       *x,
+                        const real_t       *h,
+                        const int           nsteps,
+                        const real_t *const steps,
+                        real_t *const       out) override;
+
+        void set_value_in_block(const std::string &block_name, const std::string &var_name, const real_t value) override;
+        void override_element_types(const std::vector<smesh::ElemType> &element_types) override;
+
+    private:
+        /// out += H(x) h over every domain, by the threads of the caller's region.
+        int apply_domains(const real_t *const x, const real_t *const h, real_t *const out);
+
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+}  // namespace sfem

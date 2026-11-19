@@ -75,7 +75,7 @@ namespace {
         }
     }
 
-    static int fill_api_shape_to_mesh_shape(const smesh::ElemType    element_type,
+    static int fill_api_shape_to_mesh_shape(const smesh::ElemType    /*element_type*/,
                                             const int                nshape,
                                             int *const SFEM_RESTRICT shape_map) {
         for (int i = 0; i < nshape; ++i) {

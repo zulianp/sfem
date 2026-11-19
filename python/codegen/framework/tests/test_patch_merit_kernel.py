@@ -216,3 +216,37 @@ def test_a_gradient_only_form_stages_no_value():
     names = [name for name, _ in patch_loop_one_buffers(DIM, 1, dependencies)]
     assert "pm_state_value" not in names
     assert "pm_state_value" not in text
+
+
+@pytest.mark.parametrize("element_type", ["TRI3", "TET4"])
+def test_a_multi_point_rule_publishes_no_kernel(element_type):
+    """The kernel folds the basis at one quadrature point into constants.
+
+    A mass term `rho u . v` is integrated with more points than that, and a
+    kernel published for it read its gathered values as one point with n_qp
+    times the shape functions -- past the end of the element's array.  The
+    rule each material is generated with decides it, so the materials' own are
+    asked: the mass publishes nothing, and a one-point material still publishes
+    its kernel, so the gate is not simply closed.
+    """
+    from sfem import gen
+    from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
+    from codegen.framework.materials.mooney_rivlin_kelvin_voigt import (
+        material as one_point,
+    )
+    from codegen.framework.materials.vector_mass import material as mass
+    from codegen.framework.plans.residual_structure import (
+        published_patch_merit_kernels,
+    )
+
+    def rule(material):
+        user_input = gen.UserInputStage.create(material, (element_type,), 16, None)
+        (context,) = user_input.element_contexts
+        return context.specialization.quadrature_rule
+
+    assert rule(mass).n_qp > 1
+    assert published_patch_merit_kernels(rule(mass), TOTAL_RESIDUAL_UNIT_NAME) == ()
+    assert rule(one_point).n_qp == 1
+    assert published_patch_merit_kernels(
+        rule(one_point), TOTAL_RESIDUAL_UNIT_NAME
+    ) == ("merit_patch",)

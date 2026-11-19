@@ -20,6 +20,7 @@
 //   SFEM_PROMOTE_TO_P2      1 to promote a TET4 cube to TET10
 //   SFEM_REPEAT             applies per timing window
 #include <cstdio>
+#include "smesh_base.hpp"
 #include <cmath>
 #include <memory>
 #include <string>
@@ -75,9 +76,9 @@ static double time_best(int repeats, F &&fn) {
     fn();
     double best = 1e30;
     for (int attempt = 0; attempt < 3; ++attempt) {
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int r = 0; r < repeats; ++r) fn();
-        const double t1 = MPI_Wtime();
+        const double t1 = smesh::time_seconds();
         best = std::min(best, (t1 - t0) / repeats);
     }
     return best;
@@ -122,11 +123,11 @@ int main(int argc, char *argv[]) {
             auto input  = sfem::create_buffer<real_t>(op->n_dofs_domain(), sfem::EXECUTION_SPACE_HOST);
             auto output = sfem::create_buffer<real_t>(op->n_dofs_image(), sfem::EXECUTION_SPACE_HOST);
 
-            const double t0 = MPI_Wtime();
+            const double t0 = smesh::time_seconds();
             f->update(x->data());
             auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, x,
                                                           sfem::EXECUTION_SPACE_HOST);
-            const double t1 = MPI_Wtime();
+            const double t1 = smesh::time_seconds();
 
             Row row;
             row.what  = std::string("library: ") + name;

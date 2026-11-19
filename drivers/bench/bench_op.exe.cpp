@@ -1,4 +1,5 @@
 #include <memory>
+#include "smesh_base.hpp"
 #include "sfem_Function.hpp"
 
 #include "matrixio_array.h"
@@ -14,8 +15,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 #include <vector>
@@ -39,14 +40,14 @@ typedef struct OpDesc {
 
         sfem::device_synchronize();
 
-        double start = MPI_Wtime();
+        double start = smesh::time_seconds();
 
         for (int r = 0; r < repeat; r++) {
             op->apply(x, y);
         }
 
         sfem::device_synchronize();
-        double stop = MPI_Wtime();
+        double stop = smesh::time_seconds();
         rows        = op->rows();
         cols        = op->cols();
         elapsed     = (stop - start) / repeat;
@@ -99,9 +100,9 @@ void add_matrix_free_scalar_ops(smesh::ElemType                 element_type,
     }
 }
 
-void add_matrix_based_scalar_ops(smesh::ElemType                 element_type,
+void add_matrix_based_scalar_ops(smesh::ElemType                 /*element_type*/,
                                  const bool                      semi_structured,
-                                 const enum sfem::ExecutionSpace es,
+                                 const enum sfem::ExecutionSpace /*es*/,
                                  std::vector<OpDesc_t>          &ops) {
     if (!semi_structured) {
         ops.push_back({.name = "Laplacian", .type = sfem::op_type::CRS, .block_size = 1});
@@ -145,7 +146,7 @@ void add_matrix_free_vector_ops(const int                       dim,
 void add_matrix_based_vector_ops(const int                       dim,
                                  smesh::ElemType                 element_type,
                                  const bool                      semi_structured,
-                                 const enum sfem::ExecutionSpace es,
+                                 const enum sfem::ExecutionSpace /*es*/,
                                  std::vector<OpDesc_t>          &ops) {
     if (element_type == smesh::TET10 || semi_structured) return;
     ops.push_back({.name = "LinearElasticity", .type = sfem::op_type::BSR, .block_size = dim});
@@ -262,9 +263,9 @@ int main(int argc, char *argv[]) {
         add_matrix_free_vector_ops(dim, m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
 
         if (nnodes <= smesh::Env::read("SFEM_MAX_NODES_MATRIX", 27270901)) {
-            double start = MPI_Wtime();
+            double start = smesh::time_seconds();
             m->node_to_node_graph();
-            double stop = MPI_Wtime();
+            double stop = smesh::time_seconds();
             printf("CRS Graph creation %g [s]\n", (stop - start));
             add_matrix_based_scalar_ops(m->element_type(0), SFEM_ELEMENT_REFINE_LEVEL > 1, es, ops);
         } else {
@@ -311,9 +312,21 @@ int main(int argc, char *argv[]) {
             // assemble without a previous state, and the names come from the
             // caller rather than from a test on the operator's own name, which
             // would be this benchmark deciding what an operator is.
+            // `SFEM_EXTRA_OP_FIELD_ELEMENT_TENSOR=1`: each field is a 3x3 identity per element (an
+            // active strain), not a nodal vector of zeros.
             std::vector<std::shared_ptr<sfem::Buffer<real_t>>> extra_fields;
+            const bool element_tensor_fields = smesh::Env::read("SFEM_EXTRA_OP_FIELD_ELEMENT_TENSOR", false);
             for (const auto &field : named_fields()) {
-                extra_fields.push_back(sfem::create_buffer<real_t>(op->n_dofs_domain(), es));
+                if (element_tensor_fields) {
+                    const ptrdiff_t ne = fs->mesh()->n_elements();
+                    auto            Fa = sfem::create_host_buffer<real_t>(9 * ne);
+                    for (ptrdiff_t e = 0; e < ne; ++e) {
+                        for (int k = 0; k < 9; ++k) Fa->data()[e * 9 + k] = (k % 4 == 0) ? real_t(1) : real_t(0);
+                    }
+                    extra_fields.push_back(Fa);
+                } else {
+                    extra_fields.push_back(sfem::create_buffer<real_t>(op->n_dofs_domain(), es));
+                }
                 op->set_field(field.c_str(), extra_fields.back(), 0);
             }
 
@@ -323,7 +336,7 @@ int main(int argc, char *argv[]) {
             auto input  = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);
             auto output = sfem::create_buffer<real_t>(op->n_dofs_image(), es);
 
-            double start = MPI_Wtime();
+            double start = smesh::time_seconds();
             f->update(x->data());
             //: The partially assembled tangent belongs to the linearization, so
             //: `create_linear_operator` does not build it -- a Newton step calls
@@ -335,10 +348,10 @@ int main(int argc, char *argv[]) {
                 f->inexact_update(x->data());
             }
             auto   linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
-            double stop      = MPI_Wtime();
+            double stop      = smesh::time_seconds();
             op_desc.setup    = stop - start;
 
-            op_desc.measure(linear_op, input->data(), output->data(), 5);
+            op_desc.measure(linear_op, input->data(), output->data(), SFEM_REPEAT);
         }
 
         std::cout << "#elements " << m->n_elements() << "\n";

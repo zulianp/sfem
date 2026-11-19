@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,8 +11,7 @@
 
 
 
-#include "sfem_resample_gap.hpp"
-#include "node_interpolate.hpp"
+#include "sresample_gap_calls.hpp"
 
 #include "mass.hpp"
 
@@ -20,6 +20,7 @@
 
 #include "mesh_utils.hpp"
 #include "sfem_API.hpp"
+#include "sfem_SDFObstacle.hpp"
 
 int main(int argc, char* argv[]) {
     MPI_Init(&argc, &argv);
@@ -44,7 +45,7 @@ int main(int argc, char* argv[]) {
     int SFEM_SUPERIMPOSE = 0;
     SFEM_READ_ENV(SFEM_SUPERIMPOSE, atoi);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     const char* folder = argv[1];
     ptrdiff_t nglobal[3] = {atol(argv[2]), atol(argv[3]), atol(argv[4])};
@@ -53,7 +54,7 @@ int main(int argc, char* argv[]) {
     const char* data_path = argv[11];
     const char* output_folder = argv[12];
 
-    struct stat st = {0};
+    struct stat st = {};
     if (stat(output_folder, &st) == -1) {
         mkdir(output_folder, 0700);
     }
@@ -92,19 +93,18 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    ptrdiff_t n = nglobal[0] * nglobal[1] * nglobal[2];
     geom_t* sdf = 0;
     ptrdiff_t nlocal[3];
 
     {
-        double ndarray_read_tick = MPI_Wtime();
+        double ndarray_read_tick = smesh::time_seconds();
 
         if (ndarray_create_from_file(
                 comm, data_path, SFEM_MPI_GEOM_T, 3, (void**)&sdf, nlocal, nglobal)) {
             return EXIT_FAILURE;
         }
 
-        double ndarray_read_tock = MPI_Wtime();
+        double ndarray_read_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] ndarray_create_from_file %g (seconds)\n",
@@ -118,22 +118,27 @@ int main(int argc, char* argv[]) {
 
     if (size > 1) {
         geom_t* psdf;
-        sdf_view(comm,
-                 mesh->n_nodes(),
-                 mesh->points()->data()[2],
-                 nlocal,
-                 nglobal,
-                 stride,
-                 origin,
-                 delta,
-                 sdf,
-                 &psdf,
-                 &nlocal[2],
-                 &origin[2]);
+        // A margin of 12 layers: the B-spline prefilter's reach to float precision.
+        sdf_view_ensure_margin(comm,
+                               mesh->n_nodes(),
+                               mesh->points()->data()[2],
+                               nlocal,
+                               nglobal,
+                               stride,
+                               origin,
+                               delta,
+                               sdf,
+                               12,
+                               &psdf,
+                               &nlocal[2],
+                               &origin[2]);
 
         free(sdf);
         sdf = psdf;
     }
+
+    // The interpolating cubic B-spline coefficients the sampling kernels read (sfem_sdf_sampling.hpp).
+    auto spline = sfem::SDFBSpline::create(nlocal, stride, sdf);
 
     // Edge graph for resampling on sharp edges
     ptrdiff_t n_sharp_edges = 0;
@@ -193,7 +198,7 @@ int main(int argc, char* argv[]) {
     real_t* znormal = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
     real_t* mass_vector = (real_t*)calloc(mesh->n_nodes(), sizeof(real_t));
     {
-        double resample_tick = MPI_Wtime();
+        double resample_tick = smesh::time_seconds();
 
         if (n_sharp_edges) {  // smesh::BEAM2 integral
             idx_t* edges[2] = {e0, e1};
@@ -206,10 +211,10 @@ int main(int argc, char* argv[]) {
                 mesh->points()->data(),
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 g,
                 xnormal,
@@ -230,10 +235,10 @@ int main(int argc, char* argv[]) {
                 mesh->points()->data(),
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 g,
                 xnormal,
@@ -266,10 +271,10 @@ int main(int argc, char* argv[]) {
                     mesh->points()->data(),
                     // SDF
                     nlocal,
-                    stride,
+                    spline->stride->data(),
                     origin,
                     delta,
-                    sdf,
+                    spline->origin_coefficient(),
                     // Output
                     g,
                     xnormal,
@@ -302,10 +307,10 @@ int main(int argc, char* argv[]) {
                 corner_points,
                 // SDF
                 nlocal,
-                stride,
+                spline->stride->data(),
                 origin,
                 delta,
-                sdf,
+                spline->origin_coefficient(),
                 // Output
                 p_g,
                 p_xnormal,
@@ -387,7 +392,7 @@ int main(int argc, char* argv[]) {
 
         free(mass_vector);
 
-        double resample_tock = MPI_Wtime();
+        double resample_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] resample %g (seconds)\n", rank, resample_tock - resample_tick);
@@ -396,7 +401,7 @@ int main(int argc, char* argv[]) {
 
     // Write result to disk
     {
-        double io_tick = MPI_Wtime();
+        double io_tick = smesh::time_seconds();
 
         char path[1024 * 10];
         snprintf(path, sizeof(path), "%s/gap.float64.raw", output_folder);
@@ -420,7 +425,7 @@ int main(int argc, char* argv[]) {
             mesh_write_nodal_field(mesh->comm()->get(), n_owned_nodes, node_mapping->data(), path, SFEM_MPI_REAL_T, g);
         }
 
-        double io_tock = MPI_Wtime();
+        double io_tock = smesh::time_seconds();
 
         if (!rank) {
             printf("[%d] write %g (seconds)\n", rank, io_tock - io_tick);
@@ -438,7 +443,7 @@ int main(int argc, char* argv[]) {
         free(znormal);
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!rank) {
         printf("----------------------------------------\n");

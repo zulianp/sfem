@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from enum import Enum
 
+from codegen.framework.plans.conventions import TEAM_ELEMENT_RANGE_ARGUMENTS
 from codegen.framework.ir.kernel_ast import (
     BlockNode,
     BufferDeclNode,
@@ -89,6 +90,36 @@ class TargetPlatform:
     #: constant, no `[VS]` extent, no work-item loop, no slot to index and the
     #: scalar rendering of the shared micro-kernels.
     work_item_holds_a_block: bool = True
+    #: Whether the kernel body being emitted runs on the threads of a parallel
+    #: region its caller opened (a solver's region, sfem_TeamOperator.hpp) rather
+    #: than opening one.  Its loops are then shared out by worksharing constructs
+    #: that bind to that region -- `omp for` without `parallel` -- and a block
+    #: that would open a region is one every thread runs.  The kernel's entry
+    #: point opens the region itself (`team_region_pragma`) for a caller outside
+    #: one, and its `_team` twin is the call from inside.
+    team_body: bool = False
+
+    def running_in_a_team(self):
+        """This target for a body that runs on its caller's region (`team_body`)."""
+        return dataclass_replace(self, team_body=True)
+
+    def walks_an_element_range(self):
+        """Whether the mesh pass being emitted walks its caller's element range.
+
+        A team body does, on a target with regions: its `_team` twin takes
+        [`element_begin`, `element_end`) (TEAM_ELEMENT_RANGE_PARAMETERS) and the
+        plain entry point passes the whole mesh, so that a distributed operator
+        applies the elements away from its interface while the halo is in flight
+        and the others after (sfem_ElementScope.hpp).  The elements stay
+        indexed by their number in the block: the range moves no array.
+        """
+        return self.team_body and self.team_region_pragma() is not None
+
+    def mesh_element_bounds(self):
+        """The first element of the mesh pass, and the end of it."""
+        if self.walks_an_element_range():
+            return TEAM_ELEMENT_RANGE_ARGUMENTS
+        return ("0", "nelements")
 
     def holding_one_element(self):
         """This target with the block taken away.
@@ -114,6 +145,11 @@ class TargetPlatform:
 
     def inline_qualifier(self):
         return "inline"
+
+    def library_local_type_prefix(self):
+        """What a header-only type's declaration starts with so that its members bind
+        inside the library that compiles them, or nothing."""
+        return ""
 
     def inline_definition_lines(self, inline_definition="inline"):
         return ()
@@ -146,6 +182,17 @@ class TargetPlatform:
 
     def worksharing_for_pragma(self, schedule=None):
         """The pragma sharing a loop's iterations inside an open region."""
+        return None
+
+    def team_region_pragma(self):
+        """The pragma a team kernel's entry point opens its region with, or `None`.
+
+        Not `parallel_region_pragma`: that one answers for the body being
+        emitted, which in a team body opens none.
+        """
+        return None
+
+    def atomic_write_pragma(self):
         return None
 
     def vectorize_pragma(self):
@@ -382,20 +429,21 @@ class TargetPlatform:
         `emitters/ast_printer.mesh_loop_lines` spells it.
         """
         tile_iterator = iterator("evb", "ptrdiff_t")
+        first, end = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.TILE,
                     tile_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
-                        expr_ref("nelements", "element_count"),
+                        expr_ref(first, "first_element"),
+                        expr_ref(end, "element_count"),
                     ),
                     add_assign_increment(tile_iterator, expr_ref("VS", "vector_width")),
                 )
             ),
             BufferDeclNode(
-                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, nelements - evb)"
+                "const int", "ne", (), "(int)MIN((ptrdiff_t)VS, %s - evb)" % end
             ),
         )
 
@@ -411,13 +459,16 @@ class TargetPlatform:
         decides is how the pass is opened, not what it counts.
         """
         element_iterator = iterator(index, "ptrdiff_t")
+        first = "0"
+        if extent == "nelements":
+            first, extent = self.mesh_element_bounds()
         return (
             LoopHeaderNode(
                 LoopNode(
                     LoopKind.KERNEL,
                     element_iterator,
                     iteration_range(
-                        expr_ref("0", "first_element"),
+                        expr_ref(first, "first_element"),
                         expr_ref(extent, "element_count"),
                     ),
                     pre_increment(element_iterator),
@@ -429,7 +480,7 @@ class TargetPlatform:
         """What a generated `Op` class is called here.
 
         SFEM names its device Ops for the device -- `GPULaplacian`,
-        `GPULinearElasticity`, `GPUKelvinVoigtNewmark` -- so a host and a device
+        `GPULinearElasticity` -- so a host and a device
         Op for one material are two classes rather than one name fought over.
         """
         return ""
@@ -501,7 +552,7 @@ class TargetPlatform:
 
         SFEM keeps device sources in a local `cuda/` folder beside the host
         sources of the same module: `operators/tet4/tet4_laplacian.cpp` is
-        mirrored by `operators/tet4/cuda/cu_tet4_laplacian.cu`, and the same
+        mirrored by `operators/tet4/cuda/tet4_laplacian_cuda.cu`, and the same
         shape holds in `operators/hex8`, `operators/tet10`, `algebra`,
         `resampling`, `frontend` and inside `external/smesh`.  The generated
         tree follows the repository rather than inventing its own placement.
@@ -524,6 +575,36 @@ class TargetPlatform:
         merit came out exact at one mesh size and nonsense at the next.
         """
         return "mesh->points()->data()"
+
+    def graph_host_view(self):
+        """Source lines giving a generated `Op`'s `check_graph` host views of the graph it checks.
+
+        `check_graph` walks `rowptr` and `colidx` on the host, and names them `h_rowptr` and
+        `h_colidx`.  On the host they are the arrays the assembly was handed.
+        """
+        return (
+            "      const count_t *const h_rowptr = rowptr;",
+            "      const idx_t *const h_colidx = colidx;",
+        )
+
+    def permuted_connectivity_preamble(self):
+        """Source lines a file of permuting forwarders needs once, above them."""
+        return ()
+
+    def permuted_connectivity(self, pointer_type, shape_order, name="proteus_elements"):
+        """A forwarder's connectivity table in another node order.
+
+        Returns (lines before the call, lines after it).  The table is named
+        `name` and holds `elements[shape_order[k]]` at position `k`.  On the
+        host it is an array on the stack: the table `elements` points to is in
+        host memory, so the pointers are read and reordered in place.
+        """
+        lines = ["    %s *%s[%d] = {" % (pointer_type, name, len(shape_order))]
+        for idx, source_index in enumerate(shape_order):
+            comma = "," if idx + 1 < len(shape_order) else ""
+            lines.append("        elements[%d]%s" % (source_index, comma))
+        lines.append("    };")
+        return tuple(lines), ()
 
     def element_connectivity_accessor(self):
         """Where a generated `Op` reads its connectivity from.
@@ -600,6 +681,17 @@ class TargetPlatform:
             "%sreturn sfem::codegen::%s<%s>(%s);"
             % (indent, implementation_name, template_args, ", ".join(arguments)),
         )
+
+    def cooperative_mesh_function_line(self, implementation_name, n_qp):
+        """How a kernel run a block of threads per `sfem::cooperative::ELEMENTS` elements, a thread
+        per element and point, is declared; only a device runs one."""
+        raise NotImplementedError("%s has no cooperative mesh kernels" % type(self).__name__)
+
+    def cooperative_mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements", n_qp=None
+    ):
+        """The launch of a `cooperative_mesh_function_line` kernel."""
+        raise NotImplementedError("%s has no cooperative mesh kernels" % type(self).__name__)
 
     def scatter_add_lines(self, lhs, rhs, indent, pragma_indent=None):
         """One accumulation into a node several elements may share.
@@ -691,6 +783,11 @@ class OpenMPTarget(TargetPlatform):
     def inline_qualifier(self):
         return "SFEM_INLINE"
 
+    def library_local_type_prefix(self):
+        # In a shared libsfem a member the compiler leaves out of line is otherwise called
+        # through the PLT: the lane contraction, once per block of the stored-tangent apply.
+        return '__attribute__((visibility("hidden"))) '
+
     def inline_definition_lines(self, inline_definition="inline"):
         return (
             "#ifndef SFEM_INLINE",
@@ -702,6 +799,12 @@ class OpenMPTarget(TargetPlatform):
         return "RSTR"
 
     def parallel_for_pragma(self, schedule=None, reduction=None):
+        if self.team_body:
+            # A reduction into the body's locals would be private to each thread
+            # of the caller's region; a team body takes none.
+            if reduction:
+                raise ValueError("a team body takes no reduction clause (%s)" % reduction)
+            return self.worksharing_for_pragma(schedule)
         pragma = "#pragma omp parallel for"
         if schedule:
             pragma += " schedule(%s)" % str(schedule)
@@ -710,7 +813,13 @@ class OpenMPTarget(TargetPlatform):
         return pragma
 
     def parallel_region_pragma(self):
+        return None if self.team_body else "#pragma omp parallel"
+
+    def team_region_pragma(self):
         return "#pragma omp parallel"
+
+    def atomic_write_pragma(self):
+        return "#pragma omp atomic write"
 
     def worksharing_for_pragma(self, schedule=None):
         pragma = "#pragma omp for"
@@ -818,6 +927,11 @@ class ARMSMETarget(ARMSVETarget):
 
     def target_compile_flags(self):
         return ("-march=armv9-a+sme",)
+
+
+#: The threads a block of a device mesh kernel's launch (`mesh_launch_lines`), and the launch bound
+#: its declaration carries for HIP (`mesh_function_line`, `SFEM_GENERATED_LAUNCH_BOUNDS`).
+MESH_BLOCK_SIZE = 256
 
 
 @dataclass(frozen=True)
@@ -942,10 +1056,6 @@ class CUDATarget(TargetPlatform):
     def execution_space(self):
         return "EXECUTION_SPACE_DEVICE"
 
-    def supports_inexact_apply(self):
-        #: `CUDASoABackend.emit_inexact` returns no files -- the family has not
-        #: been lowered for a device target -- so nothing may be declared for it.
-        return False
 
     def source_subdirectory(self):
         return "cuda"
@@ -953,6 +1063,24 @@ class CUDATarget(TargetPlatform):
     def points_accessor(self):
         #: `device_points_SoA()` is smesh's device copy of the same array.
         return "mesh->device_points_SoA()->data()"
+
+    def graph_host_view(self):
+        #: A device assembly is handed the graph's device arrays, which the host must not
+        #: dereference (on a Grace Hopper node it segfaults).  The check reads a host copy,
+        #: taken once per graph: `check_graph` returns before this for a graph it has passed.
+        return (
+            "      std::vector<count_t> rowptr_copy(n_rows + 1);",
+            "      if (cudaMemcpy(rowptr_copy.data(), rowptr, rowptr_copy.size() * sizeof(count_t), cudaMemcpyDeviceToHost) != cudaSuccess ||",
+            "          rowptr_copy[n_rows] < 0) {",
+            "        return SFEM_FAILURE;",
+            "      }",
+            "      std::vector<idx_t> colidx_copy(rowptr_copy[n_rows]);",
+            "      if (cudaMemcpy(colidx_copy.data(), colidx, colidx_copy.size() * sizeof(idx_t), cudaMemcpyDeviceToHost) != cudaSuccess) {",
+            "        return SFEM_FAILURE;",
+            "      }",
+            "      const count_t *const h_rowptr = rowptr_copy.data();",
+            "      const idx_t *const h_colidx = colidx_copy.data();",
+        )
 
     def element_connectivity_accessor(self):
         #: `device_elements_SoA()` hands back `idx_t *const *` where the C ABI
@@ -963,6 +1091,82 @@ class CUDATarget(TargetPlatform):
 
     def geometry_memory_space(self):
         return "smesh::MEMORY_SPACE_DEVICE"
+
+    def permuted_connectivity_preamble(self):
+        return (
+            "#if defined(SFEM_ENABLE_HIP)",
+            "#include <unordered_map>",
+            "#endif",
+            "",
+            "namespace {",
+            "  //! Reorder a device table of connectivity rows on the device.",
+            "  template <int N>",
+            "  struct ConnectivityOrder {",
+            "    int source[N];",
+            "  };",
+            "",
+            "  template <typename T, int N>",
+            "  __global__ void permute_connectivity(T *const *const elements,",
+            "                                       const ConnectivityOrder<N> order,",
+            "                                       T **const permuted) {",
+            "    const int k = threadIdx.x;",
+            "    if (k < N) permuted[k] = elements[order.source[k]];",
+            "  }",
+            "",
+            "#if defined(SFEM_ENABLE_HIP)",
+            "  //! The permuted table's storage under HIP: one per host thread and stream, kept for the",
+            "  //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does",
+            "  //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the",
+            "  //! products of a captured solver run (the coarse CG's) allocate nothing this way. The first",
+            "  //! call on a stream allocates, in relaxed capture mode: a capture under way on this thread",
+            "  //! would otherwise refuse the allocation and be invalidated.",
+            "  template <typename T, int N>",
+            "  T **permuted_connectivity_table(const cudaStream_t stream) {",
+            "    static thread_local std::unordered_map<cudaStream_t, T **> tables;",
+            "    T **&table = tables[stream];",
+            "    if (!table) {",
+            "      cudaStreamCaptureMode mode = cudaStreamCaptureModeRelaxed;",
+            "      cudaThreadExchangeStreamCaptureMode(&mode);",
+            "      if (cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;",
+            "      cudaThreadExchangeStreamCaptureMode(&mode);",
+            "    }",
+            "    return table;",
+            "  }",
+            "#endif",
+            "}  // namespace",
+            "",
+        )
+
+    def permuted_connectivity(self, pointer_type, shape_order, name="proteus_elements"):
+        #: The connectivity table a device `Op` passes -- `device_elements_SoA()` --
+        #: is itself in device memory, so the host cannot read its rows to reorder
+        #: them: that read was a segmentation fault on every HEX8 device kernel.
+        #: The reordered table is built on the device instead, in stream order
+        #: around the call, so nothing synchronises and nothing outlives it.
+        #: Under HIP the table is the thread's and stream's (permuted_connectivity_table), so a
+        #: captured product allocates nothing; the CUDA build allocates it around the call.
+        n = len(shape_order)
+        stream = "(cudaStream_t)stream"
+        before = (
+            "#if defined(SFEM_ENABLE_HIP)",
+            "    %s **%s = permuted_connectivity_table<%s, %d>(%s);" % (pointer_type, name, pointer_type, n, stream),
+            "    if (!%s) return SFEM_FAILURE;" % name,
+            "#else",
+            "    %s **%s = nullptr;" % (pointer_type, name),
+            "    if (cudaMallocAsync((void **)&%s, %d * sizeof(%s *), %s) != cudaSuccess) return SFEM_FAILURE;"
+            % (name, n, pointer_type, stream),
+            "#endif",
+            "    const ConnectivityOrder<%d> %s_order{{%s}};"
+            % (n, name, ", ".join(str(index) for index in shape_order)),
+            "    permute_connectivity<%s, %d><<<1, %d, 0, %s>>>(elements, %s_order, %s);"
+            % (pointer_type, n, n, stream, name, name),
+        )
+        after = (
+            "#if !defined(SFEM_ENABLE_HIP)",
+            "    cudaFreeAsync(%s, %s);" % (name, stream),
+            "#endif",
+        )
+        return before, after
 
     def op_stream_arguments(self):
         return ("stream",)
@@ -980,7 +1184,28 @@ class CUDATarget(TargetPlatform):
         return "CUH"
 
     def mesh_function_line(self, implementation_name):
-        return "__global__ void %s(" % implementation_name
+        return "__global__ void SFEM_GENERATED_LAUNCH_BOUNDS(%d) %s(" % (MESH_BLOCK_SIZE, implementation_name)
+
+    def cooperative_mesh_function_line(self, implementation_name, n_qp):
+        #: Its registers bounded for `MIN_BLOCKS` resident blocks: unbounded, the point's tangent
+        #: took 255 and two blocks fit (TET10, 10.9 ms); bounded for three, 9.2 ms; for six, 12.9.
+        return (
+            "__global__ void __launch_bounds__(sfem::cooperative::threads<%d>(), sfem::cooperative::MIN_BLOCKS) %s("
+            % (n_qp, implementation_name)
+        )
+
+    def cooperative_mesh_launch_lines(
+        self, implementation_name, template_args, arguments, indent="  ", extent="nelements", n_qp=None
+    ):
+        return (
+            "%sif (%s <= 0) return SFEM_SUCCESS;" % (indent, extent),
+            "%sconst int block_size = sfem::cooperative::threads<%d>();" % (indent, n_qp),
+            "%sconst int grid_size = (int)((%s + sfem::cooperative::ELEMENTS - 1) / sfem::cooperative::ELEMENTS);"
+            % (indent, extent),
+            "%ssfem::codegen::%s<%s><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(%s);"
+            % (indent, implementation_name, template_args, ", ".join(arguments)),
+            '%sreturn sfem::codegen::launch_status("%s");' % (indent, implementation_name),
+        )
 
     def success_return_lines(self, indent="  "):
         """Nothing: a `__global__` kernel returns void."""
@@ -990,7 +1215,10 @@ class CUDATarget(TargetPlatform):
         self, implementation_name, template_args, arguments, indent="  ", extent="nelements"
     ):
         return (
-            "%sconst int block_size = 256;" % indent,
+            #: A part of a mesh without elements (a rank holding none of a block) has nothing to
+            #: launch, and CUDA refuses a grid of zero blocks.
+            "%sif (%s <= 0) return SFEM_SUCCESS;" % (indent, extent),
+            "%sconst int block_size = %d;" % (indent, MESH_BLOCK_SIZE),
             "%sconst int grid_size = (int)((%s + block_size - 1) / block_size);"
             % (indent, extent),
             #: The stream the caller handed the entry point.  SFEM's own device
@@ -1032,6 +1260,11 @@ class HIPTarget(CUDATarget):
 
     def mesh_source_extension(self):
         return "hip"
+
+    def supports_inexact_apply(self):
+        #: The device stores the generated units instantiate are CUDA
+        #: (`frontend/ops/inexact/cuda`); no HIP build of them exists.
+        return False
 
     def source_subdirectory(self):
         #: The repository has no `hip/` folder to follow, so this names the

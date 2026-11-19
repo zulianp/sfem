@@ -1,0 +1,15 @@
+# The cables, their two ends pulled apart along z. Run by cables.sh.
+mesh:
+  path: cables_geometry/cables
+  packed: false
+  sidesets:
+    - {name: ex1, file: cables_geometry/ex1}
+    - {name: ex2, file: cables_geometry/ex2}
+material: {type: NeoHookeanOgden}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: ex1, value: [0, 0, -2], component: [0, 1, 2]}
+  - {type: sideset, format: name, name: ex2, value: [0, 0, 2], component: [0, 1, 2]}
+regime: steady
+solver:
+  linear: {format: MF, preconditioner: none}
+output: {path: output}

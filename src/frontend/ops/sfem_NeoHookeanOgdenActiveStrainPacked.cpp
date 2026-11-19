@@ -1,0 +1,591 @@
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+
+#include "sfem_defs.hpp"
+#include "sfem_team.h"
+#include "sfem_logger.hpp"
+#include "sfem_macros.hpp"
+#include "smesh_env.hpp"
+#include "smesh_mesh.hpp"
+
+#include "hex8_neohookean_ogden_active_strain.hpp"
+#include "hex8_partial_assembly_neohookean_ogden_active_strain_inline.hpp"
+
+#include "sfem_FunctionSpace.hpp"
+#include "smesh_mesh.hpp"
+
+#include "sfem_ElasticityAssemblyData.hpp"
+#include "sfem_MultiDomainOp.hpp"
+#include "sfem_OpTracer.hpp"
+
+#include "sfem_Parameters.hpp"
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <cstring>
+
+namespace sfem {
+
+    class NeoHookeanOgdenActiveStrainPacked::Impl {
+    public:
+        std::shared_ptr<FunctionSpace>                              space;
+        std::shared_ptr<MultiDomainOp>                              domains;
+        std::shared_ptr<FunctionSpace::PackedMesh>                  packed;
+        real_t                                                      mu{1}, lambda{1};
+        std::vector<std::shared_ptr<struct ElasticityAssemblyData>> assembly_data;
+        /// The mesh's points, taken by team_prepare for the team product.
+        geom_t **points{nullptr};
+
+        // Active strain data per block (AoS buffer and stride)
+        std::vector<SharedBuffer<real_t>> Fa;
+        std::vector<ptrdiff_t>            Fa_stride;
+
+#if SFEM_PRINT_THROUGHPUT
+        std::unique_ptr<OpTracer> op_profiler;
+#endif
+        Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {
+#if SFEM_PRINT_THROUGHPUT
+            op_profiler = std::make_unique<OpTracer>(space, "NeoHookeanOgdenActiveStrainPacked::apply");
+#endif
+        }
+        ~Impl() {}
+
+        void print_info() { domains->print_info(); }
+
+        int iterate(const std::function<int(const OpDomain &)> &func) { return domains->iterate(func); }
+    };
+
+    ptrdiff_t NeoHookeanOgdenActiveStrainPacked::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t NeoHookeanOgdenActiveStrainPacked::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+    std::unique_ptr<Op> NeoHookeanOgdenActiveStrainPacked::create(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret = std::make_unique<NeoHookeanOgdenActiveStrainPacked>(space);
+        return ret;
+    }
+
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::lor(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret            = std::make_shared<NeoHookeanOgdenActiveStrainPacked>(space);
+        ret->impl_->domains = impl_->domains->lor(space, {});
+        return ret;
+    }
+
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret            = std::make_shared<NeoHookeanOgdenActiveStrainPacked>(space);
+        ret->impl_->domains = impl_->domains->derefine(space, {});
+        return ret;
+    }
+
+    NeoHookeanOgdenActiveStrainPacked::NeoHookeanOgdenActiveStrainPacked(const std::shared_ptr<FunctionSpace> &space)
+        : impl_(std::make_unique<Impl>(space)) {}
+
+    NeoHookeanOgdenActiveStrainPacked::~NeoHookeanOgdenActiveStrainPacked() = default;
+
+    int NeoHookeanOgdenActiveStrainPacked::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::initialize");
+        impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+
+        if (!impl_->space->has_packed_mesh()) {
+            fprintf(stderr,
+                    "[Warning] NeoHookeanOgdenActiveStrainPacked: Initializing packed mesh, outer states may be inconsistent!\n");
+            impl_->space->initialize_packed_mesh();
+            fprintf(stderr, "[Warning] NeoHookeanOgdenActiveStrainPacked: Packed mesh initialized\n");
+        }
+        impl_->packed = impl_->space->packed_mesh();
+
+        impl_->assembly_data.resize(impl_->packed->n_blocks());
+
+        for (int b = 0; b < impl_->packed->n_blocks(); b++) {
+            auto name   = impl_->packed->block_name(b);
+            auto domain = impl_->domains->domains().find(name);
+            if (domain == impl_->domains->domains().end()) {
+                SFEM_ERROR("Domain %s not found", name.c_str());
+            }
+            domain->second.user_data = std::static_pointer_cast<void>(std::make_shared<int>(b));
+        }
+
+        for (int b = 0; b < impl_->packed->n_blocks(); b++) {
+            auto name                                     = impl_->packed->block_name(b);
+            auto domain                                   = impl_->domains->domains().find(name);
+            impl_->assembly_data[b]                       = std::make_shared<struct ElasticityAssemblyData>();
+            impl_->assembly_data[b]->use_partial_assembly = true;
+            impl_->assembly_data[b]->use_compression      = false;
+            impl_->assembly_data[b]->use_AoS              = true;
+            impl_->assembly_data[b]->elements             = domain->second.block->elements();
+            impl_->assembly_data[b]->elements_stride      = 1;
+            impl_->assembly_data[b]->elements             = convert_host_buffer_to_fake_SoA(
+                    domain->second.block->n_nodes_per_element(),
+                    soa_to_aos(1, domain->second.block->n_nodes_per_element(), domain->second.block->elements()));
+            impl_->assembly_data[b]->elements_stride = domain->second.block->n_nodes_per_element();
+            impl_->assembly_data[b]->partial_assembly_buffer =
+                    sfem::create_host_buffer<metric_tensor_t>(domain->second.block->n_elements() * HEX8_S_IKMN_SIZE);
+        }
+
+        if (impl_->Fa.empty()) {
+            impl_->Fa.resize(impl_->packed->n_blocks());
+            impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)0);
+            int dim = impl_->space->mesh()->spatial_dimension();
+
+            impl_->Fa[0] = sfem::create_host_buffer<real_t>(dim * dim);
+            for (int d1 = 0; d1 < dim; d1++) {
+                for (int d2 = 0; d2 < dim; d2++) {
+                    impl_->Fa[0]->data()[d1 * dim + d2] = d1 == d2;
+                }
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::hessian_crs(const real_t *const,
+                                                       const count_t *const,
+                                                       const idx_t *const,
+                                                       real_t *const) {
+        SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_crs not implemented");
+        return SFEM_FAILURE;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::hessian_crs_sym(const real_t *const,
+                                                           const count_t *const,
+                                                           const idx_t *const,
+                                                           real_t *const,
+                                                           real_t *const) {
+        SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_crs_sym not implemented");
+        return SFEM_FAILURE;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::hessian_diag(const real_t *const x, real_t *const values) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_diag");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_diag only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b             = *std::static_pointer_cast<int>(domain.user_data);
+            auto          assembly_data = impl_->assembly_data[b];
+            const real_t *Fa            = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_elasticity_diag(domain.block->n_elements(),
+                                                                       assembly_data->elements_stride,
+                                                                       mesh->n_nodes(),
+                                                                       assembly_data->elements->data(),
+                                                                       mesh->points()->data(),
+                                                                       domain.parameters->get_real_value("mu", impl_->mu),
+                                                                       domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                       Fa_stride,
+                                                                       Fa_soa,
+                                                                       3,
+                                                                       &x[0],
+                                                                       &x[1],
+                                                                       &x[2],
+                                                                       3,
+                                                                       &values[0],
+                                                                       &values[1],
+                                                                       &values[2]);
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::update(const real_t *const u) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::update");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::update only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b             = *std::static_pointer_cast<int>(domain.user_data);
+            auto          assembly_data = impl_->assembly_data[b];
+            const real_t *Fa            = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_hessian_partial_assembly(
+                    domain.block->n_elements(),
+                    assembly_data->elements_stride,
+                    assembly_data->elements->data(),
+                    mesh->points()->data(),
+                    domain.parameters->get_real_value("mu", impl_->mu),
+                    domain.parameters->get_real_value("lambda", impl_->lambda),
+                    Fa_stride,
+                    Fa_soa,
+                    3,
+                    &u[0],
+                    &u[1],
+                    &u[2],
+                    assembly_data->partial_assembly_buffer->data());
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::gradient(const real_t *const x, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::gradient");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::gradient only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b             = *std::static_pointer_cast<int>(domain.user_data);
+            auto          assembly_data = impl_->assembly_data[b];
+            const real_t *Fa            = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_gradient(domain.block->n_elements(),
+                                                                assembly_data->elements_stride,
+                                                                mesh->n_nodes(),
+                                                                assembly_data->elements->data(),
+                                                                mesh->points()->data(),
+                                                                domain.parameters->get_real_value("mu", impl_->mu),
+                                                                domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                Fa_stride,
+                                                                Fa_soa,
+                                                                3,
+                                                                &x[0],
+                                                                &x[1],
+                                                                &x[2],
+                                                                3,
+                                                                &out[0],
+                                                                &out[1],
+                                                                &out[2]);
+        });
+    }
+
+    template <bool TEAM>
+    int NeoHookeanOgdenActiveStrainPacked::apply_elements(const real_t *const x, const real_t *const h, real_t *const out) {
+        return impl_->iterate([&](const OpDomain &domain) {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::apply only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            const int   b             = *static_cast<const int *>(domain.user_data.get());
+            const auto &assembly_data = impl_->assembly_data[b];
+
+#if 1
+            const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            if (x) {
+                return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_active_strain_apply)(domain.block->n_elements(),
+                                                                 assembly_data->elements_stride,
+                                                                 assembly_data->elements->data(),
+                                                                 impl_->points,
+                                                                 domain.parameters->get_real_value("mu", impl_->mu),
+                                                                 domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                 Fa_stride,
+                                                                 Fa_soa,
+                                                                 3,
+                                                                 &x[0],
+                                                                 &x[1],
+                                                                 &x[2],
+                                                                 3,
+                                                                 &h[0],
+                                                                 &h[1],
+                                                                 &h[2],
+                                                                 3,
+                                                                 &out[0],
+                                                                 &out[1],
+                                                                 &out[2]);
+            }
+#endif
+            return SFEM_TEAM_KERNEL(TEAM, hex8_neohookean_ogden_active_strain_partial_assembly_apply)(domain.block->n_elements(),
+                                                                              assembly_data->elements_stride,
+                                                                              assembly_data->elements->data(),
+                                                                              assembly_data->partial_assembly_buffer->data(),
+                                                                              3,
+                                                                              &h[0],
+                                                                              &h[1],
+                                                                              &h[2],
+                                                                              3,
+                                                                              &out[0],
+                                                                              &out[1],
+                                                                              &out[2]);
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::apply(const real_t *const x, const real_t *const h, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::apply");
+        if (!team_supported()) {
+            team_prepare();
+            return apply_elements<false>(x, h, out);
+        }
+        return op_team_region(*this, impl_->space->n_dofs(), [&](const Team &team) {
+            return team_apply(team, x, h, out, ElementScope::ALL);
+        });
+    }
+
+    // A packed space is a single rank's: OWNED_NOT_SHARED is every element, SHARED_AND_AURA none.
+    bool NeoHookeanOgdenActiveStrainPacked::team_supported() const {
+        if (mesh_is_distributed(*impl_->space->mesh())) return false;
+        for (const auto &kv : impl_->domains->domains()) {
+            if (kv.second.element_type != smesh::HEX8) return false;
+        }
+        return true;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::team_apply(const Team &team,
+                       const real_t *const x,
+                       const real_t *const h,
+                       real_t *const       out,
+                       const ElementScope  scope) {
+        (void)team;
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        return apply_elements<true>(x, h, out);
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::team_prepare() {
+        impl_->points = impl_->space->mesh()->points()->data();
+        return SFEM_SUCCESS;
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::value(const real_t *x, real_t *const out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::value");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::value only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b             = *std::static_pointer_cast<int>(domain.user_data);
+            auto          assembly_data = impl_->assembly_data[b];
+            const real_t *Fa            = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_objective(domain.block->n_elements(),
+                                                                 assembly_data->elements_stride,
+                                                                 mesh->n_nodes(),
+                                                                 assembly_data->elements->data(),
+                                                                 mesh->points()->data(),
+                                                                 domain.parameters->get_real_value("mu", impl_->mu),
+                                                                 domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                 Fa_stride,
+                                                                 Fa_soa,
+                                                                 3,
+                                                                 &x[0],
+                                                                 &x[1],
+                                                                 &x[2],
+                                                                 false,
+                                                                 out);
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::value_steps(const real_t       *x,
+                                                       const real_t       *h,
+                                                       const int           nsteps,
+                                                       const real_t *const steps,
+                                                       real_t *const       out) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::value_steps");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::value_steps only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b             = *std::static_pointer_cast<int>(domain.user_data);
+            auto          assembly_data = impl_->assembly_data[b];
+            const real_t *Fa            = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_objective_steps(domain.block->n_elements(),
+                                                                       assembly_data->elements_stride,
+                                                                       mesh->n_nodes(),
+                                                                       assembly_data->elements->data(),
+                                                                       mesh->points()->data(),
+                                                                       domain.parameters->get_real_value("mu", impl_->mu),
+                                                                       domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                       Fa_stride,
+                                                                       Fa_soa,
+                                                                       3,
+                                                                       &x[0],
+                                                                       &x[1],
+                                                                       &x[2],
+                                                                       3,
+                                                                       &h[0],
+                                                                       &h[1],
+                                                                       &h[2],
+                                                                       nsteps,
+                                                                       steps,
+                                                                       out);
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::report(const real_t *const) { return SFEM_SUCCESS; }
+
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::clone() const {
+        SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::clone not implemented\n");
+        return nullptr;
+    }
+
+    void NeoHookeanOgdenActiveStrainPacked::set_value_in_block(const std::string &block_name,
+                                                               const std::string &var_name,
+                                                               const real_t       value) {
+        impl_->domains->set_value_in_block(block_name, var_name, value);
+    }
+
+    void NeoHookeanOgdenActiveStrainPacked::override_element_types(const std::vector<smesh::ElemType> &element_types) {
+        impl_->domains->override_element_types(element_types);
+    }
+
+    void NeoHookeanOgdenActiveStrainPacked::set_mu(const real_t mu) { impl_->mu = mu; }
+    void NeoHookeanOgdenActiveStrainPacked::set_lambda(const real_t lambda) { impl_->lambda = lambda; }
+
+    void NeoHookeanOgdenActiveStrainPacked::set_field(const char                            *name,
+                                                      const std::shared_ptr<Buffer<real_t>> &v,
+                                                      const int /*component*/) {
+        // Accept AoS active strain buffer for all blocks
+        if (name && (strcmp(name, "active_strain_aos") == 0 || strcmp(name, "Fa_aos") == 0 ||
+                     strcmp(name, "active_strain") == 0 || strcmp(name, "Fa") == 0)) {
+            if (impl_->Fa.empty()) {
+                impl_->Fa.resize(impl_->packed->n_blocks());
+                impl_->Fa_stride.resize(impl_->packed->n_blocks(), (ptrdiff_t)9);
+            }
+            impl_->Fa[0]        = v;
+            impl_->Fa_stride[0] = (ptrdiff_t)9;
+        }
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::hessian_bsr(const real_t *const  x,
+                                                       const count_t *const rowptr,
+                                                       const idx_t *const   colidx,
+                                                       real_t *const        values) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_bsr");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_bsr only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b  = *std::static_pointer_cast<int>(domain.user_data);
+            const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_bsr(domain.block->n_elements(),
+                                                           1,
+                                                           domain.block->elements()->data(),
+                                                           mesh->points()->data(),
+                                                           domain.parameters->get_real_value("mu", impl_->mu),
+                                                           domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                           Fa_stride,
+                                                           Fa_soa,
+                                                           3,
+                                                           &x[0],
+                                                           &x[1],
+                                                           &x[2],
+                                                           rowptr,
+                                                           colidx,
+                                                           values);
+        });
+    }
+
+    int NeoHookeanOgdenActiveStrainPacked::hessian_bcrs_sym(const real_t *const  x,
+                                                            const count_t *const rowptr,
+                                                            const idx_t *const   colidx,
+                                                            const ptrdiff_t      block_stride,
+                                                            real_t **const       diag_values,
+                                                            real_t **const       off_diag_values) {
+        SFEM_TRACE_SCOPE("NeoHookeanOgdenActiveStrainPacked::hessian_bcrs_sym");
+        auto mesh = impl_->space->mesh();
+        return impl_->iterate([&](const OpDomain &domain) -> int {
+            if (domain.element_type != smesh::HEX8) {
+                SFEM_ERROR("NeoHookeanOgdenActiveStrainPacked::hessian_bcrs_sym only implemented for smesh::HEX8\n");
+                return SFEM_FAILURE;
+            }
+            auto          b  = *std::static_pointer_cast<int>(domain.user_data);
+            const real_t *Fa = impl_->Fa[b] ? impl_->Fa[b]->data() : nullptr;
+            if (!Fa) {
+                SFEM_ERROR("Active strain Fa not set for block %s\n", impl_->packed->block_name(b).c_str());
+                return SFEM_FAILURE;
+            }
+            const ptrdiff_t Fa_stride = impl_->Fa_stride[b];
+
+            const real_t *Fa_soa[9];
+            for (int k = 0; k < 9; ++k) Fa_soa[k] = Fa + k;
+
+            return hex8_neohookean_ogden_active_strain_bcrs_sym(domain.block->n_elements(),
+                                                                1,
+                                                                domain.block->elements()->data(),
+                                                                mesh->points()->data(),
+                                                                domain.parameters->get_real_value("mu", impl_->mu),
+                                                                domain.parameters->get_real_value("lambda", impl_->lambda),
+                                                                Fa_stride,
+                                                                Fa_soa,
+                                                                3,
+                                                                &x[0],
+                                                                &x[1],
+                                                                &x[2],
+                                                                rowptr,
+                                                                colidx,
+                                                                block_stride,
+                                                                diag_values,
+                                                                off_diag_values);
+        });
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> NeoHookeanOgdenActiveStrainPacked::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                                           const ryml::ConstNodeRef             &node) {
+        std::shared_ptr<NeoHookeanOgdenActiveStrainPacked> op(static_cast<NeoHookeanOgdenActiveStrainPacked *>(create(space).release()));
+        if (op->initialize({}) != SFEM_SUCCESS) return nullptr;
+        if (node.has_child("mu")) {
+            real_t value = 0;
+            node["mu"].load(&value);
+            op->set_mu(value);
+        }
+        if (node.has_child("lambda")) {
+            real_t value = 0;
+            node["lambda"].load(&value);
+            op->set_lambda(value);
+        }
+        return op;
+    }
+#endif
+
+}  // namespace sfem

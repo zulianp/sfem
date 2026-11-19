@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "smesh_base.hpp"
 #include <stdlib.h>
 #include <string.h>
 
@@ -61,7 +62,7 @@ int principal_stresses(const std::shared_ptr<sfem::Communicator> &comm, int argc
                output_prefix);
     }
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     ///////////////////////////////////////////////////////////////////////////////
     // Read data
@@ -108,7 +109,7 @@ int principal_stresses(const std::shared_ptr<sfem::Communicator> &comm, int argc
         stress_bufs[d]->to_file(smesh::Path(path));
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");

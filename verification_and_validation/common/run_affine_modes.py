@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-"""Invoke an SFEM solid driver once for each affine loading mode."""
+"""Run one steady solve of the elasticity playground for each affine loading mode."""
 
 import argparse
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 import yaml
@@ -14,59 +13,64 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
+from common import playground
 from common.affine import MODE_COMPLETION_MARKER
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--kind", choices=("linear", "hyperelastic"), required=True)
     parser.add_argument("--driver", required=True, type=Path)
     parser.add_argument("--mesh", required=True, type=Path)
     parser.add_argument("--input-dir", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--initialize",
+        action="store_true",
+        help="start each mode from the affine field in <mesh>/initial_values/<mode>.<component>.float64.raw",
+    )
+    parser.add_argument(
+        "--field",
+        dest="fields",
+        action="append",
+        default=[],
+        help="name=path: an element field of the material, 9 values per element",
+    )
+    parser.add_argument("--set", dest="overrides", action="append", default=[], help="playground case override key=value")
     parser.add_argument("modes", nargs="+")
     args = parser.parse_args()
 
-    environment = os.environ.copy()
-    initialize_affine = args.kind == "hyperelastic" and environment.get(
-        "SFEM_AFFINE_INITIALIZE", "0"
-    ) not in ("", "0")
     dimension = None
-    if initialize_affine:
+    if args.initialize:
         metadata = yaml.safe_load((args.mesh / "meta.yaml").read_text(encoding="utf-8"))
         dimension = int(metadata["spatial_dimension"])
+    fields = []
+    for field in args.fields:
+        name, path = field.split("=", 1)
+        fields.append({"name": name, "file": path, "values_per_element": 9})
+
     for mode in args.modes:
-        mode_environment = environment.copy()
-        if initialize_affine:
-            components = [
-                args.mesh / "initial_values" / f"{mode}.{component}.float64.raw"
-                for component in range(dimension)
-            ]
-            mode_environment["SFEM_INITIAL_DISPLACEMENT_COMPONENTS"] = ",".join(str(path) for path in components)
         mode_output = args.output / mode
         mode_output.mkdir(parents=True, exist_ok=True)
-        dirichlet = args.input_dir / f"dirichlet_{mode}.yaml"
-        if args.kind == "linear":
-            command = [
-                str(args.driver),
-                str(args.mesh),
-                str(dirichlet),
-                "NONE",
-                str(args.input_dir / "operator.yaml"),
-                str(mode_output),
-            ]
-        else:
-            command = [str(args.driver), str(args.mesh), str(dirichlet), str(mode_output)]
+        case = playground.static_case(
+            args.mesh,
+            args.input_dir / "operator.yaml",
+            mode_output,
+            dirichlet=args.input_dir / f"dirichlet_{mode}.yaml",
+        )
+        if fields:
+            case["fields"] = fields
+        if args.initialize:
+            case["initial_conditions"] = {
+                "displacement": {
+                    "components": [
+                        str(args.mesh / "initial_values" / f"{mode}.{component}.float64.raw")
+                        for component in range(dimension)
+                    ]
+                }
+            }
 
         print(f"--- affine mode: {mode} ---", flush=True)
-        completed = subprocess.run(
-            command,
-            env=mode_environment,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
+        completed = playground.run(args.driver, case, mode_output / "case.yaml", args.overrides, os.environ.copy())
         print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
         if completed.returncode:
             return completed.returncode

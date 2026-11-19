@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "smesh_base.hpp"
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -170,12 +171,12 @@ namespace {
                          const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             f->gradient(x, out);
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
     double time_apply(const std::shared_ptr<sfem::Operator<real_t>> &op,
@@ -186,12 +187,12 @@ namespace {
                       const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             op->apply(direction, out);
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
     real_t max_abs_diff(const real_t *const left, const real_t *const right, const ptrdiff_t n) {
@@ -571,9 +572,9 @@ int main(int argc, char *argv[]) {
 
     int       completed_newton = 0;
     ptrdiff_t total_cg_it      = 0;
-    double    solve_t0         = MPI_Wtime();
+    double    solve_t0         = smesh::time_seconds();
     for (int i = 0; i < nl_max_it; ++i) {
-        const double iteration_t0 = MPI_Wtime();
+        const double iteration_t0 = smesh::time_seconds();
         generated_gradient(x->data(), rhs->data());
 
         const real_t residual = blas->norm2(ndofs, rhs->data());
@@ -618,12 +619,12 @@ int main(int argc, char *argv[]) {
 
         blas->axpy(ndofs, step, increment->data(), x->data());
 
-        const double iteration_time = MPI_Wtime() - iteration_t0;
+        const double iteration_time = smesh::time_seconds() - iteration_t0;
         const double rate_m         = 1e-6 * static_cast<double>(ndofs) / iteration_time;
         printf("%-10d %-8d %-14.4e %-12.4e %-14.3f %-12.4e\n", i, cg_it, residual, iteration_time, rate_m, step);
         completed_newton = i + 1;
     }
-    const double solve_time = MPI_Wtime() - solve_t0;
+    const double solve_time = smesh::time_seconds() - solve_t0;
 
     generated_gradient(x->data(), rhs->data());
     const real_t final_residual = blas->norm2(ndofs, rhs->data());

@@ -1,4 +1,5 @@
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +31,7 @@ void normals(const ptrdiff_t nelements,
              geom_t **const SFEM_RESTRICT normals_xyz) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     idx_t ev[4];
 
@@ -62,7 +63,7 @@ void normals(const ptrdiff_t nelements,
         normals_xyz[2][i] = n[2];
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("lform_surface_outflux.c: normals\t%g seconds\n", tock - tick);
 }
 
@@ -152,7 +153,7 @@ void tri3_p1_p1_surface_outflux(const ptrdiff_t nelements,
                                 real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     real_t element_vector_x[3];
     real_t element_vector_y[3];
@@ -208,7 +209,7 @@ void tri3_p1_p1_surface_outflux(const ptrdiff_t nelements,
         values[i2] += element_vector[2];
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("surface_outflux.c: tri3_surface_outflux\t%g seconds\n", tock - tick);
 }
 
@@ -315,7 +316,7 @@ void tri6_p2_p2_surface_outflux(const ptrdiff_t nelements,
                                 real_t *const SFEM_RESTRICT values) {
     SFEM_UNUSED(nnodes);
 
-    double tick = MPI_Wtime();
+    double tick = smesh::time_seconds();
 
     real_t element_vector_x[6];
     real_t element_vector_y[6];
@@ -371,7 +372,7 @@ void tri6_p2_p2_surface_outflux(const ptrdiff_t nelements,
         }
     }
 
-    double tock = MPI_Wtime();
+    double tock = smesh::time_seconds();
     printf("surface_outflux.c: tri6_surface_outflux\t%g seconds\n", tock - tick);
 }
 

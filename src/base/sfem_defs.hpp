@@ -1,0 +1,76 @@
+#ifndef SFEM_DEFS_H
+#define SFEM_DEFS_H
+
+#include "sfem_base.hpp"
+#include "smesh_adjacency.hpp"
+#include "smesh_elem_type.hpp"
+#include "smesh_graph.hpp"
+
+#include <assert.h>
+
+namespace sfem {
+
+    typedef const char* OperatorType;
+
+    namespace op_type {
+        inline constexpr OperatorType MATRIX_FREE = "MF";
+        inline constexpr OperatorType CRS         = "CRS";
+        inline constexpr OperatorType SPLITCRS    = "SPLITCRS";
+        inline constexpr OperatorType ALIGNEDCRS  = "ALIGNEDCRS";
+        inline constexpr OperatorType CRS_SYM     = "CRS_SYM";
+        inline constexpr OperatorType BSR         = "BSR";
+        inline constexpr OperatorType BSR_SYM     = "BSR_SYM";
+        inline constexpr OperatorType DIA         = "DIA";
+        inline constexpr OperatorType COO_SYM     = "COO_SYM";
+        inline constexpr OperatorType SPLITDACRS  = "SPLITDACRS";
+        inline constexpr OperatorType SELL        = "SELL";
+        //: Partial assembly: the tangent is stored once per linearization and
+        //: applied for every Krylov iteration.  Inexact wherever the tangent
+        //: varies within an element, exact where it does not.
+        inline constexpr OperatorType INEXACT     = "INEXACT";
+    }  // namespace op_type
+
+#define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);
+
+    enum class Accelerator { CPU = 0, CUDA = 1, OPENCL = 2, OPENACC = 3, HIP = 4 };
+
+    typedef enum {
+        ADJOINT_BASE = 0,
+        ADJOINT_REFINE_ONE_STEP,
+        ADJOINT_REFINE_ITERATIVE,
+        ADJOINT_REFINE_HYTEG_REFINEMENT
+    } AdjointRefineType;
+}  // namespace sfem
+
+namespace sfem {
+    using smesh::crs_to_coo;
+    using smesh::elem_higher_order;
+    using smesh::elem_lower_order;
+    using smesh::elem_manifold_dim;
+    using smesh::elem_num_nodes;
+    using smesh::elem_num_sides;
+    using smesh::extract_skin_sideset;
+    using smesh::is_second_order_lagrange;
+    using smesh::is_semistructured_type;
+    using smesh::macro_base_elem;
+    using smesh::macro_type_variant;
+    using smesh::proteus_hex_micro_elements_per_dim;
+    using smesh::proteus_hex_type;
+    using smesh::semistructured_level;
+    using smesh::semistructured_type;
+    using smesh::shell_type;
+    using smesh::side_type;
+    using smesh::type_from_string;
+    using smesh::type_to_string;
+}  // namespace sfem
+
+#ifdef __cplusplus
+using sfem::ADJOINT_BASE;
+using sfem::ADJOINT_REFINE_HYTEG_REFINEMENT;
+using sfem::ADJOINT_REFINE_ITERATIVE;
+using sfem::ADJOINT_REFINE_ONE_STEP;
+using sfem::AdjointRefineType;
+using sfem::Accelerator;
+#endif
+
+#endif  // SFEM_DEFS_H

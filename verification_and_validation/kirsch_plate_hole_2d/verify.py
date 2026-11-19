@@ -51,7 +51,7 @@ def evaluate_level(level, output, config):
     level_id = level["id"]
     mesh = read_mesh(output / "mesh" / level_id)
     displacement = read_component_output(
-        output / "solution" / level_id, "x", 2, mesh.n_points,
+        output / "solution" / level_id / "out", "disp", 2, mesh.n_points,
     )
     a = float(config["geometry"]["hole_radius_m"])
     tension = float(config["loading"]["remote_tension_mpa"])

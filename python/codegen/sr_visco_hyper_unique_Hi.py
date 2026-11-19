@@ -1254,7 +1254,10 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
 
         S_dev = self.expression_table["S_dev"]
 
-        # Only C10, C01, K - NO dt, g, tau!
+        # Only C10, C01, K - NO dt, g, tau! A parameter the stress does not read is left unnamed.
+        used = {str(symbol) for symbol in sp.Matrix(S_dev).free_symbols}
+        qw = "qw" if "qw" in used else "/*qw*/"
+        K = "K" if "K" in used else "/*K*/"
         signature = (
             f'static SFEM_INLINE void {fe.name().lower()}_{self.name}_S_dev_from_disp(\n'
             f'    const {real_t} *const SFEM_RESTRICT adjugate,\n'
@@ -1262,10 +1265,10 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
             f'    const {real_t}                      qx,\n'
             f'    const {real_t}                      qy,\n'
             f'    const {real_t}                      qz,\n'
-            f'    const {real_t}                      qw,\n'
+            f'    const {real_t}                      {qw},\n'
             f'    const {real_t}                      C10,\n'
             f'    const {real_t}                      C01,\n'
-            f'    const {real_t}                      K,\n'
+            f'    const {real_t}                      {K},\n'
             f'    const {real_t} *const SFEM_RESTRICT dispx,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispy,\n'
             f'    const {real_t} *const SFEM_RESTRICT dispz,\n'
@@ -1504,9 +1507,6 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
             for i in range(fe.n_nodes()):
                 expr.append(ast.AddAugmentedAssignment(sp.symbols(f"g{syms[d]}[{i}]"), grads[d][i]))
         
-        # Generate F computation code
-        F_actual = c_gen(assign_matrix("F", self.expression_table["F"]))
-        
         # Generate S_single computation: S_s00 = alpha * H_i[0] - beta * S_dev_prev[0], etc.
         voigt_names = ["S_s00", "S_s11", "S_s22", "S_s01", "S_s02", "S_s12"]
         S_single_code_lines = []
@@ -1520,10 +1520,6 @@ static SFEM_INLINE void hex8_mooney_rivlin_update_Hi_single(
         body = (
             f'{{\n'
             f'// Single Prony term history contribution to gradient\n'
-            f'{real_t} F[{dim**2}];\n'
-            f'{{\n'
-            f'{F_actual}'
-            f'}}\n\n'
             f'// S_single = alpha * H_i - beta * S_dev_prev (Voigt-6)\n'
             f'{S_single_code}\n\n'
             f'{grad_code}\n'

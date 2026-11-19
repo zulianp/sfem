@@ -25,7 +25,6 @@ SFEM_MAX_IT=120					\
 SFEM_ATOL=1e-7					\
 SFEM_ELEMENT_REFINE_LEVEL=4	    \
 SFEM_STAGNATION_THRESHOLD=10	\
-SFEM_PENALTY_PARAM=100			\
 SFEM_NL_SMOOTH_STEPS=27			\
 SMESH_TRACE_FILE=obs.csv 		\
 	$LAUNCH obs rock ./sdf dirichlet.yaml rock/contact_boundary output

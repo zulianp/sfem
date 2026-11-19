@@ -1,0 +1,214 @@
+#include "sfem_GeometricMultigrid.hpp"
+
+#include "sfem_aliases.hpp"
+
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_Transfer.hpp"
+#include "sfem_MixedPrecisionShiftableBlockSymJacobi.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_Stationary.hpp"
+#include "sfem_TeamOperator.hpp"
+#include "sfem_cg.hpp"
+#include "smesh_env.hpp"
+#include "smesh_semistructured.hpp"
+
+#include <algorithm>
+
+namespace sfem {
+
+    std::shared_ptr<MultigridData> create_gmg_data(const std::shared_ptr<Function> &f) {
+        SFEM_TRACE_SCOPE("create_gmg_data");
+
+        if (!f->space()->has_semi_structured_mesh()) {
+            SFEM_ERROR("[Error] create_ssgmg cannot build MG without a semistructured mesh");
+            return nullptr;
+        }
+
+        auto data = std::make_shared<MultigridData>();
+
+        auto  es     = f->execution_space();
+        auto &ssmesh = *f->space()->mesh();
+
+        bool has_hex  = false;
+        bool has_tet  = false;
+        bool has_quad = false;
+        for (size_t b = 0; b < ssmesh.n_blocks(); ++b) {
+            const auto bid  = static_cast<smesh::block_idx_t>(b);
+            const auto type = ssmesh.element_type(bid);
+            if (!smesh::is_semistructured_type(type)) {
+                SFEM_ERROR("create_gmg_data: block %zu is not semistructured (type %s)\n",
+                           b,
+                           smesh::type_to_string(type));
+                return nullptr;
+            }
+
+            const auto block_family = smesh::ss_source_family(type);
+            if (block_family != smesh::HEX8 && block_family != smesh::QUAD4 && block_family != smesh::TET4) {
+                SFEM_ERROR("create_gmg_data: SS family %s is not implemented in SSGMG yet\n",
+                           smesh::type_to_string(block_family));
+                return nullptr;
+            }
+
+            has_hex |= block_family == smesh::HEX8;
+            has_tet |= block_family == smesh::TET4;
+            has_quad |= block_family == smesh::QUAD4;
+        }
+
+        if (has_quad && (has_hex || has_tet)) {
+            SFEM_ERROR("create_gmg_data: mixed SS families with QUAD are not implemented\n");
+            return nullptr;
+        }
+
+        std::vector<int> levels = smesh::derefinement_levels(ssmesh);
+        std::reverse(levels.begin(), levels.end());
+        const int nlevels = levels.size();
+
+        data->functions.push_back(f);
+        data->semistructured_levels = levels;
+
+        for (int l = 1; l < nlevels; l++) {
+            auto f_prev  = data->functions.back();
+            auto fs_next = f_prev->space()->derefine(levels[l]);
+            data->functions.push_back(f_prev->derefine(fs_next, true));
+        }
+
+        auto create_r = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
+            auto fine   = data->functions[i];
+            auto coarse = data->functions[i + 1];
+            return create_constrained_transfer(
+                    sfem::create_hierarchical_restriction(fine->space(), coarse->space(), es), coarse, fine->space()->n_dofs(), es);
+        };
+
+        auto create_p = [&](const int i) -> std::shared_ptr<Operator<real_t>> {
+            auto coarse = data->functions[i];
+            auto fine   = data->functions[i - 1];
+            return create_constrained_transfer(
+                    sfem::create_hierarchical_prolongation(coarse->space(), fine->space(), es), fine, coarse->space()->n_dofs(), es);
+        };
+
+        data->prolongations.push_back(nullptr);
+
+        for (int i = 0; i < nlevels - 1; i++) {
+            data->restrictions.push_back(create_r(i));
+            data->prolongations.push_back(create_p(i + 1));
+        }
+
+        return data;
+    }
+
+    std::vector<std::shared_ptr<Operator<real_t>>> create_gmg_operators(const std::shared_ptr<MultigridData> &data,
+                                                                        const OperatorType                    op_type) {
+        std::vector<std::shared_ptr<Operator<real_t>>> operators;
+        for (int i = 0; i < (int)data->functions.size(); i++) {
+            auto f  = data->functions[i];
+            auto op = sfem::create_linear_operator(op_type, f, nullptr, f->execution_space());
+            operators.push_back(op);
+        }
+        return operators;
+    }
+
+    std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> create_gmg_default_smoothers_and_solver(
+            const std::shared_ptr<MultigridData>           &data,
+            std::vector<std::shared_ptr<Operator<real_t>>> &ops,
+            const int                                       smoothing_steps,
+            const bool                                      enable_mixed_precision) {
+        std::vector<std::shared_ptr<MatrixFreeLinearSolver<real_t>>> smoothers;
+
+        if (data->functions.empty()) {
+            SFEM_ERROR("[Error] create_gmg_default_smoothers_and_solver cannot build MG without a function");
+            return {};
+        }
+
+        const int  block_size     = data->functions.front()->space()->block_size();
+        const auto es             = data->functions.front()->execution_space();
+        const int  nlevels        = data->functions.size();
+        const int  sym_block_size = (block_size == 3 ? 6 : 3);
+
+        bool mixed_hex_tet = false;
+        {
+            auto &mesh = *data->functions.front()->space()->mesh();
+            bool  has_hex = false;
+            bool  has_tet = false;
+            for (size_t b = 0; b < mesh.n_blocks(); ++b) {
+                const auto fam = smesh::ss_source_family(mesh.element_type(static_cast<smesh::block_idx_t>(b)));
+                has_hex |= fam == smesh::HEX8;
+                has_tet |= fam == smesh::TET4;
+            }
+            mixed_hex_tet = has_hex && has_tet;
+        }
+        // ω=1 is unstable on mixed HEX+TET rediscretization (interface modes).
+        const real_t jacobi_omega =
+                smesh::Env::read("SFEM_MG_JACOBI_RELAXATION", mixed_hex_tet ? real_t(0.5) : real_t(1));
+
+        auto create_jacobi = [&](const std::shared_ptr<Function> &f) -> std::shared_ptr<Operator<real_t>> {
+            if (block_size == 1) {
+                auto diag = sfem::create_buffer<real_t>(f->space()->n_dofs(), es);
+                f->hessian_diag(nullptr, diag->data());
+                f->set_value_to_constrained_dofs(1, diag->data());
+
+                auto jacobi = sfem::create_shiftable_jacobi(diag, es);
+                jacobi->set_relaxation_parameter(jacobi_omega);
+                return jacobi;
+            } else {
+                auto fs   = f->space();
+                auto diag = sfem::create_buffer<real_t>(fs->n_dofs() / fs->block_size() * sym_block_size, es);
+                auto mask = sfem::create_buffer<mask_t>(mask_count(fs->n_dofs()), es);
+
+                f->constraints_mask(mask->data());
+                f->hessian_block_diag_sym(nullptr, diag->data());
+
+                std::shared_ptr<sfem::Operator<real_t>> jacobi;
+                if (enable_mixed_precision) {
+                    auto temp =
+                            sfem::create_mixed_precision_shiftable_block_sym_jacobi<real_t, float>(block_size, diag, mask, es);
+                    temp->set_relaxation_parameter(1. / block_size);
+                    jacobi = temp;
+                } else {
+                    auto temp = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
+                    temp->set_relaxation_parameter(1. / block_size);
+                    jacobi = temp;
+                }
+
+                return jacobi;
+            }
+        };
+
+        for (int i = 0; i < nlevels - 1; i++) {
+            auto f        = data->functions[i];
+            auto smoother = sfem::create_stationary<real_t>(ops[i], create_jacobi(f), es);
+            smoother->set_max_it(smoothing_steps);
+            smoothers.push_back(smoother);
+        }
+
+        // Distributed where the coarse operator is (ConjugateGradient::set_op).
+        std::shared_ptr<MatrixFreeLinearSolver<real_t>> coarse_solver;
+        {
+            auto cg = sfem::create_cg<real_t>(ops.back(), es);
+            cg->set_max_it(10000);
+            cg->verbose = false;
+            cg->set_rtol(1e-10);
+            cg->set_atol(1e-14);
+            coarse_solver = cg;
+        }
+
+        bool enable_coarse_space_preconditioner = true;
+        if (enable_coarse_space_preconditioner) {
+            auto f    = data->functions.back();
+            auto diag = sfem::create_buffer<real_t>(f->space()->n_dofs(), es);
+            f->hessian_diag(nullptr, diag->data());
+            auto sj_coarse = sfem::create_shiftable_jacobi(diag, es);
+            sj_coarse->set_relaxation_parameter(1. / block_size);
+            coarse_solver->set_preconditioner_op(sj_coarse);
+
+            // This is not working for some reason. BCs?
+            // coarse_solver->set_preconditioner_op(create_jacobi(data->functions.back()));
+        }
+
+        smoothers.push_back(coarse_solver);
+
+        return smoothers;
+    }
+
+}  // namespace sfem
+

@@ -5,9 +5,15 @@
 import argparse
 import os
 from pathlib import Path
-import subprocess
+import sys
 
 import yaml
+
+SUITE_DIR = Path(__file__).resolve().parents[1]
+if str(SUITE_DIR) not in sys.path:
+    sys.path.insert(0, str(SUITE_DIR))
+
+from common import playground
 
 
 def relocate_paths(value, source_mesh, target_mesh):
@@ -29,6 +35,7 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--dirichlet", default="dirichlet.yaml")
     parser.add_argument("--neumann")
+    parser.add_argument("--set", dest="overrides", action="append", default=[], help="playground case override key=value")
     args = parser.parse_args()
 
     config = yaml.safe_load(args.case.read_text(encoding="utf-8"))
@@ -43,7 +50,7 @@ def main():
         rendered = []
         for filename in (args.dirichlet, args.neumann):
             if filename is None:
-                rendered.append("NONE")
+                rendered.append(None)
                 continue
             source = args.input_dir / filename
             document = yaml.safe_load(source.read_text(encoding="utf-8"))
@@ -52,18 +59,14 @@ def main():
                 yaml.safe_dump(relocate_paths(document, canonical_mesh, target_mesh), sort_keys=False),
                 encoding="utf-8",
             )
-            rendered.append(str(target))
+            rendered.append(target)
         solution = args.output / level_id
         solution.mkdir(parents=True, exist_ok=True)
-        command = [
-            str(args.driver), str(target_mesh), rendered[0], rendered[1],
-            str(args.input_dir / "operator.yaml"), str(solution),
-        ]
-        print(f"--- structural refinement: {level_id} ---", flush=True)
-        completed = subprocess.run(
-            command, env=os.environ.copy(), text=True, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, check=False,
+        case = playground.static_case(
+            target_mesh, args.input_dir / "operator.yaml", solution, dirichlet=rendered[0], neumann=rendered[1]
         )
+        print(f"--- structural refinement: {level_id} ---", flush=True)
+        completed = playground.run(args.driver, case, solution / "case.yaml", args.overrides, os.environ.copy())
         print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
         if completed.returncode:
             return completed.returncode

@@ -15,7 +15,6 @@ from codegen.framework.package.op_wrappers import (
     generate_op_files,
     generate_op_registration_files,
 )
-from codegen.framework.emitters.inexact_apply_codegen import inexact_apply_files
 from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
 )
@@ -85,6 +84,14 @@ from codegen.framework.symbolic.boundary_forms import (
 )
 from codegen.framework.symbolic.constitutive import (
     TwoPhaseFlowConstitutiveModel,
+    continued_power,
+    isochoric_invariants,
+)
+from codegen.framework.symbolic.relaxation import (
+    PronyRelaxation,
+    RelaxationDeclaration,
+    is_relaxation_gamma,
+    relaxation_gamma_name,
 )
 from codegen.framework.symbolic.core import (
     KernelExpressions,
@@ -95,7 +102,9 @@ from codegen.framework.forms.equations import (
     EquationSystem,
     EquationSystemBuilder,
     EquationSystems,
+    QUADRATURE_OUTPUT_KERNEL,
     TOTAL_RESIDUAL_UNIT_NAME,
+    quadrature_output_dependencies,
     system_mixes_energy_and_residual,
     total_residual_collection,
 )
@@ -106,6 +115,7 @@ from codegen.framework.symbolic.fields import (
     MixedFunctionSpace,
     PREVIOUS_ARGUMENT,
     PreviousFunction,
+    QuadratureField,
     ScalarField,
     SpatialCoordinate,
     SymbolicArgument,
@@ -123,6 +133,8 @@ from codegen.framework.symbolic.fields import (
     VectorFunctionSpace,
     current_geometric_dimension,
     geometric_dimension_context,
+    is_quadrature_symbol,
+    symmetric_tensor_entries,
     previous_function,
     scalar_field,
     tensor_field,
@@ -231,7 +243,7 @@ from codegen.framework.targets import (
     ARMSVETarget,
     HIPTarget,
 )
-from codegen.framework.plans.conventions import unit_output_name
+from codegen.framework.plans.conventions import generated_include, unit_output_name
 from codegen.framework.plans.scheduling import build_expression_graph
 
 
@@ -295,11 +307,16 @@ class CodeGenerator:
     matrix_mesh_layouts: tuple = ("standard",)
     matrix_packed_passes: tuple = ("one_pass", "two_pass")
     matrix_patch_node_index_filter: bool = False
-    #: Opt in to the projected apply of `plans.inexact_apply`.  Off by default
-    #: and additive when on: it publishes an extra entry point beside the exact
-    #: one rather than replacing it, because on anything but an affine simplex
-    #: it computes a deliberately different operator.
+    #: Opt in to the stored-tangent apply (`plans.point_tangent`,
+    #: `plans.inexact_element`).  Off by default and additive when on: the
+    #: exact apply is untouched, and the stored one is reached only through
+    #: `inexact_update` and `inexact_apply`.
     inexact_apply: bool = False
+    #: Opt in to the BSR assembly on the tangent projected to positive
+    #: semidefinite per quadrature point (`MatrixFormatPlan.tangent_projection`).
+    #: Off by default and additive when on: the exact assembly is untouched, and
+    #: the projected one is reached only through `set_tangent_projection`.
+    tangent_projection: bool = False
 
     def __post_init__(self):
         _validate_name(self.name)
@@ -325,6 +342,7 @@ class CodeGenerator:
                 self.matrix_mesh_layouts,
                 self.matrix_packed_passes,
                 self.matrix_patch_node_index_filter,
+                self.tangent_projection,
             ),
         )
         _validate_op(self.op_name, self.parameter_defaults)
@@ -337,6 +355,30 @@ class GenerationResult:
     objects: tuple = ()
     plan: object = None
     plan_dump: object = None
+
+    @property
+    def include_dirs(self):
+        """What a compile of these sources needs on its include path."""
+        return generated_include_dirs(self.sources)
+
+
+def generated_include_dirs(paths):
+    """Every folder among `paths` that holds a generated header.
+
+    Generated files include each other by file name alone
+    (`plans/conventions.py generated_include`), so compiling them in place --
+    the staging tree, before install flattens it -- needs each of these folders
+    on the include path.  The library build derives the same set in CMake.
+    """
+    return tuple(
+        sorted(
+            {
+                os.path.dirname(os.path.abspath(path))
+                for path in paths
+                if str(path).endswith((".hpp", ".cuh"))
+            }
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -681,6 +723,8 @@ class LoweredEquationEvaluation:
     #: unit: an emitter sees one unit's forms and cannot see the other beside
     #: it.
     mixes_energy_and_residual: bool = False
+    #: The energy's integration-point outputs, ((name, components), ...).
+    quadrature_outputs: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -764,7 +808,9 @@ class CodeGenerationStage:
                         backend.target.source_subdirectory(),
                     ),
                 )
-                if _publishes_inexact_apply(unit.unit_name, wants_inexact):
+                if _publishes_inexact_apply(
+                    unit.unit_name, wants_inexact, unit.mixes_energy_and_residual
+                ):
                     _merge_files(
                         outputs,
                         _layout_codegen_files(
@@ -794,6 +840,7 @@ def generate(
     matrix_packed_passes=None,
     matrix_patch_node_index_filter=None,
     inexact_apply=None,
+    tangent_projection=None,
 ):
     vector_size = int(vector_size)
     if vector_size <= 0:
@@ -806,6 +853,9 @@ def generate(
     # tree came to contain kernels no generator run could reproduce.
     if inexact_apply is not None:
         material = replace(material, inexact_apply=bool(inexact_apply))
+    # The same tri-state for the projected assembly.
+    if tangent_projection is not None:
+        material = replace(material, tangent_projection=bool(tangent_projection))
 
     available_elements = _generation_available_elements(material.elements)
     selected = _parse_elements(elements, available_elements)
@@ -868,6 +918,7 @@ def generate(
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     files = _collapse_duplicate_operators(files)
+    _check_flat_file_names(files)
     _validate_generated_call_graph(files)
     _validate_generated_op_overrides(files)
     source_paths = _write_files(out_dir, files)
@@ -946,6 +997,20 @@ def run(material, default_out_dir, argv=None):
         action="store_false",
         help="Suppress the projected apply even if the material asks for it.",
     )
+    parser.add_argument(
+        "--tangent-projection",
+        dest="tangent_projection",
+        action="store_true",
+        default=None,
+        help="Emit the BSR assembly on the tangent projected to positive semidefinite beside the exact one. "
+        "Defaults to the material's own setting.",
+    )
+    parser.add_argument(
+        "--no-tangent-projection",
+        dest="tangent_projection",
+        action="store_false",
+        help="Suppress the projected assembly even if the material asks for it.",
+    )
     args = parser.parse_args(argv)
     try:
         result = generate(
@@ -964,6 +1029,7 @@ def run(material, default_out_dir, argv=None):
             matrix_packed_passes=args.matrix_packed_passes,
             matrix_patch_node_index_filter=args.patch_node_index_filter,
             inexact_apply=args.inexact_apply,
+            tangent_projection=args.tangent_projection,
         )
     except (TypeError, ValueError) as error:
         parser.error(str(error))
@@ -1139,6 +1205,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
     weak_form = sfem_soa_weak_form(
         evaluated.form_evaluation.form(FormOrder.ZERO).expression,
         evaluated.data_symbols,
+        quadrature_outputs=evaluated.quadrature_outputs,
     )
     kernel_forms = tuple(
         sfem_soa_kernel_form(
@@ -1249,7 +1316,11 @@ def _energy_expression_plans(kernel_forms, diagnostic_graph, collection):
     plans = []
     for kernel_form in kernel_forms:
         form_order = _form_order_for_kernel_name(kernel_form.name)
-        dependencies = _metadata_dependencies(collection, form_order)
+        dependencies = (
+            quadrature_output_dependencies(kernel_form.weak_form.quadrature_outputs, collection.variables)
+            if kernel_form.name == QUADRATURE_OUTPUT_KERNEL
+            else _metadata_dependencies(collection, form_order)
+        )
         source = replace(kernel_form, dependencies=dependencies)
         plans.append(
             KernelExpressionPlan(
@@ -1310,6 +1381,10 @@ def _form_order_for_kernel_name(name):
         return FormOrder.ONE
     if name == "apply":
         return FormOrder.TWO
+    if name == QUADRATURE_OUTPUT_KERNEL:
+        # Filed with the 1-form, whose stress it is; its own dependencies are
+        # taken from its expressions, not from the 1-form's.
+        return FormOrder.ONE
     raise ValueError("unsupported energy kernel form '%s'" % name)
 
 
@@ -1436,6 +1511,7 @@ def _selected_matrix_format_plan(
         mesh_layouts,
         packed_passes,
         patch_filter,
+        getattr(material, "tangent_projection", False),
     )
 
 
@@ -1535,7 +1611,6 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
                 if not selected:
                     continue
                 files[source_path] = _tensor_product_proteus_alias_source(
-                    source_path,
                     c_abi_path,
                     selected,
                     alias,
@@ -1840,12 +1915,12 @@ def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
         # delegating to the PROTEUS twin the way it does on the host.
         "source_suffixes": tuple(
             "_%s_%s.%s" % (element_name, kind, extension)
-            for kind in ("operator", "boundary_operator", "inexact_apply_operator")
+            for kind in ("operator", "boundary_operator")
         ),
         "suffix_pairs": tuple(
             ("_%s_%s.%s" % (element_name, kind, extension),
              "_%s_%s.%s" % (proteus_name, kind, extension))
-            for kind in ("inexact_apply_operator", "operator", "boundary_operator")
+            for kind in ("operator", "boundary_operator")
         ),
     }
 
@@ -1862,15 +1937,14 @@ def _extern_c_declarations(source):
     )
 
 
-def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, alias):
-    include_path = _relative_codegen_include(os.path.dirname(source_path), c_abi_path)
+def _tensor_product_proteus_alias_source(c_abi_path, declarations, alias):
     declarations = tuple(
         declaration
         for declaration in declarations
         if "_matrix_assembly_" not in declaration["name"]
     )
     lines = [
-        '#include "%s"' % include_path,
+        '#include "%s"' % generated_include(c_abi_path),
         "",
     ]
     target_declarations = []
@@ -1887,6 +1961,8 @@ def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, 
         lines.extend(_extern_c_prototype_lines(declaration))
     if target_declarations:
         lines.append("")
+    if any(_c_element_pointer_param_index(_c_params(d["params"])) is not None for d in declarations):
+        lines.extend(current_target().permuted_connectivity_preamble())
     for declaration in declarations:
         lines.extend(
             _tensor_product_proteus_alias_function(
@@ -1913,19 +1989,21 @@ def _tensor_product_proteus_alias_function(declaration, alias):
 
     args = [_c_param_name(param) for param in params]
     element_index = _c_element_pointer_param_index(params)
+    after = ()
     if element_index is not None:
         pointer_type = _c_element_pointer_type(params[element_index])
-        shape_order = alias["shape_order"]
-        lines.append("    %s *proteus_elements[%d] = {" % (pointer_type, alias["n_shape"]))
-        for idx, source_index in enumerate(shape_order):
-            comma = "," if idx + 1 < len(shape_order) else ""
-            lines.append("        elements[%d]%s" % (source_index, comma))
-        lines.append("    };")
+        before, after = current_target().permuted_connectivity(pointer_type, alias["shape_order"])
+        lines.extend(before)
         args[element_index] = "proteus_elements"
 
     call = "%s(%s)" % (target, ", ".join(args))
     if return_type == "void":
         lines.append("    %s;" % call)
+        lines.extend(after)
+    elif after:
+        lines.append("    const %s status = %s;" % (return_type, call))
+        lines.extend(after)
+        lines.append("    return status;")
     else:
         lines.append("    return %s;" % call)
     lines.extend(["}", ""])
@@ -2002,22 +2080,13 @@ def _c_element_pointer_type(param):
 
 
 def _layout_codegen_files(unit, context, files, subdirectory=""):
-    local_headers = tuple(
-        generated.path
-        for generated in files
-        if _is_codegen_local_header(generated.path)
-    )
+    """Place each file; its source is unchanged, because every `#include` the
+    emitters print is already a bare file name (`plans/conventions.py
+    generated_include`) and so does not depend on where either file lands."""
     return tuple(
         GeneratedKernelFile(
             _layout_codegen_path(unit, context, generated.path, subdirectory),
-            _layout_codegen_source(
-                unit,
-                context,
-                generated.path,
-                generated.source,
-                local_headers,
-                subdirectory,
-            ),
+            generated.source,
         )
         for generated in files
     )
@@ -2050,52 +2119,6 @@ def _layout_codegen_path(unit, context, filename, subdirectory=""):
     if not directory:
         return filename
     return os.path.join(directory, filename)
-
-
-def _layout_codegen_source(
-    unit, context, filename, source, local_headers, subdirectory=""
-):
-    if _is_target_independent_codegen_file(filename):
-        subdirectory = ""
-    directory = _codegen_file_directory(unit, context, filename, subdirectory)
-    replacements = {}
-    for header in _CODEGEN_COMMON_HEADERS:
-        # Each included header is looked up where *it* was placed, which is not
-        # always where this file was: `matrix_formats.hpp` keeps the host
-        # position under every target.
-        header_directory = _in_target_subdirectory(
-            "", "" if _is_target_independent_codegen_file(header) else subdirectory
-        )
-        replacements[header] = _relative_codegen_include(
-            directory, os.path.join(header_directory, header)
-        )
-    for local in local_headers:
-        replacements[local] = _relative_codegen_include(
-            directory,
-            os.path.join(
-                _in_target_subdirectory(
-                    _codegen_dimension_directory(context), subdirectory
-                ),
-                local,
-            ),
-        )
-
-    relocated = source
-    for header, relative in replacements.items():
-        if header != relative:
-            relocated = relocated.replace(
-                '#include "%s"' % header,
-                '#include "%s"' % relative,
-            )
-    # The reference headers are a family, so their includes move by path rather
-    # than by a lookup of each name.
-    reference_directory = _in_target_subdirectory(REFERENCE_DIRECTORY, subdirectory)
-    if directory or reference_directory != REFERENCE_DIRECTORY:
-        relocated = relocated.replace(
-            '#include "%s/' % REFERENCE_DIRECTORY,
-            '#include "%s/' % _relative_codegen_include(directory, reference_directory),
-        )
-    return relocated
 
 
 def _is_shared_primitive_header(filename):
@@ -2190,6 +2213,10 @@ _CODEGEN_COMMON_HEADERS = frozenset(
 
 _CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
     (
+        #: Identical for every material, like the primitives, so one copy at the
+        #: tree root: a copy per material is several files with one name, which
+        #: a flattened install and a bare-name include cannot tell apart.
+        "matrix_formats.hpp",
         "kernel_math.hpp",
         "kernel_math.cuh",
         "kernel_diagnostics.hpp",
@@ -2203,32 +2230,25 @@ _CODEGEN_SHARED_PRIMITIVE_HEADERS = frozenset(
 )
 
 
-def _relative_codegen_include(directory, target):
-    if not directory:
-        return target.replace(os.sep, "/")
-    return os.path.relpath(target, start=directory).replace(os.sep, "/")
-
-
 def _relocate_generated_primitive_headers(files, out_dir, material_name):
+    """Move the headers every material shares up to the generated tree root.
+
+    Only the file moves: the files that include it name it bare, so nothing
+    that includes it has to be rewritten to follow it.
+    """
     if not _uses_generated_shared_primitive_headers(out_dir, material_name):
         return files
 
     relocated = {}
-    header_targets = {}
-    for filename in files:
-        if _is_shared_primitive_header(filename) or _is_shared_reference_header(filename):
-            header_targets[filename] = os.path.join("..", filename)
-
-    if not header_targets:
-        return files
-
     for filename, source in files.items():
-        target = header_targets.get(filename, filename)
-        rewritten = _rewrite_generated_primitive_includes(filename, source, header_targets)
+        if _is_shared_primitive_header(filename) or _is_shared_reference_header(filename):
+            target = os.path.join("..", filename)
+        else:
+            target = filename
         existing = relocated.get(target)
-        if existing is not None and existing != rewritten:
+        if existing is not None and existing != source:
             raise RuntimeError("conflicting generated source for %s" % target)
-        relocated[target] = rewritten
+        relocated[target] = source
     return relocated
 
 
@@ -2241,21 +2261,6 @@ def _uses_generated_shared_primitive_headers(out_dir, material_name):
     # its device sources.  The sibling `<material>_cuda` tree this used to
     # accept was a second place for the same material and is gone.
     return generated_root == "generated" and output_name == material_name
-
-
-def _rewrite_generated_primitive_includes(filename, source, header_targets):
-    directory = os.path.dirname(filename)
-    rewritten = source
-    for header, target in header_targets.items():
-        local_include = _relative_codegen_include(directory, header)
-        shared_include = _relative_codegen_include(directory, target)
-        if local_include == shared_include:
-            continue
-        rewritten = rewritten.replace(
-            '#include "%s"' % local_include,
-            '#include "%s"' % shared_include,
-        )
-    return rewritten
 
 
 def _codegen_output_element_label(unit, context):
@@ -2304,7 +2309,34 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
         raise ValueError(
             "single-equation generated Op wrappers require an unnamed equation"
         )
-    return generate_op_files(material, selected, kernel_sources)
+    return generate_op_files(
+        material, selected, kernel_sources, quadrature_points=_quadrature_points_by_element(user_input)
+    )
+
+
+def _quadrature_points_by_element(user_input):
+    """{element: (points of each geometry route's rule)}.
+
+    What the kernels were generated with, handed to packaging rather than
+    re-derived there: an operator that stores integration-point history has to
+    allocate it at the points its kernels visit.
+    """
+    ret = {}
+    for context in user_input.element_contexts:
+        rules = [context.specialization.quadrature_rule.n_qp]
+        if context.affine_specialization is not None:
+            rules.append(context.affine_specialization.quadrature_rule.n_qp)
+        ret.setdefault(str(context.element_type).upper(), set()).update(rules)
+    return {element: tuple(sorted(rules)) for element, rules in ret.items()}
+
+
+def _reads_integration_point_fields(equations):
+    return any(
+        is_quadrature_symbol(symbol)
+        for equation in equations
+        if equation.is_energy
+        for symbol in sp.sympify(equation.define).free_symbols
+    )
 
 
 def _total_residual_unit(material_system, mixed_order=False, matrix_format_plan=None):
@@ -2352,6 +2384,19 @@ def _total_residual_unit(material_system, mixed_order=False, matrix_format_plan=
         # Taylor-Hood material keeps every kernel it has, and its residual
         # merit falls back to assembling per trial step, which is correct and
         # slow rather than absent.
+        return None
+    if _reads_integration_point_fields(equations):
+        # The residual-merit kernels do not read integration-point streams
+        # yet.  A material written as one energy loses nothing by it: its
+        # 0-form is the energy, reduced element-wise, and the residual merit
+        # is only the fallback a mixed material needs.  A mixed one has no
+        # such fallback, so it is refused rather than given a merit that
+        # silently ignores its history.
+        if mixes_energy_and_residual:
+            raise NotImplementedError(
+                "a material mixing an energy with a residual cannot read "
+                "integration-point fields yet: its residual merit has no stream for them"
+            )
         return None
     return LoweredEquationEvaluation(
         TOTAL_RESIDUAL_UNIT_NAME,
@@ -2411,6 +2456,7 @@ def _evaluate_equation(
             mixes_energy_and_residual=mixes_energy_and_residual,
             diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan if "apply" in equation.kernels else None,
+            quadrature_outputs=equation.quadrature_outputs,
         )
     if equation.is_residual:
         if form_collection.kind is not FormKind.RESIDUAL:
@@ -2741,6 +2787,28 @@ def _merge_files(outputs, files):
         outputs[generated.path] = generated.source
 
 
+def _check_flat_file_names(files):
+    """Refuse two generated files that share a file name.
+
+    Every `#include` between generated files is a bare file name and
+    `make install` flattens the headers into one directory, so a file name is
+    the whole of a file's identity: two files called the same would make the
+    build tree's include ambiguous and let one overwrite the other on install.
+    This sees one generation run; the top-level CMakeLists.txt checks the whole
+    installed set, which is where the host and device runs meet.
+    """
+    seen = {}
+    for filename in files:
+        name = generated_include(filename)
+        other = seen.setdefault(name, filename)
+        if other != filename:
+            raise RuntimeError(
+                "generated files '%s' and '%s' share the name '%s', which "
+                "install flattening and bare-name includes cannot tell apart"
+                % (other, filename, name)
+            )
+
+
 def _write_files(out_dir, files):
     """Write the generated sources, each appearing complete or not at all.
 
@@ -2874,7 +2942,7 @@ def _repo_root():
     """
     path = os.path.dirname(os.path.abspath(__file__))
     while True:
-        if os.path.isdir(os.path.join(path, "base")) and os.path.isdir(
+        if os.path.isdir(os.path.join(path, "src", "base")) and os.path.isdir(
             os.path.join(path, "python")
         ):
             return path
@@ -2890,8 +2958,9 @@ def _compile_operators(paths):
         raise RuntimeError("C++ compiler is not available")
     repo_root = _repo_root()
     include_dirs = [
-        os.path.join(repo_root, "base"),
+        os.path.join(repo_root, "src", "base"),
     ]
+    include_dirs.extend(generated_include_dirs(paths))
     include_dirs.extend(_smesh_source_include_dirs(repo_root))
     include_dirs.extend(_compile_config_include_dirs(repo_root))
     objects = []
@@ -3031,6 +3100,7 @@ __all__ = [
     "dx",
     "ds",
     "GenerationResult",
+    "generated_include_dirs",
     "KernelTarget",
     "current_geometric_dimension",
     "geometric_dimension_context",
@@ -3047,6 +3117,8 @@ __all__ = [
     "PRESSURE",
     "PREVIOUS_ARGUMENT",
     "PreviousFunction",
+    "PronyRelaxation",
+    "QuadratureField",
     "QuadratureSetting",
     "QualifiedExpression",
     "ScalarField",
@@ -3084,6 +3156,8 @@ __all__ = [
     "grad",
     "inner",
     "inv",
+    "continued_power",
+    "isochoric_invariants",
     "material_parameter",
     "matrix_format_plan_from_request",
     "matrix_inner",

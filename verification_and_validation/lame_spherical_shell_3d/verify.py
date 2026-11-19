@@ -37,8 +37,8 @@ def evaluate_level(level, output, config, geometry):
     level_id = level["id"]
     mesh = read_mesh(output / "mesh" / level_id)
     solution = output / "solution" / level_id
-    observed_displacement = read_component_output(solution, "x", 3, mesh.n_points)
-    reaction = read_component_output(solution, "material_reaction", 3, mesh.n_points)
+    observed_displacement = read_component_output(solution / "out", "disp", 3, mesh.n_points)
+    reaction = read_component_output(solution / "out", "material_reaction", 3, mesh.n_points)
     a = float(config["geometry"]["inner_radius_m"])
     b = float(config["geometry"]["outer_radius_m"])
     pressure = float(config["loading"]["inner_pressure_mpa"])

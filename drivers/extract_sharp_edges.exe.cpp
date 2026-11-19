@@ -9,7 +9,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "smesh_edgeset.hpp"
 #include "smesh_extractions.hpp"

@@ -1,7 +1,9 @@
 # SFEMOptions
 
 # ##############################################################################
-option(BUILD_SHARED_LIBS "build shared libraries" OFF)
+# libsfem and the libraries built with it (smesh, sresample, SCCD, SSDF, ryml) are shared by
+# default: every driver and test links them at run time instead of carrying its own copy.
+option(BUILD_SHARED_LIBS "build shared libraries" ON)
 option(SFEM_ENABLE_AMG "Enable AMG solver" ON)
 option(SFEM_ENABLE_AVX2 "Enable AVX2 intrinsics" OFF)
 option(SFEM_ENABLE_AVX512 "Enable AVX512 intrinsics" OFF)
@@ -9,24 +11,34 @@ option(SFEM_ENABLE_AVX512_SORT "Enable AVX512 sort" OFF)
 option(SFEM_ENABLE_BLAS "Enable BLAS" OFF)
 option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_CUDA_LINEINFO "Enable cuda line info for profiling" OFF)
+# With SFEM_ENABLE_CUDA=ON, which turns the device path on, SFEM_ENABLE_HIP=ON compiles the same
+# device sources with HIP instead of CUDA, for AMD GPUs (base/hip/sfem_gpu_runtime.hpp). gfx942 is
+# MI300A. smesh, SCCD, SSDF and sresample follow.
+option(SFEM_ENABLE_HIP "Build the device path with HIP, for AMD GPUs" OFF)
+set(SFEM_HIP_ARCHITECTURES "gfx942" CACHE STRING "HIP (AMD GPU) architectures to build for")
+# The vendor libraries' sparse products and BLAS (hipSPARSE and hipBLAS under HIP) instead of SFEM's
+# own kernels.
+option(SFEM_ENABLE_CUSPARSE "cuSPARSE (hipSPARSE) for the device CRS and BSR products" OFF)
+option(SFEM_ENABLE_CUBLAS "cuBLAS (hipBLAS) for the device vector operations" OFF)
 option(SFEM_ENABLE_DEV_MODE "Add additional flags for more strict compilation" OFF)
 option(SFEM_ENABLE_EXPLICIT_VECTORIZATION "Enable explicit vectorization kernels" ON)
-option(SFEM_ENABLE_FP16_JACOBIANS "Enable half precision jacobians when using Cuda" ON)
 option(SFEM_ENABLE_GLIBCXX_DEBUG "uses flags -D_GLIBCXX_DEBUG when compiling in debug mode" OFF)
-option(SFEM_ENABLE_HXTSORT "Enable HXTSort library for unsigned indices" OFF)
 option(SFEM_ENABLE_LAPACK "Enable Lapck support" OFF)
 option(SFEM_ENABLE_MEM_DIAGNOSTICS "Enable mem diagonstics" ON)
 option(SFEM_ENABLE_METIS "Enable METIS graph-partitioning" OFF)
 option(SFEM_ENABLE_MINIMAL "Build only the SFEM library (no drivers, no tests)" OFF)
 option(SFEM_ENABLE_MPI "Enable MPI support" ON)
+option(SFEM_ENABLE_NCCL "NCCL for device communication within a node, in builds with MPI and CUDA (off when not found)" ON)
 option(SFEM_ENABLE_OPENMP "Enable OpenMP support" OFF)
+option(SFEM_ENABLE_ZSTD "zstd stage for compressed mesh/field files (smesh .smz; off when not found)" ON)
+option(SFEM_ENABLE_LZ4 "lz4 stage for compressed mesh/field files (smesh .smz; off when not found)" OFF)
 option(SFEM_ENABLE_PYTHON "Enable python bindings for SFEM" OFF)
 option(SFEM_ENABLE_RYAML "Enable YAML input files with RapidYAML" ON)
-option(SFEM_ENABLE_CODEGEN "Enable code generation" OFF)
 option(SFEM_ENABLE_AGGRESSIVE_OPT "Enable aggressive optimizations" OFF)
 option(SFEM_ENABLE_SCCD "Enable SCCD library" OFF)
-option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" OFF)
+option(SFEM_SCCD_BUILD_SHARED_LIBS "Build bundled SCCD as a shared library" ${BUILD_SHARED_LIBS})
 option(SFEM_ENABLE_SSDF "Enable SSDF library" OFF)
+option(SFEM_ENABLE_SRESAMPLE "Enable the sresample library: SDF obstacles and grid/mesh transfer" ON)
 set(_SFEM_ENABLE_CUBIQL_DEFAULT ${SFEM_ENABLE_SSDF})
 option(SFEM_ENABLE_CUBIQL "Enable cuBQL acceleration in SSDF" ${_SFEM_ENABLE_CUBIQL_DEFAULT})
 unset(_SFEM_ENABLE_CUBIQL_DEFAULT)
@@ -34,7 +46,6 @@ if(SFEM_ENABLE_SSDF AND NOT SFEM_ENABLE_CUBIQL)
     message(STATUS "SFEM_ENABLE_CUBIQL enabled because SFEM_ENABLE_SSDF is ON")
     set(SFEM_ENABLE_CUBIQL ON CACHE BOOL "Enable cuBQL acceleration in SSDF" FORCE)
 endif()
-option(SFEM_ENABLE_SRESAMPLE "Enable resampling library" OFF) # TODO
 
 if(WIN32)        
     set(SFEM_ENABLE_EXPLICIT_VECTORIZATION
@@ -45,7 +56,9 @@ endif()
 
 option(SFEM_USE_OCCUPANCY_MAX_POTENTIAL "Enable usage of cudaOccupancyMaxPotentialBlockSize" OFF)
 option(SFEM_ENABLE_RESAMPLING "Enable resampling features" OFF)
-option(SFEM_ENABLE_TRACE "Eneable trace facilities and output sfem.trace.csv (Override with SFEM_TRACE_FILE in the env)" ON)
+option(SFEM_ENABLE_TRACE "Enable trace facilities: smesh writes smesh.trace.csv (override with SMESH_TRACE_FILE in the env)" ON)
+option(SFEM_ENABLE_TRACE_MUTEX "Trace the scopes run on threads of their own (SFEM_TRACE_SCOPE_MUTEX: the field export's writer), every trace event then under a mutex; off, they are not traced" OFF)
+option(SFEM_ENABLE_PRONY_DIAGNOSTICS "Count the Prony history updates the storage format rounds away (host loops; the prony probe reports them)" OFF)
 
 get_directory_property(HAS_PARENT PARENT_DIRECTORY)
 
@@ -70,10 +83,6 @@ message(STATUS "SFEM_ENABLE_MINIMAL: ${SFEM_ENABLE_MINIMAL}")
 include(CMakeDependentOption)
 # cmake_dependent_option(BUILD_SHARED_LIBS "Build shared libraries" OFF
 #                        "NOT USE_XSDK_DEFAULTS" ON)
-
-# FIXME: LAPACK supporting long double?
-cmake_dependent_option(SFEM_ENABLE_LAPACK "Enable
-Lapack for dense matrix operations" ON "NOT SFEM_HAVE_QUAD_PRECISION" OFF)
 
 # MPI is required cmake_dependent_option(SFEM_ENABLE_MPI "Enable MPI
 # support" ON "NOT TPL_ENABLE_MPI" OFF)
@@ -109,6 +118,21 @@ if(SFEM_ENABLE_DEV_MODE)
     set(SFEM_DEV_FLAGS
         "-Wall -Wextra -pedantic -Werror -Werror=enum-compare -Werror=delete-non-virtual-dtor -Werror=reorder -Werror=return-type" # -Werror=uninitialized
     )
+    # Two exceptions to -pedantic, as in smesh: unknown pragmas warn without failing (#pragma unroll
+    # under GCC, #pragma omp without OpenMP), and designated initializers, the C++20 feature the
+    # sources use throughout in C++17 (every compiler here accepts it as an extension), whose
+    # members left out take their defaults by design (GCC's missing-field-initializers).
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(SFEM_DEV_DESIGNATOR_FLAG -Wno-c++20-designator)
+    else()
+        set(SFEM_DEV_DESIGNATOR_FLAG -Wno-c++20-extensions)
+    endif()
+    set(SFEM_DEV_FLAGS "${SFEM_DEV_FLAGS} -Wno-error=unknown-pragmas ${SFEM_DEV_DESIGNATOR_FLAG} -Wno-missing-field-initializers")
+    # The same for C, without the C++-only checks, and for CUDA: nvcc's own warnings and the host
+    # compiler's on the code nvcc hands it.
+    set(SFEM_DEV_C_FLAGS -Wall -Wextra -pedantic -Werror -Werror=return-type -Wno-error=unknown-pragmas)
+    set(SFEM_DEV_CUDA_FLAGS --Werror=all-warnings
+        "-Xcompiler=-Wall,-Wextra,-Werror,-Wno-error=unknown-pragmas,${SFEM_DEV_DESIGNATOR_FLAG},-Wno-missing-field-initializers")
 endif()
 
 if(SFEM_ENABLE_GLIBCXX_DEBUG)
@@ -117,7 +141,6 @@ if(SFEM_ENABLE_GLIBCXX_DEBUG)
 endif()
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SFEM_DEV_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG
     "${CMAKE_CXX_FLAGS_DEBUG} ${SFEM_SPECIAL_DEBUG_FLAGS}")
 

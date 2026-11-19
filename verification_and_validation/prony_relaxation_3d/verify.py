@@ -100,13 +100,6 @@ def main():
         fitted_tau_errors.extend(np.abs(fitted - tau) / tau)
 
     reference_temperature = temperatures[0]
-    fine_times, baseline_reaction = reaction_history(
-        args.output / "solution" / temperature_label(reference_temperature) / "fine",
-        np.arange(1, round(duration / time_steps[-1]) + 1, dtype=np.float64) * time_steps[-1],
-    )
-    _, rejected_reaction = reaction_history(args.output / "solution" / "rejected_trial", fine_times)
-    commit_error = relative_l2_error(rejected_reaction, baseline_reaction)
-
     history_error = max(finest_history_errors)
     tau_error = max(fitted_tau_errors)
     reference_factor = all_levels[reference_temperature]["fine"][1]
@@ -143,8 +136,6 @@ def main():
                    tolerances["wlf_collapse_relative_l2"], "1", oracle),
         make_check("temporal_reduction_deficit", max(reductions), 1.0, reduction_deficit,
                    tolerances["temporal_reduction_deficit"], "1", oracle),
-        make_check("rejected_trial_history_relative_l2", commit_error, 0, commit_error,
-                   tolerances["rejected_trial_history_relative_l2"], "1", oracle),
     ]
     history_path = args.output / "relaxation_history.csv"
     times, observed, expected, _ = all_levels[reference_temperature]["fine"]

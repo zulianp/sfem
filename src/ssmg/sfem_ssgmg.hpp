@@ -1,0 +1,15 @@
+#ifndef SFEM_SSGMG_HPP
+#define SFEM_SSGMG_HPP
+
+#include "sfem_Multigrid.hpp"
+#include "sfem_Function.hpp"
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_BLAS_cuda.hpp"
+#endif
+
+namespace sfem {
+    std::shared_ptr<Multigrid<real_t>> create_ssgmg(const std::shared_ptr<Function> &f, const enum ExecutionSpace es);
+}  // namespace sfem
+
+#endif  // SFEM_SSGMG_HPP

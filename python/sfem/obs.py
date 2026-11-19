@@ -216,7 +216,7 @@ def build_cuboid_highfreq_contact(base_resolution=2, element_refine_level=2, es=
     f.add_operator(op)
     left_right_selector = lambda x, y, z: abs(x) < 1e-8 or abs(x - 1) < 1e-8
     left_right = sfem.Sideset.create_from_selector(m, left_right_selector)
-    print(f"Created sideset with {left_right.size()} sides")
+    print(f"Created sideset with {sum(s.size() for s in left_right)} sides")
 
     conds = []
     for i, val in enumerate([0, -0.1, 0]):
@@ -278,7 +278,7 @@ def build_cuboid_multisphere_contact(base_resolution=2, element_refine_level=2, 
     f.add_operator(op)
     left_right_selector = lambda x, y, z: abs(x) < 1e-8 or abs(x - 1) < 1e-8
     left_right = sfem.Sideset.create_from_selector(m, left_right_selector)
-    print(f"Created sideset with {left_right.size()} sides")
+    print(f"Created sideset with {sum(s.size() for s in left_right)} sides")
     
     conds = []
     for i, val in enumerate([0, -0.1, 0]):

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import sympy as sp
 
+from codegen.framework.pipeline.driver import generated_include_dirs
 from codegen.framework.symbolic import (
     DeformationGradient,
     DimensionSpecialization,
@@ -954,6 +955,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_quad4_tensor_product_operator.cpp"),
+                    *(
+                        "-I%s" % include_dir
+                        for include_dir in generated_include_dirs(
+                            os.path.join(tmpdir, generated.path) for generated in generated_files
+                        )
+                    ),
                     "-o",
                     os.path.join(tmpdir, "generated_quad4_tensor_product_operator.o"),
                 ],
@@ -1055,6 +1062,12 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
                     "-O3",
                     "-c",
                     os.path.join(tmpdir, "generated_hex8_tensor_product_operator.cpp"),
+                    *(
+                        "-I%s" % include_dir
+                        for include_dir in generated_include_dirs(
+                            os.path.join(tmpdir, generated.path) for generated in generated_files
+                        )
+                    ),
                     "-o",
                     os.path.join(tmpdir, "generated_hex8_tensor_product_operator.o"),
                 ],
@@ -1656,7 +1669,7 @@ class NeoHookeanOgdenFrameworkTest(unittest.TestCase):
         # The four 1-D shape values live in `reference/line_p1_q2.hpp` now, and
         # this source forwards into it rather than carrying them.
         self.assertNotIn("static const s_t data[4] = {s_t(", operator_source)
-        self.assertIn('#include "../../../reference/line_p1_q2.hpp"', operator_source)
+        self.assertIn('#include "line_p1_q2.hpp"', operator_source)
         isoparametric_mesh_source = operator_source.split(
             "static SFEM_INLINE int %s_hex8_gradient_i_msoa_impl"
             % prefix,

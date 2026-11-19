@@ -51,7 +51,7 @@ def _required_elements(element):
 def _repo_root():
     path = os.path.dirname(os.path.abspath(__file__))
     while True:
-        if os.path.isdir(os.path.join(path, "base")) and os.path.isdir(
+        if os.path.isdir(os.path.join(path, "src", "base")) and os.path.isdir(
             os.path.join(path, "python")
         ):
             return path
@@ -77,14 +77,14 @@ def _include_flags(root, generated_dir, material, dim):
         os.path.join(generated_dir, material, "d%d" % dim),
         os.path.join(generated_dir, material),
         generated_dir,
-        os.path.join(root, "base"),
+        os.path.join(root, "src", "base"),
         os.path.join(root, "build"),
         os.path.join(root, "build", "external", "smesh"),
         os.path.join(root, "external", "smesh", "src"),
     ]
     # Generated kernels may include hand-written SFEM operator headers -- the
     # PROTEUS_HEX8 Laplacian wraps hex8_laplacian_inline_cpu.hpp, for instance.
-    operators_root = os.path.join(root, "operators")
+    operators_root = os.path.join(root, "src", "operators")
     if os.path.isdir(operators_root):
         dirs.append(operators_root)
         for current, subdirs, _files in os.walk(operators_root):

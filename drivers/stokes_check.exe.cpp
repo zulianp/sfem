@@ -3,6 +3,7 @@
 #endif
 
 #include <math.h>
+#include "smesh_base.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +17,7 @@
 #include "sfem_base.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_vec.hpp"
-#include "sortreduce.hpp"
+#include "sfem_sortreduce.hpp"
 
 #include "mass.hpp"
 
@@ -76,7 +77,7 @@ static SFEM_INLINE real_t p3(const real_t x, const real_t y) {
 }
 
 void stokes_ref_sol(const int tp_num,
-                    const real_t mu,
+                    const real_t /*mu*/,
                     const ptrdiff_t nnodes,
                     geom_t **const points,
                     real_t *const ux,

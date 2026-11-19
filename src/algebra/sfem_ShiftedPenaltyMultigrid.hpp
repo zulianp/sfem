@@ -1,0 +1,1609 @@
+#ifndef SFEM_SHIFTED_PENALTY_MULTIGRID_HPP
+#define SFEM_SHIFTED_PENALTY_MULTIGRID_HPP
+
+#include <cmath>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <vector>
+
+#include <algorithm>
+
+#include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ParallelOperator.hpp"
+#include "sfem_SolverExec.hpp"
+#include "sfem_ShiftedPenaltyKernels_openmp.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "sfem_operator_factory.hpp"
+#include "sfem_tpl_blas.hpp"
+
+#include "sfem_aliases.hpp"
+
+#include "smesh_device_buffer.hpp"
+#include "smesh_env.hpp"
+#include "smesh_exchange.hpp"
+
+// MATLAB version
+// https://bitbucket.org/hkothari/matsci/src/ab637a0655512c4ddf299914dd45fdb563ac7b34/Solvers/%2BBoxConstraints/%40PenaltyMG/PenaltyMG.m?at=restructuring
+namespace sfem {
+
+    /**
+     * @class ShiftedPenaltyMultigrid
+     * @brief A multigrid solver with shifted penalty method for constrained optimization problems.
+     *
+     * This class implements a multigrid solver that incorporates a shifted penalty method
+     * to handle constraints. It supports various cycle types (V-cycle, W-cycle) and provides
+     * mechanisms for nonlinear smoothing, penalty parameter updates, and coarse space corrections.
+     * Level 0 is the finest.
+     *
+     * @tparam T The data type for numerical computations (e.g., float, double).
+     *
+     * ### Public Enums:
+     * - `CycleType`: Defines the type of multigrid cycle (V, W).
+     * - `CycleReturnCode`: Return codes for the multigrid cycle (CYCLE_CONTINUE, CYCLE_CONVERGED, CYCLE_FAILURE).
+     *
+     * ### Nested Classes:
+     * - `Memory`: Manages memory buffers for solution, right-hand side, work, and diagonal data.
+     * - `Stats`: Collects and outputs statistics about the solver's performance.
+     *
+     * ### Public Methods:
+     * - `set_upper_bound`: Sets the upper bound for the solution.
+     * - `set_lower_bound`: Sets the lower bound for the solution.
+     * - `set_penalty_parameter`: Sets the penalty parameter for the shifted penalty method.
+     * - `set_omega_factor`: Sets the omega factor for the shifted penalty method.
+     * - `set_stagnation_threshold`: Sets the stagnation threshold for the shifted penalty method.
+     * - `set_constraints_op`: Sets the constraint operators and their transpose.
+     * - `add_level_constraint_op_x_op`: Adds a level-specific constraint operator.
+     * - `apply`: Applies the multigrid solver to solve the system.
+     * - `clear`: Clears all levels and associated data.
+     * - `n_levels`: Returns the number of levels in the multigrid hierarchy.
+     * - `rows`: Returns the number of rows in the finest level operator.
+     * - `cols`: Returns the number of columns in the finest level operator.
+     * - `add_level`: Adds a level to the multigrid hierarchy.
+     * - `add_constraints_restriction`: Adds a restriction operator for constraints.
+     * - `default_init`: Initializes the solver with default settings.
+     * - `set_max_it`: Sets the maximum number of iterations.
+     * - `set_max_inner_it`: Sets the maximum number of inner iterations.
+     * - `set_atol`: Sets the absolute tolerance for convergence.
+     * - `set_rtol`: Sets the relative tolerance for convergence.
+     * - `set_nlsmooth_steps`: Sets the number of nonlinear smoothing steps.
+     * - `set_cycle_type`: Sets the type of multigrid cycle.
+     * - `set_project_coarse_space_correction`: Enables or disables coarse space correction projection.
+     * - `set_max_penalty_param`: Sets the maximum penalty parameter.
+     * - `set_penalty_param`: Sets the initial penalty parameter.
+     * - `enable_line_search`: Enables or disables line search for coarse space corrections.
+     * - `collect_energy_norm_correction`: Enables or disables collection of energy norm corrections.
+     * - `set_debug`: Enables or disables debug mode.
+     *
+     * ### Private Methods:
+     * - `create_buffer`: Creates a memory buffer for a given size.
+     * - `ensure_init`: Ensures that the solver is initialized.
+     * - `init`: Initializes the solver's memory and data structures.
+     * - `shifted_op`: Constructs a shifted operator for a given level.
+     * - `eval_residual_and_jacobian`: Evaluates the residual and Jacobian for the current solution.
+     * - `penalty_pseudo_galerkin_assembly`: Assembles the penalty pseudo-Galerkin operator.
+     * - `nonlinear_smooth`: Performs nonlinear smoothing on the finest level.
+     * - `nonlinear_cycle`: Executes a nonlinear multigrid cycle.
+     * - `cycle`: Executes a multigrid cycle for a given level.
+     * - `collect_stats`: Collects solver statistics.
+     * - `write_stats`: Writes solver statistics to a CSV file.
+     * - `monitor`: Monitors and logs the solver's progress.
+     *
+     * ### Private Members:
+     * - `operator_`: Operators for each level in the multigrid hierarchy.
+     * - `smoother_`: Smoothers or solvers for each level.
+     * - `prolongation_`: Prolongation operators for each level.
+     * - `restriction_`: Restriction operators for each level.
+     * - `constraints_op_`: Constraint operator for the finest level.
+     * - `constraints_op_transpose_`: Transpose of the constraint operator.
+     * - `constraints_op_x_op_`: Constraint operators for each level.
+     * - `constraints_restriction_`: Restriction operators for constraints.
+     * - `upper_bound_`: Upper bound for the solution.
+     * - `lower_bound_`: Lower bound for the solution.
+     * - `correction`, `lagr_lb`, `lagr_ub`: Buffers for corrections and Lagrange multipliers.
+     * - `memory_`: Memory buffers for each level.
+     * - `wrap_input_`: Flag to indicate whether to wrap input arrays.
+     * - `max_it_`, `iterations_`: Maximum and current iteration counts.
+     * - `cycle_type_`: Type of multigrid cycle.
+     * - `atol_`: Absolute tolerance for convergence.
+     * - `verbose`: Flag for verbose output.
+     * - `project_coarse_space_correction_`: Flag for coarse space correction projection.
+     * - `enable_line_search_`: Flag for enabling line search.
+     * - `skip_coarse`: Flag to skip coarse grid corrections.
+     * - `collect_energy_norm_correction_`: Flag to collect energy norm corrections.
+     * - `penalty_param_`, `max_penalty_param_`: Penalty parameter and its maximum value.
+     * - `nlsmooth_steps`: Number of nonlinear smoothing steps.
+     * - `max_inner_it`: Maximum number of inner iterations.
+     * - `count_smoothing_steps`: Counter for smoothing steps.
+     * - `debug`: Flag for debug mode.
+     * - `stats`: Vector to store solver statistics.
+     * - `blas_`: BLAS implementation for numerical operations.
+     * - `impl_`: Implementation of the shifted penalty method.
+     */
+
+    template <typename T>
+    class ShiftedPenaltyMultigrid final : public Operator<T> {
+    public:
+        /// Outer iterations of the last apply.
+        int iterations() const { return iterations_; }
+        // The value is the cycle index, the coarse-level visits per pass: V 1, W 2 (a larger index is valid).
+        enum class CycleType : int { V = 1, W = 2 };
+
+        enum CycleReturnCode { CYCLE_CONTINUE = 0, CYCLE_CONVERGED = 1, CYCLE_FAILURE = 2 };
+
+        class Memory {
+        public:
+            SharedBuffer<T>  rhs;
+            SharedBuffer<T>  solution;
+            SharedBuffer<T>  work;
+            SharedBuffer<T>  diag;
+            inline ptrdiff_t size() const { return solution->size(); }
+            ~Memory() {}
+        };
+
+        struct Stats {
+            int    count_iter;
+            int    count_mg_cycles;
+            int    count_nl_smooth;
+            int    count_smooth;
+            real_t norm_penetration;
+            real_t norm_residual;
+            real_t energy_norm_correction;
+            real_t penalty_param;
+            real_t omega;
+            real_t relative_residual;
+
+            static void header(std::ostream& os) {
+                os << "count_iter,";
+                os << "count_mg_cycles,";
+                os << "count_nl_smooth,";
+                os << "count_smooth,";
+                os << "norm_penetration,";
+                os << "norm_residual,";
+                os << "energy_norm_correction,";
+                os << "penalty_param,";
+                os << "omega,";
+                os << "relative_residual,";
+                os << "rate\n";
+            }
+
+            friend std::ostream& operator<<(std::ostream& os, const Stats& stats) {
+                os << stats.count_iter << ",";
+                os << stats.count_mg_cycles << ",";
+                os << stats.count_nl_smooth << ",";
+                os << stats.count_smooth << ",";
+                os << stats.norm_penetration << ",";
+                os << stats.norm_residual << ",";
+                os << stats.energy_norm_correction << ",";
+                os << stats.penalty_param << ",";
+                os << stats.omega << ",";
+                os << stats.relative_residual << ",";
+                return os;
+            }
+        };
+
+        void set_upper_bound(const SharedBuffer<T>& ub) { upper_bound_ = ub; }
+        void set_lower_bound(const SharedBuffer<T>& lb) { lower_bound_ = lb; }
+        void set_penalty_parameter(const T val) { penalty_param_ = val; }
+        void set_omega_factor(const T val) { omega_factor = val; }
+        void set_stagnation_threshold(const T val) { stagnation_threshold = val; }
+        void set_constraints_op(const std::shared_ptr<Operator<T>>& op, const std::shared_ptr<Operator<T>>& op_t) {
+            constraints_op_           = op;
+            constraints_op_transpose_ = op_t;
+        }
+
+        void add_level_constraint_op_x_op(const std::shared_ptr<SparseBlockVector<T>>& constraints_op_x_op) {
+            constraints_op_x_op_.push_back(constraints_op_x_op);
+        }
+
+        ExecutionContext execution_context() const override { return blas_ ? blas_->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
+
+        int apply(const T* const rhs, T* const x) override {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::apply");
+
+            ensure_init();
+            prepare_fine_blocks();
+
+            count_smoothing_steps = 0;
+
+            // Wrap input arrays into fine level of mg (allocation size: owned + ghosts).
+            if (wrap_input_) {
+                const ptrdiff_t n_alloc           = level_alloc(finest_level());
+                memory_[finest_level()]->solution = Buffer<T>::wrap(n_alloc, x);
+                memory_[finest_level()]->rhs      = Buffer<T>::wrap(n_alloc, (T*)rhs);
+            }
+
+            trap_finite("x0", x, operator_[finest_level()]->rows());
+            trap_finite("rhs", rhs, operator_[finest_level()]->rows());
+
+            const int level    = finest_level();
+            auto      mem      = memory_[level];
+            auto      smoother = smoother_[level];
+            auto      op       = operator_[level];
+
+            const ptrdiff_t n_dofs             = op->rows();
+            const ptrdiff_t n_constrained_dofs = (constraints_op_ ? constraints_op_->rows() : n_dofs);
+
+            T* lb               = (lower_bound_) ? lower_bound_->data() : nullptr;
+            T* ub               = (upper_bound_) ? upper_bound_->data() : nullptr;
+            // The multipliers carry over from the previous apply on the same constraints: the next
+            // Newton iteration or time step starts from the reaction it found, not from the bare
+            // penalty, and the constraints re-linearised in between are corrected by the first update.
+            const auto keep_or_zero = [&](const T* const bound, SharedBuffer<T>& lagr) {
+                if (!bound) {
+                    lagr = nullptr;
+                } else if (!lagr || (ptrdiff_t)lagr->size() != n_constrained_dofs) {
+                    lagr = create_buffer(n_constrained_dofs);
+                    blas_->zeros(n_constrained_dofs, lagr->data());
+                }
+            };
+            keep_or_zero(lb, lagr_lb);
+            keep_or_zero(ub, lagr_ub);
+
+            T penetration_tol  = 1 / (penalty_param_ * 0.1);
+
+            int count_inner_iter        = 0;
+            int count_lagr_mult_updates = 0;
+            T   omega                   = omega_factor / penalty_param_;
+
+            SharedBuffer<T> x_old;
+            if (collect_energy_norm_correction_) {
+                x_old = create_buffer(level_alloc(finest_level()));
+                blas_->copy(n_dofs, x, x_old->data());
+            }
+
+            T residual_norm_0 = 1;
+            if (constraints_op_) {
+                fill_finest_residual();
+                residual_norm_0 = reduce_norm2(n_dofs, mem->work->data());
+                trap_finite_scalar("||g|| start", residual_norm_0);
+
+                if (debug && is_root_rank()) {
+                    printf("||g|| start: %e\n", (double)residual_norm_0);
+                }
+            }
+
+            bool converged = false;
+            for (iterations_ = 0; iterations_ < max_it_; iterations_++) {
+                T rnorm_previous = 10000000000;
+
+                if (!smesh::Env::read<bool>("UPDATE_CONSTRAINTS_IN_NONLINEAR_CYCLE", false)) {
+                    if (update_constraints_) {
+                        update_constraints_(mem->solution->data());
+                    }
+                }
+
+                for (int inner_iter = 0; inner_iter < max_inner_it; inner_iter++) {
+                    count_inner_iter++;
+
+                    CycleReturnCode ret = nonlinear_cycle();
+
+                    if (ret == CYCLE_CONVERGED) {
+                        break;
+                    }
+
+                    fill_finest_residual();
+
+                    const T residual_norm = reduce_norm2(n_dofs, mem->work->data());
+                    trap_finite_scalar("r_norm", residual_norm);
+
+                    if (debug && is_root_rank()) {
+                        printf("%d) r_norm=%g (<%g)\n", inner_iter, (double)residual_norm, omega);
+                    }
+
+                    bool stagnation = (std::abs(residual_norm / rnorm_previous) > stagnation_threshold);
+                    rnorm_previous  = residual_norm;
+                    if (stagnation && is_root_rank()) {
+                        printf("Stagnation detected\n");
+                    }
+
+                    if (((residual_norm < std::max(atol_, omega) || residual_norm / residual_norm_0 < rtol_) &&
+                         inner_iter != 0) ||
+                        stagnation) {
+                        break;
+                    }
+                }
+
+                auto Tx = x;
+
+                if (constraints_op_) {
+                    gather_solution_ghosts();
+                    blas_->zeros(n_constrained_dofs, correction->data());
+                    constraints_op_->apply(mem->solution->data(), correction->data());
+                    Tx = correction->data();
+                }
+
+                // With multipliers the violation is the augmented Lagrangian's: a row that carries force
+                // must also be closed, or the force and the gap are not complementary.
+                const T* const w     = penalty_weights_ ? penalty_weights_->data() : nullptr;
+                const T        e_pen = enable_shift
+                                               ? ((ub) ? impl_.sq_norm_kkt_p(n_constrained_dofs, penalty_param_, w, Tx, ub, lagr_ub->data()) : T(0)) +
+                                                  ((lb) ? impl_.sq_norm_kkt_m(n_constrained_dofs, penalty_param_, w, Tx, lb, lagr_lb->data()) : T(0))
+                                               : ((ub) ? impl_.sq_norm_ramp_p(n_constrained_dofs, Tx, ub) : T(0)) +
+                                                  ((lb) ? impl_.sq_norm_ramp_m(n_constrained_dofs, Tx, lb) : T(0));
+
+                const T norm_pen      = std::sqrt(reduce_sum(e_pen));
+                const T norm_residual = reduce_norm2(n_dofs, mem->work->data());
+
+                if (enable_shift) {
+                    if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, Tx, ub, lagr_ub->data());
+                    if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, Tx, lb, lagr_lb->data());
+                    count_lagr_mult_updates++;
+                }
+
+                // Store it for diagonstics
+                const T prev_penalty_param = penalty_param_;
+                const T prev_omega         = omega;
+
+                // I moved the previous three lines outside of the if
+                if (norm_pen < penetration_tol) {
+                    // if (enable_shift) {
+                    //     if (ub) impl_.update_lagr_p(n_constrained_dofs, penalty_param_, Tx, ub, lagr_ub->data());
+                    //     if (lb) impl_.update_lagr_m(n_constrained_dofs, penalty_param_, Tx, lb, lagr_lb->data());
+                    //     count_lagr_mult_updates++;
+                    // }
+
+                    penetration_tol = penetration_tol / pow(penalty_param_, penetration_tol_exp);
+                    omega           = std::max(atol_, omega_factor * omega / penalty_param_);
+
+                } else {
+                    penalty_param_  = std::min(penalty_param_ * penalty_param_increase, max_penalty_param_);
+                    penetration_tol = 1 / pow(penalty_param_, (1 - penetration_tol_exp));
+                    omega           = omega_factor / penalty_param_;
+                }
+
+                if (debug && is_root_rank() && ub) {
+                    printf("lagr_ub: %e\n", blas_->norm2(n_constrained_dofs, lagr_ub->data()));
+                }
+
+                if (debug && is_root_rank() && lb) {
+                    printf("lagr_lb: %e\n", blas_->norm2(n_constrained_dofs, lagr_lb->data()));
+                }
+
+                monitor(iterations_ + 1,
+                        count_inner_iter,
+                        count_smoothing_steps,
+                        count_lagr_mult_updates,
+                        norm_pen,
+                        norm_residual,
+                        norm_residual / residual_norm_0,
+                        penetration_tol,
+                        prev_penalty_param);
+
+                real_t energy_norm_correction = -1;
+                if (collect_energy_norm_correction_) {
+                    SFEM_TRACE_SCOPE("collect_energy_norm_correction");
+
+                    blas_->zaxpby(n_dofs, 1, x, -1, x_old->data(), correction->data());
+                    blas_->zeros(x_old->size(), x_old->data());
+                    level_jacobian(finest_level())->apply(correction->data(), x_old->data());
+                    energy_norm_correction = sqrt(reduce_sum(blas_->dot(n_dofs, x_old->data(), correction->data())));
+                    blas_->copy(n_dofs, x, x_old->data());
+                }
+
+                collect_stats({.count_iter             = iterations_ + 1,
+                               .count_mg_cycles        = count_inner_iter,
+                               .count_nl_smooth        = 2 * (count_inner_iter * nlsmooth_steps),
+                               .count_smooth           = count_smoothing_steps,
+                               .norm_penetration       = norm_pen,
+                               .norm_residual          = norm_residual,
+                               .energy_norm_correction = energy_norm_correction,
+                               .penalty_param          = prev_penalty_param,
+                               .omega                  = prev_omega,
+                               .relative_residual      = norm_residual / residual_norm_0});
+
+                // The residual meets an absolute tolerance of its own when the caller sets one (it knows
+                // the residual it needs: rtol_ measures against this apply's start), atol_ otherwise.
+                const T residual_atol = residual_atol_ > 0 ? residual_atol_ : atol_;
+                if (norm_pen < atol_ && (norm_residual < residual_atol || norm_residual / residual_norm_0 < rtol_)) {
+                    converged = true;
+                    break;
+                }
+            }
+
+            write_stats();
+            return converged ? SFEM_SUCCESS : SFEM_FAILURE;
+        }
+
+        void clear() {
+            prolongation_.clear();
+            restriction_.clear();
+            smoother_.clear();
+        }
+
+        inline int n_levels() const { return smoother_.size(); }
+
+        inline std::ptrdiff_t rows() const override { return operator_[finest_level()]->rows(); }
+        inline std::ptrdiff_t cols() const override { return operator_[finest_level()]->cols(); }
+
+        // Fine level prolongation has to be null
+        // Coarse level restriction has to be null
+        inline void add_level(const std::shared_ptr<Operator<T>>&               op,
+                              const std::shared_ptr<MatrixFreeLinearSolver<T>>& smoother_or_solver,
+                              const std::shared_ptr<Operator<T>>&               prolongation,
+                              const std::shared_ptr<Operator<T>>&               restriction) {
+            operator_.push_back(op);
+            smoother_.push_back(smoother_or_solver);
+            prolongation_.push_back(prolongation);
+            restriction_.push_back(restriction);
+        }
+
+        inline void add_constraints_restriction(const std::shared_ptr<Operator<T>>& restict_diag) {
+            constraints_restriction_.push_back(restict_diag);
+        }
+
+        /// Per level, the restriction of the constraint blocks (the operator that restricts
+        /// add_level_constraint_op_x_op's blocks). With it a coarse level's penalty is the restriction
+        /// of the fine active-weighted blocks, J n n^T m, not the restricted J times the restricted
+        /// n n^T m: a node out of contact then adds nothing to its coarse neighbour's penalty.
+        inline void add_constraints_block_restriction(const std::shared_ptr<Operator<T>>& restrict_blocks) {
+            constraints_block_restriction_.push_back(restrict_blocks);
+        }
+
+        void set_nodal_block_size(const int block_size) { nodal_block_size_ = block_size > 0 ? block_size : 1; }
+
+        void add_level_exchange(const std::shared_ptr<smesh::Exchange>& exchange) { exchanges_.push_back(exchange); }
+
+        /// The level's constrained dofs zeroed: fn, and, where given, its team form (the calling
+        /// thread's rows, after team_prepare outside the region).
+        void add_level_apply_zero_constraints(const std::function<void(T* const)>&              fn,
+                                              const std::function<void(const Team&, T* const)>& team_fn      = {},
+                                              const std::function<int()>&                        team_prepare = {}) {
+            apply_zero_constraints_.push_back(fn);
+            team_apply_zero_constraints_.push_back(team_fn);
+            team_prepare_zero_constraints_.push_back(team_prepare);
+        }
+
+        void default_init() {
+            blas_ = OpenMPBLAS<T>::create();
+            OpenMPShiftedPenaltyKernels<T>::build(impl_);
+        }
+
+        void set_max_it(const int val) { max_it_ = val; }
+        void set_max_inner_it(const int val) { max_inner_it = val; }
+        void set_atol(const T val) { atol_ = val; }
+        void set_rtol(const T val) { rtol_ = val; }
+        void set_residual_atol(const T val) { residual_atol_ = val; }
+        /// Per constraint row, the factor the penalty is scaled by (null: 1): the row's penalty is
+        /// penalty_param * weights[i], so penalty_param is relative to what the weights measure.
+        void set_penalty_weights(const SharedBuffer<T>& weights) { penalty_weights_ = weights; }
+        /// Symmetric blocks added to the fine level's operator at the constraint nodes, in the layout
+        /// of the finest add_level_constraint_op_x_op (null: none, and nothing is allocated for them).
+        /// The residual, the shifted operator, its smoother and the coarse penalties restricted from
+        /// the fine level carry them. Read at each apply.
+        void set_fine_blocks(const SharedBuffer<T>& blocks) { fine_block_values_ = blocks; }
+        /// y += the fine blocks (set_fine_blocks) times x.
+        void apply_fine_blocks(const T* const x, T* const y) {
+            ensure_init();
+            prepare_fine_blocks();
+            if (fine_blocks_op_) fine_blocks_op_->apply(x, y);
+        }
+        void set_nlsmooth_steps(const int steps) { nlsmooth_steps = steps; }
+        void set_cycle_type(const CycleType val) { cycle_type_ = val; }
+        void set_project_coarse_space_correction(const bool val) { project_coarse_space_correction_ = val; }
+        void set_max_penalty_param(const real_t val) { max_penalty_param_ = val; }
+        void set_penalty_param(const real_t val) { penalty_param_ = val; }
+        void enable_line_search(const bool val) { enable_line_search_ = val; }
+        void collect_energy_norm_correction(const bool val) { collect_energy_norm_correction_ = val; }
+        void set_debug(const int val) { debug = val; }
+        void set_penalty_param_increase(const real_t val) { penalty_param_increase = val; }
+        void set_enable_shift(const bool val) { enable_shift = val; }
+
+        void set_update_constraints(std::function<void(const T* const)> fun) { update_constraints_ = fun; }
+
+        using EvalMaterialResidualFn = std::function<void(const T* const x, T* const r)>;
+        using LinearizeFn            = std::function<void(const T* const x_fine)>;
+        using ApplyJacobianFn        = std::function<void(const T* const x_lin, const T* const h, T* const y)>;
+
+        void set_eval_material_residual(EvalMaterialResidualFn fn) { eval_material_residual_ = std::move(fn); }
+        void set_linearize(LinearizeFn fn) { linearize_ = std::move(fn); }
+        void set_apply_jacobian(const int level, ApplyJacobianFn fn) {
+            if (level < 0) {
+                return;
+            }
+            if (apply_jacobian_.size() <= static_cast<size_t>(level)) {
+                apply_jacobian_.resize(static_cast<size_t>(level) + 1);
+            }
+            apply_jacobian_[static_cast<size_t>(level)] = std::move(fn);
+        }
+
+        std::shared_ptr<BLAS<T>>& blas() { return blas_; }
+        ShiftedPenaltyKernels<T>&    impl() { return impl_; }
+
+    private:
+        SharedBuffer<T> create_buffer(const ptrdiff_t n) const {
+            auto blas_impl = blas_;
+            return Buffer<T>::own(
+                    n,
+                    blas_impl->allocate(n),
+                    [blas_impl](void* ptr) { blas_impl->destroy(ptr); },
+                    (enum MemorySpace)this->execution_space());
+        }
+
+        inline int finest_level() const { return 0; }
+        inline int coarsest_level() const { return n_levels() - 1; }
+        inline int coarser_level(int level) const { return level + 1; }
+        inline int finer_level(int level) const { return level - 1; }
+
+        std::ptrdiff_t level_owned(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->rows();
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::ptrdiff_t level_alloc(const int l) const {
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[l]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return std::max(pop->row_allocation_size(), pop->col_allocation_size());
+            }
+            return smoother_[l]->rows();
+        }
+
+        std::shared_ptr<Communicator> parallel_comm() const {
+            if (operator_.empty()) {
+                return nullptr;
+            }
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[finest_level()]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                return pop->comm();
+            }
+            return nullptr;
+        }
+
+        bool is_root_rank() const {
+            auto comm = parallel_comm();
+            return !comm || comm->rank() == 0;
+        }
+
+        T reduce_sum(const T local) const {
+            auto comm = parallel_comm();
+            return comm ? comm->sum(local) : local;
+        }
+
+        T reduce_norm2(const ptrdiff_t n, const T* const x) const {
+            const T local_sq = blas_->dot(n, x, x);
+            return std::sqrt(reduce_sum(local_sq));
+        }
+
+        smesh::Exchange* level_exchange(const int level) const {
+            if (level < 0 || static_cast<size_t>(level) >= exchanges_.size()) {
+                return nullptr;
+            }
+            return exchanges_[static_cast<size_t>(level)].get();
+        }
+
+        void exchange_gather(const int level, T* const x) const {
+            if (auto* ex = level_exchange(level)) {
+                ex->gather(x, nodal_block_size_);
+            }
+        }
+
+        void apply_zero_constraints_level(const int level, T* const x) const {
+            if (level < 0 || static_cast<size_t>(level) >= apply_zero_constraints_.size()) {
+                return;
+            }
+            if (auto& fn = apply_zero_constraints_[static_cast<size_t>(level)]) {
+                fn(x);
+            }
+        }
+
+        void exchange_scatter_add_and_gather(const int level, T* const y) const {
+            if (auto* ex = level_exchange(level)) {
+                ex->scatter_add(y, nodal_block_size_);
+                ex->gather(y, nodal_block_size_);
+            }
+        }
+
+        void gather_solution_ghosts() {
+            if (!parallel_comm()) {
+                return;
+            }
+            auto mem = memory_[finest_level()];
+            exchange_gather(finest_level(), mem->solution->data());
+        }
+
+        void trap_finite(const char* tag, const T* const x, const ptrdiff_t n) const {
+            if (!debug || !x || n <= 0) {
+                return;
+            }
+
+            const T*        h = x;
+            SharedBuffer<T> host;
+            if (this->execution_space() == EXECUTION_SPACE_DEVICE) {
+                host = Buffer<T>::wrap(static_cast<size_t>(n), const_cast<T*>(x), MEMORY_SPACE_DEVICE);
+                host = smesh::to_host(host);
+                h    = host->data();
+            }
+
+            ptrdiff_t first = -1;
+            ptrdiff_t nbad  = 0;
+            for (ptrdiff_t i = 0; i < n; ++i) {
+                if (h[i] == h[i] && std::isfinite(static_cast<double>(h[i]))) {
+                    continue;
+                }
+                if (first < 0) {
+                    first = i;
+                }
+                ++nbad;
+            }
+            if (nbad) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid NaN trap [%s]: nbad=%ld first=%ld val=%g n=%ld\n",
+                           tag,
+                           (long)nbad,
+                           (long)first,
+                           first >= 0 ? (double)h[first] : 0.0,
+                           (long)n);
+            }
+        }
+
+        // Unconditional: a non-finite residual norm or step length stops the solve whatever `debug` says.
+        void trap_finite_scalar(const char* tag, const T v) const {
+            if (v == v && std::isfinite(static_cast<double>(v))) {
+                return;
+            }
+            SFEM_ERROR("ShiftedPenaltyMultigrid NaN trap [%s]: val=%g\n", tag, (double)v);
+        }
+
+        void maybe_linearize() {
+            if (linearize_) {
+                linearize_(memory_[finest_level()]->solution->data());
+            }
+        }
+
+        void eval_material_residual(const T* const x, T* const r) {
+            if (eval_material_residual_) {
+                eval_material_residual_(x, r);
+            } else {
+                operator_[finest_level()]->apply(x, r);
+            }
+            if (fine_blocks_op_) fine_blocks_op_->apply(x, r);
+        }
+
+        std::shared_ptr<Operator<T>> level_jacobian(const int level) {
+            if (level >= 0 && static_cast<size_t>(level) < apply_jacobian_.size() &&
+                apply_jacobian_[static_cast<size_t>(level)]) {
+                const T* const  x_lin = memory_[finest_level()]->solution->data();
+                auto            fn    = apply_jacobian_[static_cast<size_t>(level)];
+                auto            op    = operator_[level];
+                auto            blas  = blas_;
+                const ptrdiff_t n_y   = level_alloc(level);
+                return make_op<T>(
+                        op->rows(),
+                        op->cols(),
+                        [fn, x_lin, blas, n_y, this](const T* const h, T* const y) {
+                            this->trap_finite("J:h", h, n_y);
+                            blas->zeros(n_y, y);
+                            fn(x_lin, h, y);
+                            this->trap_finite("J:y", y, n_y);
+                        },
+                        this->execution_space());
+            }
+            return operator_[level];
+        }
+
+        void fill_finest_residual() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::fill_finest_residual");
+
+            const int level = finest_level();
+            auto      mem   = memory_[level];
+            auto      op    = operator_[level];
+
+            const ptrdiff_t n_dofs             = op->rows();
+            const ptrdiff_t n_constrained_dofs = (constraints_op_ ? constraints_op_->rows() : n_dofs);
+
+            const T* const lb   = (lower_bound_) ? lower_bound_->data() : nullptr;
+            const T* const ub   = (upper_bound_) ? upper_bound_->data() : nullptr;
+            const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
+            const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
+
+            maybe_linearize();
+            trap_finite("x", mem->solution->data(), n_dofs);
+
+            if (constraints_op_) {
+                gather_solution_ghosts();
+                blas_->zeros(n_constrained_dofs, correction->data());
+                constraints_op_->apply(mem->solution->data(), correction->data());
+
+                blas_->zeros(n_constrained_dofs, mem->work->data());
+                impl_.calc_r_pen(n_constrained_dofs, correction->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->work->data());
+
+                blas_->zeros(level_alloc(level), correction->data());
+                constraints_op_transpose_->apply(mem->work->data(), correction->data());
+                exchange_scatter_add_and_gather(level, correction->data());
+
+                blas_->zeros(n_dofs, mem->work->data());
+                eval_material_residual(mem->solution->data(), mem->work->data());
+                blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                blas_->axpy(n_dofs, 1, correction->data(), mem->work->data());
+                apply_zero_constraints_level(level, mem->work->data());
+            } else {
+                blas_->zeros(n_dofs, mem->work->data());
+                eval_material_residual(mem->solution->data(), mem->work->data());
+                blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                impl_.calc_r_pen(n_dofs, mem->solution->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->work->data());
+            }
+            trap_finite("r", mem->work->data(), n_dofs);
+        }
+
+        void ensure_init() {
+            if (memory_.empty()) {
+                init();
+            }
+        }
+
+        int init() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::init");
+
+            assert(prolongation_.size() == restriction_.size());
+            assert(operator_.size() == smoother_.size());
+
+            memory_.clear();
+            memory_.resize(this->n_levels());
+
+            correction = create_buffer(level_alloc(finest_level()));
+            for (int l = 0; l < n_levels(); l++) {
+                memory_[l] = std::make_shared<Memory>();
+
+                const ptrdiff_t n = level_alloc(l);
+                if (l != finest_level() || !wrap_input_) {
+                    memory_[l]->solution = create_buffer(n);
+                    memory_[l]->rhs      = create_buffer(n);
+                }
+
+                memory_[l]->work = create_buffer(n);
+                if (constraints_op_) {
+                    memory_[l]->diag = create_buffer(constraints_op_x_op_[l]->n_blocks());
+                } else {
+                    memory_[l]->diag = create_buffer(n);
+                }
+            }
+
+            // Restricted active-weighted blocks: a coarse level's penalty is its blocks with unit weights.
+            penalty_op_x_op_.clear();
+            weighted_blocks_ = nullptr;
+            if (restricts_weighted_blocks()) {
+                const auto fine  = constraints_op_x_op_[finest_level()];
+                weighted_blocks_ = create_buffer(fine->n_blocks() * fine->block_size());
+                penalty_op_x_op_.resize(n_levels());
+                for (int l = coarser_level(finest_level()); l < n_levels(); l = coarser_level(l)) {
+                    const auto      geometric = constraints_op_x_op_[l];
+                    const ptrdiff_t nb        = geometric->n_blocks();
+                    auto            blocks    = create_buffer(nb * geometric->block_size());
+                    blas_->zeros(blocks->size(), blocks->data());
+                    penalty_op_x_op_[l] = sfem::create_sparse_block_vector(geometric->idx(), blocks);
+                    blas_->values(nb, 1, memory_[l]->diag->data());
+                }
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        bool restricts_weighted_blocks() const {
+            return constraints_op_ && n_levels() > 1 && (int)constraints_block_restriction_.size() >= n_levels() - 1;
+        }
+
+        // The blocks the penalty weights at a level: the fine constraint blocks, or a coarse level's
+        // restricted active-weighted ones.
+        std::shared_ptr<SparseBlockVector<T>> level_op_x_op(const int level) const {
+            if (level == finest_level() && fine_shift_) return fine_shift_;
+            if (level != finest_level() && restricts_weighted_blocks()) return penalty_op_x_op_[level];
+            return constraints_op_x_op_[level];
+        }
+
+        // The weights of level_op_x_op's blocks: the penalty's, or one where the blocks are weighted
+        // already (the fine level with fine blocks).
+        SharedBuffer<T> level_op_x_op_weights(const int level) const {
+            if (level == finest_level() && fine_shift_) return unit_weights_;
+            return memory_[level]->diag;
+        }
+
+        // The fine blocks' views and their unit weights, for the blocks set_fine_blocks gave; none
+        // without them.
+        void prepare_fine_blocks() {
+            if (!fine_block_values_) {
+                fine_blocks_    = nullptr;
+                fine_shift_     = nullptr;
+                fine_blocks_op_ = nullptr;
+                unit_weights_   = nullptr;
+                return;
+            }
+            if (!restricts_weighted_blocks()) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: fine blocks need the constraint blocks' restrictions\n");
+            }
+            const auto      fine = constraints_op_x_op_[finest_level()];
+            const ptrdiff_t nb   = fine->n_blocks();
+            if ((ptrdiff_t)fine_block_values_->size() != nb * fine->block_size()) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: %ld fine block values for %ld blocks of %d\n",
+                           (long)fine_block_values_->size(),
+                           (long)nb,
+                           fine->block_size());
+            }
+            if (!unit_weights_ || (ptrdiff_t)unit_weights_->size() != nb) {
+                unit_weights_ = create_buffer(nb);
+                blas_->values(nb, 1, unit_weights_->data());
+            }
+            fine_blocks_    = sfem::create_sparse_block_vector(fine->idx(), fine_block_values_);
+            fine_shift_     = sfem::create_sparse_block_vector(fine->idx(), weighted_blocks_);
+            fine_blocks_op_ = sfem::create_sparse_block_vector_mult(operator_[finest_level()]->rows(), fine_blocks_, unit_weights_);
+        }
+
+        // The fine level's active-weighted penalty blocks J n n^T m, plus the fine blocks.
+        void weight_fine_blocks() {
+            const int  fl   = finest_level();
+            const auto fine = constraints_op_x_op_[fl];
+            impl_.scale_blocks(fine->n_blocks(), fine->block_size(), memory_[fl]->diag->data(), fine->data()->data(), weighted_blocks_->data());
+            if (fine_blocks_) blas_->axpy(weighted_blocks_->size(), 1, fine_blocks_->data()->data(), weighted_blocks_->data());
+        }
+
+        std::shared_ptr<Operator<T>> shifted_op(const int level) {
+            std::shared_ptr<Operator<T>> jac = level_jacobian(level);
+            if (auto team = team_shifted_op(level, jac)) return team;
+
+            std::shared_ptr<Operator<T>> sop;
+            if (constraints_op_) {
+                sop = jac + sfem::create_sparse_block_vector_mult(jac->rows(), level_op_x_op(level), level_op_x_op_weights(level));
+            } else {
+                sop = jac + sfem::diag_op(memory_[level]->diag, this->execution_space());
+            }
+
+            auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            if (pop && pop->comm() && pop->comm()->size() > 1) {
+                auto*     ex = level_exchange(level);
+                const int bs = nodal_block_size_;
+                return make_parallel_op<T>(
+                        pop->comm(),
+                        pop->rows(),
+                        pop->cols(),
+                        pop->row_allocation_size(),
+                        pop->col_allocation_size(),
+                        [sop, ex, bs](const T* const x, T* const y) {
+                            if (ex) {
+                                ex->gather(const_cast<T*>(x), bs);
+                            }
+                            sop->apply(x, y);
+                        },
+                        pop->execution_space());
+            }
+            return sop;
+        }
+
+        // The shifted operator in team form, where the Jacobian has one (null otherwise), so that a
+        // smoother or the coarse solver over it runs in one region. Under MPI the leader first
+        // brings x's ghosts. The contact blocks go first: their loop splits blocks, not rows, and its
+        // barrier keeps them apart from the Jacobian's writes; a diagonal shift goes after, on the
+        // thread's own rows.
+        std::shared_ptr<Operator<T>> team_shifted_op(const int level, const std::shared_ptr<Operator<T>>& jac) {
+            if (this->execution_space() != EXECUTION_SPACE_HOST) return nullptr;
+            auto tjac = std::dynamic_pointer_cast<TeamOperator<T>>(jac);
+            if (!tjac || !tjac->team_capable()) return nullptr;
+
+            std::shared_ptr<ScaledBlockVectorMult<T>> blocks;
+            SharedBuffer<T>                           diag;
+            if (constraints_op_) {
+                blocks = std::make_shared<ScaledBlockVectorMult<T>>();
+                blocks->n_dofs  = jac->rows();
+                blocks->sbv     = level_op_x_op(level);
+                blocks->scaling = level_op_x_op_weights(level);
+                blocks->init();
+            } else {
+                diag = memory_[level]->diag;
+            }
+
+            auto*     ex  = level_exchange(level);
+            const int bs  = nodal_block_size_;
+            auto      pop = std::dynamic_pointer_cast<ParallelOperator<T>>(operator_[level]);
+            const bool distributed = pop && pop->comm() && pop->comm()->size() > 1;
+            auto apply = [tjac, blocks, diag, ex, bs, distributed](const Team& team, const T* const x, T* const y) {
+                if (distributed && ex) {
+                    if (team.leader()) ex->gather(const_cast<T*>(x), bs);
+                    team.barrier();
+                }
+                if (blocks) blocks->team_apply(team, x, y);
+                tjac->team_apply(team, x, y);
+                if (diag) team_blas::xypaz(team.begin, team.end, x, diag->data(), T(1), y);
+            };
+            auto prepare = [tjac, blocks]() -> int {
+                if (tjac->prepare() != SFEM_SUCCESS) return SFEM_FAILURE;
+                return blocks ? blocks->prepare() : SFEM_SUCCESS;
+            };
+            if (distributed) {
+                return make_team_op<T>(pop->comm(),
+                                       pop->rows(),
+                                       pop->cols(),
+                                       pop->row_allocation_size(),
+                                       pop->col_allocation_size(),
+                                       false,
+                                       std::move(apply),
+                                       std::move(prepare));
+            }
+            return make_team_lambda_op<T>(jac->rows(), jac->cols(), false, std::move(apply), std::move(prepare));
+        }
+
+        void eval_residual_and_jacobian() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::eval_residual_and_jacobian");
+
+            const int level = finest_level();
+            auto      mem   = memory_[level];
+            auto      op    = operator_[level];
+
+            const ptrdiff_t n_dofs             = op->rows();
+            const ptrdiff_t n_constrained_dofs = (constraints_op_ ? constraints_op_->rows() : n_dofs);
+
+            const T* const lb   = (lower_bound_) ? lower_bound_->data() : nullptr;
+            const T* const ub   = (upper_bound_) ? upper_bound_->data() : nullptr;
+            const T* const l_lb = lagr_lb ? lagr_lb->data() : nullptr;
+            const T* const l_ub = lagr_ub ? lagr_ub->data() : nullptr;
+
+            fill_finest_residual();
+
+            if (debug > 1 && is_root_rank()) {
+                printf("Residual: %g\n", blas_->norm2(n_dofs, mem->work->data()));
+                if (ub) {
+                    printf("UB: %g, LUB %g\n", blas_->norm2(n_constrained_dofs, ub), blas_->norm2(n_constrained_dofs, l_ub));
+                }
+                if (lb) {
+                    printf("LB: %g, LLB %g\n", blas_->norm2(n_constrained_dofs, lb), blas_->norm2(n_constrained_dofs, l_lb));
+                }
+            }
+
+            if (constraints_op_) {
+                gather_solution_ghosts();
+                blas_->zeros(n_constrained_dofs, correction->data());
+                constraints_op_->apply(mem->solution->data(), correction->data());
+                blas_->zeros(n_constrained_dofs, mem->diag->data());
+                impl_.calc_J_pen(n_constrained_dofs, correction->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->diag->data());
+                if (fine_shift_) weight_fine_blocks();
+            } else {
+                blas_->zeros(n_dofs, mem->diag->data());
+                impl_.calc_J_pen(n_dofs, mem->solution->data(), penalty_param_, penalty_weights_ ? penalty_weights_->data() : nullptr, lb, ub, l_lb, l_ub, mem->diag->data());
+            }
+            trap_finite("J_pen", mem->diag->data(), static_cast<ptrdiff_t>(mem->diag->size()));
+        }
+
+        void penalty_pseudo_galerkin_assembly() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::penalty_pseudo_galerkin_assembly");
+
+            if (restricts_weighted_blocks()) {
+                const int fl = finest_level();
+                weight_fine_blocks();
+                const T* from = weighted_blocks_->data();
+                for (int l = fl; l != coarsest_level(); l = coarser_level(l)) {
+                    auto to = penalty_op_x_op_[coarser_level(l)]->data();
+                    blas_->zeros(to->size(), to->data());
+                    constraints_block_restriction_[l]->apply(from, to->data());
+                    trap_finite("J_pen_blocks_coarse", to->data(), static_cast<ptrdiff_t>(to->size()));
+                    from = to->data();
+                }
+                return;
+            }
+
+            for (int l = finest_level(); l != coarsest_level(); l = coarser_level(l)) {
+                auto mem_coarse = memory_[coarser_level(l)];
+                blas_->zeros(mem_coarse->diag->size(), mem_coarse->diag->data());
+
+                if (constraints_op_) {
+                    constraints_restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
+                } else {
+                    restriction_[l]->apply(memory_[l]->diag->data(), mem_coarse->diag->data());
+                }
+                trap_finite("J_pen_coarse", mem_coarse->diag->data(), static_cast<ptrdiff_t>(mem_coarse->diag->size()));
+            }
+        }
+
+        void nonlinear_smooth() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_smooth");
+
+            if (team_nonlinear_smooth()) return;
+
+            const int level    = finest_level();
+            auto      mem      = memory_[level];
+            auto      smoother = smoother_[level];
+            auto      op       = operator_[level];
+            auto      sop      = shifted_op(level);
+
+            const ptrdiff_t n_dofs = op->rows();
+            for (int ns = 0; ns < nlsmooth_steps; ns++) {
+                eval_residual_and_jacobian();
+
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
+                } else {
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
+                }
+
+                // Zero owned+ghosts: Jacobi n_blocks is n_local and accumulates (+=).
+                blas_->zeros(correction->size(), correction->data());
+                smoother->apply(mem->work->data(), correction->data());
+                trap_finite("nlsmooth:c", correction->data(), n_dofs);
+                blas_->axpy(n_dofs, 1, correction->data(), mem->solution->data());
+                trap_finite("nlsmooth:x", mem->solution->data(), n_dofs);
+
+                count_smoothing_steps += smoother->iterations();
+            }
+        }
+
+        // The nonlinear smoothing steps in one region, where every part of a step has a team form
+        // (the host, contact constraints, a linear material, no debug traps): false otherwise, and
+        // nothing done. A step is the plain one's: the residual (fill_finest_residual), the
+        // penalty's Jacobian (eval_residual_and_jacobian), the smoother's shift, the smoother, the
+        // update. The contact rows' vectors are their own (team_projection_,
+        // team_penalty_residual_), so that the projection serves the residual and the Jacobian.
+        bool team_nonlinear_smooth() {
+            const int level = finest_level();
+            if (this->execution_space() != EXECUTION_SPACE_HOST || debug || !constraints_op_ || linearize_ ||
+                eval_material_residual_ || (level < (int)apply_jacobian_.size() && apply_jacobian_[level])) {
+                return false;
+            }
+            auto team_of = [](const std::shared_ptr<Operator<T>>& op) {
+                auto t = std::dynamic_pointer_cast<TeamOperator<T>>(op);
+                return t && t->team_capable() ? t : nullptr;
+            };
+            auto project    = team_of(constraints_op_);
+            auto distribute = team_of(constraints_op_transpose_);
+            auto material   = team_of(operator_[level]);
+            auto fine_blocks = std::dynamic_pointer_cast<TeamOperator<T>>(fine_blocks_op_);
+            if (!project || !distribute || !material || (fine_blocks_op_ && !fine_blocks)) return false;
+
+            const bool has_zero      = level < (int)apply_zero_constraints_.size() && apply_zero_constraints_[level];
+            const bool has_team_zero = level < (int)team_apply_zero_constraints_.size() && team_apply_zero_constraints_[level];
+            if (has_zero && !has_team_zero) return false;
+
+            auto smoother = smoother_[level];
+            auto sop      = shifted_op(level);
+            auto sbv      = level_op_x_op(level);
+            auto weights  = level_op_x_op_weights(level);
+            auto shiftable = smoother->shiftable_preconditioner();
+            if (!std::dynamic_pointer_cast<TeamOperator<T>>(sop) || !shiftable || !shiftable->team_shift_capable()) return false;
+
+            const ptrdiff_t n_c   = constraints_op_->rows();
+            const auto      fine  = constraints_op_x_op_[level];
+            if (fine_shift_ && fine->n_blocks() != n_c) return false;
+
+            // Outside the region: the smoother over the shifted operator (its shift is the steps'),
+            // and every part's checks and scratch.
+            smoother->set_op_and_diag_shift(sop, sbv, weights);
+            auto tsmoother = std::dynamic_pointer_cast<TeamOperator<T>>(smoother);
+            if (!tsmoother || !tsmoother->team_capable()) return false;
+            if (tsmoother->prepare() != SFEM_SUCCESS || project->prepare() != SFEM_SUCCESS || distribute->prepare() != SFEM_SUCCESS ||
+                material->prepare() != SFEM_SUCCESS || (fine_blocks && fine_blocks->prepare() != SFEM_SUCCESS)) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: a team part failed its checks\n");
+            }
+            if (has_team_zero && team_prepare_zero_constraints_[level] && team_prepare_zero_constraints_[level]() != SFEM_SUCCESS) {
+                SFEM_ERROR("ShiftedPenaltyMultigrid: the constraints' team form failed its checks\n");
+            }
+            if (!team_projection_ || (ptrdiff_t)team_projection_->size() != n_c) {
+                team_projection_       = create_buffer(n_c);
+                team_penalty_residual_ = create_buffer(n_c);
+            }
+
+            auto            mem         = memory_[level];
+            const ptrdiff_t n_owned     = level_owned(level);
+            const ptrdiff_t n_alloc     = level_alloc(level);
+            const bool      distributed = parallel_comm() != nullptr;
+            auto*           ex          = level_exchange(level);
+            const int       bs          = nodal_block_size_;
+            const int       block_size  = fine->block_size();
+
+            T* const       x          = mem->solution->data();
+            const T* const rhs        = mem->rhs->data();
+            T* const       r          = mem->work->data();
+            T* const       c          = correction->data();
+            T* const       J          = mem->diag->data();
+            T* const       proj       = team_projection_->data();
+            T* const       rpen       = team_penalty_residual_->data();
+            const T* const lb         = lower_bound_ ? lower_bound_->data() : nullptr;
+            const T* const ub         = upper_bound_ ? upper_bound_->data() : nullptr;
+            const T* const l_lb       = lagr_lb ? lagr_lb->data() : nullptr;
+            const T* const l_ub       = lagr_ub ? lagr_ub->data() : nullptr;
+            const T* const pw         = penalty_weights_ ? penalty_weights_->data() : nullptr;
+            const T        rho        = penalty_param_;
+            T* const       weighted   = fine_shift_ ? weighted_blocks_->data() : nullptr;
+            const T* const fine_vals  = fine_blocks_ ? fine_blocks_->data()->data() : nullptr;
+            const T* const geometric  = fine->data()->data();
+            const auto     zero_team  = has_team_zero ? team_apply_zero_constraints_[level] : nullptr;
+            const int      steps      = nlsmooth_steps;
+
+#pragma omp parallel
+            {
+                const sfem_team_t ct = sfem_team_current(distributed);
+                const Team        td = Team::of(n_owned, ct.tid, ct.threads, distributed);
+                const Team        tc = Team::of(n_c, ct.tid, ct.threads, distributed);
+                for (int ns = 0; ns < steps; ns++) {
+                    // Every vector the step accumulates into starts from zero.
+                    team_blas::zeros(td.begin, td.end, c);
+                    team_blas::zeros(td.begin, td.end, r);
+                    team_blas::zeros(tc.begin, tc.end, proj);
+                    team_blas::zeros(tc.begin, tc.end, rpen);
+                    team_blas::zeros(tc.begin, tc.end, J);
+                    if (td.leader()) team_blas::zeros(n_owned, n_alloc, c);
+                    td.barrier();
+                    // x's ghosts from their owners, once every thread's update of its rows is in.
+                    if (distributed && ex) {
+                        if (td.leader()) ex->gather(x, bs);
+                        td.barrier();
+                    }
+
+                    // The penalty's residual and Jacobian on the contact rows, from one projection.
+                    project->team_apply(tc, x, proj);
+                    shifted_penalty_team::calc_r_pen(tc.begin, tc.end, proj, rho, pw, lb, ub, l_lb, l_ub, rpen);
+                    shifted_penalty_team::calc_J_pen(tc.begin, tc.end, proj, rho, pw, lb, ub, l_lb, l_ub, J);
+                    if (weighted) {
+                        shifted_penalty_team::scale_blocks(tc.begin, tc.end, block_size, J, geometric, weighted);
+                        if (fine_vals) team_blas::axpy(tc.begin * block_size, tc.end * block_size, T(1), fine_vals, weighted);
+                    }
+                    td.barrier();
+
+                    // The residual: rhs - A x - (the penalty's forces), the constrained rows zero.
+                    distribute->team_apply(td, rpen, c);
+                    if (distributed && ex) {
+                        if (td.leader()) {
+                            ex->scatter_add(c, bs);
+                            ex->gather(c, bs);
+                        }
+                        td.barrier();
+                    }
+                    if (fine_blocks) fine_blocks->team_apply(td, x, r);
+                    material->team_apply(td, x, r);
+                    team_blas::axpby(td.begin, td.end, T(1), rhs, T(-1), r);
+                    team_blas::axpy(td.begin, td.end, T(1), c, r);
+                    team_blas::zeros(td.begin, td.end, c);
+                    if (td.leader()) team_blas::zeros(n_owned, n_alloc, c);
+                    if (zero_team) zero_team(td, r);
+
+                    // The smoother's shift (its loop ends on a barrier), the smoother, the update.
+                    shiftable->team_shift(sbv, weights);
+                    tsmoother->team_apply(td, r, c);
+                    team_blas::axpy(td.begin, td.end, T(1), c, x);
+                }
+            }
+
+            count_smoothing_steps += steps * smoother->iterations();
+            return true;
+        }
+
+        CycleReturnCode nonlinear_cycle() {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::nonlinear_cycle");
+
+            const int       level        = finest_level();
+            auto            mem          = memory_[level];
+            auto            smoother     = smoother_[level];
+            auto            sop          = shifted_op(level);
+            auto            restriction  = restriction_[level];
+            auto            prolongation = prolongation_[coarser_level(level)];
+            auto            mem_coarse   = memory_[coarser_level(level)];
+            const ptrdiff_t n_fine       = operator_[level]->rows();
+
+            if (smesh::Env::read<bool>("UPDATE_CONSTRAINTS_IN_NONLINEAR_CYCLE", false)) {
+                if (update_constraints_) {
+                    update_constraints_(mem->solution->data());
+                }
+            }
+
+            nonlinear_smooth();
+
+            {
+                // Evaluate for restriction
+                eval_residual_and_jacobian();
+
+                // Restriction
+                blas_->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                restriction->apply(mem->work->data(), mem_coarse->rhs->data());
+                trap_finite("restrict:r_c", mem_coarse->rhs->data(), operator_[coarser_level(level)]->rows());
+                blas_->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
+            }
+
+            if (!skip_coarse) {
+                maybe_linearize();
+                penalty_pseudo_galerkin_assembly();
+
+                int ret = team_cycle(coarser_level(finest_level()));
+                if (ret < 0) ret = cycle(coarser_level(finest_level()));
+                trap_finite("coarse:x", mem_coarse->solution->data(), operator_[coarser_level(finest_level())]->rows());
+
+                if (ret == CYCLE_FAILURE && is_root_rank()) {
+                    fprintf(stderr, "Coarse level solver did not converge as desired!\n");
+                }
+
+                {
+                    // Prolongation
+                    blas_->zeros(correction->size(), correction->data());
+                    prolongation->apply(mem_coarse->solution->data(), correction->data());
+                    trap_finite("prolong:c", correction->data(), n_fine);
+
+                    if (enable_line_search_) {
+                        // ATTENTION to code changes and side-effects
+                        SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::line_search");
+
+                        //  dot(c, (b - A * x))
+                        T numerator = blas_->dot(correction->size(), correction->data(), mem->work->data());
+                        blas_->zeros(mem->work->size(), mem->work->data());
+                        sop->apply(correction->data(), mem->work->data());
+                        trap_finite("line_search:Jc", mem->work->data(), n_fine);
+
+                        // dot(c, A * c)
+                        T denominator = blas_->dot(correction->size(), correction->data(), mem->work->data());
+                        T alpha       = numerator / (denominator == 0 ? T(1e-16) : denominator);
+                        trap_finite_scalar("line_search:alpha", alpha);
+
+                        if (debug && is_root_rank()) printf("alpha = %g\n", alpha);
+
+                        blas_->scal(correction->size(), alpha, correction->data());
+                    }
+
+                    // FIXME if we find a good reason for this add GPU support here
+                    if (project_coarse_space_correction_ && this->execution_space() == EXECUTION_SPACE_HOST) {
+                        assert(!constraints_op_);  // FIXME not supported yet!!!
+
+                        auto            c  = correction->data();
+                        auto            ub = upper_bound_->data();
+                        auto            x  = mem->solution->data();
+                        const ptrdiff_t n  = correction->size();
+
+#pragma omp parallel for
+                        for (ptrdiff_t i = 0; i < n; i++) {
+                            x[i] = std::min(x[i] + c[i], ub[i] + std::max(T(0), x[i] - ub[i]));
+                        }
+
+                    } else {
+                        // Owned dofs only; ghosts are filled by gather (avoid polluting aura).
+                        blas_->axpby(n_fine, 1, correction->data(), 1, mem->solution->data());
+                    }
+                    gather_solution_ghosts();
+                    trap_finite("prolong:x", mem->solution->data(), n_fine);
+                }
+            }
+
+            nonlinear_smooth();
+
+            return CYCLE_CONTINUE;
+        }
+
+        // The linear cycle from `top` down in one region, where every level's operator, smoother
+        // and transfers have a team form (the host, no debug traps): its return code, or -1 and
+        // nothing done. The smoothers are shifted once, before the region: the shift is the same at
+        // every visit of a cycle. The cycle is cycle()'s, each level's rows split among the
+        // region's threads (thread 0 takes none under MPI).
+        int team_cycle(const int top) {
+            SFEM_TRACE_SCOPE("ShiftedPenaltyMultigrid::team_cycle");
+            if (this->execution_space() != EXECUTION_SPACE_HOST || debug) return -1;
+            const int n = n_levels();
+            team_cycle_.resize(n);
+            for (int l = top; l < n; l++) {
+                auto& tl = team_cycle_[l];
+                auto  sop = shifted_op(l);
+                if (!std::dynamic_pointer_cast<TeamOperator<T>>(sop)) return -1;
+                auto smoother = smoother_[l];
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(l), level_op_x_op_weights(l));
+                } else {
+                    smoother->set_op_and_diag_shift(sop, memory_[l]->diag);
+                }
+                tl.op       = std::dynamic_pointer_cast<TeamOperator<T>>(sop);
+                tl.smoother = std::dynamic_pointer_cast<TeamOperator<T>>(smoother);
+                tl.restriction  = l != coarsest_level() ? std::dynamic_pointer_cast<TeamOperator<T>>(restriction_[l]) : nullptr;
+                tl.prolongation = l != coarsest_level() ? std::dynamic_pointer_cast<TeamOperator<T>>(prolongation_[coarser_level(l)]) : nullptr;
+                if (!tl.smoother || !tl.smoother->team_capable()) return -1;
+                if (l != coarsest_level() && (!tl.restriction || !tl.restriction->team_capable() || !tl.prolongation ||
+                                              !tl.prolongation->team_capable())) {
+                    return -1;
+                }
+            }
+            for (int l = top; l < n; l++) {
+                auto& tl = team_cycle_[l];
+                for (auto op : {tl.op, tl.smoother, tl.restriction, tl.prolongation}) {
+                    if (op && op->prepare() != SFEM_SUCCESS) SFEM_ERROR("ShiftedPenaltyMultigrid: a level's team part failed its checks\n");
+                }
+                team_reduction_buffer(tl.sums, level_owned(l));
+            }
+
+            const bool distributed = parallel_comm() != nullptr;
+#pragma omp parallel
+            {
+                const sfem_team_t ct = sfem_team_current(distributed);
+                team_cycle_level(top, ct.tid, ct.threads, distributed);
+            }
+
+            // As cycle(): only a cycle that is the coarse solve itself reports its failure.
+            const int coarse = coarsest_level();
+            return top == coarse && team_cycle_[coarse].smoother->team_status() != SFEM_SUCCESS ? CYCLE_FAILURE : CYCLE_CONTINUE;
+        }
+
+        // One level of team_cycle on every thread of the region.
+        void team_cycle_level(const int level, const int tid, const int threads, const bool distributed) {
+            auto&               tl = team_cycle_[level];
+            const ptrdiff_t     owned = level_owned(level);
+            const ptrdiff_t     alloc = level_alloc(level);
+            const Team          team  = Team::of(owned, tid, threads, distributed);
+            TeamReduction<T, 1> sums(tl.sums.data(), team_chunk_count(owned));
+            TeamExec<T>         e(team, sums);
+
+            auto     mem = memory_[level];
+            T* const x   = mem->solution->data();
+            T* const b   = mem->rhs->data();
+            T* const w   = mem->work->data();
+            // The entries past the owned rows (ghosts and aura), the leader's.
+            auto zero_rest = [&](T* const v, const ptrdiff_t n_owned, const ptrdiff_t n_alloc) {
+                if (team.leader()) team_blas::zeros(n_owned, n_alloc, v);
+            };
+
+            if (coarsest_level() == level) {
+                e.zeros(x);
+                zero_rest(x, owned, alloc);
+                tl.smoother->team_apply(team, b, x);
+                // The solver's leader is this one: its status is in.
+                if (team.leader() && tl.smoother->team_status() != SFEM_SUCCESS && is_root_rank()) {
+                    fflush(stdout);
+                    fflush(stderr);
+                    fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother_[level]->iterations());
+                }
+                return;
+            }
+
+            const int       coarse  = coarser_level(level);
+            auto            mc      = memory_[coarse];
+            const ptrdiff_t c_owned = level_owned(coarse);
+            const ptrdiff_t c_alloc = level_alloc(coarse);
+            const Team      tc      = Team::of(c_owned, tid, threads, distributed);
+            TeamExec<T>     ec(tc, sums);
+            T* const        x_c = mc->solution->data();
+            T* const        b_c = mc->rhs->data();
+            auto*           ex  = level_exchange(level);
+
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
+                tl.smoother->team_apply(team, b, x);
+
+                // Compute residual
+                zero_rest(w, owned, alloc);
+                e.apply(*tl.op, x, w, false);
+                e.axpby(1, b, -1, w);
+
+                // Restriction
+                zero_rest(b_c, c_owned, c_alloc);
+                ec.apply(*tl.restriction, w, b_c, false);
+                ec.zeros(x_c);
+                zero_rest(x_c, c_owned, c_alloc);
+
+                team_cycle_level(coarse, tid, threads, distributed);
+
+                // Prolongation, the coarse space correction (owned); ghosts via gather.
+                zero_rest(w, owned, alloc);
+                e.apply(*tl.prolongation, x_c, w, false);
+                e.axpby(1, w, 1, x);
+                if (distributed && ex) {
+                    e.barrier();
+                    if (team.leader()) ex->gather(x, nodal_block_size_);
+                    e.barrier();
+                }
+
+                tl.smoother->team_apply(team, b, x);
+            }
+        }
+
+                CycleReturnCode cycle(const int level) {
+            SFEM_TRACE_SCOPE_VARIANT("ShiftedPenaltyMultigrid::cycle(%d)", level);
+
+            auto mem      = memory_[level];
+            auto smoother = smoother_[level];
+            auto op       = operator_[level];
+            auto sop      = shifted_op(level);
+
+            const ptrdiff_t n_dofs = op->rows();
+
+            assert(mem->solution->size() >= static_cast<size_t>(n_dofs));
+            assert(mem->rhs->size() >= static_cast<size_t>(n_dofs));
+
+            if (coarsest_level() == level) {
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
+                } else {
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
+                }
+
+                blas_->zeros(mem->solution->size(), mem->solution->data());
+                if (!smoother->apply(mem->rhs->data(), mem->solution->data())) {
+                    trap_finite("coarse_solve:x", mem->solution->data(), n_dofs);
+                    return CYCLE_CONTINUE;
+                } else {
+                    if (is_root_rank()) {
+                        fflush(stdout);
+                        fflush(stderr);
+                        fprintf(stderr, "Coarse grid solver did not reach desired tol in %d\n", smoother->iterations());
+                    }
+                    return CYCLE_FAILURE;
+                }
+            }
+
+            auto restriction  = restriction_[level];
+            auto prolongation = prolongation_[coarser_level(level)];
+            auto mem_coarse   = memory_[coarser_level(level)];
+
+            for (int k = 0; k < static_cast<int>(this->cycle_type_); k++) {
+                if (constraints_op_) {
+                    smoother->set_op_and_diag_shift(sop, level_op_x_op(level), level_op_x_op_weights(level));
+                } else {
+                    smoother->set_op_and_diag_shift(sop, mem->diag);
+                }
+
+                smoother->apply(mem->rhs->data(), mem->solution->data());
+                trap_finite("cycle:x_pre", mem->solution->data(), n_dofs);
+
+                {
+                    // Compute residual
+                    blas_->zeros(mem->work->size(), mem->work->data());
+                    sop->apply(mem->solution->data(), mem->work->data());
+                    blas_->axpby(n_dofs, 1, mem->rhs->data(), -1, mem->work->data());
+                    trap_finite("cycle:r", mem->work->data(), n_dofs);
+                }
+
+                {
+                    // Restriction
+                    blas_->zeros(mem_coarse->rhs->size(), mem_coarse->rhs->data());
+                    restriction->apply(mem->work->data(), mem_coarse->rhs->data());
+                    blas_->zeros(mem_coarse->solution->size(), mem_coarse->solution->data());
+                }
+
+                cycle(coarser_level(level));
+
+                {
+                    // Prolongation
+                    blas_->zeros(mem->work->size(), mem->work->data());
+                    prolongation->apply(mem_coarse->solution->data(), mem->work->data());
+
+                    // Apply coarse space correction (owned); ghosts via gather.
+                    blas_->axpby(n_dofs, 1, mem->work->data(), 1, mem->solution->data());
+                    exchange_gather(level, mem->solution->data());
+                    trap_finite("cycle:x_post", mem->solution->data(), n_dofs);
+                }
+
+                smoother->apply(mem->rhs->data(), mem->solution->data());
+                trap_finite("cycle:x_post_smooth", mem->solution->data(), n_dofs);
+            }
+            return CYCLE_CONTINUE;
+        }
+
+        void collect_stats(struct Stats s) { stats.push_back(s); }
+
+        void write_stats() {
+            if (!is_root_rank()) {
+                return;
+            }
+            const char* SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH = "./spmg_stats.csv";
+            SFEM_READ_ENV(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH, );
+
+            std::ofstream os(SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH);
+            if (!os.good()) {
+                fprintf(stderr,
+                        "Unable to open file SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH=%s\n",
+                        SFEM_SHIFTED_PENALTY_MULTIGRID_STATS_PATH);
+            }
+
+            Stats::header(os);
+
+            real_t prev_norm = stats[0].energy_norm_correction;
+            for (auto& s : stats) {
+                os << s;
+                os << s.energy_norm_correction / prev_norm << "\n";
+                prev_norm = s.energy_norm_correction;
+            }
+
+            os.close();
+        }
+
+        void monitor(const int iter,
+                     const int count_inner_iter,
+                     const int count_smoothing_steps,
+                     const int count_lagr_mult_updates,
+                     const T   norm_pen,
+                     const T   norm_residual,
+                     const T   relative_residual,
+                     const T   penetration_tol,
+                     const T   penalty_param) {
+            if (!is_root_rank()) {
+                return;
+            }
+            printf("%d|%d|%d) [lagr++ %d] norm_pen %e, ||r|| %e, ||r/r0|| %e, penetration_tol %e, "
+                   "penalty "
+                   "%e\n",
+                   iter,
+                   count_inner_iter,
+                   count_smoothing_steps,
+                   count_lagr_mult_updates,
+                   norm_pen,
+                   norm_residual,
+                   relative_residual,
+                   penetration_tol,
+                   penalty_param);
+        }
+
+
+        std::vector<std::shared_ptr<Operator<T>>>               operator_;
+        std::vector<std::shared_ptr<MatrixFreeLinearSolver<T>>> smoother_;
+
+        std::vector<std::shared_ptr<Operator<T>>> prolongation_;
+        std::vector<std::shared_ptr<Operator<T>>> restriction_;
+
+        std::shared_ptr<Operator<T>>                       constraints_op_;
+        std::shared_ptr<Operator<T>>                       constraints_op_transpose_;
+        std::vector<std::shared_ptr<SparseBlockVector<T>>> constraints_op_x_op_;
+        std::vector<std::shared_ptr<Operator<T>>>          constraints_restriction_;
+        std::vector<std::shared_ptr<Operator<T>>>          constraints_block_restriction_;
+        std::vector<std::shared_ptr<SparseBlockVector<T>>> penalty_op_x_op_;
+        SharedBuffer<T>                                    weighted_blocks_;
+        SharedBuffer<T>                                    fine_block_values_;
+        std::shared_ptr<SparseBlockVector<T>>              fine_blocks_;
+        std::shared_ptr<SparseBlockVector<T>>              fine_shift_;  // weighted_blocks_, unit weights
+        std::shared_ptr<Operator<T>>                       fine_blocks_op_;
+        SharedBuffer<T>                                    unit_weights_;
+        SharedBuffer<T>                                    penalty_weights_;
+        std::vector<std::shared_ptr<smesh::Exchange>>      exchanges_;
+        std::vector<std::function<void(T* const)>>         apply_zero_constraints_;
+        std::vector<std::function<void(const Team&, T* const)>> team_apply_zero_constraints_;
+        std::vector<std::function<int()>>                  team_prepare_zero_constraints_;
+        SharedBuffer<T>                                    team_projection_, team_penalty_residual_;  // contact rows
+        // Each level's parts in team form and its executor's sums (team_cycle).
+        struct TeamCycleLevel {
+            std::shared_ptr<TeamOperator<T>> op, smoother, restriction, prolongation;
+            std::vector<T>                   sums;
+        };
+        std::vector<TeamCycleLevel> team_cycle_;
+        std::function<void(const T* const)>                update_constraints_;
+        EvalMaterialResidualFn                             eval_material_residual_;
+        LinearizeFn                                        linearize_;
+        std::vector<ApplyJacobianFn>                       apply_jacobian_;
+        int                                                nodal_block_size_{1};
+
+        SharedBuffer<T> upper_bound_;
+        SharedBuffer<T> lower_bound_;
+        SharedBuffer<T> correction, lagr_lb, lagr_ub;
+
+        // Internals
+        std::vector<std::shared_ptr<Memory>> memory_;
+        bool                                 wrap_input_{true};
+
+        bool collect_energy_norm_correction_{false};
+        bool enable_line_search_{false};
+        bool project_coarse_space_correction_{false};
+        bool skip_coarse{false};
+        bool verbose{true};
+
+        int count_smoothing_steps{0};
+        int max_inner_it{3};
+        int nlsmooth_steps{3};
+        CycleType cycle_type_{CycleType::V};
+        int iterations_{0};
+        int max_it_{10};
+
+        T    max_penalty_param_{10000};
+        T    penalty_param_{10};
+        T    penalty_param_increase{10};
+        T    atol_{1e-10};
+        T    rtol_{1e-10};
+        T    residual_atol_{0};  // 0: atol_
+        T    penetration_tol_exp{0.9};
+        T    omega_factor{100};
+        T    stagnation_threshold{0.999};
+        bool enable_shift{true};
+
+        int                       debug{0};
+        std::vector<struct Stats> stats;
+
+        std::shared_ptr<BLAS<T>> blas_;
+        ShiftedPenaltyKernels<T>    impl_;
+    };
+
+    template <typename T>
+    std::shared_ptr<ShiftedPenaltyMultigrid<T>> h_spmg() {
+        auto mg = std::make_shared<ShiftedPenaltyMultigrid<T>>();
+        mg->default_init();
+        return mg;
+    }
+
+}  // namespace sfem
+
+#endif  // SFEM_SHIFTED_PENALTY_MULTIGRID_HPP

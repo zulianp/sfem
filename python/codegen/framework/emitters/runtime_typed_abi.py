@@ -24,6 +24,11 @@ now go through this module so the two boundaries cannot disagree about what a
 runtime-typed parameter looks like.
 """
 
+from codegen.framework.plans.conventions import (
+    ABI_TEAM_TAIL,
+    TEAM_ELEMENT_RANGE_PARAMETERS,
+    WHOLE_MESH_ELEMENT_RANGE,
+)
 from codegen.framework.targets import current_target
 
 import re
@@ -46,6 +51,20 @@ RUNTIME_TYPE_ARGUMENT = "scalar_bytes"
 #: The concrete scalars an entry point instantiates.  A table rather than a
 #: pair of branches: adding a precision is a row here and nothing else.
 RUNTIME_SCALAR_TYPES = ("double", "float")
+
+#: The second width an assembled matrix's entry point takes: its values, spelled
+#: `v_t` in the parameter list, are a type of their own.  A tangent may be
+#: stored in single precision while the state it is computed from, and the
+#: element matrix, stay in double -- assembled in place, rather than copied
+#: and narrowed afterwards, so that there is one matrix and its traffic is
+#: halved.  It follows the scalar's slot, with the same width convention.
+VALUES_TYPE_PARAMETER = "const int values_bytes"
+VALUES_TYPE_ARGUMENT = "values_bytes"
+
+#: The value types each scalar's matrix may be stored in: its own, or a
+#: narrower one.  A wider store would only spend memory on digits the element
+#: matrix never had.
+RUNTIME_VALUES_TYPES = {"double": ("double", "float"), "float": ("float",)}
 
 
 def runtime_type_correspondence_lines():
@@ -72,13 +91,21 @@ def carries_scalar(param):
     )
 
 
+def carries_values(param):
+    """Whether this parameter is an assembled matrix's values (`v_t`)."""
+    return bool(re.search(r"\bv_t\b", param))
+
+
 def runtime_typed_parameter(param):
     """One parameter as the merged entry point declares it.
 
     A pointer to the dispatched scalar crosses as `void *`; a scalar passed by
     value crosses as `real_t` and is converted on the way in, which is what the
-    public entry points already do with material parameters.
+    public entry points already do with material parameters.  Matrix values
+    (`v_t`) cross as `void *` too, typed by their own width.
     """
+    if carries_values(param):
+        return re.sub(r"\bv_t\b", "void", param, count=1)
     if not carries_scalar(param):
         return param
     if "*" in param:
@@ -86,9 +113,15 @@ def runtime_typed_parameter(param):
     return re.sub(_SCALAR_SPELLINGS, "real_t", param, count=1)
 
 
+def has_values(params):
+    """Whether an entry point stores matrix values of a type of their own."""
+    return any(carries_values(param) for param in params)
+
+
 def runtime_typed_parameters(params):
-    """The whole list, with the type parameter first."""
-    return (RUNTIME_TYPE_PARAMETER,) + tuple(
+    """The whole list, with the type parameters first."""
+    values = (VALUES_TYPE_PARAMETER,) if has_values(params) else ()
+    return (RUNTIME_TYPE_PARAMETER,) + values + tuple(
         runtime_typed_parameter(param) for param in params
     )
 
@@ -101,14 +134,19 @@ def parameter_name(param):
     return match.group(1)
 
 
-def runtime_typed_argument(param, scalar_type):
+def runtime_typed_argument(param, scalar_type, values_type=None):
     """One argument at a concrete instantiation, cast back from `void *`.
 
     Two shapes reach here.  A plain buffer is one pointer and casts to one.  A
     field handed as an array of pointers -- `const s_t *const u_data[3]` --
     decays to a pointer-to-pointer, so it casts to `const float *const *`.
+    Matrix values cast to `values_type`.
     """
     name = parameter_name(param)
+    if carries_values(param):
+        if values_type is None:
+            raise ValueError("%r is matrix values, but no values type was given" % param)
+        return "(%s *)%s" % (values_type, name)
     if not carries_scalar(param) or "*" not in param:
         return name
     const = "const " if param.lstrip().startswith("const ") else ""
@@ -117,12 +155,14 @@ def runtime_typed_argument(param, scalar_type):
     return "(%s%s *)%s" % (const, scalar_type, name)
 
 
-def runtime_typed_arguments(params, scalar_type):
+def runtime_typed_arguments(params, scalar_type, values_type=None):
     """Every argument for one instantiation, in declaration order."""
-    return tuple(runtime_typed_argument(param, scalar_type) for param in params)
+    return tuple(
+        runtime_typed_argument(param, scalar_type, values_type) for param in params
+    )
 
 
-def cast_arguments(params, argument_names, scalar_type):
+def cast_arguments(params, argument_names, scalar_type, values_type=None):
     """Cast a call's arguments back from `void *`, matched to the parameters.
 
     The emitters build a call's argument list by name rather than from the
@@ -133,7 +173,7 @@ def cast_arguments(params, argument_names, scalar_type):
     """
     by_name = {parameter_name(param): param for param in params}
     return tuple(
-        runtime_typed_argument(by_name[name], scalar_type)
+        runtime_typed_argument(by_name[name], scalar_type, values_type)
         if name in by_name
         else name
         for name in argument_names
@@ -153,21 +193,8 @@ def entry_point_name(public_name):
     return current_target().entry_point_name(public_name)
 
 
-def runtime_typed_entry_point_lines(
-    public_name, params, call, indent="  ", parameter_lines=None
-):
-    """One `extern "C"` entry point that selects its scalar at run time.
-
-    `call(scalar_type, arguments)` returns the body lines that reach the
-    template for that scalar -- the emitters differ in how they spell it, some
-    forwarding to one implementation and some to a pair, so the call is the
-    caller's to write and only the shape around it is here.
-
-    `parameter_lines` formats the declaration, defaulting to one parameter per
-    line at four spaces; a caller with its own indentation passes its own.
-    """
-    lines = ['extern "C" int %s(' % entry_point_name(public_name)]
-    declared = runtime_typed_parameters(params) + current_target().entry_point_suffix_parameters()
+def _entry_point_head(name, declared, parameter_lines):
+    lines = ['extern "C" int %s(' % entry_point_name(name)]
     if parameter_lines is None:
         lines.extend(
             "    %s%s" % (param, "," if index + 1 < len(declared) else "")
@@ -176,25 +203,128 @@ def runtime_typed_entry_point_lines(
     else:
         lines.extend(parameter_lines(declared))
     lines.append(") {")
+    return lines
+
+
+def _team_region_entry_point_lines(public_name, declared, indent, parameter_lines):
+    """The plain entry point of a team kernel: its scalar checked, then one region
+    in which every thread calls the `_team` twin.  The check comes first so a bad
+    scalar is reported once rather than by every thread."""
+    target = current_target()
+    # The twin of a kernel walking the mesh takes an element range; this name takes the mesh.
+    whole = dict(zip(TEAM_ELEMENT_RANGE_PARAMETERS, WHOLE_MESH_ELEMENT_RANGE))
+    forwarded = [whole.get(param, parameter_name(param)) for param in declared]
+    declared = [param for param in declared if param not in whole]
+    lines = _entry_point_head(public_name, declared, parameter_lines)
     lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
+    for scalar_type in RUNTIME_SCALAR_TYPES:
+        lines.append("%s  case (int)sizeof(%s):" % (indent, scalar_type))
+    lines.extend(
+        [
+            "%s    break;" % indent,
+            "%s  default:" % indent,
+            '%s    return sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
+            % (indent, public_name, RUNTIME_TYPE_ARGUMENT),
+            "%s}" % indent,
+            "%sint ret = SFEM_SUCCESS;" % indent,
+            target.team_region_pragma(),
+            "%s{" % indent,
+            "%s  const int err = %s(%s);"
+            % (
+                indent,
+                entry_point_name(public_name + ABI_TEAM_TAIL),
+                ", ".join(forwarded),
+            ),
+            "%s  if (err != SFEM_SUCCESS) {" % indent,
+            target.atomic_write_pragma(),
+            "%s    ret = err;" % indent,
+            "%s  }" % indent,
+            "%s}" % indent,
+            "%sreturn ret;" % indent,
+            "}",
+            "",
+        ]
+    )
+    return lines
+
+
+def runtime_typed_entry_point_lines(
+    public_name, params, call, indent="  ", parameter_lines=None, team=None
+):
+    """One `extern "C"` entry point that selects its scalar at run time.
+
+    `call(scalar_type, arguments)` returns the body lines that reach the
+    template for that scalar -- the emitters differ in how they spell it, some
+    forwarding to one implementation and some to a pair, so the call is the
+    caller's to write and only the shape around it is here.  An entry point
+    with matrix values (`v_t`) selects their type too, in a switch inside each
+    scalar's arm, and calls `call(scalar_type, arguments, values_type)`.
+
+    `parameter_lines` formats the declaration, defaulting to one parameter per
+    line at four spaces; a caller with its own indentation passes its own.
+
+    `team`: the template is a team body (`TargetPlatform.team_body`), by default
+    when the bound target says so.  The selection is then published as the
+    `_team` twin (ABI_TEAM_TAIL), the call from inside a region, and the plain
+    name opens the region around it -- on a target that has regions; elsewhere
+    the plain entry point is the only one.
+    """
+    declared = runtime_typed_parameters(params) + current_target().entry_point_suffix_parameters()
+    team = current_target().team_body if team is None else team
+    team = team and current_target().team_region_pragma() is not None
+    if team and has_values(params):
+        raise ValueError("%s: a team entry point selects one scalar, not a matrix value type" % public_name)
+    # The `_team` twin first: the region-opening name calls it, and not every
+    # source that defines both includes the header declaring them.
+    lines = _entry_point_head(public_name + ABI_TEAM_TAIL if team else public_name, declared, parameter_lines)
+    lines.append("%sswitch (%s) {" % (indent, RUNTIME_TYPE_ARGUMENT))
+    values = has_values(params)
     for scalar_type in RUNTIME_SCALAR_TYPES:
         # Each arm gets its own scope.  A body that declares anything -- the
         # two-pass packed assembly declares a graph status before it fills --
         # otherwise redefines that name in the next arm, and C++ refuses to
         # jump past an initialisation into a later case.
         lines.append("%s  case (int)sizeof(%s): {" % (indent, scalar_type))
-        for line in call(scalar_type, runtime_typed_arguments(params, scalar_type)):
-            lines.append("%s    %s" % (indent, line))
-        lines.append("%s  }" % indent)
+        if not values:
+            for line in call(scalar_type, runtime_typed_arguments(params, scalar_type)):
+                lines.append("%s    %s" % (indent, line))
+            lines.append("%s  }" % indent)
+            continue
+        lines.append("%s    switch (%s) {" % (indent, VALUES_TYPE_ARGUMENT))
+        for values_type in RUNTIME_VALUES_TYPES[scalar_type]:
+            lines.append("%s      case (int)sizeof(%s): {" % (indent, values_type))
+            for line in call(
+                scalar_type,
+                runtime_typed_arguments(params, scalar_type, values_type),
+                values_type,
+            ):
+                lines.append("%s        %s" % (indent, line))
+            lines.append("%s      }" % indent)
+        lines.extend(
+            [
+                "%s      default:" % indent,
+                "%s        break;" % indent,
+                "%s    }" % indent,
+                "%s    break;" % indent,
+                "%s  }" % indent,
+            ]
+        )
     lines.extend(
         [
             "%s  default:" % indent,
             "%s    break;" % indent,
             "%s}" % indent,
-            '%sreturn sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
-            % (indent, public_name, RUNTIME_TYPE_ARGUMENT),
+            (
+                '%sreturn sfem::codegen::unsupported_values_dispatch("%s", (int)%s, (int)%s);'
+                % (indent, public_name, RUNTIME_TYPE_ARGUMENT, VALUES_TYPE_ARGUMENT)
+                if values
+                else '%sreturn sfem::codegen::unsupported_dispatch("%s", -1, (int)%s);'
+                % (indent, public_name, RUNTIME_TYPE_ARGUMENT)
+            ),
             "}",
             "",
         ]
     )
+    if team:
+        lines.extend(_team_region_entry_point_lines(public_name, declared, indent, parameter_lines))
     return lines

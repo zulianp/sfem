@@ -1,0 +1,194 @@
+#ifndef SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
+#define SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP
+
+#include "sfem_base.hpp"
+
+#include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_ShiftableJacobi.hpp"
+#include "sfem_aliases.hpp"
+#include "sfem_BLAS_openmp.hpp"
+#include "smesh_env.hpp"
+
+namespace sfem {
+
+    template <typename HP, typename LP>
+    class MixedPrecisionShiftableBlockSymJacobi final : public ShiftableOperator<HP>, public TeamOperator<HP> {
+    public:
+        /// In the execution context, on the dim x dim symmetric diagonal blocks diag, stored in LP.
+        static std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create(const int                   dim,
+                                                                                     const SharedBuffer<HP>     &diag,
+                                                                                     const SharedBuffer<mask_t> &constraints_mask,
+                                                                                     const ExecutionContext     &context);
+
+        std::shared_ptr<BLAS<LP>>           blas;
+        ShiftableBlockSymJacobiKernels<HP, LP> impl;
+
+        SharedBuffer<HP>     diag;
+        SharedBuffer<LP>     inv_diag;
+        SharedBuffer<mask_t> constraints_mask;
+        HP                   relaxation_parameter{1. / 3};
+        int                  block_size{3};
+        bool                 is_symmetric{true};
+        // SFEM_JACOBI_SPARSE_UPDATE=0 forces full inv_diag rebuild (debug / A-B vs sparse path).
+        bool enable_sparse_update_{true};
+        // bool                 sparse_update_policy_logged_{false};
+
+        void default_init() {
+            blas = OpenMPBLAS<LP>::create();
+            OpenMPShiftableBlockSymJacobiKernels<HP, LP>::build(block_size, impl);
+        }
+
+        void set_relaxation_parameter(const HP relaxation) {
+            if (inv_diag && relaxation_parameter != HP(0)) {
+                blas->scal(inv_diag->size(), static_cast<LP>(relaxation / relaxation_parameter), inv_diag->data());
+            }
+
+            relaxation_parameter = relaxation;
+        }
+
+        // void read_sparse_update_policy() {
+        //     enable_sparse_update_ = smesh::Env::read<bool>("SFEM_JACOBI_SPARSE_UPDATE", true);
+        //     if (!sparse_update_policy_logged_) {
+        //         static bool logged_once = false;
+        //         if (!logged_once) {
+        //             printf("MixedPrecisionShiftableBlockSymJacobi: SFEM_JACOBI_SPARSE_UPDATE=%d\n",
+        //                    (int)enable_sparse_update_);
+        //             logged_once = true;
+        //         }
+        //         sparse_update_policy_logged_ = true;
+        //     }
+        // }
+
+        void set_diag(const SharedBuffer<HP>& d) {
+            SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::set_diag");
+
+            assert(block_size == 3);
+            assert(is_symmetric);
+            assert(this->execution_space() == (enum ExecutionSpace)d->mem_space());
+            assert(constraints_mask);
+
+            // read_sparse_update_policy();
+
+            const ptrdiff_t n_blocks = d->size() / 6;
+            diag                     = d;
+            inv_diag                 = create_buffer<LP>(n_blocks * block_size * block_size, this->execution_space());
+            impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
+            impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
+            impl.inplace_invert(n_blocks, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+        }
+
+        int shift(const SharedBuffer<HP>& d) override {
+            SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::shift");
+
+            assert(d->size() == diag->size());
+
+            const ptrdiff_t n_blocks = d->size() / 6;
+            impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
+            impl.add_sym_diag_to_diag(n_blocks, d->data(), inv_diag->data());
+            impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
+            impl.inplace_invert(n_blocks, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            return SFEM_SUCCESS;
+        }
+
+        int shift(const std::shared_ptr<SparseBlockVector<HP>>& block_diag, const SharedBuffer<HP>& scaling) override {
+            SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::shift");
+
+            const ptrdiff_t n_blocks = inv_diag->size() / 9;
+            const ptrdiff_t n_sparse = block_diag->idx()->size();
+
+            if (enable_sparse_update_ && impl.sparse_update_inv_diag) {
+                impl.sparse_update_inv_diag(n_sparse,
+                                            block_diag->idx()->data(),
+                                            diag->data(),
+                                            block_diag->data()->data(),
+                                            scaling->data(),
+                                            constraints_mask->data(),
+                                            (LP)relaxation_parameter,
+                                            inv_diag->data());
+                return SFEM_SUCCESS;
+            }
+
+            // Full rebuild path (pre-28487044 behavior / SFEM_JACOBI_SPARSE_UPDATE=0).
+            impl.sym_diag_to_diag(n_blocks, diag->data(), inv_diag->data());
+            impl.add_sparse_sym_diag_to_diag(
+                    n_sparse, block_diag->idx()->data(), block_diag->data()->data(), scaling->data(), inv_diag->data());
+
+            impl.apply_mask(n_blocks, constraints_mask->data(), inv_diag->data());
+            impl.inplace_invert(n_blocks, inv_diag->data());
+            blas->scal(inv_diag->size(), relaxation_parameter, inv_diag->data());
+            return SFEM_SUCCESS;
+        }
+
+        /// The sparse update (shift(block_diag, scaling)) from inside a region by every thread of it,
+        /// ending on the loop's barrier.
+        bool team_shift_capable() const override {
+            return this->execution_space() == EXECUTION_SPACE_HOST && enable_sparse_update_ && block_size == 3;
+        }
+        void team_shift(const std::shared_ptr<SparseBlockVector<HP>>& block_diag, const SharedBuffer<HP>& scaling) override {
+            block_sym_jacobi_sparse_update_team<HP, LP>(block_diag->idx()->size(),
+                                                    block_diag->idx()->data(),
+                                                    diag->data(),
+                                                    block_diag->data()->data(),
+                                                    scaling->data(),
+                                                    constraints_mask->data(),
+                                                    (LP)relaxation_parameter,
+                                                    inv_diag->data());
+        }
+
+        /* Operator */
+        int apply(const HP* const x, HP* const y) override {
+            SFEM_TRACE_SCOPE("MixedPrecisionShiftableBlockSymJacobi::apply");
+            if (team_capable()) return team_region_apply<HP>(*this, x, y);
+            const ptrdiff_t n_blocks = inv_diag->size() / (block_size * block_size);
+            impl.apply(n_blocks, inv_diag->data(), x, y);
+            return SFEM_SUCCESS;
+        }
+
+        /// y += D^{-1} x on the calling thread's rows, whole blocks, as the OpenMP kernel computes
+        /// it: it reads x there only.
+        void team_apply(const Team& team, const HP* const x, HP* const y) const override {
+            static_assert(team_chunk_align % 3 == 0, "a team share is whole blocks of 3");
+            const LP* const inv = inv_diag->data();
+            for (ptrdiff_t i = team.begin / 3; i < team.end / 3; i++) block_sym_jacobi_apply_block(i, inv, x, y);
+        }
+        Team team() const override { return Team::current(inv_diag->size() / block_size); }
+        bool input_in_share() const override { return true; }
+        bool team_capable() const override { return this->execution_space() == EXECUTION_SPACE_HOST && block_size == 3; }
+
+        const void* device_blocks3(ptrdiff_t& n_blocks, int& scalar_bytes) const override {
+            if (block_size != 3 || !inv_diag || this->execution_space() != EXECUTION_SPACE_DEVICE) return nullptr;
+            n_blocks     = inv_diag->size() / 9;
+            scalar_bytes = sizeof(LP);
+            return inv_diag->data();
+        }
+
+        inline std::ptrdiff_t rows() const override { return diag->size(); }
+        inline std::ptrdiff_t cols() const override { return diag->size(); }
+        ExecutionContext      execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
+    };
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> h_mixed_precision_shiftable_block_sym_jacobi(
+            const SharedBuffer<HP>&     diag,
+            const SharedBuffer<mask_t>& constraints_mask) {
+        auto ret = std::make_shared<MixedPrecisionShiftableBlockSymJacobi<HP, LP>>();
+        ret->default_init();
+        ret->constraints_mask = constraints_mask;
+        ret->set_diag(diag);
+        return ret;
+    }
+
+    template <typename HP, typename LP>
+    std::shared_ptr<MixedPrecisionShiftableBlockSymJacobi<HP, LP>> create_mixed_precision_shiftable_block_sym_jacobi(
+            const int                   dim,
+            const SharedBuffer<HP>     &diag,
+            const SharedBuffer<mask_t> &constraints_mask,
+            const ExecutionContext     &context) {
+        return MixedPrecisionShiftableBlockSymJacobi<HP, LP>::create(dim, diag, constraints_mask, context);
+    }
+
+}  // namespace sfem
+
+#endif  // SFEM_MIXED_PRECISION_SHIFTABLE_BLOCK_SYM_JACOBI_HPP

@@ -1,0 +1,264 @@
+#include <stdio.h>
+
+#include "sfem_test.hpp"
+
+#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+
+#include "spectral_hex_laplacian.hpp"
+
+#include <cmath>
+
+int test_derefine(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
+    int L = 8;
+
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
+
+    // Create the points to avoid duplication in coarse levels (lazy init)!
+    // Otherwise every level will construct its points
+    // fs->mesh().points();
+
+    auto levels = smesh::derefinement_levels(*fs->mesh());
+    assert(levels[3] == L);
+    assert(levels[2] == 4);
+    assert(levels[1] == 2);
+    assert(levels[0] == 1);
+
+    auto l2_mesh = smesh::derefine(fs->mesh(), levels[2]);
+    auto l1_mesh = smesh::derefine(fs->mesh(), levels[1]);
+
+    // Recursive way
+    auto l1_mesh_from_l2 = smesh::derefine(l2_mesh, levels[1]);
+
+    smesh::create_directory(output_dir);
+
+    SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l2_mesh, output_dir / "l2_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh, output_dir / "l1_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(l1_mesh_from_l2, output_dir / "l1_mesh_from_l2") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "og_mesh") == SFEM_SUCCESS);
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_derefine_cube() {
+
+    int SFEM_BASE_RESOLUTION = 1;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
+                                          SFEM_BASE_RESOLUTION * 2,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          2,
+                                          1,
+                                          1);
+
+    return test_derefine(m, smesh::Path("test_derefine_cube"));
+}
+
+int test_derefine_mesh() {
+    auto     m    = sfem::Mesh::create_from_file(sfem::Communicator::world(), smesh::Path("impeller"));
+    return test_derefine(m, smesh::Path("test_derefine_mesh"));
+}
+
+int test_prolongation(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path & /*output_dir*/) {
+    int L = 8;
+
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
+    auto levels = smesh::derefinement_levels(*fs->mesh());
+
+    auto coarse_fs = fs->derefine(levels[2]);  // Choose any level
+
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+
+    auto es = sfem::EXECUTION_SPACE_HOST;
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+    }
+
+    auto prolongation = create_hierarchical_prolongation(coarse_fs, fs, es);
+    auto coarse_field = sfem::create_host_buffer<real_t>(coarse_fs->n_dofs());
+
+    {
+        auto            data  = coarse_field->data();
+        const ptrdiff_t ndofs = coarse_fs->n_dofs();
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            data[i] = 1;
+        }
+    }
+
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        coarse_field = smesh::to_device(coarse_field);
+    }
+
+    auto fine_field = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+    prolongation->apply(coarse_field->data(), fine_field->data());
+
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        fine_field = smesh::to_host(fine_field);
+    }
+
+    {
+        auto            data  = fine_field->data();
+        const ptrdiff_t ndofs = fs->n_dofs();
+
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            SFEM_TEST_ASSERT(fabs(data[i] - 1) < 1e-8);
+        }
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_restriction(const std::shared_ptr<sfem::Mesh> &m, const smesh::Path &output_dir) {
+    const char *SFEM_EXECUTION_SPACE{nullptr};
+    SFEM_READ_ENV(SFEM_EXECUTION_SPACE, );
+
+    auto es = sfem::EXECUTION_SPACE_HOST;
+    if (SFEM_EXECUTION_SPACE) {
+        es = sfem::execution_space_from_string(SFEM_EXECUTION_SPACE);
+    }
+
+    int  L      = 4;
+    auto ssmesh = smesh::to_semistructured(L, m, true, false);
+    auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
+
+    auto levels = smesh::derefinement_levels(*fs->mesh());
+
+    auto coarse_fs    = fs->derefine(levels[1]);  // Choose any level
+    auto restriction  = create_hierarchical_restriction(fs, coarse_fs, es);
+    auto coarse_field = sfem::create_host_buffer<real_t>(coarse_fs->n_dofs());
+    auto fine_field   = sfem::create_buffer<real_t>(fs->n_dofs(), es);
+
+    {
+        auto            data  = fine_field->data();
+        const ptrdiff_t ndofs = fs->n_dofs();
+        for (ptrdiff_t i = 0; i < ndofs; i++) {
+            data[i] = 1;
+        }
+    }
+
+    if (es == sfem::EXECUTION_SPACE_DEVICE) {
+        fine_field = smesh::to_device(fine_field);
+    }
+
+    restriction->apply(fine_field->data(), coarse_field->data());
+
+    smesh::create_directory(output_dir);
+    SFEM_TEST_ASSERT(m->write(output_dir / "input_mesh") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(coarse_fs->mesh(), output_dir / "coarse") == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(smesh::semistructured_export_as_standard(fs->mesh(), output_dir / "fine") == SFEM_SUCCESS);
+
+    sfem::Output out(coarse_fs);
+    out.set_output_dir(output_dir / "coarse/fields");
+    SFEM_TEST_ASSERT(out.write("u", coarse_field->data()) == SFEM_SUCCESS);
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_prolongation_cube() {
+
+    int SFEM_BASE_RESOLUTION = 1;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
+                                          SFEM_BASE_RESOLUTION * 2,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          2,
+                                          1,
+                                          1);
+
+    return test_prolongation(m, smesh::Path("test_derefine_cube"));
+}
+
+int test_restrict_cube() {
+
+    int SFEM_BASE_RESOLUTION = 1;
+    SFEM_READ_ENV(SFEM_BASE_RESOLUTION, atoi);
+
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(),
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          SFEM_BASE_RESOLUTION * 1,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          1,
+                                          1);
+
+    return test_restriction(m, smesh::Path("test_restrict_cube"));
+}
+
+// SpectralElementLaplacian (Lagrange basis, exact quadrature on an affine mesh): the energy of u = x is the volume
+// (to the quadrature tables' digits, ~1e-10) and 1^T A u = 0. Its team form (Op::apply) against the plain kernel,
+// which opens its own region.
+int test_spectral_laplacian() {
+    auto m = sfem::Mesh::create_hex8_cube(sfem::Communicator::world(), 2, 1, 1, 0, 0, 0, 2, 1, 1);
+
+    for (int L : {2, 4}) {
+        auto ssmesh = smesh::to_semistructured(L, m, true, false);
+        auto fs     = sfem::FunctionSpace::create(ssmesh, 1);
+        auto op     = sfem::create_op(fs, "SpectralElementLaplacian", sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(op != nullptr);
+        SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+
+        const ptrdiff_t n      = fs->n_dofs();
+        auto            u      = sfem::create_host_buffer<real_t>(n);
+        auto            out    = sfem::create_host_buffer<real_t>(n);
+        auto            ref    = sfem::create_host_buffer<real_t>(n);
+        auto            points = ssmesh->points()->data();
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            u->data()[i] = points[0][i];
+        }
+
+        SFEM_TEST_ASSERT(op->apply(nullptr, u->data(), out->data()) == SFEM_SUCCESS);
+
+        auto block = ssmesh->block(0);
+        SFEM_TEST_ASSERT(spectral_hex_laplacian_apply(smesh::semistructured_level(*ssmesh),
+                                                      block->n_elements(),
+                                                      smesh::semistructured_interior_start(*ssmesh),
+                                                      block->elements()->data(),
+                                                      points,
+                                                      u->data(),
+                                                      ref->data()) == SFEM_SUCCESS);
+
+        double energy = 0, sum = 0, diff = 0, scale = 0;
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            energy += u->data()[i] * out->data()[i];
+            sum += out->data()[i];
+            diff  = std::max(diff, (double)std::abs(out->data()[i] - ref->data()[i]));
+            scale = std::max(scale, (double)std::abs(ref->data()[i]));
+        }
+
+        printf("SpectralElementLaplacian L=%d: energy %.15g, sum %g, |team - plain| %g of %g\n", L, energy, sum, diff, scale);
+        SFEM_TEST_ASSERT(std::abs(energy - 2) < 1e-8);
+        SFEM_TEST_ASSERT(std::abs(sum) < 1e-10);
+        SFEM_TEST_ASSERT(diff <= 1e-12 * scale);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+int main(int argc, char *argv[]) {
+    SFEM_UNIT_TEST_INIT(argc, argv);
+    SFEM_RUN_TEST(test_derefine_cube);
+    // SFEM_RUN_TEST(test_derefine_mesh); // FIXME use mesh that is always available
+    SFEM_RUN_TEST(test_prolongation_cube);
+    SFEM_RUN_TEST(test_restrict_cube);
+    SFEM_RUN_TEST(test_spectral_laplacian);
+    SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
+}

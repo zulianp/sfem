@@ -40,7 +40,9 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "linear_elasticity",
     systems,
-    elements=gen.sfem_default_element_types(),
+    # The default set plus the higher-order elements the V&V patch and mode
+    # cases verify this material on.
+    elements=gen.sfem_default_element_types() + ("TRI6", "HEX27", "PROTEUS_HEX27"),
     op_name="GeneratedLinearElasticity",
     parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),
     matrix_formats=("bsr", "block_diag_sym"),

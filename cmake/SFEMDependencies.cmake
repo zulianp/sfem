@@ -2,10 +2,45 @@
 
 set(SFEM_SMESH_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/smesh")
 
+if(SFEM_ENABLE_HIP AND NOT SFEM_ENABLE_CUDA)
+    message(FATAL_ERROR "SFEM_ENABLE_HIP=ON selects the backend of the device path, "
+                        "which SFEM_ENABLE_CUDA=ON turns on: set both.")
+endif()
+
 # CUDA must be enabled before add_subdirectory(smesh): otherwise CMake does not
 # treat .cu sources as CUDA and smesh CUDA kernels (e.g. macrotet4 prolongation)
 # are never compiled into libsmesh.
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    if(CMAKE_VERSION VERSION_LESS 3.21)
+        message(FATAL_ERROR "SFEM_ENABLE_HIP needs CMake 3.21 or later (enable_language(HIP)); this is ${CMAKE_VERSION}")
+    endif()
+    # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
+    # enable_language. SFEM_HIP_ARCHITECTURES is the one setting, for SFEM and its subprojects alike:
+    # a reconfigure with another value takes it.
+    foreach(arch IN LISTS SFEM_HIP_ARCHITECTURES)
+        if(NOT arch MATCHES "^gfx[0-9a-f]+(:.*)?$")
+            message(FATAL_ERROR "SFEM_HIP_ARCHITECTURES: '${arch}' is not an AMD GPU target (gfx...)")
+        endif()
+    endforeach()
+    set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures (from SFEM_HIP_ARCHITECTURES)" FORCE)
+    enable_language(HIP)
+    if(NOT DEFINED CMAKE_HIP_STANDARD)
+        set(CMAKE_HIP_STANDARD 17)
+        set(CMAKE_HIP_STANDARD_REQUIRED ON)
+    endif()
+    # Executables made of C++ sources are linked by the C++ compiler, as smesh's and SCCD's are.
+    set(CMAKE_HIP_LINKER_PREFERENCE_PROPAGATES OFF)
+
+    # The null stream is the calling thread's default stream (hipStreamPerThread), as in the CUDA
+    # build below: what is issued without a stream (a device operator's null stream) joins the
+    # context's work, and a graph capturing that stream takes it (MPRGP's run). On the legacy null
+    # stream HIP neither orders such work with the capture nor refuses it, so a captured product
+    # would be missing from the graph. The compiler takes the flag, host compilers the definition;
+    # set before smesh is added. The symbol copies then take the symbol's address
+    # (cudaMemcpyToSymbol in base/hip/sfem_gpu_runtime.hpp and SCCD's runtime header).
+    string(APPEND CMAKE_HIP_FLAGS " -fgpu-default-stream=per-thread")
+    add_compile_definitions(HIP_API_PER_THREAD_DEFAULT_STREAM)
+elseif(SFEM_ENABLE_CUDA)
     if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
         set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
     endif()
@@ -19,6 +54,13 @@ if(SFEM_ENABLE_CUDA)
         set(CMAKE_CUDA_STANDARD 17)
         set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
+
+    # The null stream is the calling thread's default stream (cudaStreamPerThread), not the legacy
+    # one: a graph can capture it, and every launch, copy and thrust call issued without a stream
+    # stays in one order on it. nvcc takes the flag, host compilers the definition; set before smesh
+    # is added so that its kernels share the stream (sfem_execution_context.hpp).
+    string(APPEND CMAKE_CUDA_FLAGS " --default-stream per-thread")
+    add_compile_definitions(CUDA_API_PER_THREAD_DEFAULT_STREAM)
 endif()
 
 if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
@@ -28,15 +70,20 @@ if(EXISTS "${SFEM_SMESH_PATH}/CMakeLists.txt")
     set(SMESH_ENABLE_BLAS ${SFEM_ENABLE_BLAS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_CUDA_LINEINFO ${SFEM_ENABLE_CUDA_LINEINFO} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SMESH_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SMESH_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_LAPACK ${SFEM_ENABLE_LAPACK} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_METIS ${SFEM_ENABLE_METIS} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_NCCL ${SFEM_ENABLE_NCCL} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SMESH_ENABLE_RYAML ${SFEM_ENABLE_RYAML} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_ZSTD ${SFEM_ENABLE_ZSTD} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_LZ4 ${SFEM_ENABLE_LZ4} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_TRACE ${SFEM_ENABLE_TRACE} CACHE BOOL "" FORCE)
+    set(SMESH_ENABLE_TRACE_MUTEX ${SFEM_ENABLE_TRACE_MUTEX} CACHE BOOL "" FORCE)
     set(SMESH_USE_OCCUPANCY_MAX_POTENTIAL ${SFEM_USE_OCCUPANCY_MAX_POTENTIAL} CACHE BOOL "" FORCE)
-    set(SMESH_ENABLE_CUBLAS ${SFEM_ENABLE_CUBLAS} CACHE BOOL "" FORCE)
-    set(SMESH_ENABLE_CUSPARSE ${SFEM_ENABLE_CUSPARSE} CACHE BOOL "" FORCE)
 
     if(SFEM_ENABLE_MINIMAL)
         set(SMESH_ENABLE_DRIVERS OFF CACHE BOOL "" FORCE)
@@ -171,7 +218,23 @@ endif()
 
 # ##############################################################################
 
-if(SFEM_ENABLE_CUDA)
+if(SFEM_ENABLE_HIP)
+    # hip::host carries the runtime and the platform define that host code including the
+    # base/hip/compat headers needs. SFEM_ENABLE_CUSPARSE and SFEM_ENABLE_CUBLAS take hipSPARSE and
+    # hipBLAS (base/hip/compat/cusparse.h, cublas_v2.h); NVTX has no counterpart.
+    if(NOT TARGET hip::host)
+        find_package(hip REQUIRED)
+    endif()
+    list(APPEND SFEM_DEP_LIBRARIES hip::host)
+    if(SFEM_ENABLE_CUSPARSE)
+        find_package(hipsparse REQUIRED)
+        list(APPEND SFEM_DEP_LIBRARIES roc::hipsparse)
+    endif()
+    if(SFEM_ENABLE_CUBLAS)
+        find_package(hipblas REQUIRED)
+        list(APPEND SFEM_DEP_LIBRARIES roc::hipblas)
+    endif()
+elseif(SFEM_ENABLE_CUDA)
     enable_language(CUDA)
 
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
@@ -210,29 +273,13 @@ if(SFEM_ENABLE_CUDA)
         include_directories($ENV{CRAY_CUDATOOLKIT_INCLUDE_OPTS})
     endif()
 
-    # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
-    # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
-    # -lThrust, which does not exist and breaks downstream links.
-    find_package(Thrust CONFIG)
-    if(Thrust_FOUND)
-        if(NOT TARGET Thrust)
-            thrust_create_target(Thrust)
-        endif()
-        get_target_property(_SFEM_THRUST_INCLUDES Thrust INTERFACE_INCLUDE_DIRECTORIES)
-        if(_SFEM_THRUST_INCLUDES)
-            list(APPEND SFEM_DEP_INCLUDES ${_SFEM_THRUST_INCLUDES})
-        endif()
-        unset(_SFEM_THRUST_INCLUDES)
-    else()
-        message(STATUS "Thrust CMake package not found; using CUDA toolkit includes")
-    endif()
 endif()
 
 
 
 if(SFEM_ENABLE_RYAML)
     set(RYML_REPO_URL https://github.com/biojppm/rapidyaml CACHE STRING "")
-    set(RYML_BRANCH_NAME master CACHE STRING "")
+    set(RYML_BRANCH_NAME v0.16.0 CACHE STRING "")
     include(FetchContent)
     FetchContent_Declare(ryml
         GIT_REPOSITORY ${RYML_REPO_URL}
@@ -275,9 +322,6 @@ endif()
 
 # ##############################################################################
 
-# if(SFEM_ENABLE_HIP)
-# # TODO
-# endif()
 
 if(SFEM_ENABLE_AVX512_SORT)
 	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/external/x86-simd-sort/src") 
@@ -288,6 +332,8 @@ if(SFEM_ENABLE_SCCD)
     set(SCCD_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SCCD_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SCCD_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SCCD_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SCCD_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SCCD_ENABLE_SMESH ON CACHE BOOL "" FORCE)
     set(SCCD_BUILD_SHARED_LIBS ${SFEM_SCCD_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
     if(SFEM_ENABLE_MINIMAL)
@@ -298,6 +344,11 @@ if(SFEM_ENABLE_SCCD)
 
     set(SFEM_SCCD_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sccd")
     add_subdirectory("${SFEM_SCCD_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sccd")
+    # SCCD is header templates instantiated in sfem's sources: its headers are system headers
+    # there, so SFEM_ENABLE_DEV_MODE judges sfem's code, not SCCD's (CMake 3.25 and later).
+    if(TARGET sccd)
+        set_target_properties(sccd PROPERTIES SYSTEM ON)
+    endif()
 
     if(TARGET SCCD::sccd)
         list(APPEND SFEM_SUBMODULES SCCD::sccd)
@@ -312,7 +363,16 @@ if(SFEM_ENABLE_SSDF)
     set(SSDF_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
     set(SSDF_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SSDF_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SSDF_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
     set(SSDF_ENABLE_CUBIQL ${SFEM_ENABLE_CUBIQL} CACHE BOOL "" FORCE)
+    # cuBQL enables CUDA whenever it finds nvcc; a build without CUDA tells it not to, and so does
+    # a HIP build, where ssdf compiles cuBQL's GPU builder as HIP.
+    if(SFEM_ENABLE_CUDA AND NOT SFEM_ENABLE_HIP)
+        set(CUBQL_DISABLE_CUDA OFF CACHE BOOL "" FORCE)
+    else()
+        set(CUBQL_DISABLE_CUDA ON CACHE BOOL "" FORCE)
+    endif()
     set(SSDF_ENABLE_SMESH ON CACHE BOOL "" FORCE)
     
     set(SSDF_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/ssdf")
@@ -326,5 +386,69 @@ if(SFEM_ENABLE_SSDF)
         list(APPEND SFEM_SUBMODULES ssdf::ssdf)
     else()
         message(FATAL_ERROR "Failed to build SSDF library, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
+if(SFEM_ENABLE_SRESAMPLE)
+    set(SRESAMPLE_ENABLE_OPENMP ${SFEM_ENABLE_OPENMP} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_MPI ${SFEM_ENABLE_MPI} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_CUDA ${SFEM_ENABLE_CUDA} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_ENABLE_HIP ${SFEM_ENABLE_HIP} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_HIP_ARCHITECTURES ${SFEM_HIP_ARCHITECTURES} CACHE STRING "" FORCE)
+    set(SRESAMPLE_ENABLE_TESTING ${SFEM_ENABLE_TESTING} CACHE BOOL "" FORCE)
+    set(SRESAMPLE_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
+    # sresample is ours: sfem's DEV_MODE judges it too, through its own option.
+    set(SRESAMPLE_ENABLE_DEV_MODE ${SFEM_ENABLE_DEV_MODE} CACHE BOOL "" FORCE)
+    # Its demos read meshes with smesh, which sfem always has.
+    if(SFEM_ENABLE_MINIMAL)
+        set(SRESAMPLE_ENABLE_SMESH OFF CACHE BOOL "" FORCE)
+    else()
+        set(SRESAMPLE_ENABLE_SMESH ON CACHE BOOL "" FORCE)
+    endif()
+    # The templates are instantiated for sfem's real_t, geom_t and idx_t too, and for double
+    # coordinates (sresample's mesh-mesh intersection, whose callers pass double meshes).
+    set(SRESAMPLE_INSTANTIATIONS
+        "float64,float32,int32,float32;float64,float32,int32,float64;float32,float32,int32,float32;float64,float64,int32,float64;${SFEM_REAL_TYPE},${SFEM_GEOM_TYPE},${SFEM_IDX_TYPE},${SFEM_GEOM_TYPE}"
+        CACHE STRING "" FORCE)
+
+    set(SFEM_SRESAMPLE_PATH "${CMAKE_CURRENT_LIST_DIR}/../external/sresample")
+    add_subdirectory("${SFEM_SRESAMPLE_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/external/sresample")
+
+    if(TARGET sresample)
+        list(APPEND SFEM_SUBMODULES sresample)
+    else()
+        message(FATAL_ERROR "Failed to build sresample, make sure to run: git submodule update --init --recursive")
+    endif()
+endif()
+
+# After the subprojects: SCCD creates its own imported Thrust target, which would clash with one
+# created here first (a subdirectory sees its parent's imported targets).
+if(SFEM_ENABLE_HIP)
+    # hipCUB (the Prony store's device scan, through base/hip/compat/cub), rocThrust (amg/cuda) and the
+    # rocPRIM under both are header-only and used by the .cu files only; CMakeLists.txt adds their
+    # include directories to the HIP sources. Their targets are not linked, because through rocPRIM
+    # they bring hip::device, which compiles every C++ source as HIP.
+    if(NOT TARGET hip::hipcub)
+        find_package(hipcub REQUIRED)
+    endif()
+    if(SFEM_ENABLE_AMG AND NOT TARGET roc::rocthrust)
+        find_package(rocthrust REQUIRED)
+    endif()
+elseif(SFEM_ENABLE_CUDA)
+    # Thrust is header-only (ships with the CUDA toolkit). Do not add it to
+    # SFEM_DEP_LIBRARIES: install(EXPORT) serializes the INTERFACE target as
+    # -lThrust, which does not exist and breaks downstream links.
+    find_package(Thrust CONFIG)
+    if(Thrust_FOUND)
+        if(NOT TARGET Thrust)
+            thrust_create_target(Thrust)
+        endif()
+        get_target_property(_SFEM_THRUST_INCLUDES Thrust INTERFACE_INCLUDE_DIRECTORIES)
+        if(_SFEM_THRUST_INCLUDES)
+            list(APPEND SFEM_DEP_INCLUDES ${_SFEM_THRUST_INCLUDES})
+        endif()
+        unset(_SFEM_THRUST_INCLUDES)
+    else()
+        message(STATUS "Thrust CMake package not found; using CUDA toolkit includes")
     endif()
 endif()

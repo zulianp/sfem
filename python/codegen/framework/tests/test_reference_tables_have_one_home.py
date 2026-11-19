@@ -136,7 +136,7 @@ class TheHeaderIsSelfContainedTest(unittest.TestCase):
 GENERATED = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))),
-    "frontend", "ops", "generated",
+    "src", "frontend", "ops", "generated",
 )
 
 _TABLE = re.compile(r"    static const s_t data\[\d+\] = \{s_t")

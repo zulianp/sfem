@@ -1,0 +1,185 @@
+#include "sfem_OpFactory.hpp"
+
+#include <map>
+#include "sfem_BoundaryMass.hpp"
+#include "generated/sfem_generated_ops_registration.hpp"
+#include "generated/neumann/op/sfem_GeneratedNeumann.hpp"
+#include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral.hpp"
+#include "sfem_Gradient.hpp"
+#include "sfem_Hyperelasticity.hpp"
+#include "sfem_Laplacian.hpp"
+#include "sfem_LinearElasticity.hpp"
+#include "sfem_LumpedMass.hpp"
+#include "sfem_Mass.hpp"
+#include "sfem_MooneyRivlinActiveStrainPacked.hpp"
+#include "sfem_InertiaPotential.hpp"
+#include "sfem_NeoHookeanOgden.hpp"
+#include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
+#include "sfem_NeoHookeanOgdenPacked.hpp"
+#include "sfem_PackedLaplacian.hpp"
+#include "sfem_SemiStructuredEMLaplacian.hpp"
+#include "sfem_SemiStructuredEMLinearElasticity.hpp"
+#include "sfem_SemiStructuredHyTeGLinearElasticity.hpp"
+#include "sfem_SpectralElementLaplacian.hpp"
+#include "sfem_VectorLaplacian.hpp"
+
+#ifdef SFEM_ENABLE_RYAML
+#include <c4/format.hpp>
+#include <ryml_std.hpp>
+#endif
+
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
+
+namespace sfem {
+
+    class OpFactory::Impl {
+    public:
+        std::map<std::string, FactoryFunction>         name_to_create;
+        std::map<std::string, FactoryFunctionBoundary> name_to_create_boundary;
+    };
+
+    OpFactory::OpFactory() : impl_(std::make_unique<Impl>()) {}
+
+    OpFactory::~OpFactory() = default;
+
+    OpFactory &OpFactory::instance() {
+        static OpFactory instance_;
+
+        if (instance_.impl_->name_to_create.empty()) {
+            instance_.private_register_op("InertiaPotential", InertiaPotential::create);
+            // The two names this operator used to have.  It never implemented
+            // either method -- it is a lumped mass about a predictor, and the
+            // caller picks `alpha` and fills `u_hat` -- so one class answers
+            // both, and the keys stay because drivers and env vars resolve
+            // operators by string.
+            instance_.private_register_op("BDF2InertiaPotential", InertiaPotential::create);
+            instance_.private_register_op("NewmarkInertiaPotential", InertiaPotential::create);
+            instance_.private_register_op("LinearElasticity", LinearElasticity::create);
+            instance_.private_register_op("Laplacian", Laplacian::create);
+            instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);
+            instance_.private_register_op("em:Laplacian", SemiStructuredEMLaplacian::create);
+            instance_.private_register_op("em:LinearElasticity", SemiStructuredEMLinearElasticity::create);
+            instance_.private_register_op("LinearElasticityHyTeG", SemiStructuredHyTeGLinearElasticity::create);
+            instance_.private_register_op("SpectralElementLaplacian", SpectralElementLaplacian::create);
+            instance_.private_register_op("Mass", Mass::create);
+            instance_.private_register_op("LumpedMass", LumpedMass::create);
+            instance_.private_register_op("NeoHookeanOgden", NeoHookeanOgden::create);
+            instance_.private_register_op("NeoHookeanOgdenPacked", NeoHookeanOgdenPacked::create);
+            instance_.private_register_op("GeneratedNeumann", GeneratedNeumann::create);
+            instance_.private_register_op("GeneratedNeumannGeneral", GeneratedNeumannGeneral::create);
+            instance_.private_register_op("NeoHookeanOgdenActiveStrainPacked", NeoHookeanOgdenActiveStrainPacked::create);
+            instance_.private_register_op("MooneyRivlin", MooneyRivlinActiveStrainPacked::create);
+            instance_.private_register_op("MooneyRivlinActiveStrainPacked", MooneyRivlinActiveStrainPacked::create);
+            instance_.private_register_op("Hyperelasticity", Hyperelasticity::create);
+            instance_.private_register_op("PackedLaplacian", PackedLaplacian::create);
+            instance_.private_register_op("Gradient", Gradient::create);
+            register_generated_ops();
+            instance_.impl_->name_to_create_boundary["BoundaryMass"] = BoundaryMass::create;
+        }
+
+        return instance_;
+    }
+
+    void OpFactory::private_register_op(const std::string &name, FactoryFunction factory_function) {
+        impl_->name_to_create[name] = factory_function;
+    }
+
+    void OpFactory::register_op(const std::string &name, FactoryFunction factory_function) {
+        instance().private_register_op(name, factory_function);
+    }
+
+    std::shared_ptr<Op> OpFactory::create(const std::shared_ptr<FunctionSpace> &space,
+                                          const std::string                    &name,
+                                          const ExecutionSpace                  es) {
+        SFEM_UNUSED(es);
+#ifdef SFEM_ENABLE_CUDA
+        if (es == EXECUTION_SPACE_DEVICE) {
+            static bool registered_device_ops = false;
+            if (!registered_device_ops) {
+                sfem::register_device_ops();
+                registered_device_ops = true;
+            }
+
+            assert(instance().impl_);
+
+            std::string m_name = name;
+            if (m_name.rfind("gpu:", 0) != 0) {
+                m_name = d_op_str(m_name);
+            }
+
+            auto &ntc = instance().impl_->name_to_create;
+            auto  it  = ntc.find(m_name);
+            if (it == ntc.end()) {
+                std::cerr << "Unable to find op " << m_name << "\n";
+                return nullptr;
+            }
+
+            return it->second(space);
+        }
+#endif  // SFEM_ENABLE_CUDA
+
+        assert(instance().impl_);
+
+        auto &ntc = instance().impl_->name_to_create;
+        auto  it  = ntc.find(name);
+
+        if (it == ntc.end()) {
+            std::cerr << "Unable to find op " << name << "\n";
+            return nullptr;
+        }
+
+        return it->second(space);
+    }
+
+    std::shared_ptr<Op> OpFactory::create_boundary(const std::shared_ptr<FunctionSpace>   &space,
+                                                   const std::shared_ptr<Buffer<idx_t *>> &boundary_elements,
+                                                   const std::string                      &name,
+                                                   const ExecutionSpace                    es) {
+        if (es != EXECUTION_SPACE_HOST) {
+            std::cerr << "Boundary op " << name << " exists on the host only\n";
+            return nullptr;
+        }
+
+        assert(instance().impl_);
+
+        auto &ntc = instance().impl_->name_to_create_boundary;
+        auto  it  = ntc.find(name);
+
+        if (it == ntc.end()) {
+            std::cerr << "Unable to find op " << name << "\n";
+            return nullptr;
+        }
+
+        return it->second(space, boundary_elements);
+    }
+
+    std::string d_op_str(const std::string &name) { return "gpu:" + name; }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            const ryml::ConstNodeRef             &node,
+                                            const ExecutionSpace                  es) {
+        std::string name;
+        node["type"].load(&name);
+
+        auto prototype = create_op(space, name.c_str(), es);
+        if (!prototype) return nullptr;
+        return prototype->create_from_yaml(space, node);
+    }
+
+    std::shared_ptr<Op> create_op_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                            std::string                           yaml,
+                                            const ExecutionSpace                  es) {
+        ryml::Tree tree = ryml::parse_in_place(ryml::to_substr(yaml));
+        auto       root = tree.rootref();
+        auto       node = root.has_child("operator") ? root["operator"] : root;
+        if (!node.has_child("type")) {
+            SFEM_ERROR("Operator YAML requires a type\n");
+            return nullptr;
+        }
+        return create_op_from_yaml(space, node, es);
+    }
+#endif  // SFEM_ENABLE_RYAML
+}  // namespace sfem

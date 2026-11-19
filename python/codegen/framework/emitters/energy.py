@@ -82,6 +82,16 @@ class OpenMPEnergySoASourceBuilder:
     def parallel_for_lines(self, reduction=None):
         return self.target.parallel_element_loop_lines("static", reduction)
 
+    def parallel_region_lines(self):
+        """The region a kernel opens to stage through thread scratch: nothing in a
+        team body, whose block every thread of its caller's region runs."""
+        pragma = self.target.parallel_region_pragma()
+        return () if pragma is None else (pragma,)
+
+    def worksharing_for_lines(self, schedule=None):
+        pragma = self.target.worksharing_for_pragma(schedule)
+        return () if pragma is None else (pragma,)
+
     def atomic_update_lines(self):
         """The atomic-update pragma, or nothing where the target has none.
 
@@ -209,6 +219,12 @@ class CUDAEnergySoASourceBuilder:
     def parallel_for_lines(self, reduction=None):
         return ()
 
+    def parallel_region_lines(self):
+        return ()
+
+    def worksharing_for_lines(self, schedule=None):
+        return ()
+
     def atomic_update_lines(self):
         """Nothing: CUDA scatters with ``atomicAdd``, not a pragma."""
         return ()
@@ -317,7 +333,39 @@ class CUDAEnergySoAEmitter:
         # it unpacked, which is the kind of decision that survives only as long
         # as nobody tidies the argument list -- passing the plan whole brought
         # the formats back and two backend tests caught it immediately.
+        #
+        # (Since the energy assembly kernel is spelled through the target --
+        # its declaration, qualifiers, atomics and launch -- BSR on the standard
+        # layout assembles here too.  The CRS scatters and the packed passes
+        # still spell OpenMP pragmas, so they stay off this target.)
+        from codegen.framework.plans.matrix_formats import (
+            MatrixFormat,
+            MatrixFormatPlan,
+            MatrixMeshLayout,
+        )
+
+        formats = plan.matrix_format_plan
+        if formats is not None:
+            # The symmetric block diagonal scatters through the same atomics, and
+            # it is what the block-Jacobi smoothers of SSMGC read on the device.
+            device = tuple(
+                variant
+                for variant in formats.variants
+                if variant.matrix_format in (MatrixFormat.BSR, MatrixFormat.BLOCK_DIAG_SYM)
+                and variant.mesh_layout is MatrixMeshLayout.STANDARD
+            )
+            # The projected tangent goes with the BSR assembly: the projection is a
+            # per-point function the device kernel calls as the host's does.
+            formats = (
+                MatrixFormatPlan(
+                    device,
+                    tangent_projection=formats.tangent_projection
+                    and any(variant.matrix_format is MatrixFormat.BSR for variant in device),
+                )
+                if device
+                else None
+            )
         return generate_sfem_soa_cpp_files_for_element(
-            dataclasses.replace(plan, matrix_format_plan=None),
+            dataclasses.replace(plan, matrix_format_plan=formats),
             source_builder=self._source_builder(),
         )

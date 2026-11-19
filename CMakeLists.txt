@@ -5,7 +5,7 @@ project(
     sfem
     VERSION 0.1.0
     LANGUAGES "C" "CXX"
-    HOMEPAGE_URL "https://bitbucket.org/zulianp/sfem"
+    HOMEPAGE_URL "https://github.com/zulianp/sfem"
     DESCRIPTION
     "SFEM: Simple FEM"
     )
@@ -24,6 +24,16 @@ include(cmake/SFEMBuildTypes.cmake)
 include(cmake/SFEMCMakeFunctions.cmake)
 include(cmake/SFEMDependencies.cmake)
 
+# SFEM_ENABLE_DEV_MODE: warnings are errors in SFEM's own sources (the library, drivers, tests and
+# bindings added below), in C, C++ and CUDA; not in the dependencies added above.
+if(SFEM_ENABLE_DEV_MODE)
+    separate_arguments(SFEM_DEV_CXX_FLAGS UNIX_COMMAND "${SFEM_DEV_FLAGS}")
+    add_compile_options(
+        "$<$<COMPILE_LANGUAGE:CXX>:${SFEM_DEV_CXX_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:C>:${SFEM_DEV_C_FLAGS}>"
+        "$<$<COMPILE_LANGUAGE:CUDA>:${SFEM_DEV_CUDA_FLAGS}>")
+endif()
+
 if(SFEM_ENABLE_PYTHON)
     include(cmake/SFEMPython.cmake)
 endif()
@@ -33,7 +43,13 @@ endif()
 # Library
 ######################################################
 
-find_package(MatrixIO REQUIRED)
+# smesh provides matrixio (fetched when SMESH_ENABLE_MPI=ON) but links it
+# privately, so link it here as well. Fall back to a local matrix.io checkout.
+if(TARGET matrixio::matrixio)
+    list(APPEND SFEM_SUBMODULES matrixio::matrixio)
+else()
+    find_package(MatrixIO REQUIRED)
+endif()
 
 set(SFEM_MODULES
     algebra base matrix 
@@ -44,25 +60,20 @@ set(SFEM_MODULES
     algebra/dia
     algebra/crs_x_bsr
     algebra/ell
+    algebra/sell
     algebra/mg
     algebra/openmp
     algebra/parallel
-    mesh 
-    mesh/multiblock
-    mesh/sshex8
+    mesh
     operators 
     operators/beam2 
     operators/boundary_conditions
     operators/contact
     operators/cvfem 
-    operators/cvfem_quad4
-    operators/cvfem_tet4
-    operators/cvfem_tri3
     operators/edgeshell2
     operators/edgeshell3
     operators/generic
     operators/hex8
-    operators/hierarchical
     operators/macro_tet4
     operators/macro_tri3
     operators/navier_stokes
@@ -83,13 +94,6 @@ set(SFEM_MODULES
     solver
     ssmg
 )
-
-# FIXME DG is yet to be implemented 
-# list(APPEND SFEM_MODULES
-#     operators/hex8/dg
-#     operators/quad4/dg
-#     operators/spectral_hex/dg
-# )
 
 if(SFEM_ENABLE_EXPLICIT_VECTORIZATION)
     list(APPEND SFEM_MODULES operators/tet4/vectorized)
@@ -118,38 +122,14 @@ if(SFEM_ENABLE_RESAMPLING)
 endif()
 
 list(APPEND SFEM_MODULES 
-    resampling/interpolate
-    resampling/quadshell4
-    resampling/trishell3
-    resampling/beam2
-    resampling/surface
-    )
-
-list(APPEND SFEM_MODULES 
     frontend
     frontend/constraints
     frontend/ops
-    frontend/ops/generated
-    frontend/ops/generated/body_force
-    frontend/ops/generated/body_force/op
-    frontend/ops/generated/laplace
-    frontend/ops/generated/laplace/op
-    frontend/ops/generated/linear_elasticity
-    frontend/ops/generated/linear_elasticity/op
-    frontend/ops/generated/saint_venant_kirchhoff
-    frontend/ops/generated/saint_venant_kirchhoff/op
-    frontend/ops/generated/neohookean_ogden
-    frontend/ops/generated/neohookean_ogden/op
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
-    frontend/ops/generated/two_phase_flow
-    frontend/ops/generated/two_phase_flow/op
-    frontend/mesh
+    frontend/ops/prony
+    frontend/ops/inexact
+    frontend/nonlinear
+    frontend/mech
 )
-
-if(SFEM_ENABLE_METIS)
-    list(APPEND SFEM_MODULES graphs)
-endif()
 
 if(SFEM_ENABLE_SCCD AND SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/collisions)
@@ -159,53 +139,49 @@ if(SFEM_ENABLE_SSDF)
     list(APPEND SFEM_MODULES frontend/distances frontend/contact)
 endif()
 
+if(SFEM_ENABLE_SRESAMPLE)
+    list(APPEND SFEM_MODULES frontend/sdf_contact)
+endif()
+
 if(SFEM_ENABLE_CUDA)
-     list(APPEND SFEM_MODULES 
+     list(APPEND SFEM_MODULES
         algebra/cuda
+        algebra/bsr/cuda
         frontend/cuda
         operators/boundary_conditions/cuda
         operators/contact/cuda
         operators/cuda
         operators/hex8/cuda
-        operators/hierarchical/cuda
         operators/macro_tet4/cuda
-        operators/quadshell4/cuda
         operators/spectral_hex/cuda
         operators/sshex8/cuda
-        operators/ssquad4/cuda
-        operators/sstet4/cuda
         operators/tet10/cuda
         operators/tet4/cuda
-        resampling/surface/cuda
-        resampling/quadshell4/cuda
         ssmg/cuda
         frontend/ops/cuda
-        # The generated device tree, laid out the way the hand-written one is:
-        # a local `cuda/` folder beside the host sources it mirrors.  These are
-        # the folders whose files are included by bare name and so need to be
-        # on the include path; the kernels below them include by relative path
-        # and are swept up by the recursive glob further down.
-        frontend/ops/generated/cuda
-        frontend/ops/generated/body_force/op/cuda
-        frontend/ops/generated/laplace/op/cuda
-        frontend/ops/generated/linear_elasticity/op/cuda
-        frontend/ops/generated/neohookean_ogden/op/cuda
-        frontend/ops/generated/mooney_rivlin_kelvin_voigt/op/cuda
-        frontend/ops/generated/two_phase_flow/op/cuda
+        frontend/ops/prony/cuda
+        frontend/ops/inexact/cuda
     )
 
     if(SFEM_ENABLE_AMG)
         list(APPEND SFEM_MODULES amg/cuda amg/vector_amg)
     endif()
+
+    if(SFEM_ENABLE_HIP)
+        list(APPEND SFEM_MODULES base/hip)
+    endif()
 endif()
 
+# The library's sources live under src/.
+set(SFEM_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 foreach(MODULE ${SFEM_MODULES})
-    scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
+    scan_directories(${SFEM_SRC_DIR}/${MODULE} "." SFEM_BUILD_INCLUDES
        SFEM_HEADERS SFEM_SOURCES)
 
     if(SFEM_ENABLE_CUDA)
-        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cu")
-        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cuh")
+        file(GLOB SFEM_MODULE_KERNEL_SOURCES CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${MODULE}/*.cu")
+        file(GLOB SFEM_MODULE_KERNEL_HEADERS CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${MODULE}/*.cuh")
         # message(STATUS "${MODULE} : ${SFEM_MODULE_KERNEL_SOURCES}")
     endif()
 
@@ -219,9 +195,9 @@ foreach(MODULE ${SFEM_MODULES})
 endforeach(MODULE)
 
 file(GLOB_RECURSE SFEM_GENERATED_SOURCES CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cpp")
+     "${SFEM_SRC_DIR}/frontend/ops/generated/*.cpp")
 file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
-     "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.hpp")
+     "${SFEM_SRC_DIR}/frontend/ops/generated/*.hpp")
 
 # The device tree's wrappers are `.cpp` -- host C++ that launches device kernels
 # -- so this glob sweeps them up whether or not CUDA is enabled.  They cannot do
@@ -230,8 +206,8 @@ file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
 # glob below only collects when CUDA is on.  Compiling them anyway meant a
 # host-only build depended on the device runtime being on the include path.
 if(NOT SFEM_ENABLE_CUDA)
-    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/.*/cuda/")
-    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/.*/cuda/")
+    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/(.*/)?cuda/")
+    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/(.*/)?cuda/")
 endif()
 list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
 list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
@@ -242,12 +218,36 @@ list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
 # tree nests by dimension and element rather than by module.
 if(SFEM_ENABLE_CUDA)
     file(GLOB_RECURSE SFEM_GENERATED_KERNEL_SOURCES CONFIGURE_DEPENDS
-         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cu")
+         "${SFEM_SRC_DIR}/frontend/ops/generated/*.cu")
     file(GLOB_RECURSE SFEM_GENERATED_KERNEL_HEADERS CONFIGURE_DEPENDS
-         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cuh")
+         "${SFEM_SRC_DIR}/frontend/ops/generated/*.cuh")
     list(APPEND SFEM_KERNEL_SOURCES ${SFEM_GENERATED_KERNEL_SOURCES})
     list(APPEND SFEM_KERNEL_HEADERS ${SFEM_GENERATED_KERNEL_HEADERS})
 endif()
+
+# Generated files include each other by file name alone, because install copies
+# every header into one flat `include/` (`plans/conventions.py
+# generated_include`).  So the build tree puts every generated folder that holds
+# a header on the include path -- derived from the headers rather than listed,
+# so a new material or element needs no edit here -- and file names must be
+# unique, or the flat install would let one header overwrite another.
+set(SFEM_GENERATED_INCLUDE_DIRS)
+set(SFEM_GENERATED_HEADER_NAMES)
+foreach(header ${SFEM_GENERATED_HEADERS} ${SFEM_GENERATED_KERNEL_HEADERS})
+    get_filename_component(header_dir "${header}" DIRECTORY)
+    get_filename_component(header_name "${header}" NAME)
+    list(APPEND SFEM_GENERATED_INCLUDE_DIRS "${header_dir}")
+    list(FIND SFEM_GENERATED_HEADER_NAMES "${header_name}" seen)
+    if(NOT seen EQUAL -1)
+        message(FATAL_ERROR
+            "Two generated headers are named ${header_name}; one is ${header}. "
+            "Generated headers are included by file name and installed flat, "
+            "so their names must be unique.")
+    endif()
+    list(APPEND SFEM_GENERATED_HEADER_NAMES "${header_name}")
+endforeach()
+list(REMOVE_DUPLICATES SFEM_GENERATED_INCLUDE_DIRS)
+list(APPEND SFEM_BUILD_INCLUDES ${SFEM_GENERATED_INCLUDE_DIRS})
 
 list(REMOVE_DUPLICATES SFEM_SOURCES)
 list(REMOVE_DUPLICATES SFEM_HEADERS)
@@ -257,29 +257,32 @@ if(SFEM_ENABLE_CUDA)
     list(APPEND SFEM_HEADERS "${SFEM_KERNEL_HEADERS}")
 endif()
 
+# A HIP build compiles the same device sources with the HIP compiler (base/hip/sfem_gpu_runtime.hpp).
+if(SFEM_ENABLE_HIP)
+    set_source_files_properties(${SFEM_KERNEL_SOURCES} PROPERTIES LANGUAGE HIP)
+endif()
+
+# The stored tangent's device stores (frontend/ops/inexact/cuda and each unit's generated
+# `_inexact_store.cu`) keep IEEE single precision under the build's -use_fast_math: flush-to-zero
+# puts a denormal test on every double-to-float conversion of an increment difference (18 per
+# element in the TET4 element-matrix apply, 18% slower), and the set-up then rounds as the host's.
+# HIP's defaults are IEEE already (below).
+if(SFEM_ENABLE_CUDA AND NOT SFEM_ENABLE_HIP)
+    set(SFEM_INEXACT_DEVICE_SOURCES ${SFEM_KERNEL_SOURCES})
+    list(FILTER SFEM_INEXACT_DEVICE_SOURCES INCLUDE REGEX "(_inexact_store|/frontend/ops/inexact/cuda/[^/]*)\\.cu$")
+    set_source_files_properties(${SFEM_INEXACT_DEVICE_SOURCES} PROPERTIES
+        COMPILE_OPTIONS "--ftz=false;--prec-div=true;--prec-sqrt=true")
+endif()
+
 list(REMOVE_ITEM SFEM_SOURCES
-    "frontend/sfem_Communicator.cpp"
-    "frontend/sfem_CRSGraph.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_Communicator.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/frontend/sfem_CRSGraph.cpp")
+    "${SFEM_SRC_DIR}/frontend/sfem_Communicator.cpp"
+    "${SFEM_SRC_DIR}/frontend/sfem_CRSGraph.cpp")
 list(FILTER SFEM_SOURCES EXCLUDE REGEX "sfem_(Communicator|CRSGraph)\\.cpp$")
 
 # message(STATUS "SFEM_BUILD_INCLUDES: ${SFEM_BUILD_INCLUDES}")
 # message(STATUS "SFEM_HEADERS: ${SFEM_HEADERS}") 
 # message(STATUS "SFEM_SOURCES: ${SFEM_SOURCES}")
 # message(STATUS "SFEM_KERNEL_SOURCES: ${SFEM_KERNEL_SOURCES}")
-
-string(TOLOWER ${CMAKE_BUILD_TYPE} LBT)
-
-if(NOT LBT STREQUAL "debug" AND NOT LBT STREQUAL "asan" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-    if (SFEM_VEC_SIZE STREQUAL "4" OR SFEM_CPU_ARCH STREQUAL "aaarch64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX2}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX2}")
-    elseif (SFEM_VEC_SIZE STREQUAL "8")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_AVX512}")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_AVX512}")
-    endif()
-endif()
 
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
@@ -308,24 +311,47 @@ target_include_directories(sfem BEFORE
 target_include_directories(
     sfem BEFORE
     PUBLIC $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${SFEM_SRC_DIR}>
     $<INSTALL_INTERFACE:include>)
 
 
 target_include_directories(sfem PUBLIC ${SFEM_DEP_INCLUDES})
 
-if(SFEM_ENABLE_HXTSORT)
-    if(NOT SFEM_ENABLE_OPENMP)
-        message(FATAL_ERROR "Option -DSFEM_ENABLE_HXTSORT=ON requires -DSFEM_ENABLE_OPENMP=ON")
-    endif()
-    target_include_directories(sfem PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/external/HXTSort")
-    # target_compile_definitions(sfem PRIVATE "-D_XOPEN_SOURCE=600")
-endif()
-
 ######################################################
 # link
 
 target_link_libraries(sfem PUBLIC ${SFEM_DEP_LIBRARIES} ${CMAKE_DL_LIBS})
+
+if(SFEM_ENABLE_HIP)
+    # The CUDA headers' names resolve to base/hip/compat, ahead of everything else.
+    target_include_directories(sfem BEFORE PUBLIC
+        $<BUILD_INTERFACE:${SFEM_SRC_DIR}/base/hip/compat>
+        $<INSTALL_INTERFACE:include/hip_compat>)
+    # hipCUB, rocThrust and rocPRIM headers, for the .cu files only (see SFEMDependencies.cmake).
+    set(_SFEM_HIP_HEADER_TARGETS hip::hipcub roc::rocprim)
+    if(SFEM_ENABLE_AMG)
+        list(APPEND _SFEM_HIP_HEADER_TARGETS roc::rocthrust)
+    endif()
+    foreach(hdr_target ${_SFEM_HIP_HEADER_TARGETS})
+        target_include_directories(sfem PRIVATE
+            "$<$<COMPILE_LANGUAGE:HIP>:$<TARGET_PROPERTY:${hdr_target},INTERFACE_INCLUDE_DIRECTORIES>>")
+    endforeach()
+    # The HIP build keeps IEEE arithmetic: division and square root correctly rounded (the compiler's
+    # default) and subnormals kept (stated here, flushing being a per-target choice). The CUDA build
+    # differs: -use_fast_math (SFEMBuildTypes.cmake) takes approximate division and square root and
+    # flushes subnormals to zero, so the two vendors' results differ in their last digits, the HIP
+    # build's being the more accurate.
+    target_compile_options(sfem PRIVATE $<$<COMPILE_LANGUAGE:HIP>:-fno-gpu-flush-denormals-to-zero>)
+    # nvcc includes cuda_runtime.h into every .cu before its first line; base/hip/compat's does here.
+    target_compile_options(sfem PRIVATE "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:HIP_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:HIP>:-fgpu-default-stream=per-thread>>)
+elseif(SFEM_ENABLE_CUDA)
+    # Code built against the installed library shares its default stream (SFEMDependencies.cmake).
+    target_compile_definitions(sfem INTERFACE $<INSTALL_INTERFACE:CUDA_API_PER_THREAD_DEFAULT_STREAM>)
+    target_compile_options(sfem INTERFACE $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:CUDA>:--default-stream=per-thread>>)
+endif()
 # message(STATUS "SFEM_DEP_LIBRARIES: ${SFEM_DEP_LIBRARIES}")
 
 ######################################################
@@ -338,11 +364,6 @@ set_target_properties(
 
 set(SFEM_TARGETS sfem)
 
-# Optional generated operator plug-ins (not built by default)
-if(SFEM_ENABLE_CODEGEN)
-    # add_subdirectory(operators/generated)
-endif() 
-
 if(SFEM_ENABLE_CUDA)
     message(STATUS "CMAKE_CUDA_ARCHITECTURES: ${CMAKE_CUDA_ARCHITECTURES}")
 endif()
@@ -352,7 +373,7 @@ endif()
 # Executables
 
 if(NOT SFEM_ENABLE_MINIMAL)
-    list(APPEND SFEM_DRIVER_MODULES . mesh examples mesh_functions postprocess sdf bench ale simulations contact mech verification)
+    list(APPEND SFEM_DRIVER_MODULES . postprocess bench ale simulations mech verification)
 
     foreach(DRIVER_MODULE ${SFEM_DRIVER_MODULES})
         file(GLOB MODULE_C_DRIVERS CONFIGURE_DEPENDS "drivers/${DRIVER_MODULE}/*.c")
@@ -365,12 +386,17 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
     if(${SFEM_SCALAR_TYPE} STREQUAL "float32")
         # FIXME these executables need to be fixed when compiling with real_t=float32
-        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;assemble4;cvfem_assemble;heat_equation;heat_equation;taylor_hood_navier_stokes)
+        list (APPEND SFEM_EXCLUDED_EXEC assemble;assemble3;cvfem_assemble;taylor_hood_navier_stokes)
     endif()
 
     if(NOT SFEM_ENABLE_MPI)
         # These drivers depend on distributed/MPI-only headers (e.g. smesh_distributed_aura.hpp)
         list(APPEND SFEM_EXCLUDED_EXEC "partition")
+    endif()
+
+    if(NOT SFEM_ENABLE_RYAML)
+        # The playground reads its case from YAML.
+        list(APPEND SFEM_EXCLUDED_EXEC "playground")
     endif()
 
     if(SFEM_ENABLE_RESAMPLING)
@@ -379,6 +405,15 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
         list(APPEND DRIVERS "${RESAMPLING_C_EXAMPLES}")
         list(APPEND DRIVERS "${RESAMPLING_CXX_EXAMPLES}")
+
+        if(NOT SFEM_ENABLE_MPI)
+            # Written against MPI communicators (Communicator::wrap, distributed reads).
+            list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf;grid_to_mesh")
+        endif()
+        if(NOT SFEM_ENABLE_SRESAMPLE)
+            # They sample an SDF with sresample.
+            list(APPEND SFEM_EXCLUDED_EXEC "gap_from_sdf;geometry_aware_gap_from_sdf")
+        endif()
     endif()
 
     if(SFEM_ENABLE_CUDA)
@@ -387,8 +422,6 @@ if(NOT SFEM_ENABLE_MINIMAL)
 
         list(APPEND DRIVERS "${CUDA_C_EXAMPLES}")
         list(APPEND DRIVERS "${CUDA_CXX_EXAMPLES}")
-    else()
-        list(APPEND SFEM_EXCLUDED_EXEC "run_poisson_cuda;lapl_matrix_free;linear_elasticity_matrix_free;sym_spmv_bench")
     endif()
 
 
@@ -414,6 +447,11 @@ if(NOT SFEM_ENABLE_MINIMAL)
         add_executable(bench_packed_laplacian_cuda
             bench/cuda/bench_packed_laplacian.cpp
             bench/cuda/bench_packed_laplacian.cu)
+        if(SFEM_ENABLE_HIP)
+            set_source_files_properties(bench/cuda/bench_packed_laplacian.cu PROPERTIES LANGUAGE HIP)
+            target_compile_options(bench_packed_laplacian_cuda PRIVATE
+                "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-include cuda_runtime.h>")
+        endif()
         target_link_libraries(bench_packed_laplacian_cuda PRIVATE sfem)
         # if(SFEM_ENABLE_OPENMP)
         #     if(OPENMP_DIR)
@@ -450,11 +488,9 @@ if(SFEM_ENABLE_TESTING)
     list(APPEND SFEM_UNIT_TESTS
         algebra/crs/tests
         algebra/bsr/tests
+        algebra/sell/tests
         algebra/crs_x_bsr/tests
-        operators/ssquad4/tests
-        operators/sshex8/tests
         operators/stencil/tests
-        mesh/tests
         frontend/tests
         ssmg/tests
     )
@@ -483,7 +519,7 @@ if(SFEM_ENABLE_TESTING)
     endif()
 
     foreach(UNIT_TEST ${SFEM_UNIT_TESTS})
-        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${UNIT_TEST}/*.cpp")
+        file(GLOB CXX_UNIT_TESTS CONFIGURE_DEPENDS "${SFEM_SRC_DIR}/${UNIT_TEST}/*.cpp")
 
         list(APPEND TEST_DRIVERS "${CXX_UNIT_TESTS}")
 
@@ -499,11 +535,43 @@ if(SFEM_ENABLE_TESTING)
         if(TEST_DRIVER_NAME STREQUAL "sfem_TwoBodyContactTest" AND NOT SFEM_ENABLE_SCCD)
             continue()
         endif()
+        # Tests that sample SDF obstacles (sresample).
+        if(NOT SFEM_ENABLE_SRESAMPLE AND TEST_DRIVER_NAME MATCHES
+           "^sfem_(SDFSampling|NodeObstacleContact|PlaygroundContact|MGSDFContact|CudaContact)Test$")
+            continue()
+        endif()
+        # Tests whose cases are YAML.
+        if(NOT SFEM_ENABLE_RYAML AND TEST_DRIVER_NAME MATCHES
+           "^sfem_(ElasticityCase|PlaygroundCases|PlaygroundContact|LoadProfile|CudaEnergyBSRAssembly|CudaMatrixCoreApply|InexactViscous|CudaInexactViscous)Test$")
+            continue()
+        endif()
         add_executable(${TEST_DRIVER_NAME} ${TEST_DRIVER})
         target_link_libraries(${TEST_DRIVER_NAME} PRIVATE sfem)
         add_test(NAME ${TEST_DRIVER_NAME} COMMAND ${TEST_DRIVER_NAME})
         list(APPEND SFEM_TARGETS ${TEST_DRIVER_NAME})
     endforeach(TEST_DRIVER ${TEST_DRIVERS})
+
+    # The same applies with the matrix-core path turned off: the generated kernels answer.
+    if(TARGET sfem_CudaMatrixCoreApplyTest)
+        add_test(NAME sfem_CudaMatrixCoreApplyTest_generated COMMAND sfem_CudaMatrixCoreApplyTest)
+        set_tests_properties(sfem_CudaMatrixCoreApplyTest_generated PROPERTIES ENVIRONMENT "SFEM_MATRIX_CORE_APPLY=0")
+    endif()
+
+    # Every device launch names its stream (scripts/testing/check_streams.py): a scan of the
+    # sources, run in every configuration.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME sfem_StreamGate
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_streams.py ${CMAKE_CURRENT_SOURCE_DIR})
+    endif()
+
+    # The documentation's Playground cases pass the schema and run, and its links resolve
+    # (scripts/testing/check_docs.py).
+    if(Python3_Interpreter_FOUND AND TARGET playground)
+        add_test(NAME sfem_DocsCasesTest
+                 COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/testing/check_docs.py
+                         ${CMAKE_CURRENT_SOURCE_DIR} --playground $<TARGET_FILE:playground> --run)
+    endif()
 
     if(TARGET sfem_MaMALTest)
         target_include_directories(sfem_MaMALTest PRIVATE external/ssdf/serial ${CMAKE_CURRENT_BINARY_DIR}/external/ssdf)
@@ -513,7 +581,7 @@ if(SFEM_ENABLE_TESTING)
     endif()
 
     if(SFEM_ENABLE_MPI)
-        add_executable(sfem_ParallelLaplacianApplyTest frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
+        add_executable(sfem_ParallelLaplacianApplyTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelLaplacianApplyTest.cpp)
         target_link_libraries(sfem_ParallelLaplacianApplyTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelLaplacianApplyTest
@@ -521,7 +589,7 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelLaplacianApplyTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelLaplacianApplyTest)
 
-        add_executable(sfem_ParallelCGTest frontend/tests/mpi/sfem_ParallelCGTest.cpp)
+        add_executable(sfem_ParallelCGTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelCGTest.cpp)
         target_link_libraries(sfem_ParallelCGTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelCGTest
@@ -529,7 +597,7 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelCGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelCGTest)
 
-        add_executable(sfem_ParallelFunctionSpaceTest frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
+        add_executable(sfem_ParallelFunctionSpaceTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelFunctionSpaceTest.cpp)
         target_link_libraries(sfem_ParallelFunctionSpaceTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelFunctionSpaceTest
@@ -537,13 +605,33 @@ if(SFEM_ENABLE_TESTING)
         set_tests_properties(sfem_ParallelFunctionSpaceTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelFunctionSpaceTest)
 
-        add_executable(sfem_ParallelSSGMGTest frontend/tests/mpi/sfem_ParallelSSGMGTest.cpp)
+        add_executable(sfem_ParallelSSGMGTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelSSGMGTest.cpp)
         target_link_libraries(sfem_ParallelSSGMGTest PRIVATE sfem)
         add_test(
             NAME sfem_ParallelSSGMGTest
             COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelSSGMGTest>)
         set_tests_properties(sfem_ParallelSSGMGTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1")
         list(APPEND SFEM_TARGETS sfem_ParallelSSGMGTest)
+
+        if(SFEM_ENABLE_CUDA)
+            add_executable(sfem_ParallelExchangeStreamTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelExchangeStreamTest.cpp)
+            target_link_libraries(sfem_ParallelExchangeStreamTest PRIVATE sfem)
+            add_test(
+                NAME sfem_ParallelExchangeStreamTest
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelExchangeStreamTest>)
+            set_tests_properties(sfem_ParallelExchangeStreamTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 120)
+            list(APPEND SFEM_TARGETS sfem_ParallelExchangeStreamTest)
+        endif()
+
+        if(SFEM_ENABLE_RYAML AND SFEM_ENABLE_SRESAMPLE)
+            add_executable(sfem_ParallelObstacleTest ${SFEM_SRC_DIR}/frontend/tests/mpi/sfem_ParallelObstacleTest.cpp)
+            target_link_libraries(sfem_ParallelObstacleTest PRIVATE sfem)
+            add_test(
+                NAME sfem_ParallelObstacleTest
+                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 4 $<TARGET_FILE:sfem_ParallelObstacleTest>)
+            set_tests_properties(sfem_ParallelObstacleTest PROPERTIES ENVIRONMENT "OMP_NUM_THREADS=1" TIMEOUT 300)
+            list(APPEND SFEM_TARGETS sfem_ParallelObstacleTest)
+        endif()
     endif()
 endif()
 
@@ -593,6 +681,10 @@ install(FILES ${CMAKE_BINARY_DIR}/sfem_config.py DESTINATION scripts/sfem)
 install(FILES ${CMAKE_BINARY_DIR}/sfem_config.sh DESTINATION workflows)
 
 install(FILES ${SFEM_HEADERS} DESTINATION include)
+
+if(SFEM_ENABLE_HIP)
+    install(DIRECTORY ${SFEM_SRC_DIR}/base/hip/compat/ DESTINATION include/hip_compat)
+endif()
 
 install(
     EXPORT SFEMTargets

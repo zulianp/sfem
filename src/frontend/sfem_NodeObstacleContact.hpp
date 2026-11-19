@@ -1,0 +1,213 @@
+#ifndef SFEM_NODE_OBSTACLE_CONTACT_HPP
+#define SFEM_NODE_OBSTACLE_CONTACT_HPP
+
+#include <memory>
+#include <vector>
+
+#include "sfem_ContactStabilisedNewmarkScheme.hpp"
+#include "sfem_NodeObstacleView.hpp"
+#include "sfem_Obstacle.hpp"
+#include "sfem_Team.hpp"
+#include "sfem_aliases.hpp"
+#include "smesh_grid.hpp"
+
+namespace sfem {
+    class MemoryLedger;
+
+    // Frictionless contact of a set of mesh nodes with a rigid obstacle, given by its SDF grid
+    // (positive inside) and sampled by the library at the displaced nodes (SDFObstacle::sample_nodes,
+    // node_interpolate.hpp): the grid's interpolating cubic B-spline, whose gradient and curvature
+    // are continuous. Node i keeps out of it: gap_i = -sdf(X_i + u_i) / |grad sdf| >= 0; outside the
+    // grid there is no obstacle.
+    // A step dx changes the gap by -n_i . dx_i to first order, n_i the unit gradient there, so the
+    // linearised step is the QP with the constraints n_i . dx_i <= gap_i. In each contact node's
+    // frame [n_i, t1_i, t2_i] that is an upper bound on one component, which a box-constrained QP
+    // solver takes as it is.
+    //
+    // It is the contact of a ContactStabilisedNewmarkScheme: the reaction of the last KKT measure
+    // and the velocity projection. Host only, as SDFObstacle::sample_nodes is.
+    // (Both are on the device as well: with a device execution space every buffer here, and every
+    // array a method takes, is device memory.)
+    class NodeObstacleContact final : public ContactStabilisedNewmarkScheme::Contact {
+    public:
+        // `dir` is the axis whose frame a node outside the grid gets. `nodes` and `points` are on the
+        // host; with a device `es` the contact copies them. Under MPI the vectors are ndofs long, of
+        // which the first owned_dofs are this rank's, `nodes` are among its owned ones, and every
+        // measure (kkt_residual, min_gap) is over all ranks.
+        NodeObstacleContact(const std::shared_ptr<smesh::Grid<geom_t>> &sdf,
+                            const std::shared_ptr<Communicator>        &comm,
+                            const SharedBuffer<idx_t>                  &nodes,
+                            const SharedBuffer<geom_t *>               &points,
+                            const ptrdiff_t                             ndofs,
+                            const ptrdiff_t                             owned_dofs,
+                            const int                                   dir,
+                            const ExecutionContext                     &context = EXECUTION_SPACE_HOST);
+
+        // The union of several SDF grids (UnionObstacle: each node against the nearest), e.g. a fine
+        // grid around small features and a coarse one around large ones; one grid is the above.
+        NodeObstacleContact(const std::vector<std::shared_ptr<smesh::Grid<geom_t>>> &sdfs,
+                            const std::shared_ptr<Communicator>                     &comm,
+                            const SharedBuffer<idx_t>                               &nodes,
+                            const SharedBuffer<geom_t *>                            &points,
+                            const ptrdiff_t                                          ndofs,
+                            const ptrdiff_t                                          owned_dofs,
+                            const int                                                dir,
+                            const ExecutionContext                                  &context = EXECUTION_SPACE_HOST);
+
+        ptrdiff_t                   size() const { return nodes_->size(); }
+        // On the host, whatever the execution space.
+        const SharedBuffer<idx_t>  &nodes() const { return nodes_; }
+        /// Every node of the vectors to its contact node's index, -1 if it is none (execution space).
+        const idx_t                *frame_of() const { return frame_of_->data(); }
+        // In the execution space.
+        const SharedBuffer<real_t> &gap() const { return gap_; }
+        ExecutionSpace              execution_space() const { return context_.space(); }
+
+        /// Its nodes' state (CONTACT) and its obstacle's (Obstacle::account).
+        void account(MemoryLedger &ledger) const;
+
+        // Samples the gap, the normals and the frames with the nodes displaced by x.
+        void update(const real_t *const x);
+
+        // What the constraints see of the sampled gap g (every method, from the next update on):
+        // g - shift + (1 - release) * p0_i, and no obstacle past `cutoff`. `shift` keeps a
+        // clearance; p0_i = max(0, -(g - shift)) at the state of capture_penetration is how far
+        // that state is inside, of which a share 1 - release is still admitted: a start inside
+        // the obstacle is released from it as `release` goes from 0 to 1. Defaults: shift 0, no
+        // cutoff, nothing captured.
+        void set_shift(const real_t shift) { shift_ = shift; }
+        void set_cutoff(const real_t cutoff) { cutoff_ = cutoff; }
+        void capture_penetration(const real_t *const x);
+        void set_release(const real_t release) { release_ = release; }
+
+        // out <- s .* (Q^T in) at the contact nodes and s .* in elsewhere: into their frames, then
+        // scaled. Over all ndofs, s per dof or null for none, in may be out.
+        void to_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // out <- Q (s .* in) at the contact nodes and s .* in elsewhere: scaled, then back from
+        // their frames. One sweep each, where the scaling and the frames would take two.
+        void from_frame(const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // to_frame and from_frame over the nodes of the calling thread's share of the dofs, on the
+        // host, inside a region its caller opened (Team).
+        void to_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
+        void from_frame(const Team &team, const real_t *const s, const real_t *const in, real_t *const out) const;
+
+        // The step's upper bound in the frames: the gap on each contact node's normal component,
+        // `unbounded` everywhere else.
+        void upper_bound(const real_t unbounded, real_t *const ub) const;
+        /// node_obstacle_scaling at the contact nodes: the diagonal in `inverse_scale` on entry.
+        void scaling(const real_t *const ub, real_t *const inverse_scale, real_t *const scale, real_t *const scaled_bound) const;
+
+        // First-order optimality of the step. At the solution the residual r is the obstacle's
+        // reaction mu_i n_i at the nodes it touches: along the normal, pushing out (mu_i >= 0),
+        // and zero where the node is clear of the obstacle (min(mu_i, gap_i) = 0).
+        //
+        // Writes r less the admissible reaction, mu_i = max(0, -n_i . r_i), to `projected` and
+        // returns sqrt(|projected|^2 + sum_i min(mu_i, k_i gap_i)^2) over the nodes clear of the
+        // obstacle: stationarity and complementarity, both forces, with k_i the stiffness of the
+        // node's equation. Penetration is a length, max_i -gap_i, and goes to *penetration.
+        // Keeps mu_i for `reaction`.
+        real_t kkt_residual(const real_t *const r,
+                            const real_t *const k,  // per dof
+                            real_t *const       projected,
+                            real_t *const       penetration);
+
+        // The constraints' share of the Newton tangent at the nodes displaced by x. The Lagrangian
+        // E - sum_i mu_i gap_i adds -mu_i hess(gap_i), and on a curved obstacle that term is what
+        // keeps Newton quadratic for a body sliding over it. At a node on the surface -hess(gap_i)
+        // is the library's curvature (H - n m^T - m n^T) / |grad sdf|, m = H n, the B-spline's
+        // Hessian H corrected for its gradient not being exactly unit (for a sphere it is
+        // -(I - n n^T) / R). mu_i is the reaction at a node in contact, read from the residual r as
+        // in kkt_residual. Adds each node's 3x3 block to the diagonal block of the BSR tangent.
+        //
+        // Away from the solution that estimate can be large, and on a convex obstacle the term is
+        // negative across it, enough to make the tangent indefinite. `curvature`
+        // (NodeObstacleCurvature) takes the whole term; or each node's share scaled so that its
+        // most negative part (bounded by row sums) stays within half of the node's inertia
+        // stiffness k_i = c0 m_i; or each node's share without its negative eigenvalues. `sign` -1
+        // takes back an earlier call.
+        void add_curvature(const real_t *const  x,
+                           const real_t *const  r,
+                           const real_t *const  k,
+                           const int            curvature,
+                           const real_t         sign,
+                           const count_t *const       rowptr,
+                           const idx_t *const         colidx,
+                           const smesh::PrimitiveType values_type,
+                           void *const                values);
+
+        // The same term as add_curvature, one packed symmetric 3x3 block per contact node
+        // (node_obstacle_curvature_blocks, 6 * size() entries, overwritten), for a tangent that
+        // applies it on its own; apply_blocks adds B_i in_i to out_i at each contact node,
+        // blocks_diagonal their diagonals to d.
+        void curvature_blocks(const real_t *const x, const real_t *const r, const real_t *const k, const int curvature, real_t *const blocks);
+        void apply_blocks(const real_t *const blocks, const real_t *const in, real_t *const out) const;
+        // The same at the contact nodes of the calling thread's rows (a region's Team, the host).
+        void apply_blocks(const Team &team, const real_t *const blocks, const real_t *const in, real_t *const out) const;
+        void blocks_diagonal(const real_t *const blocks, real_t *const d) const;
+        // out = B_i in at the contact nodes (blocks null: none) + shift reference .* in, at every node.
+        void extra(const real_t *const blocks, const real_t shift, const real_t *const reference, const real_t *const in, real_t *const out) const;
+
+        // -mu_i n_i at the contact nodes, with mu_i of the last kkt_residual, zero elsewhere: the
+        // residual's part that is the obstacle's reaction.
+        void reaction(real_t *const out) const override;
+
+        // The velocity correction of the contact-stabilised Newmark method (Deuflhard, Krause and
+        // Ertel 2008, in the form of Klapproth 2012, ZIB-Report 12-18, eq. 12f): with a lumped mass
+        // the L2 projection of x + dt v onto the admissible set is pointwise, so every contact node
+        // whose next position x_i + dt v_i would be inside the obstacle is moved to its surface
+        // along the normal, and v_i is what reaches that point. Its normal velocity into the
+        // obstacle is gone; nothing else changes.
+        void project_velocity(const real_t *const x, real_t *const v, const real_t dt) override;
+
+        // gap_i n_i at the contact nodes, zero elsewhere: the vector to the obstacle's surface.
+        void gap_field(real_t *const out) const;
+
+        // The smallest gap of the contact nodes at the last update, read on the host.
+        real_t min_gap() const;
+
+    private:
+        std::shared_ptr<Obstacle>    obstacle_;
+        SharedBuffer<idx_t>          nodes_;
+        SharedBuffer<idx_t>          idx_;  // nodes_ in the execution space
+        SharedBuffer<idx_t>          frame_of_;  // per node of the vectors its contact node, -1 if none
+        SharedBuffer<geom_t *>       points_;
+        // The coordinates by axis in the execution space, as a host array of rows: a device
+        // SharedBuffer<T *> keeps its row pointers on the device, where the host cannot read them.
+        std::vector<SharedBuffer<geom_t>> point_rows_;
+        geom_t                           *xyz_[3];
+        ExecutionContext                  context_;
+        SharedBuffer<real_t>         complementarity_, penetration_;
+        std::shared_ptr<Communicator> comm_;
+        ptrdiff_t                    ndofs_;
+        ptrdiff_t                    owned_dofs_;
+        int                          dir_;
+        // Rows of size() entries, stored flat for the same reason (rows()).
+        SharedBuffer<real_t>         normals_;    // 3 rows
+        SharedBuffer<real_t>         curvature_;  // 6 rows
+        SharedBuffer<real_t>         gap_;
+        SharedBuffer<real_t>         mu_;
+        SharedBuffer<real_t>         frames_;
+        SharedBuffer<real_t>         ahead_;
+        SharedBuffer<real_t>         ahead_gap_;
+        SharedBuffer<real_t>         ahead_normals_;  // 3 rows
+        SharedBuffer<real_t>         p0_;             // null until capture_penetration
+        real_t                       shift_{0};
+        real_t                       cutoff_{obstacle_unreachable};
+        real_t                       release_{1};
+
+        // The sampled gap and normals to what the constraints see.
+        void offset(const SharedBuffer<real_t> &gap, const SharedBuffer<real_t> &normals) const;
+
+        // The contact nodes with these normals and gaps (the current or the ahead samples).
+        NodeObstacleView view(const SharedBuffer<real_t> &normals, const SharedBuffer<real_t> &gap) const;
+
+        void rows(const SharedBuffer<real_t> &flat, const int k, real_t **const out) const {
+            for (int c = 0; c < k; ++c) out[c] = flat->data() + c * size();
+        }
+    };
+
+}  // namespace sfem
+
+#endif  // SFEM_NODE_OBSTACLE_CONTACT_HPP

@@ -135,6 +135,26 @@ def _work_item_loop_text(indent, index_name, simd_lines, single_work_item):
     )
 
 
+#: GCC's `-Wmaybe-uninitialized` around the lane-blocked `tensor_test`, and
+#: only there.  The caller fills the flux it passes for every point and every
+#: lane below `ne`, and `test` reads exactly those -- but in loops whose trip
+#: count is `ne`, so GCC sees a path on which nothing was written (`ne <= 0`).
+#: Where `test` is not inlined (a 64-point HEX64 block in float, GCC 13 at
+#: -O3) GCC then reports the flux as possibly uninitialised merely because its
+#: address is passed as a `const` pointer.  It is a false positive; clearing the
+#: flux to silence it would cost a store per point and lane on every call.  The
+#: scalar spelling has no `ne`, hence no such path, and keeps the warning.
+_FLUX_DIAGNOSTIC_PUSH = """#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+"""
+_FLUX_DIAGNOSTIC_POP = """
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif"""
+
+
 def _weak_form_ops_source(
     inline_qualifier,
     work_item_index,
@@ -170,6 +190,8 @@ def _weak_form_ops_source(
         "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
         "work_item_count_4": "    const int ne,\n" if lane_blocked else "",
         "ne_argument": "ne, " if lane_blocked else "",
+        "flux_diagnostic_push": _FLUX_DIAGNOSTIC_PUSH if lane_blocked else "",
+        "flux_diagnostic_pop": _FLUX_DIAGNOSTIC_POP if lane_blocked else "",
     }
     for indent_size in (12, 16, 20):
         values["work_item_loop_%d" % indent_size] = _work_item_loop_text(
@@ -379,6 +401,7 @@ def sfem_tensor_product_kernels_header_source(
         )
         for lane_blocked in _RENDERED_SPELLINGS[target.kernel_vector_width() is None]
     )
+    values["assembly_ops"] = _ASSEMBLY_OPS_TEMPLATE % {"inline_qualifier": inline_qualifier}
     return _expand_residual_stream_layouts(_TENSOR_PRODUCT_KERNELS_TEMPLATE % values)
 
 
@@ -715,7 +738,7 @@ static %(inline_qualifier)s void tensor_gradient_contiguous%(scalar_suffix)s(
       %(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
+%(flux_diagnostic_push)stemplate <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
 %(work_item_count_4)s    const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
@@ -724,7 +747,7 @@ static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
     const int component) {
   %(weak_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template test<NC>(
       %(ne_argument)sshape_1d, grad_1d, flux, out_streams, component);
-}'''
+}%(flux_diagnostic_pop)s'''
 
 
 _RESIDUAL_OPS_TEMPLATE = r'''template <typename s_t, int NQ, int NS%(width_param)s, int ND>
@@ -1185,6 +1208,193 @@ static %(inline_qualifier)s void tensor_integrate_value_contiguous%(scalar_suffi
 '''
 
 
+# Element-matrix assembly from the tangent at the quadrature points.  An energy's
+# element matrix is symmetric, and these use it.  The tangent of one point -- or
+# of one slab of points -- is all that is ever held: the matrix is accumulated as
+# the rule is walked, never from a tangent stored at every point.
+#
+# Which walk an element takes is the plan's: one point at a time where a 1-D
+# basis has two functions and there is nothing to factorise, one slab (every
+# point with the last coordinate fixed) otherwise, contracted one dimension at a
+# time.  Measured on Grace (GH200, gcc 13, one thread): the point walk is 21%
+# faster than the slab walk on HEX8, the slab walk 2x faster than the point walk
+# on PROTEUS_HEX27, and both beat holding the tangent at every point (by 45% and
+# 10%).
+_ASSEMBLY_OPS_TEMPLATE = r"""//! One point's contribution to a symmetric element matrix, upper triangle only:
+//!   K[(i, s), (j, t)] += w sum_{d, e} g[d][s] D[(i, d), (j, e)] g[e][t],
+//! with g the shape gradients pushed forward by the adjugate (so w = qw / det),
+//! g_ref laid out [k][s] and D, the physical tangent, (NC * ND) x (NC * ND).
+//! `mirror_upper_triangle_scalar` completes the matrix once the rule is done.
+template <typename s_t, int NS, int ND, int NC>
+static %(inline_qualifier)s void point_test_symmetric_scalar(
+    const s_t *const RSTR g_ref,
+    const s_t *const RSTR adj,
+    const s_t w,
+    const s_t *const RSTR D,
+    s_t *const RSTR element_matrix) {
+  static_assert(ND == 2 || ND == 3, "point_test_symmetric_scalar is spelled for 2 and 3 dimensions");
+  static constexpr int NDOFS = NC * NS;
+  static constexpr int NA = NC * ND;
+  // Written out per dimension rather than looped over it: on Grace (gcc 13)
+  // the loop form of these sums cost 11%% of the whole HEX8 assembly.
+  s_t g[ND][NS];
+  for (int s = 0; s < NS; ++s) {
+    if constexpr (ND == 3) {
+      const s_t r0 = g_ref[0 * NS + s], r1 = g_ref[1 * NS + s], r2 = g_ref[2 * NS + s];
+      g[0][s] = r0 * adj[0] + r1 * adj[3] + r2 * adj[6];
+      g[1][s] = r0 * adj[1] + r1 * adj[4] + r2 * adj[7];
+      g[2][s] = r0 * adj[2] + r1 * adj[5] + r2 * adj[8];
+    } else {
+      const s_t r0 = g_ref[0 * NS + s], r1 = g_ref[1 * NS + s];
+      g[0][s] = r0 * adj[0] + r1 * adj[2];
+      g[1][s] = r0 * adj[1] + r1 * adj[3];
+    }
+  }
+  // Every trial column's weighted flux at the point: W[(i, d)][(j, t)] =
+  // w sum_e D[(i, d), (j, e)] g[e][t].
+  s_t W[NA][NDOFS];
+  for (int a = 0; a < NA; ++a) {
+    for (int j = 0; j < NC; ++j) {
+      if constexpr (ND == 3) {
+        const s_t a0 = w * D[a * NA + j * ND + 0];
+        const s_t a1 = w * D[a * NA + j * ND + 1];
+        const s_t a2 = w * D[a * NA + j * ND + 2];
+        for (int t = 0; t < NS; ++t) W[a][j * NS + t] = a0 * g[0][t] + a1 * g[1][t] + a2 * g[2][t];
+      } else {
+        const s_t a0 = w * D[a * NA + j * ND + 0];
+        const s_t a1 = w * D[a * NA + j * ND + 1];
+        for (int t = 0; t < NS; ++t) W[a][j * NS + t] = a0 * g[0][t] + a1 * g[1][t];
+      }
+    }
+  }
+  for (int i = 0; i < NC; ++i) {
+    for (int s = 0; s < NS; ++s) {
+      const int r = i * NS + s;
+      s_t *const RSTR row = &element_matrix[r * NDOFS];
+      if constexpr (ND == 3) {
+        const s_t g0 = g[0][s], g1 = g[1][s], g2 = g[2][s];
+        const s_t *const RSTR w0 = W[i * ND + 0];
+        const s_t *const RSTR w1 = W[i * ND + 1];
+        const s_t *const RSTR w2 = W[i * ND + 2];
+        for (int c = r; c < NDOFS; ++c) row[c] += g0 * w0[c] + g1 * w1[c] + g2 * w2[c];
+      } else {
+        const s_t g0 = g[0][s], g1 = g[1][s];
+        const s_t *const RSTR w0 = W[i * ND + 0];
+        const s_t *const RSTR w1 = W[i * ND + 1];
+        for (int c = r; c < NDOFS; ++c) row[c] += g0 * w0[c] + g1 * w1[c];
+      }
+    }
+  }
+}
+
+template <typename s_t, int NDOFS>
+static %(inline_qualifier)s void mirror_upper_triangle_scalar(s_t *const RSTR element_matrix) {
+  for (int r = 1; r < NDOFS; ++r) {
+    for (int c = 0; c < r; ++c) element_matrix[r * NDOFS + c] = element_matrix[c * NDOFS + r];
+  }
+}
+
+//! The reference gradients of every shape of a tensor-product basis at point q
+//! of its rule, laid out [k][s], from the 1-D tables.
+template <typename s_t, int NQ, int NS, int ND>
+static %(inline_qualifier)s void tensor_point_reference_gradients_scalar(
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const int q,
+    s_t *const RSTR g_ref) {
+  static constexpr int NQ1 = integer_root(NQ, ND);
+  static constexpr int NS1 = integer_root(NS, ND);
+  const int qx = q %% NQ1;
+  if constexpr (ND == 2) {
+    const int qy = q / NQ1;
+    for (int sy = 0; sy < NS1; ++sy) {
+      for (int sx = 0; sx < NS1; ++sx) {
+        const int s = sx + NS1 * sy;
+        const s_t bx = shape_1d[qx * NS1 + sx], gx = grad_1d[qx * NS1 + sx];
+        const s_t by = shape_1d[qy * NS1 + sy], gy = grad_1d[qy * NS1 + sy];
+        g_ref[0 * NS + s] = gx * by;
+        g_ref[1 * NS + s] = bx * gy;
+      }
+    }
+  } else {
+    const int qy = (q / NQ1) %% NQ1;
+    const int qz = q / (NQ1 * NQ1);
+    for (int sz = 0; sz < NS1; ++sz) {
+      for (int sy = 0; sy < NS1; ++sy) {
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          const s_t bx = shape_1d[qx * NS1 + sx], gx = grad_1d[qx * NS1 + sx];
+          const s_t by = shape_1d[qy * NS1 + sy], gy = grad_1d[qy * NS1 + sy];
+          const s_t bz = shape_1d[qz * NS1 + sz], gz = grad_1d[qz * NS1 + sz];
+          g_ref[0 * NS + s] = gx * by * bz;
+          g_ref[1 * NS + s] = bx * gy * bz;
+          g_ref[2 * NS + s] = bx * by * gz;
+        }
+      }
+    }
+  }
+}
+
+//! One slab of a tensor-product rule -- every point whose last coordinate is
+//! `q_last`, NQ1^(ND-1) of them -- tested against every shape of one field
+//! component and accumulated into `out[s]`:
+//!   out[s] += sum_{p in slab} sum_k G_k(s; p) flux[k][p],
+//! factorised one dimension at a time, the slab's own factor applied per shape.
+template <typename s_t, int NQ1, int NS1, int ND>
+static %(inline_qualifier)s void tensor_slab_test_scalar(
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const int q_last,
+    const s_t *const RSTR flux,
+    s_t *const RSTR out) {
+  if constexpr (ND == 2) {
+    const int qy = q_last;
+    for (int sx = 0; sx < NS1; ++sx) {
+      s_t a0 = s_t(0), a1 = s_t(0);
+      for (int qx = 0; qx < NQ1; ++qx) {
+        a0 += grad_1d[qx * NS1 + sx] * flux[0 * NQ1 + qx];
+        a1 += shape_1d[qx * NS1 + sx] * flux[1 * NQ1 + qx];
+      }
+      for (int sy = 0; sy < NS1; ++sy) {
+        out[sx + NS1 * sy] += shape_1d[qy * NS1 + sy] * a0 + grad_1d[qy * NS1 + sy] * a1;
+      }
+    }
+  } else {
+    static constexpr int NP = NQ1 * NQ1;
+    const int qz = q_last;
+    s_t a[3 * NQ1 * NS1];
+    for (int qy = 0; qy < NQ1; ++qy) {
+      for (int sx = 0; sx < NS1; ++sx) {
+        s_t a0 = s_t(0), a1 = s_t(0), a2 = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int p = qx + NQ1 * qy;
+          const s_t bx = shape_1d[qx * NS1 + sx], gx = grad_1d[qx * NS1 + sx];
+          a0 += gx * flux[0 * NP + p];
+          a1 += bx * flux[1 * NP + p];
+          a2 += bx * flux[2 * NP + p];
+        }
+        a[(0 * NQ1 + qy) * NS1 + sx] = a0;
+        a[(1 * NQ1 + qy) * NS1 + sx] = a1;
+        a[(2 * NQ1 + qy) * NS1 + sx] = a2;
+      }
+    }
+    for (int sy = 0; sy < NS1; ++sy) {
+      for (int sx = 0; sx < NS1; ++sx) {
+        s_t cb = s_t(0), cg = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const s_t by = shape_1d[qy * NS1 + sy], gy = grad_1d[qy * NS1 + sy];
+          cb += by * a[(0 * NQ1 + qy) * NS1 + sx] + gy * a[(1 * NQ1 + qy) * NS1 + sx];
+          cg += by * a[(2 * NQ1 + qy) * NS1 + sx];
+        }
+        for (int sz = 0; sz < NS1; ++sz) {
+          out[sx + NS1 * (sy + NS1 * sz)] += shape_1d[qz * NS1 + sz] * cb + grad_1d[qz * NS1 + sz] * cg;
+        }
+      }
+    }
+  }
+}
+"""
+
 _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 #define SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 
@@ -1211,6 +1421,8 @@ static %(kernel_callable)sconstexpr int integer_root(const int value, const int 
 %(weak_form_ops)s
 
 %(residual_form_ops)s
+
+%(assembly_ops)s
 } // namespace codegen
 } // namespace sfem
 

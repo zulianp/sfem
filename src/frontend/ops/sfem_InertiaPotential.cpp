@@ -1,0 +1,495 @@
+#include "sfem_InertiaPotential.hpp"
+
+#include "sfem_Function.hpp"
+#include "sfem_LinearOperatorFactory.hpp"
+#include "sfem_blas_factory.hpp"
+#ifdef SFEM_ENABLE_CUDA
+#include "sfem_Function_incore_cuda.hpp"
+#endif
+#ifdef SFEM_ENABLE_CUDA
+#include "cuda/sfem_InertiaPotential_cuda.hpp"
+#endif
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_LumpedMass.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+
+#include <algorithm>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+
+namespace sfem {
+
+    class InertiaPotential::Impl {
+    public:
+        std::shared_ptr<FunctionSpace>  space;
+        std::shared_ptr<Buffer<real_t>> mass;
+        std::shared_ptr<Buffer<real_t>> u_hat;
+        ExecutionSpace                  es{EXECUTION_SPACE_HOST};
+        std::shared_ptr<BLAS<real_t>>   blas;
+        real_t                          alpha{1};
+        real_t                          density{1};
+        bool                            consistent_mass{false};
+        //! The consistent mass, with its density set to alpha * density: its action and its
+        //! matrix are the potential's Hessian as they stand.
+        std::shared_ptr<Op>             consistent;
+
+        //! Room for the three vectors the quadratic form needs.  Allocated once
+        //! rather than per call, and in the caller's space like everything else.
+        std::shared_ptr<Buffer<real_t>> offset;   // x - u_hat, or + a step
+        std::shared_ptr<Buffer<real_t>> scaled;   // that, times alpha
+        std::shared_ptr<Buffer<real_t>> weighted; // and times the mass
+
+        Impl(const std::shared_ptr<FunctionSpace> &sp, const ExecutionSpace space_of)
+            : space(sp), es(space_of), blas(sfem::blas<real_t>(space_of)) {}
+
+        void ensure_value_scratch() {
+            const ptrdiff_t ndofs = space->n_dofs();
+            if (!offset) offset = create_buffer<real_t>(ndofs, es);
+            if (!weighted) weighted = create_buffer<real_t>(ndofs, es);
+        }
+
+        int ensure_state() const {
+            if (!mass || !u_hat) {
+                SFEM_ERROR("InertiaPotential: mass and u_hat must be initialized");
+                return SFEM_FAILURE;
+            }
+
+            const ptrdiff_t ndofs = space->n_dofs();
+            if (mass->size() != static_cast<size_t>(ndofs) || u_hat->size() != static_cast<size_t>(ndofs)) {
+                SFEM_ERROR("InertiaPotential: incompatible mass/u_hat sizes");
+                return SFEM_FAILURE;
+            }
+
+            return SFEM_SUCCESS;
+        }
+
+        void sync_consistent() {
+            if (!consistent) return;
+            for (const auto &block : space->mesh()->blocks()) {
+                consistent->set_value_in_block(block->name(), "density", alpha * density);
+            }
+        }
+
+        //! out = beta * out + alpha M v, with the consistent mass.
+        int consistent_times(const real_t *const v, const real_t beta, real_t *const out) {
+            if (beta == 0) blas->zeros(space->n_dofs(), out);
+            return consistent->apply(nullptr, v, out);
+        }
+
+        int no_format(const char *format) const {
+            fprintf(stderr, "InertiaPotential: the consistent mass has no %s format\n", format);
+            return SFEM_FAILURE;
+        }
+    };
+
+    std::unique_ptr<Op> InertiaPotential::create(const std::shared_ptr<FunctionSpace> &space) {
+        return std::make_unique<InertiaPotential>(space);
+    }
+
+    InertiaPotential::InertiaPotential(const std::shared_ptr<FunctionSpace> &space,
+                                       const ExecutionSpace                  es)
+        : impl_(std::make_unique<Impl>(space, es)) {}
+
+    InertiaPotential::~InertiaPotential() = default;
+
+    ExecutionContext InertiaPotential::execution_context() const { return impl_->es; }
+
+    ptrdiff_t InertiaPotential::n_dofs_domain() const { return impl_->space->n_dofs(); }
+
+    ptrdiff_t InertiaPotential::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+    int InertiaPotential::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("InertiaPotential::initialize");
+
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+
+        if (!impl_->mass) {
+            // Zero density contributes nothing; skip assembly so quasi-static
+            // runs (e.g. SFEM_RHO=0) do not require an element mass kernel.
+            if (impl_->density == real_t(0)) {
+                impl_->mass = create_buffer<real_t>(ndofs, impl_->es);
+            } else {
+                // The lumped mass is assembled on the host, because `LumpedMass` is
+                // a host operator, and then moved to wherever this one runs.  It is
+                // built once, so the transfer is once too.
+                auto host_mass = create_host_buffer<real_t>(ndofs);
+                LumpedMass lumped_mass(impl_->space);
+                if (lumped_mass.initialize(block_names) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
+
+                if (lumped_mass.hessian_diag(nullptr, host_mass->data()) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
+
+                if (impl_->density != real_t(1)) {
+                    sfem::blas<real_t>(EXECUTION_SPACE_HOST)
+                            ->scal(ndofs, impl_->density, host_mass->data());
+                }
+
+                impl_->mass = host_mass;
+#ifdef SFEM_ENABLE_CUDA
+                if (impl_->es == EXECUTION_SPACE_DEVICE) {
+                    impl_->mass = smesh::to_device(host_mass);
+                }
+#endif
+            }
+        }
+
+        if (!impl_->u_hat) {
+            impl_->u_hat = create_buffer<real_t>(ndofs, impl_->es);
+        }
+
+        if (impl_->consistent_mass && !impl_->consistent) {
+            impl_->consistent = create_op(impl_->space, "GeneratedVectorMass", impl_->es);
+            if (!impl_->consistent || impl_->consistent->initialize(block_names) != SFEM_SUCCESS) {
+                SFEM_ERROR("InertiaPotential: unable to create the consistent mass\n");
+                return SFEM_FAILURE;
+            }
+            impl_->sync_consistent();
+        }
+
+        impl_->scaled = create_buffer<real_t>(ndofs, impl_->es);
+        // The gradient takes `offset` with the consistent mass only; the value's two at its first call.
+        if (impl_->consistent) impl_->offset = create_buffer<real_t>(ndofs, impl_->es);
+
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::hessian_crs(const real_t *const,
+                                          const count_t *const SFEM_RESTRICT rowptr,
+                                          const idx_t *const SFEM_RESTRICT   colidx,
+                                          real_t *const SFEM_RESTRICT        values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_crs");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        if (impl_->consistent) return impl_->consistent->hessian_crs(nullptr, rowptr, colidx, values);
+
+        const ptrdiff_t     ndofs = impl_->space->n_dofs();
+        const real_t        alpha = impl_->alpha;
+        const real_t *const mass  = impl_->mass->data();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (impl_->es == EXECUTION_SPACE_DEVICE) {
+            return cu_inertia_potential_hessian_crs(ndofs, rowptr, colidx, mass, alpha, values, execution_context().stream());
+        }
+#endif
+
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            const count_t begin = rowptr[i];
+            const count_t end   = rowptr[i + 1];
+            for (count_t k = begin; k < end; ++k) {
+                if (colidx[k] == i) {
+                    values[k] += alpha * mass[i];
+                    break;
+                }
+            }
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::hessian_bsr(const real_t *const                x,
+                                      const count_t *const SFEM_RESTRICT rowptr,
+                                      const idx_t *const SFEM_RESTRICT   colidx,
+                                      real_t *const SFEM_RESTRICT        values) {
+        return hessian_bsr_typed(x, rowptr, colidx, smesh::SMESH_DEFAULT, values);
+    }
+
+    int InertiaPotential::hessian_bsr_typed(const real_t *const,
+                                            const count_t *const SFEM_RESTRICT rowptr,
+                                            const idx_t *const SFEM_RESTRICT   colidx,
+                                            const smesh::PrimitiveType         values_type,
+                                            void *const                        values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_bsr");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        if (impl_->consistent) return impl_->consistent->hessian_bsr_typed(nullptr, rowptr, colidx, values_type, values);
+
+        const int           bs      = impl_->space->block_size();
+        const ptrdiff_t     n_nodes = impl_->space->n_dofs() / bs;
+        const ptrdiff_t     bs2     = bs * bs;
+        const real_t        alpha   = impl_->alpha;
+        const real_t *const mass    = impl_->mass->data();
+
+#ifdef SFEM_ENABLE_CUDA
+        if (impl_->es == EXECUTION_SPACE_DEVICE) {
+            return cu_inertia_potential_hessian_bsr(
+                    n_nodes, bs, rowptr, colidx, mass, alpha, values_type, values, execution_context().stream());
+        }
+#endif
+
+        return with_tangent_values(values_type, values, [&](auto *const v) {
+#pragma omp parallel for
+            for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+                const count_t begin = rowptr[node];
+                const count_t end   = rowptr[node + 1];
+                for (count_t k = begin; k < end; ++k) {
+                    if (colidx[k] == node) {
+                        auto *const block = &v[k * bs2];
+                        for (int d = 0; d < bs; ++d) {
+                            block[d * bs + d] += alpha * mass[node * bs + d];
+                        }
+                        break;
+                    }
+                }
+            }
+            return SFEM_SUCCESS;
+        });
+    }
+
+    bool InertiaPotential::hessian_is_diagonal() const { return !impl_->consistent_mass; }
+
+    int InertiaPotential::hessian_diag(const real_t *const, real_t *const SFEM_RESTRICT values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_diag");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        if (impl_->consistent) return impl_->no_format("diagonal");
+
+        impl_->blas->axpy(impl_->space->n_dofs(), impl_->alpha, impl_->mass->data(), values);
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::hessian_block_diag_sym(const real_t *const, real_t *const SFEM_RESTRICT values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_block_diag_sym");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        if (impl_->consistent) return impl_->no_format("block-diagonal");
+
+        const int       bs      = impl_->space->block_size();
+        const ptrdiff_t n_nodes = impl_->space->n_dofs() / bs;
+        const int       packed  = bs * (bs + 1) / 2;
+
+#ifdef SFEM_ENABLE_CUDA
+        if (impl_->es == EXECUTION_SPACE_DEVICE) {
+            return cu_inertia_potential_hessian_block_diag_sym(
+                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values, execution_context().stream());
+        }
+#endif
+
+        const real_t *const SFEM_RESTRICT mass  = impl_->mass->data();
+        const real_t                      alpha = impl_->alpha;
+
+#pragma omp parallel for
+        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+            real_t *const block = &values[node * packed];
+            for (int d = 0; d < bs; ++d) {
+                // The packed index of entry (d, d) in the upper triangle.
+                block[d * bs - d * (d - 1) / 2] += alpha * mass[node * bs + d];
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::gradient(const real_t *const SFEM_RESTRICT x, real_t *const SFEM_RESTRICT out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::gradient");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+
+        // out += alpha * m * (x - u_hat), in three vector operations so that
+        // it runs wherever the caller's vectors are.
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        auto            blas  = impl_->blas;
+        if (impl_->consistent) {
+            blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+            return impl_->consistent_times(impl_->offset->data(), 1, out);
+        }
+        blas->zaxpby(ndofs, impl_->alpha, x, -impl_->alpha, impl_->u_hat->data(), impl_->scaled->data());
+        blas->xypaz(ndofs, impl_->mass->data(), impl_->scaled->data(), 1, out);
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::apply(const real_t *const, const real_t *const SFEM_RESTRICT h, real_t *const SFEM_RESTRICT out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::apply");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+
+        if (impl_->consistent) return impl_->consistent_times(h, 1, out);
+
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        auto            blas  = impl_->blas;
+        blas->copy(ndofs, h, impl_->scaled->data());
+        blas->scal(ndofs, impl_->alpha, impl_->scaled->data());
+        blas->xypaz(ndofs, impl_->mass->data(), impl_->scaled->data(), 1, out);
+        return SFEM_SUCCESS;
+    }
+
+    bool InertiaPotential::team_supported() const { return !impl_->consistent_mass && impl_->es == EXECUTION_SPACE_HOST; }
+
+    int InertiaPotential::team_prepare() { return impl_->ensure_state(); }
+
+    int InertiaPotential::team_apply(const Team &team,
+                                     const real_t *const,
+                                     const real_t *const SFEM_RESTRICT h,
+                                     real_t *const SFEM_RESTRICT       out,
+                                     const ElementScope                scope) {
+        if (scope == ElementScope::SHARED_AND_AURA) return SFEM_SUCCESS;
+        // out += alpha m h on the calling thread's rows, as apply's scal and xypaz compute it.
+        const real_t *const SFEM_RESTRICT mass  = impl_->mass->data();
+        const real_t                      alpha = impl_->alpha;
+        for (ptrdiff_t i = team.begin; i < team.end; ++i) out[i] = mass[i] * (alpha * h[i]) + 1 * out[i];
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::value(const real_t *const SFEM_RESTRICT x, real_t *const out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::value");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        impl_->ensure_value_scratch();
+
+        // 0.5 * alpha * (x - u_hat)^T M (x - u_hat), as a weighted dot.
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        auto            blas  = impl_->blas;
+        blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+        if (impl_->consistent) {
+            if (impl_->consistent_times(impl_->offset->data(), 0, impl_->weighted->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            *out += real_t(0.5) * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+            return SFEM_SUCCESS;
+        }
+        blas->xypaz(ndofs, impl_->mass->data(), impl_->offset->data(), 0, impl_->weighted->data());
+        *out += real_t(0.5) * impl_->alpha *
+                blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+        return SFEM_SUCCESS;
+    }
+
+    int InertiaPotential::value_steps(const real_t *const SFEM_RESTRICT x,
+                                          const real_t *const SFEM_RESTRICT h,
+                                          const int                         nsteps,
+                                          const real_t *const SFEM_RESTRICT steps,
+                                          real_t *const SFEM_RESTRICT       out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::value_steps");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        impl_->ensure_value_scratch();
+
+        if (nsteps <= 0) {
+            return SFEM_SUCCESS;
+        }
+
+        // The potential is a quadratic in the step, so the steps need no vector
+        // work at all.  With `o = x - u_hat`,
+        //
+        //   1/2 a (o + s h)^T M (o + s h) = A + s B + s^2 C
+        //
+        // with `A = 1/2 a o^T M o`, `B = a o^T M h` and `C = 1/2 a h^T M h`.
+        // Three weighted dots are computed once and every step is then a
+        // polynomial: a twelve-point line search costs what one point costs,
+        // where it used to cost three vector passes and a dot per step.
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        auto            blas  = impl_->blas;
+        const real_t    half  = real_t(0.5) * impl_->alpha;
+
+        blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+
+        if (impl_->consistent) {
+            // The same quadratic with alpha M from the consistent mass, alpha folded in.
+            if (impl_->consistent_times(impl_->offset->data(), 0, impl_->weighted->data()) != SFEM_SUCCESS ||
+                impl_->consistent_times(h, 0, impl_->scaled->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            const real_t a = real_t(0.5) * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+            const real_t b = blas->dot(ndofs, h, impl_->weighted->data());
+            const real_t c = real_t(0.5) * blas->dot(ndofs, h, impl_->scaled->data());
+            for (int step = 0; step < nsteps; ++step) {
+                out[step] += a + steps[step] * b + steps[step] * steps[step] * c;
+            }
+            return SFEM_SUCCESS;
+        }
+
+        // `M o` and `M h`, each once.  `weighted` and `scaled` are this
+        // operator's own scratch, so no allocation happens here.
+        blas->xypaz(ndofs, impl_->mass->data(), impl_->offset->data(), 0, impl_->weighted->data());
+        const real_t a_term = half * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+        const real_t b_term = impl_->alpha * blas->dot(ndofs, h, impl_->weighted->data());
+
+        blas->xypaz(ndofs, impl_->mass->data(), h, 0, impl_->scaled->data());
+        const real_t c_term = half * blas->dot(ndofs, h, impl_->scaled->data());
+
+        for (int step = 0; step < nsteps; ++step) {
+            const real_t s = steps[step];
+            out[step] += a_term + s * b_term + s * s * c_term;
+        }
+
+        return SFEM_SUCCESS;
+    }
+
+    std::shared_ptr<Op> InertiaPotential::clone() const {
+        auto ret            = std::make_shared<InertiaPotential>(impl_->space, impl_->es);
+        ret->impl_->mass    = impl_->mass;
+        ret->impl_->u_hat   = impl_->u_hat;
+        ret->impl_->alpha   = impl_->alpha;
+        ret->impl_->density = impl_->density;
+        ret->impl_->consistent_mass = impl_->consistent_mass;
+        ret->impl_->consistent      = impl_->consistent;
+        return ret;
+    }
+
+    std::shared_ptr<Op> InertiaPotential::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        auto ret = std::make_shared<InertiaPotential>(space, impl_->es);
+        ret->set_density(impl_->density);
+        ret->set_consistent_mass(impl_->consistent_mass);
+        ret->set_alpha(impl_->alpha);
+        if (ret->initialize() != SFEM_SUCCESS) return nullptr;
+        return ret;
+    }
+
+    void InertiaPotential::set_alpha(const real_t alpha) {
+        impl_->alpha = alpha;
+        impl_->sync_consistent();
+    }
+
+    void InertiaPotential::set_density(const real_t density) {
+        impl_->density = density;
+        impl_->sync_consistent();
+    }
+
+    void InertiaPotential::set_consistent_mass(const bool consistent) { impl_->consistent_mass = consistent; }
+
+    void InertiaPotential::set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat) { impl_->u_hat = u_hat; }
+
+    void InertiaPotential::set_mass(const std::shared_ptr<Buffer<real_t>> &mass) { impl_->mass = mass; }
+
+    void InertiaPotential::set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int) {
+        if (!strcmp(name, "u_hat")) {
+            impl_->u_hat = values;
+        } else if (!strcmp(name, "mass")) {
+            impl_->mass = values;
+        }
+    }
+
+    void InertiaPotential::set_value_in_block(const std::string &, const std::string &var_name, const real_t value) {
+        if (var_name == "alpha") {
+            impl_->alpha = value;
+        } else if (var_name == "density") {
+            impl_->density = value;
+        }
+        impl_->sync_consistent();
+    }
+
+    std::shared_ptr<Buffer<real_t>> InertiaPotential::mass() const { return impl_->mass; }
+
+    std::shared_ptr<Buffer<real_t>> InertiaPotential::u_hat() const { return impl_->u_hat; }
+
+}  // namespace sfem

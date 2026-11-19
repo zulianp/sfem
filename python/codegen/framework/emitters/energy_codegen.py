@@ -1,4 +1,7 @@
+import collections
+import contextlib
 from dataclasses import dataclass
+import functools
 import sympy as sp
 
 from codegen.framework.emitters.kernel_prologue import (
@@ -9,8 +12,10 @@ from codegen.framework.emitters.kernel_prologue import (
     resolve_kernel_constants,
 )
 from codegen.framework.plans.conventions import (
+    with_team_element_range,
     PREFIXES,
     abi_geometry_name,
+    generated_include,
     abi_local_level,
     abi_mesh_fragment,
     INLINE_QUALIFIER_MACROS,
@@ -32,7 +37,8 @@ from codegen.framework.plans.affine_element_kernel import (
     p1_simplex_metric_apply_plan,
 )
 from codegen.framework.plans.form_transformations import stabilise_constant_cancellation
-from codegen.framework.plans.geometry_variants import geometry_variant_plan
+from codegen.framework.plans.geometry_variants import geometry_variant_plan, kernel_target
+from codegen.framework.plans import quadrature_fields
 from codegen.framework.emitters.kernel_diagnostics_record import (
     STRUCT_NAME,
     DiagnosticsRecord,
@@ -49,6 +55,7 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.form_emission import (
     FormAccumulation,
+    form_is_integrated,
     element_api_field_roles,
     form_material_parameter_names,
     form_reads_current,
@@ -65,6 +72,7 @@ from codegen.framework.plans.form_emission import (
     form_n_field_components,
     objective_kernel_variants,
     writes_per_shape,
+    POINTWISE_OUTPUT_KERNELS,
 )
 from codegen.framework.plans.evaluation_strategy import (
     quadrature_scope_lines,
@@ -169,6 +177,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     reference_include_lines,
     tensor_product_q_index_lines,
     tensor_product_quadrature_weight_expr,
+    quadrature_reference_owner,
 )
 from codegen.framework.plans.diagnostics import validate_diagnostics_plan_names
 from codegen.framework.plans.reference_data import validate_reference_data_plan
@@ -177,6 +186,10 @@ from codegen.framework.plans.form_transformations import (
 )
 from codegen.framework.plans.direct_assembly import (
     assembles_in_closed_form,
+    block_assembly_admits,
+    matrix_core_apply_admits,
+    matrix_core_apply_launch_admits,
+    tensor_product_point_tangent_admits,
 )
 from codegen.framework.plans.scheduling import build_expression_graph
 
@@ -423,7 +436,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         "",
         _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        *("    %s," % parameter for parameter in _count_params()),
+        *("    %s," % parameter for parameter in _unnamed_count_params()),
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR,",
         "    std::true_type) {",
@@ -783,6 +796,9 @@ def generate_sfem_soa_cpp_files(
                     math_name,
                     tensor_product_name,
                     source_builder,
+                    tangent_projection=bool(
+                        matrix_format_plan is not None and matrix_format_plan.tangent_projection
+                    ),
                 ),
             )
         )
@@ -805,7 +821,7 @@ def generate_sfem_soa_cpp_files(
                 ),
             ),
             GeneratedKernelFile(
-                "%s_element.hpp" % prefix,
+                source_builder.header_name("%s_element" % prefix),
                 _sfem_soa_element_api_header(
                     forms,
                     prefix,
@@ -973,6 +989,22 @@ def _sfem_soa_local_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
+    # A device tensor-product element publishes the apply at one point for the apply on the FP64
+    # matrix units (HIP and CUDA builds; the header and the struct are guarded there).
+    use_tensor_product_reference = _use_tensor_product_reference(
+        quadrature_rule,
+        _sfem_soa_reference_inputs(array_inputs),
+        basis_family,
+    )
+    apply_points = [
+        form
+        for form in forms
+        if matrix_core_apply_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+    ]
+    if apply_points:
+        lines.extend([MATRIX_CORE_GUARD, '#include "%s"' % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER, "#endif"])
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     for form in forms:
@@ -990,6 +1022,13 @@ def _sfem_soa_local_header(
             )
         )
         lines.append("")
+        for point_form in [candidate for candidate in apply_points if candidate is form]:
+            lines.extend(
+                _sfem_soa_tensor_product_apply_point_struct(
+                    point_form, _sfem_soa_tensor_product_apply_point_name(prefix, point_form), dim
+                )
+            )
+            lines.append("")
         specialized = _constant_p1_specialized_local(
             prefix,
             quadrature_rule,
@@ -1124,6 +1163,7 @@ def _sfem_soa_hessian_header(
     math_name="kernel_math.hpp",
     tensor_product_name="tensor_product_kernels.hpp",
     source_builder=None,
+    tangent_projection=False,
 ):
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
@@ -1159,6 +1199,34 @@ def _sfem_soa_hessian_header(
         "",
     ]
     lines = [line for line in lines if line != ""]
+    # The direct element matrix calls `point_test_symmetric_scalar` and
+    # `mirror_upper_triangle_scalar` on every family, and they live in the
+    # tensor-product header.  A target that includes that header only for
+    # tensor-product elements leaves a simplex's Hessian without them.
+    tensor_include = '#include "%s"' % tensor_product_name
+    if tensor_include not in lines:
+        math_include = '#include "%s"' % math_name
+        lines.insert(lines.index(math_include) + 1, tensor_include)
+    if tangent_projection:
+        lines.insert(lines.index(tensor_include) + 1, '#include "%s"' % TANGENT_PROJECTION_HEADER)
+    # A device assembles a higher-order simplex a thread per point (`COOPERATIVE_ASSEMBLY_HEADER`),
+    # from each point's tangent: the header defines it beside the element matrix.
+    cooperative = (
+        current_target().supports_device_kernels
+        and not use_tensor_product_reference
+        and use_reference_gradient_vectors
+    )
+    # A device tensor-product element carries its point tangent for the assembly a block per element.
+    point_tangents = [
+        tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        for form in forms
+    ]
+    if cooperative or any(point_tangents):
+        lines.insert(lines.index(tensor_include) + 1, '#include "%s"' % COOPERATIVE_ASSEMBLY_HEADER)
+    if any(point_tangents):
+        lines.insert(lines.index(tensor_include) + 2, '#include "%s"' % TENSOR_PRODUCT_BSR_HESSIAN_HEADER)
     lines.extend(["namespace sfem {", "namespace codegen {", ""])
 
     emitted = set()
@@ -1185,9 +1253,32 @@ def _sfem_soa_hessian_header(
                 use_tensor_product_reference,
                 use_reference_gradient_vectors,
                 source_builder,
+                project=tangent_projection,
             )
         )
         lines.append("")
+        if cooperative:
+            lines.extend(
+                _sfem_soa_direct_hessian_point_tangent_function(
+                    form,
+                    _sfem_soa_direct_hessian_point_tangent_name(prefix),
+                    dim,
+                    reference_inputs,
+                    source_builder,
+                    project=tangent_projection,
+                )
+            )
+            lines.append("")
+        point_tangent = tensor_product_point_tangent_admits(
+            form, dim, on_device=current_target().supports_device_kernels, tensor_product=use_tensor_product_reference
+        )
+        if point_tangent:
+            lines.extend(
+                _sfem_soa_tensor_product_point_tangent_struct(
+                    form, _sfem_soa_tensor_product_point_tangent_name(prefix), dim
+                )
+            )
+            lines.append("")
         constant_p1 = _sfem_soa_closed_form_hessian(
             prefix,
             quadrature_rule,
@@ -1224,7 +1315,16 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     use_reference_gradient_vectors,
     source_builder,
     constant_p1=None,
+    project=False,
 ):
+    """The element matrix of one element, as `element_matrix[NDOFS * NDOFS]`.
+
+    With `project` it takes the `PROJECT` flag (`PROJECT_TEMPLATE_PARAMETER`) that
+    projects each point's tangent; the closed form has no point tangent to
+    project and never takes it.
+    """
+    if project and constant_p1 is not None:
+        raise ValueError("the closed-form element matrix has no point tangent to project")
     n_field_components = form_n_field_components(form, dim)
     params = [
         *(
@@ -1256,6 +1356,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
         )
         params.append("const s_t *const RSTR q_weight")
     params.extend(_form_material_parameter_declarations(form))
+    params.extend(quadrature_fields.block_parameters(quadrature_fields.quadrature_field_streams(form)))
     # The current state, where the tangent depends on it.  Same shape the apply
     # takes it in, so the caller hands over the streams it already gathered.
     # The component count is settled by the form, and the signature is written
@@ -1320,6 +1421,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 "",
                 "  ",
                 emit_tensor_product_static_constants=False,
+                project=project,
             )
         )
     else:
@@ -1334,6 +1436,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 "",
                 "  ",
                 emit_tensor_product_static_constants=False,
+                project=project,
             )
         )
     lines.append("}")
@@ -1356,7 +1459,297 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             # The header the IR actually prints; the `lines` built above
             # only supply the body slice, which is why changing the literal
             # there left the emitted `int NQ` in place.
-            template_params=_block_template_params(constant_p1 is not None, ()),
+            template_params=_block_template_params(constant_p1 is not None, ())
+            + ((PROJECT_TEMPLATE_PARAMETER,) if project else ()),
+        )
+    )
+
+
+def _sfem_soa_direct_hessian_point_tangent_name(local_prefix):
+    return "%s_direct_hessian_reference_point_tangent" % local_prefix
+
+
+#: The device library of the cooperative assembly (`pullback_symmetric`, `pair_blocks_bsr`, ...).
+COOPERATIVE_ASSEMBLY_HEADER = "sfem_cuda_CooperativeAssembly.cuh"
+
+#: The device library of a tensor-product element's BSR assembly a block of threads per element
+#: (`sfem::tensor_product::cuda::bsr_hessian`), for elements whose matrix a thread cannot hold
+#: (`plans.direct_assembly.block_assembly_admits`).
+TENSOR_PRODUCT_BSR_HESSIAN_HEADER = "sfem_cuda_TensorProductBSRHessian.cuh"
+
+def _sfem_soa_tensor_product_point_tangent_name(local_prefix):
+    return "%s_point_tangent" % local_prefix
+
+
+#: What an entry point needs to launch `sfem::tensor_product::cuda::bsr_hessian`: the point tangent
+#: (`_sfem_soa_tensor_product_point_tangent_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes.
+TensorProductBSRLaunch = collections.namedtuple("TensorProductBSRLaunch", "point ref quad nq1 ns1")
+
+
+def _tensor_product_bsr_launch_lines(launch, scalar_type, values_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's assembly a block per element, on the caller's stream."""
+    parameters = ", ".join("(%s)%s" % (scalar_type, parameter) for parameter in material_parameter_names)
+    state = ", ".join("(const %s *)u%s" % (scalar_type, _component_name(d)) for d in range(dim))
+    return (
+        "%sreturn sfem::tensor_product::cuda::bsr_hessian<sfem::codegen::%s, %s<%s>, %s<%s>, %s, %s, geom_t, %d, %d>("
+        % (indent, launch.point, launch.ref, scalar_type, launch.quad, scalar_type, scalar_type, values_type, launch.nq1, launch.ns1),
+        "%s    nelements, elements, points, {{%s}}, u_stride, %s, rowptr, colidx, (%s *)values, stream);"
+        % (indent, parameters, state, values_type),
+    )
+
+
+def _sfem_soa_tensor_product_point_tangent_struct(form, name, dim):
+    """The tangent at one point, from the state's reference gradient there, pulled back to the
+    reference cell and weighted, packed: `T[(i, m), (j, n)] = (w / det) sum_{d, e} adj[m][d]
+    D[(i, d), (j, e)] adj[n][e]`, what `sfem::tensor_product::cuda::bsr_hessian` reads per point. D is
+    the element-matrix kernel's own (`_sfem_soa_direct_hessian_tangent_lines`)."""
+    material = _sfem_soa_direct_hessian_material(form, dim)
+    parameters = form_material_parameter_names(form)
+    adj_names = [current_target().work_item_name("adj", component) for component in range(dim * dim)]
+    det_name = current_target().work_item_name("det", 0)
+    at = "    "
+    n_components = form_n_field_components(form, dim)
+    return [
+        "// %s: the tangent at one point, pulled back to the reference cell and weighted, packed" % name,
+        "// (`sfem::cooperative::packed`); the device's assembly a block per element reads it",
+        "// (`%s`)." % TENSOR_PRODUCT_BSR_HESSIAN_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t w,",
+        "                                               s_t *const RSTR T) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t gu_ref%d = gu_ref[%d];" % (at, k, k) for k in range(n_components * dim)),
+        *("%sconst s_t %s = adj[%d];" % (at, adj_name, component) for component, adj_name in enumerate(adj_names)),
+        "%sconst s_t %s = det;" % (at, det_name),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, det_name),
+        *_sfem_soa_direct_hessian_push_forward_lines(form.weak_form, dim, at),
+        *_sfem_soa_direct_hessian_tangent_lines(material, dim, at),
+        "%ssfem::cooperative::pullback_symmetric<s_t, %d, %d>(adj, w * idet, D, T);" % (at, n_components, dim),
+        "  }",
+        "};",
+    ]
+
+
+#: The device library of the apply on the FP64 matrix units (`sfem::tensor_product::matrix_core_apply`:
+#: AMD's matrix cores under HIP, NVIDIA's tensor cores under CUDA), for the elements
+#: `plans.direct_assembly.matrix_core_apply_launch_admits` admits.
+TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER = "sfem_cuda_TensorProductMatrixCoreApply.cuh"
+
+#: The guard of what reads that library: a device compiler of either vendor (a host compilation of
+#: the device headers, as the compile test's, skips it).
+MATRIX_CORE_GUARD = "#if defined(SFEM_ENABLE_HIP) || defined(__CUDACC__)"
+
+
+def _sfem_soa_tensor_product_apply_point_name(local_prefix, form):
+    return "%s_%s_point" % (local_prefix, form.name)
+
+
+#: What an entry point needs to launch `sfem::tensor_product::matrix_core_apply`: the point
+#: (`_sfem_soa_tensor_product_apply_point_struct`), the 1D shape and quadrature tables' structs and
+#: their sizes, the field's components, the geometry and whether the state is read.
+TensorProductMatrixCoreLaunch = collections.namedtuple(
+    "TensorProductMatrixCoreLaunch", "point ref quad nq1 ns1 n_components isoparametric reads_current"
+)
+
+
+def _matrix_core_field_lines(declaration, name, cast, n_components, indent):
+    """The kernel's view of a field's component arrays: a pointer per component, an array of them
+    for a vector field and the one pointer for a scalar (handed on by address)."""
+    components = ["(%s)%s%s" % (cast, name, _component_name(d)) for d in range(n_components)]
+    return {
+        True: ["%s%s %s[%d] = {%s};" % (indent, declaration, name, n_components, ", ".join(components))],
+        False: ["%s%s %s = %s;" % (indent, declaration, name, components[0])],
+    }[n_components > 1]
+
+
+def _matrix_core_apply_launch_lines(launch, scalar_type, material_parameter_names, dim, indent="  "):
+    """The entry point's launch of the library's apply on the FP64 matrix units, in double only: it
+    returns unless turned off (`SFEM_MATRIX_CORE_APPLY=0`) or without FP64 tensor cores (CUDA below
+    sm_80), so the generated kernel's launch after it is float's and the fallback."""
+    if launch is None or scalar_type != "double":
+        return []
+    at = indent + "  "
+    by_address = {True: "%s", False: "&%s"}[launch.n_components > 1]
+    affine = (
+        "{}"
+        if launch.isoparametric
+        else "{{%s}}" % ", ".join(["g_adj%d" % i for i in range(dim * dim)] + ["g_det0"])
+    )
+    parameters = ", ".join("(double)%s" % parameter for parameter in material_parameter_names)
+    state = (
+        _matrix_core_field_lines("const double *const", "u", "const double *", launch.n_components, at)
+        if launch.reads_current
+        else []
+    )
+    return [
+        MATRIX_CORE_GUARD,
+        "%s{" % indent,
+        "%s// The FP64 matrix units (`%s`)." % (at, TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER),
+        "%sconst sfem::tensor_product::MatrixCoreAffineGeometry<geom_t> affine = %s;" % (at, affine),
+        *state,
+        *_matrix_core_field_lines("const double *const", "h", "const double *", launch.n_components, at),
+        *_matrix_core_field_lines("double *const", "out", "double *", launch.n_components, at),
+        "%sconst int matrix_core_status = sfem::tensor_product::matrix_core_apply<%s<double>, %s<double>, %d, %d, %d, %s, sfem::codegen::%s, geom_t>("
+        % (
+            at,
+            launch.ref,
+            launch.quad,
+            launch.ns1,
+            launch.nq1,
+            launch.n_components,
+            "true" if launch.isoparametric else "false",
+            launch.point,
+        ),
+        "%s    nelements, elements, affine, %s, {{%s}}, %s, %s, h_stride, %s, out_stride, %s, (cudaStream_t)stream);"
+        % (
+            at,
+            "points" if launch.isoparametric else "nullptr",
+            parameters,
+            "u_stride" if launch.reads_current else "0",
+            (by_address % "u") if launch.reads_current else "nullptr",
+            by_address % "h",
+            by_address % "out",
+        ),
+        "%sif (matrix_core_status != sfem::tensor_product::MATRIX_CORE_DECLINED) return matrix_core_status;" % at,
+        "%s}" % indent,
+        "#endif",
+    ]
+
+
+def _sfem_soa_tensor_product_apply_point_struct(form, name, dim):
+    """The apply at one point: the reference flux `loperand` (index 3 c + k) from the direction's and,
+    when the material reads it, the state's reference gradients there, the adjugate, determinant and
+    weight. The apply block's point section (`_append_sfem_soa_tensor_weak_form_lines`) as a functor,
+    which `sfem::tensor_product::matrix_core_apply` reads per point."""
+    weak_form = form.weak_form
+    parameters = form_material_parameter_names(form)
+    n_components = form_n_field_components(form, dim)
+    uses_current = form_reads_current(form, default=True)
+    target = current_target()
+
+    def geometry_value(geometry_name, component):
+        return target.work_item_name(geometry_name, component)
+
+    at = "    "
+    lines = [
+        MATRIX_CORE_GUARD,
+        "// %s: the apply at one point, the apply block's point section; the device's apply on the" % name,
+        "// FP64 matrix units reads it (`%s`)." % TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER,
+        "struct %s {" % name,
+        "  static constexpr int n_parameters = %d;" % len(parameters),
+        "  static constexpr bool reads_current = %s;" % ("true" if uses_current else "false"),
+        "",
+        "  template <typename s_t>",
+        "  static __device__ __forceinline__ void point(const s_t *const RSTR parameters,",
+        "                                               const s_t *const RSTR grad_h_ref,",
+        "                                               const s_t *const RSTR gu_ref,",
+        "                                               const s_t *const RSTR adj,",
+        "                                               const s_t det,",
+        "                                               const s_t qw,",
+        "                                               s_t *const RSTR loperand) {",
+        *("%sconst s_t %s = parameters[%d];" % (at, parameter, index) for index, parameter in enumerate(parameters)),
+        *("%sconst s_t %s = adj[%d];" % (at, geometry_value("adj", component), component) for component in range(dim * dim)),
+        "%sconst s_t %s = det;" % (at, geometry_value("det", 0)),
+        "%sconst s_t idet = s_t(1) / %s;" % (at, geometry_value("det", 0)),
+        *(["%ss_t gu[%d];" % (at, n_components * dim)] if uses_current else []),
+        "%ss_t trial_grad[%d];" % (at, n_components * dim),
+    ]
+    mapped = [("gu_ref", "gu")] * uses_current + [("grad_h_ref", "trial_grad")]
+    for row in range(n_components):
+        for col in range(dim):
+            for source, target_name in mapped:
+                terms = " + ".join(
+                    "%s[%d] * %s" % (source, row * dim + k, geometry_value("adj", k * dim + col)) for k in range(dim)
+                )
+                lines.append("%s%s[%d] = (%s) * idet;" % (at, target_name, row * dim + col, terms))
+    material = _weak_form_material_expression(
+        weak_form,
+        form.name,
+        _weak_form_deformation_gradient_substitutions(weak_form, "gu"),
+        tuple(sp.symbols("trial_grad[%d]" % i) for i in range(weak_form.n_field_components * dim)),
+    )
+    _append_transformed_loperand_lines(
+        lines,
+        material,
+        dim,
+        "weak_mat_tmp",
+        geometry_value,
+        scalar_temporaries=True,
+        destination=lambda index: "loperand[%d] =" % index,
+        indent=at,
+    )
+    lines.extend(["  }", "};", "#endif"])
+    return lines
+
+
+def _sfem_soa_direct_hessian_point_tangent_function(form, name, dim, reference_inputs, source_builder, project=False):
+    """One quadrature point's tangent, pulled back to the reference frame and weighted, packed:
+    `T[(i, m), (j, n)] = (qw / det) sum_{d, e} adj[m][d] D[(i, d), (j, e)] adj[n][e]`.
+
+    The device's assembly of a higher-order simplex (`sfem_cuda_CooperativeAssembly.cuh`) gives each
+    point a thread and contracts these into the element's node-pair blocks; `q` is the thread's
+    point, `adj` and `det` its geometry. D is the element-matrix kernel's own, projected with
+    `PROJECT` (`_sfem_soa_direct_hessian_tangent_lines`).
+    """
+    params = [
+        "const int q",
+        "const s_t *const RSTR adj",
+        "const s_t det",
+        *_sfem_reference_gradient_vector_params(dim),
+        "const s_t *const RSTR q_weight",
+        *_form_material_parameter_declarations(form),
+        *quadrature_fields.block_parameters(quadrature_fields.quadrature_field_streams(form)),
+        *(
+            "const s_t b%s_data[NS * %d]" % (stream_prefix, form_n_field_components(form, dim))
+            for _role, stream_prefix in element_api_field_roles(form)
+            if stream_prefix == "u"
+        ),
+        "s_t *const RSTR T",
+    ]
+    material = _sfem_soa_direct_hessian_material(form, dim)
+    adj_names = [current_target().work_item_name("adj", component) for component in range(dim * dim)]
+    det_name = current_target().work_item_name("det", 0)
+    body = [
+        *_BLOCK_TEMPLATE_ASSERTS[False],
+        '  static_assert(NS > 0, "NS must be positive");',
+        kernel_constant("NC", form_n_field_components(form, dim), indent="  "),
+        kernel_constant("ND", dim, indent="  "),
+        "  const s_t qw = q_weight[q];",
+        *("  const s_t %s = adj[%d];" % (adj_name, component) for component, adj_name in enumerate(adj_names)),
+        "  const s_t %s = det;" % det_name,
+        "  const s_t idet = s_t(1) / %s;" % det_name,
+        *_sfem_soa_direct_hessian_point_state_lines(
+            form, dim, reference_inputs, False, True, "", "  ", form_reads_current(form, default=True)
+        ),
+        *_sfem_soa_direct_hessian_tangent_lines(material, dim, "  "),
+        # A call, not inlined (`project_abs_symmetric_call`).
+        *(
+            ("  if constexpr (PROJECT) {", "    sfem::cooperative::project_abs_symmetric_call<s_t, %d>(D);" % len(material), "  }")
+            if project
+            else ()
+        ),
+        "  const s_t adj_q[ND * ND] = {%s};" % ", ".join(adj_names),
+        "  sfem::cooperative::pullback_symmetric<s_t, NC, ND>(adj_q, qw * idet, D, T);",
+    ]
+    return _print_energy_kernel(
+        FunctionDefNode(
+            name,
+            params=tuple(params),
+            body=(
+                RawLinesNode(
+                    tuple(body),
+                    reason="_sfem_soa_direct_hessian_point_tangent_function body: the element-matrix kernel's point lines, not yet IR",
+                ),
+            ),
+            qualifier="static %s" % _inline_qualifier(source_builder),
+            template_params=_block_template_params(False, ()) + ((PROJECT_TEMPLATE_PARAMETER,) if project else ()),
         )
     )
 
@@ -1835,9 +2228,10 @@ def _sfem_soa_weak_form_block_function(
         for name in (
             _QUADRATURE_WEIGHT_PARAMETER[bool(shared.use_tensor_product_reference)],
         )
-        if not omit_reference_basis_inputs
+        if not omit_reference_basis_inputs and form_is_integrated(form)
     )
     params.extend(_form_material_parameter_declarations(form))
+    params.extend(quadrature_fields.block_parameters(quadrature_fields.quadrature_field_streams(form)))
     if use_stream_arrays:
         if shared.uses_current:
             params.append(
@@ -1848,7 +2242,7 @@ def _sfem_soa_weak_form_block_function(
                 "const s_t *const RSTR h_streams[NS * %d]" % n_field_components
             )
         params.extend(_objective_step_parameters(form))
-        params.append(
+        params.extend(
             _BLOCK_OUTPUT_PARAMETER[form_accumulation(form)](n_field_components)
         )
     else:
@@ -2251,9 +2645,36 @@ def _tensor_weak_per_shape_tail(
         )
 
 
+def _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing, n_points="NQ"):
+    """Evaluate the declared tensors at this point and write them in place.
+
+    Every element-type body ends here the same way: the deformation gradient of
+    the point is in `gu`, the output streams are at the point
+    (`quadrature_fields.point_base_lines`), and each component is one store.
+    """
+    outputs = dict(weak_form.quadrature_outputs)
+    expressions = []
+    targets = []
+    for stream in quadrature_fields.written_streams(quadrature_fields.quadrature_field_streams(form)):
+        for component, expression in enumerate(outputs[stream.name]):
+            expressions.append(sp.sympify(expression).xreplace(substitutions))
+            targets.append("%s =" % quadrature_fields.store_target(stream, component, work_item, n_points))
+    _append_cse_array_assignments(lines, expressions, targets, "qp_out_tmp")
+    lines.extend(closing)
+
+
+def _tensor_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, out_streams, closing, step_gradient=None,
+):
+    """A quadrature output: evaluate at the point, store, nothing to contract."""
+    _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing)
+
+
 _TENSOR_WEAK_TAIL = {
     FormAccumulation.SCALAR: _tensor_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _tensor_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _tensor_weak_per_point_tail,
 }
 
 
@@ -2304,11 +2725,14 @@ def _append_sfem_soa_tensor_weak_form_lines(
             )
 
     lines.append("  for (int q = 0; q < NQ; ++q) {")
-    lines.extend(tensor_product_q_index_lines(dim, "    "))
-    lines.append(
-        "    const s_t qw = %s;"
-        % tensor_product_quadrature_weight_expr(dim)
-    )
+    # The lattice coordinates serve only the weight: the point's tables are
+    # reached through `q` itself.  A body that does not integrate takes neither.
+    for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]:
+        lines.extend(tensor_product_q_index_lines(dim, "    "))
+        lines.append(
+            "    const s_t qw = %s;"
+            % tensor_product_quadrature_weight_expr(dim)
+        )
     if uses_current:
         lines.extend(
             _reference_gradient_offset_lines("gu_ref", n_field_components, dim, "    ")
@@ -2333,6 +2757,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
             % (component, component)
         )
     lines.append("    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;")
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "    "))
     step_loop = _objective_step_loop(
         form,
         weak_form,
@@ -2341,9 +2767,11 @@ def _append_sfem_soa_tensor_weak_form_lines(
         work_item,
         source_builder,
         # The density is scaled by the measure, so the second work-item loop
-        # reads the determinant again rather than carrying it across.
+        # reads the determinant again rather than carrying it across -- and
+        # the integration-point fields it names.
         ["const s_t %s = det_q0[%s];"
-         % (_work_item_name(source_builder, "det", 0), work_item)],
+         % (_work_item_name(source_builder, "det", 0), work_item)]
+        + quadrature_fields.load_lines(point_streams, "", work_item),
         "    ",
     )
     if step_loop is not None:
@@ -2362,6 +2790,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         "      const s_t %s = det_q0[%s];"
         % (_work_item_name(source_builder, "det", 0), work_item)
     )
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
@@ -2704,9 +3136,21 @@ def _constant_p1_weak_per_shape_tail(
     lines.extend(["      }", "    }"])
 
 
+def _constant_p1_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+    step_gradient=None,
+):
+    """A quadrature output at the element's one point: evaluate, store."""
+    _append_quadrature_output_lines(
+        lines, form, weak_form, substitutions, work_item, closing, quadrature_fields.SINGLE_POINT
+    )
+
+
 _CONSTANT_P1_WEAK_TAIL = {
     FormAccumulation.SCALAR: _constant_p1_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _constant_p1_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _constant_p1_weak_per_point_tail,
 }
 
 
@@ -2749,6 +3193,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # loop has a single trip.  No strategy test is wanted here -- a
     # higher-order simplex never arrives, so a branch would describe a
     # case that cannot happen.
+    point_streams = quadrature_fields.quadrature_field_streams(form)
     step_loop = _objective_step_loop(
         form,
         weak_form,
@@ -2761,7 +3206,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         [
             "const ptrdiff_t goff = %s;" % work_item,
             "const s_t %s = det0[goff];" % geometry_value("det", 0),
-        ],
+        ]
+        + quadrature_fields.load_lines(point_streams, "", work_item, quadrature_fields.SINGLE_POINT),
         "      ",
     )
     # No quadrature point, and so no name for one.  The rule of a lowest-order
@@ -2775,9 +3221,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # Folded as an exact rational, so the emitted constant is the same double
     # the table held and the kernel's answer is bit-identical.
     lines.append("    {")
-    lines.append(
+    # A body that does not integrate, a quadrature output, takes no weight.
+    lines.extend(
         "      const s_t qw = %s;" % _sfem_ccode(sp.nsimplify(quadrature_weight))
+        for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]
     )
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "      ", quadrature_fields.SINGLE_POINT))
     if step_loop is not None:
         lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "      "))
@@ -2791,6 +3240,12 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(
+            quadrature_fields.load_lines(point_streams, "      ", work_item, quadrature_fields.SINGLE_POINT)
+        )
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -2960,9 +3415,19 @@ def _simplex_weak_per_shape_tail(
     lines.extend(["      }", "    }"])
 
 
+def _simplex_weak_per_point_tail(
+    lines, form, weak_form, substitutions, dim, n_field_components,
+    work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+    step_gradient=None,
+):
+    """A quadrature output: evaluate at the point, store, nothing to contract."""
+    _append_quadrature_output_lines(lines, form, weak_form, substitutions, work_item, closing)
+
+
 _SIMPLEX_WEAK_TAIL = {
     FormAccumulation.SCALAR: _simplex_weak_scalar_tail,
     FormAccumulation.PER_SHAPE: _simplex_weak_per_shape_tail,
+    FormAccumulation.PER_POINT: _simplex_weak_per_point_tail,
 }
 
 
@@ -2999,8 +3464,10 @@ def _append_sfem_soa_weak_form_lines(
     gradient_name = _weak_gradient_name(form)
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
-    if form.name not in ("objective", "gradient", "apply"):
-        raise ValueError("weak form kernel name must be objective, gradient, or apply")
+    if form.name not in ("objective", "gradient", "apply") + POINTWISE_OUTPUT_KERNELS:
+        raise ValueError(
+            "weak form kernel name must be objective, gradient, apply, or %s" % ", ".join(POINTWISE_OUTPUT_KERNELS)
+        )
     if form.name == "apply" and not form.has_direction:
         raise ValueError("weak form apply kernel requires has_direction=True")
     if len(reference_inputs) != 1 or reference_inputs[0].name != "grad_ref":
@@ -3059,8 +3526,14 @@ def _append_sfem_soa_weak_form_lines(
         scalar_temporaries=True,
     )
 
+    point_streams = quadrature_fields.quadrature_field_streams(form)
     lines.append("    for (int q = 0; q < NQ; ++q) {")
-    lines.append("      const s_t qw = q_weight[q];")
+    # A body that does not integrate, a quadrature output, takes no weights.
+    lines.extend(
+        "      const s_t qw = q_weight[q];"
+        for _integrated in [candidate for candidate in (form,) if form_is_integrated(candidate)]
+    )
+    lines.extend(quadrature_fields.point_base_lines(point_streams, "      "))
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -3132,7 +3605,8 @@ def _append_sfem_soa_weak_form_lines(
         [
             "const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
             "const s_t %s = det0[goff];" % _work_item_name(source_builder, "det", 0),
-        ],
+        ]
+        + quadrature_fields.load_lines(point_streams, "", work_item),
         "      ",
     )
     if step_loop is not None:
@@ -3148,6 +3622,10 @@ def _append_sfem_soa_weak_form_lines(
         "      const s_t %s = det0[goff];"
         % geometry_value("det", 0)
     )
+    # With steps, this loop only maps the two gradients and the step loop,
+    # which evaluates the density, reads the integration-point fields.
+    for _unstepped in [candidate for candidate in (step_loop,) if candidate is None]:
+        lines.extend(quadrature_fields.load_lines(point_streams, "      ", work_item))
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
@@ -4049,25 +4527,26 @@ def _sfem_soa_operator_source(
             for _affine_mode in variants.affine_modes:
                 if "plain" in objective_variants:
                     lines.append("")
-                    lines.extend(
-                        _sfem_soa_mesh_operator_function(
-                            form,
-                            prefix,
-                            dim,
-                            n_nodes,
-                            affine_rule.n_qp,
-                            vector_size,
-                            local_prefix,
-                            array_inputs,
-                            affine_rule,
-                            basis_family,
-                            geometry_family,
-                            use_shared_weak_local,
-                            geometry_mode="affine",
-                            matrix_format_plan=matrix_format_plan,
-                            source_builder=source_builder,
+                    with _product_in_a_team(form, source_builder) as builder:
+                        lines.extend(
+                            _sfem_soa_mesh_operator_function(
+                                form,
+                                prefix,
+                                dim,
+                                n_nodes,
+                                affine_rule.n_qp,
+                                vector_size,
+                                local_prefix,
+                                array_inputs,
+                                affine_rule,
+                                basis_family,
+                                geometry_family,
+                                use_shared_weak_local,
+                                geometry_mode="affine",
+                                matrix_format_plan=matrix_format_plan,
+                                source_builder=builder,
+                            )
                         )
-                    )
                 fast_aos_unit_lines = _tet4_linear_elasticity_aos_unit_mesh_operator_function(
                     form,
                     prefix,
@@ -4102,25 +4581,26 @@ def _sfem_soa_operator_source(
             for _isoparametric_mode in variants.isoparametric_modes:
                 if "plain" in objective_variants:
                     lines.append("")
-                    lines.extend(
-                        _sfem_soa_mesh_operator_function(
-                            form,
-                            prefix,
-                            dim,
-                            n_nodes,
-                            n_qp,
-                            vector_size,
-                            local_prefix,
-                            array_inputs,
-                            quadrature_rule,
-                            basis_family,
-                            geometry_family,
-                            use_shared_weak_local,
-                            geometry_mode="isoparametric",
-                            matrix_format_plan=matrix_format_plan,
-                            source_builder=source_builder,
+                    with _product_in_a_team(form, source_builder) as builder:
+                        lines.extend(
+                            _sfem_soa_mesh_operator_function(
+                                form,
+                                prefix,
+                                dim,
+                                n_nodes,
+                                n_qp,
+                                vector_size,
+                                local_prefix,
+                                array_inputs,
+                                quadrature_rule,
+                                basis_family,
+                                geometry_family,
+                                use_shared_weak_local,
+                                geometry_mode="isoparametric",
+                                matrix_format_plan=matrix_format_plan,
+                                source_builder=builder,
+                            )
                         )
-                    )
                 if "steps" in objective_variants:
                     lines.append("")
                     lines.extend(
@@ -4451,6 +4931,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
     n_field_components=None,
     metric=None,
     expanded_value_plan=None,
+    quadrature_streams=(),
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -4490,6 +4971,10 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             "    const %s %s," % (scalar_type, parameter)
             for parameter in material_parameter_names
+        )
+        lines.extend(
+            "    %s," % parameter
+            for parameter in quadrature_fields.mesh_parameters(quadrature_streams, scalar_type)
         )
         lines.append("    const ptrdiff_t u_stride,")
         for d in range(n_field_components):
@@ -4642,13 +5127,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
                 lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-            lines.extend(
-                [
-                    "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                    "        s_t *badj_streams[ND * ND] = {%s};"
-                    % ", ".join("badj%d" % i for i in range(dim * dim)),
-                ]
-            )
+            lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
         lines.extend(
             [
                 "",
@@ -4816,6 +5295,9 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             if not omit_reference_basis_inputs
         )
         call_args.extend(material_parameter_names)
+        call_args.extend(
+            quadrature_fields.block_call_arguments(quadrature_streams, "evb", "nelements")
+        )
         # The packed half of the same arrangement the mesh kernel makes: the
         # block owns the step loop, so this gathers once and calls once.
         call_args.extend(
@@ -4910,7 +5392,9 @@ def _mesh_operator_parameters(
     else:
         base_params.append("const g_t *const *const RSTR points")
 
-    material_params = _form_material_parameter_declarations(form)
+    material_params = _form_material_parameter_declarations(form) + quadrature_fields.mesh_parameters(
+        quadrature_fields.quadrature_field_streams(form)
+    )
     field_params = []
     if uses_current:
         field_params.append("const ptrdiff_t u_stride")
@@ -4932,16 +5416,19 @@ def _mesh_operator_parameters(
         "const ptrdiff_t %s" % name for name in (output.stride,) if name
     ) + tuple(
         "s_t *const RSTR %s" % name
-        for name in _OUTPUT_ABI_BUFFERS[output.per_shape](
+        for name in _OUTPUT_ABI_BUFFERS[form_accumulation(form)](
             n_field_components, _component_name
         )
     )
 
-    impl_params = (
-        tuple(base_params)
-        + tuple(material_params)
-        + tuple(field_params)
-        + tuple(output_params)
+    impl_params = tuple(
+        with_team_element_range(
+            tuple(base_params)
+            + tuple(material_params)
+            + tuple(field_params)
+            + tuple(output_params),
+            current_target(),
+        )
     )
     wrapper_params = tuple(
         param.replace("g_t", "geom_t").replace("g_t", "geom_t")
@@ -5053,6 +5540,9 @@ _WEAK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
         lambda form, n_field_components, n_nodes, order: []
     ),
+    FormAccumulation.PER_POINT: (
+        lambda form, n_field_components, n_nodes, order: []
+    ),
     FormAccumulation.PER_SHAPE: _per_shape_weak_output_stream_array,
 }
 
@@ -5084,6 +5574,9 @@ def _per_shape_block_output_stream_array(form, n_field_components, n_nodes,
 #: an empty sequence, which emits nothing without anyone deciding not to.
 _BLOCK_OUTPUT_STREAM_ARRAY = {
     FormAccumulation.SCALAR: (
+        lambda form, n_field_components, n_nodes, compact, order: []
+    ),
+    FormAccumulation.PER_POINT: (
         lambda form, n_field_components, n_nodes, compact, order: []
     ),
     FormAccumulation.PER_SHAPE: _per_shape_block_output_stream_array,
@@ -5156,6 +5649,8 @@ def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
 _OUTPUT_SCATTER = {
     FormAccumulation.SCALAR: _scalar_output_scatter,
     FormAccumulation.PER_SHAPE: _per_shape_output_scatter,
+    # The block wrote the integration-point streams; there is nothing to move.
+    FormAccumulation.PER_POINT: lambda *args: None,
 }
 
 
@@ -5207,13 +5702,15 @@ def _append_mesh_operator_compact_buffers(
         if uses_direction:
             lines.append("    s_t bh_data[NS * NC]%s;" % current_target().work_item_extent())
         output = mesh_output_shape(form)
-        lines.append(
+        lines.extend(
             "    s_t %s%s%s;"
             % (
-                output.block,
+                block,
                 "".join("[%s]" % extent for extent in output.extents),
                 current_target().work_item_extent(),
             )
+            for block in (output.block,)
+            if block
         )
         if compact_coordinate_buffers:
             lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
@@ -5334,6 +5831,7 @@ def _append_mesh_operator_compact_stream_buffers(
     reference_inputs,
     use_reference_gradient_vectors,
     use_tensor_product_reference,
+    integrated=True,
 ):
     """The compacted stream buffers a mesh operator stages into.
 
@@ -5350,6 +5848,7 @@ def _append_mesh_operator_compact_stream_buffers(
             emit_reference_basis=(
                 not omit_reference_basis_inputs or geometry_mode == "isoparametric"
             ),
+            integrated=integrated,
         )
     )
 
@@ -5584,6 +6083,7 @@ def _append_mesh_operator_packed_entry_points(
                 n_field_components=n_field_components,
                 metric=metric,
                 expanded_plan=expanded_plan,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
             )
         )
 
@@ -5670,6 +6170,22 @@ def _target_scatter_add_lines(source_builder):
         return lambda lhs, rhs, indent: ["%s%s += %s;" % (indent, lhs, rhs)]
     return lambda lhs, rhs, indent: list(target.scatter_add_lines(lhs, rhs, indent))
 
+
+
+@contextlib.contextmanager
+def _product_in_a_team(form, source_builder):
+    """The builder the operator's product is emitted with.
+
+    The product (form `apply`) is what a solver applies in its Krylov loop, on
+    the threads of the region the solver opened (sfem_TeamOperator.hpp): its
+    bodies are team bodies (`TargetPlatform.team_body`), and its entry points
+    come as the region-opening name and its `_team` twin
+    (`runtime_typed_entry_point_lines`).  Every other form, and a target without
+    regions, keeps the builder it was given (`kernel_target`).
+    """
+    target = kernel_target(form, source_builder.target)
+    with use_target(target):
+        yield dataclass_replace(source_builder, target=target)
 
 
 def _sfem_soa_mesh_operator_function(
@@ -5833,6 +6349,7 @@ def _sfem_soa_mesh_operator_function(
         reference_inputs,
         use_reference_gradient_vectors,
         use_tensor_product_reference,
+        integrated=form_is_integrated(form),
     )
     if use_tensor_product_reference:
         lines.extend(
@@ -5991,17 +6508,20 @@ def _sfem_soa_mesh_operator_function(
                 use_tensor_product_reference, tensor_weight_name, scalar_weight_name
             ),
         )
-        if not omit_reference_basis_inputs
+        if not omit_reference_basis_inputs and form_is_integrated(form)
     )
     call_args.extend(material_parameter_names)
+    call_args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_field_streams(form), "evb", "nelements"
+        )
+    )
     if use_stream_arrays:
         if uses_current:
             call_args.append("bu_streams")
         if uses_direction:
             call_args.append("bh_streams")
-        call_args.append(
-            _OUTPUT_CALL_ARGUMENT[mesh_output_shape(form).per_shape]
-        )
+        call_args.extend(_OUTPUT_CALL_ARGUMENT[form_accumulation(form)])
     else:
         if uses_current:
             call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
@@ -6070,16 +6590,47 @@ def _sfem_soa_mesh_operator_function(
 
 
     wrapper_args = tuple(_cpp_argument_name(param) for param in wrapper_params)
+    # The apply of a tensor-product element of the orders the plan admits runs on the FP64 matrix
+    # units (`TENSOR_PRODUCT_MATRIX_CORE_APPLY_HEADER`), in double; the generated kernel stays float's
+    # and the fallback.
+    matrix_core_admitted = matrix_core_apply_launch_admits(
+        form,
+        dim,
+        quadrature_rule,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        isoparametric=geometry_mode == "isoparametric",
+        tensor_product_geometry=use_tensor_product_geometry,
+    )
+    matrix_core_launch = (
+        TensorProductMatrixCoreLaunch(
+            _sfem_soa_tensor_product_apply_point_name(local_prefix, form),
+            quadrature_reference_owner(quadrature_rule, "shape_1d"),
+            quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+            quadrature_rule.tensor_product_n_qp_1d,
+            quadrature_rule.tensor_product_n_shape_1d,
+            n_field_components,
+            geometry_mode == "isoparametric",
+            uses_current,
+        )
+        if matrix_core_admitted
+        else None
+    )
+    if matrix_core_launch is not None and metric is not None:
+        raise ValueError("the matrix-core apply reads the adjugate, not a cached metric")
     lines.extend(
         runtime_typed_entry_point_lines(
             function_name,
             wrapper_params,
-            lambda scalar_type, _positional: source_builder.wrapper_call_lines(
-                implementation_name,
-                scalar_type,
-                _mesh_template_arguments(effective_vector_size),
-                cast_arguments(wrapper_params, wrapper_args, scalar_type),
-            ),
+            lambda scalar_type, _positional: [
+                *_matrix_core_apply_launch_lines(matrix_core_launch, scalar_type, material_parameter_names, dim),
+                *source_builder.wrapper_call_lines(
+                    implementation_name,
+                    scalar_type,
+                    _mesh_template_arguments(effective_vector_size),
+                    cast_arguments(wrapper_params, wrapper_args, scalar_type),
+                ),
+            ],
             parameter_lines=parameter_list_lines,
         )
     )
@@ -6267,6 +6818,7 @@ def _sfem_soa_packed_apply_public_wrappers(
     n_field_components=None,
     metric=None,
     expanded_plan=None,
+    quadrature_streams=(),
 ):
     n_field_components = dim if n_field_components is None else n_field_components
     if geometry_mode not in ("affine", "isoparametric"):
@@ -6323,6 +6875,10 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 "    const %s %s," % (scalar_type, parameter)
                 for parameter in material_parameter_names
+            )
+            lines.extend(
+                "    %s," % parameter
+                for parameter in quadrature_fields.mesh_parameters(quadrature_streams, scalar_type)
             )
             if uses_current:
                 lines.append("    const ptrdiff_t u_stride,")
@@ -6394,7 +6950,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "",
-                    "#pragma omp parallel",
+                    *source_builder.parallel_region_lines(),
                     "  {",
                 ]
             )
@@ -6414,7 +6970,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 [
                     "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);",
                     "",
-                    "#pragma omp for schedule(static)",
+                    *source_builder.worksharing_for_lines("static"),
                     "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
                     "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
                     "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -6547,13 +7103,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
                     lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-                lines.extend(
-                    [
-                        "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
-                        "        s_t *badj_streams[ND * ND] = {%s};"
-                        % ", ".join("badj%d" % i for i in range(dim * dim)),
-                    ]
-                )
+                lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
             if uses_current:
                 lines.extend(
                     _ordered_stream_pointer_array_lines(
@@ -6757,6 +7307,9 @@ def _sfem_soa_packed_apply_public_wrappers(
                 if not omit_reference_basis_inputs
             )
             call_args.extend(material_parameter_names)
+            call_args.extend(
+                quadrature_fields.block_call_arguments(quadrature_streams, "evb", "nelements")
+            )
             if uses_current:
                 call_args.append("bu_streams")
             if uses_direction:
@@ -7152,7 +7705,9 @@ def _objective_steps_lines(
     else:
         base_params.append("const g_t *const *const RSTR points")
 
-    material_params = _form_material_parameter_declarations(form)
+    material_params = _form_material_parameter_declarations(form) + quadrature_fields.mesh_parameters(
+        quadrature_fields.quadrature_field_streams(form)
+    )
     field_params = ["const ptrdiff_t u_stride"]
     field_params.extend(
         "const s_t *const RSTR u%s" % _component_name(d)
@@ -7507,6 +8062,11 @@ def _objective_steps_lines(
         if not omit_reference_basis_inputs
     )
     call_args.extend(material_parameter_names)
+    call_args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_field_streams(form), "evb", "nelements"
+        )
+    )
     if use_stream_arrays:
         call_args.extend(("bu_streams", "bh_streams"))
     else:
@@ -7613,6 +8173,7 @@ def _objective_steps_lines(
                 n_field_components=n_field_components,
                 metric=metric,
                 expanded_value_plan=value_plan,
+                quadrature_streams=quadrature_fields.quadrature_field_streams(form),
             )
         )
     return lines
@@ -7840,66 +8401,118 @@ def _sfem_soa_direct_hessian_point_geometry_lines(dim, indent):
     return lines
 
 
-def _sfem_soa_direct_hessian_trial_gradient_lines(
-    dim,
-    reference_gradient_expr,
-    indent,
-):
-    """The trial basis function's physical gradient, staged for the material.
+def _sfem_soa_direct_hessian_tangent_lines(material, dim, indent, declare=True, project=False):
+    """The point's physical tangent D, as `s_t D[(NC * ND) * (NC * ND)]`.
 
-    `trial_grad` is the field gradient a *single* trial degree of freedom
-    produces: zero everywhere but the component it belongs to, which is what
-    makes the material evaluated against it that degree of freedom's column.
-    `reference_gradient_expr(k)` is however the caller's element spells the
-    reference gradient -- a one-dimensional product on a tensor-product element,
-    a table lookup elsewhere.
+    `material` is the response to a trial gradient and is linear in it, so its
+    coefficients are the tangent, a function of the state and the geometry
+    alone, evaluated once per point rather than once per column.  The element
+    matrix of an energy is symmetric and so is D: the upper triangle is
+    eliminated and mirrored, which roughly halves the elimination.  The
+    symmetry is checked at a pseudo-random point before it is relied on.
 
-    A field gradient has one row per field component and one column per spatial
-    direction, so it is `NC * ND` entries strided by `ND`.  Both used to be
-    spelled `NC`, which is right only for a displacement: a scalar field in two
-    dimensions then declared `trial_grad[1]` and wrote index 1, which the
-    compiler will tell you about under `-Warray-bounds` and which no material
-    reached until laplace was written as an energy.
+    With `project`, D is then projected to positive semidefinite where the
+    kernel's `PROJECT` flag is set (`project_abs_symmetric`), so the element
+    matrix contracted from it is too.  The flag is a template parameter: the
+    exact assembly instantiates it off and compiles to what it was without it.
     """
-    lines = [
-        "%sconst s_t trial_grad_ref%d = %s;" % (indent, k, reference_gradient_expr(k))
-        for k in range(dim)
-    ]
+    n = len(material)
+    trial = [sp.Symbol("trial_grad[%d]" % j) for j in range(n)]
+    upper, targets = [], []
+    for a in range(n):
+        for b in range(a, n):
+            upper.append(sp.diff(material[a], trial[b]))
+            targets.append("D[%d] =" % (a * n + b))
+    _check_tangent_symmetry(material, trial)
+    body = []
+    _append_cse_array_assignments(body, tuple(upper), targets, "weak_hess_tmp")
+    lines = ["%ss_t D[%d];" % (indent, n * n)] if declare else []
+    lines.extend("%s%s" % (indent, line.strip()) for line in body)
     lines.extend(
-        [
-            "%ss_t trial_grad[NC * ND];" % indent,
-            "%sfor (int i = 0; i < NC * ND; ++i) {" % indent,
-            "%s  trial_grad[i] = s_t(0);" % indent,
-            "%s}" % indent,
-        ]
+        "%sD[%d] = D[%d];" % (indent, b * n + a, a * n + b) for a in range(n) for b in range(a + 1, n)
     )
-    for phys_component in range(dim):
-        terms = [
-            "trial_grad_ref%d * %s"
-            % (
-                ref_component,
-                current_target().work_item_name("adj", ref_component * dim + phys_component),
-            )
-            for ref_component in range(dim)
-        ]
-        lines.append(
-            "%strial_grad[trial_component * ND + %d] = (%s) * idet;"
-            % (indent, phys_component, " + ".join(terms))
+    if project:
+        lines.extend(
+            [
+                "%sif constexpr (PROJECT) {" % indent,
+                "%s  project_abs_symmetric<s_t, %d>(D);" % (indent, n),
+                "%s}" % indent,
+            ]
         )
     return lines
 
 
-def _sfem_soa_direct_hessian_material_lines(material, dim, indent):
-    """The material's response to that trial gradient, eliminated once."""
-    lines = ["%ss_t material[NC * ND];" % indent]
-    body = []
-    _append_cse_array_assignments(
-        body,
-        tuple(material),
-        ["material[%d] =" % i for i in range(dim * dim)],
-        "weak_hess_tmp",
-    )
-    lines.extend("%s%s" % (indent, line.strip()) for line in body)
+#: The template flag of an element-matrix kernel and of its assembly that
+#: selects the projected tangent, and its default: off, which is the exact one.
+PROJECT_TEMPLATE_PARAMETER = "bool PROJECT = false"
+
+#: The header that declares `project_abs_symmetric`.
+TANGENT_PROJECTION_HEADER = "sfem_TangentProjection.hpp"
+
+
+def _check_tangent_symmetry(material, trial):
+    """Refuse a tangent that is not symmetric, at one pseudo-random point.
+
+    The assembly relies on it twice -- D's lower triangle is a mirror and so is
+    the element matrix's -- and an energy's second variation always has it, so
+    a failure here is a material that reached this path without being one.
+    """
+    import random
+
+    n = len(material)
+    tangent = [[sp.diff(material[a], trial[b]) for b in range(n)] for a in range(n)]
+    symbols = set()
+    for row in tangent:
+        for entry in row:
+            symbols |= entry.free_symbols
+    generator = random.Random(1234)
+    point = {symbol: sp.Float(0.1 + 0.05 * generator.random()) for symbol in sorted(symbols, key=str)}
+    for a in range(n):
+        for b in range(a + 1, n):
+            lower = complex(tangent[b][a].xreplace(point).evalf())
+            upper = complex(tangent[a][b].xreplace(point).evalf())
+            if abs(lower - upper) > 1e-9 * (1 + abs(upper)):
+                raise ValueError(
+                    "hessian assembly: the tangent is not symmetric (entry %d, %d: %r vs %r)"
+                    % (a, b, upper, lower)
+                )
+
+
+def _sfem_soa_direct_hessian_pullback_lines(n_components, dim, target, indent, adj_name="adj_q", weight="weight"):
+    """D pulled back to the reference element and weighted, into `target % index`:
+
+        A[(i, k), (j, l)] = qw / det sum_{d, e} adj[k][d] D[(i, d), (j, e)] adj[l][e],
+
+    index (i * ND + k) * NC * ND + j * ND + l, written as two 3x3 products per
+    block.  What a slab's columns contract against their reference gradients.
+    """
+    n = n_components * dim
+
+    def adj(k, d):
+        return "%s[%d]" % (adj_name, k * dim + d)
+
+    lines = ["%sconst s_t pullback_weight = %s;" % (indent, weight)]
+    for i in range(n_components):
+        for j in range(n_components):
+            for k in range(dim):
+                for e in range(dim):
+                    lines.append(
+                        "%sconst s_t pullback_%d_%d_%d_%d = %s;"
+                        % (
+                            indent, i, j, k, e,
+                            " + ".join("%s * D[%d]" % (adj(k, d), (i * dim + d) * n + j * dim + e) for d in range(dim)),
+                        )
+                    )
+            for k in range(dim):
+                for l in range(dim):
+                    lines.append(
+                        "%s%s = pullback_weight * (%s);"
+                        % (
+                            indent,
+                            target % ((i * dim + k) * n + j * dim + l),
+                            " + ".join("pullback_%d_%d_%d_%d * %s" % (i, j, k, e, adj(l, e)) for e in range(dim)),
+                        )
+                    )
     return lines
 
 
@@ -7967,6 +8580,13 @@ def _sfem_soa_direct_hessian_closed_form_assembly_lines(
             "%sconst s_t idet = s_t(1) / %s;"
             % (indent, current_target().work_item_name("det", 0)),
         ]
+    )
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    lines.extend(quadrature_fields.point_base_lines(point_streams, indent, quadrature_fields.SINGLE_POINT))
+    lines.extend(
+        quadrature_fields.load_lines(
+            point_streams, indent, quadrature_fields.SINGLE_ELEMENT, quadrature_fields.SINGLE_POINT
+        )
     )
     if uses_current:
         # The state's reference gradient is a sum over the element's nodes with
@@ -8066,27 +8686,33 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     reference_prefix,
     indent,
     emit_tensor_product_static_constants=True,
+    project=False,
 ):
-    """The element matrix of a tensor-product element, a column at a time.
+    """The element matrix of a tensor-product element, accumulated as the rule is walked.
 
-    The shape this element's evaluation strategy asks for, and the reason it is
-    not the quadrature shape is complexity.  Contracting the test functions
-    point by point costs `NQ * NDOFS` per column, which is `p^6` for a degree-`p`
-    element in three dimensions and `p^9` for the whole matrix.
-    `tensor_test_scalar` is the same contraction taken one dimension at a time,
-    at `p^4` a column and `p^7` in all, and it is the routine the matrix-free
-    apply on this element already calls.  The state is evaluated the same way,
-    once, by `tensor_gradient_contiguous_scalar`.
+    Only the tangent of the points in hand is ever held.  Holding it at every
+    point -- so that each trial column could be contracted over the whole rule
+    in one factorised pass -- costs a tangent per point of memory for nothing
+    the walk below does not do faster.  The walk is the element's:
 
-    The `_scalar` micro-kernels are the ones this kernel wants.  Assembly has a
-    single element in hand -- it scatters into a sparse row and has nowhere to
-    put a block of them -- so the lane-blocked ones would carry a lane loop that
-    runs once and stage buffers with `VS - 1` slots nobody writes.
+    - one point at a time where the 1-D basis has two functions (HEX8, QUAD4):
+      there is nothing to factorise, and the point's contribution is a dense,
+      symmetric outer product (`point_test_symmetric_scalar`), upper triangle
+      only, mirrored once at the end;
+    - one slab at a time otherwise -- every point with the last coordinate
+      fixed: the slab's tangent is pulled back and every trial column is
+      contracted over the slab one dimension at a time
+      (`tensor_slab_test_scalar`).  The matrix is symmetric, so a column is
+      written as the row it equals, contiguously.
 
-    The loop order is the other half of the change.  Quadrature was outermost
-    and the trial degree of freedom inside it; the factorised contraction wants
-    every quadrature point of one column in hand at once, so the column is
-    outermost now and `flux` spans the rule.
+    Measured on Grace, one thread: on HEX8 the point walk takes 4.0 us an
+    element against 5.4 us for the slab walk and 7.2 us for the tangent held at
+    every point; on PROTEUS_HEX27 the slab walk takes 76 us against 84 us and
+    151 us for the point walk.
+
+    The state is evaluated once, factorised, by
+    `tensor_gradient_contiguous_scalar`.  The `_scalar` micro-kernels are the
+    ones assembly wants: it has a single element in hand.
     """
     n_field_components = form_n_field_components(form, dim)
     uses_current = form_reads_current(form, default=True)
@@ -8104,6 +8730,11 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
             for i in range(weak_form.n_field_components * dim)
         ),
     )
+    n_tangent = len(material)
+    # Projected point by point on a device; on the host every point of a walk's step at once, in
+    # lockstep across SIMD lanes (`project_abs_symmetric_lanes`), as in
+    # `_sfem_soa_direct_hessian_matrix_assembly_lines`.
+    lanes = project and not current_target().supports_device_kernels
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
         "%s  element_matrix[entry] = s_t(0);" % indent,
@@ -8120,132 +8751,199 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
         lines.extend(
             _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
         )
-    lines.extend(
-        [
-            # One column's reference flux at every quadrature point, which is
-            # what the factorised contraction consumes.
-            "%ss_t flux[NC * NQ * ND];" % indent,
-            # Where the column lands.  `tensor_test_scalar` accumulates through
-            # a stream per degree of freedom, so pointing those streams straight
-            # into the matrix writes the column with no scratch vector and no
-            # copy after it.
-            "%ss_t *column[NC * NS];" % indent,
-            "%sfor (int trial_component = 0; trial_component < NC; ++trial_component) {"
-            % indent,
-            "%s  for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {" % indent,
-        ]
-    )
-    lines.extend(
-        _tensor_product_shape_coordinate_lines(dim, "trial_shape", "trial", "%s    " % indent)
-    )
-    lines.append("%s    for (int q = 0; q < NQ; ++q) {" % indent)
-    lines.extend(tensor_product_q_index_lines(dim, "%s      " % indent))
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    # The tangent at point q, its adjugate and its weight qw / det: what both
+    # walks need from a point.  One evaluation, called by whichever walk this
+    # element takes; the header is shared by every element of the dimension, so
+    # the walk is chosen from NS1 at compile time.
     lines.append(
-        "%s      const s_t qw = %s;"
-        % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+        "%sauto point_tangent = [&](const int q, s_t *const RSTR D, s_t *const RSTR adj_q, s_t &weight) {" % indent
     )
+    point_indent = "%s  " % indent
+    lines.extend(tensor_product_q_index_lines(dim, point_indent))
+    lines.append(
+        "%sconst s_t qw = %s;"
+        % (point_indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+    )
+    lines.extend(_sfem_soa_direct_hessian_point_geometry_lines(dim, point_indent))
+    lines.extend(quadrature_fields.point_base_lines(point_streams, point_indent))
     lines.extend(
-        _sfem_soa_direct_hessian_point_geometry_lines(dim, "%s      " % indent)
+        quadrature_fields.load_lines(point_streams, point_indent, quadrature_fields.SINGLE_ELEMENT)
     )
     if uses_current:
         lines.extend(
             _sfem_soa_direct_hessian_current_gradient_lines(
-                weak_form,
-                dim,
-                n_field_components,
-                reference_inputs,
-                True,
-                False,
-                reference_prefix,
-                "%s      " % indent,
+                weak_form, dim, n_field_components, reference_inputs, True, False,
+                reference_prefix, point_indent,
             )
         )
     lines.extend(
-        _sfem_soa_direct_hessian_trial_gradient_lines(
-            dim,
-            lambda k: _sfem_soa_reference_gradient_expr_for_shape(
-                dim,
-                k,
-                True,
-                False,
-                reference_inputs,
-                "trial_shape",
-                coord_prefix="trial",
-                reference_prefix=reference_prefix,
-            ),
-            "%s      " % indent,
-        )
+        _sfem_soa_direct_hessian_tangent_lines(material, dim, point_indent, declare=False, project=project and not lanes)
     )
     lines.extend(
-        _sfem_soa_direct_hessian_material_lines(material, dim, "%s      " % indent)
+        "%sadj_q[%d] = %s;" % (point_indent, c, current_target().work_item_name("adj", c))
+        for c in range(dim * dim)
     )
-    # Back to the reference element, weighted: this is what the contraction
-    # integrates, and it is the same expression the point-by-point shape
-    # multiplied a test gradient by, with the test function taken out of it.
-    for row in range(n_field_components):
-        for k in range(dim):
-            terms = [
-                "material[%s] * %s"
-                % (
-                    c_sum(c_product(row, "ND"), d),
-                    current_target().work_item_name("adj", k * dim + d),
-                )
-                for d in range(dim)
-            ]
-            lines.append(
-                "%s      flux[%s] = qw * (%s);"
-                % (
-                    indent,
-                    c_sum(c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"), k),
-                    " + ".join(terms),
-                )
-            )
-    lines.append("%s    }" % indent)
-    lines.extend(
-        [
-            "%s    for (int out_shape = 0; out_shape < NS; ++out_shape) {" % indent,
-            *(
-                "%s      column[out_shape * NC + %d] = "
-                "&element_matrix[(%d * NS + out_shape) * NDOFS "
-                "+ trial_component * NS + trial_shape];" % (indent, row, row)
-                for row in range(n_field_components)
-            ),
-            "%s    }" % indent,
+    lines.extend(["%sweight = qw * idet;" % point_indent, "%s};" % indent])
+
+    # One point at a time.
+    size = n_tangent * n_tangent
+
+    def point_walk(at):
+        return [
+            "%sfor (int q = 0; q < NQ; ++q) {" % at,
+            "%s  s_t D[%d], adj_q[ND * ND], weight;" % (at, size),
+            "%s  point_tangent(q, D, adj_q, weight);" % at,
+            "%s  s_t g_ref[ND * NS];" % at,
+            "%s  tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
+            % (at, reference_prefix, reference_prefix),
+            "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, weight, D, element_matrix);" % at,
+            "%s}" % at,
         ]
-    )
-    for row in range(n_field_components):
+
+    lines.append("%sif constexpr (NS1 == 2) {" % indent)
+    if lanes:
+        at = "%s    " % indent
         lines.extend(
             [
-                "%s    tensor_test_scalar<s_t, NQ, NS, %d, NC>(" % (indent, dim),
-                "%s        %sshape_1d, %sgrad_1d, flux + %s, column, %d);"
-                % (
-                    indent,
-                    reference_prefix,
-                    reference_prefix,
-                    c_product(row, "NQ", "ND"),
-                    row,
-                ),
+                "%s  if constexpr (PROJECT) {" % indent,
+                "%ss_t Dq[NQ * %d], adjq[NQ * ND * ND], weights[NQ];" % (at, size),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+                "%s  point_tangent(q, &Dq[q * %d], &adjq[q * ND * ND], weights[q]);" % (at, size),
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NQ>(Dq);" % (at, n_tangent),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+                "%s  s_t g_ref[ND * NS];" % at,
+                "%s  tensor_point_reference_gradients_scalar<s_t, NQ, NS, ND>(%sshape_1d, %sgrad_1d, q, g_ref);"
+                % (at, reference_prefix, reference_prefix),
+                "%s  point_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, &adjq[q * ND * ND], weights[q], &Dq[q * %d], element_matrix);"
+                % (at, size),
+                "%s}" % at,
+                "%s  } else {" % indent,
+            ]
+            + point_walk(at)
+            + ["%s  }" % indent]
+        )
+    else:
+        lines.extend(point_walk("%s  " % indent))
+    lines.extend(
+        [
+            "%s  mirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent,
+            "%s} else {" % indent,
+        ]
+    )
+    # One slab at a time.
+    walk = "%s  " % indent
+    slab = "NQ1 * NQ1" if dim == 3 else "NQ1"
+    lines.extend(
+        [
+            "%sstatic constexpr int NP = %s;" % (walk, slab),
+            "%ss_t slab_tangent[NP * %d];" % (walk, n_tangent * n_tangent),
+            "%ss_t flux[NC * ND * NP];" % walk,
+            "%sfor (int q_last = 0; q_last < NQ1; ++q_last) {" % walk,
+        ]
+    )
+
+    def slab_points(at):
+        return (
+            [
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  s_t D[%d], adj_q[ND * ND], weight;" % (at, size),
+                "%s  point_tangent(p + NP * q_last, D, adj_q, weight);" % at,
+            ]
+            + _sfem_soa_direct_hessian_pullback_lines(n_field_components, dim, "slab_tangent[p * %d + %%d]" % size, "%s  " % at)
+            + ["%s}" % at]
+        )
+
+    if lanes:
+        at = "%s    " % walk
+        lines.extend(
+            [
+                "%s  if constexpr (PROJECT) {" % walk,
+                "%ss_t Dp[NP * %d], adjp[NP * ND * ND], wp[NP];" % (at, size),
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  point_tangent(p + NP * q_last, &Dp[p * %d], &adjp[p * ND * ND], wp[p]);" % (at, size),
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NP>(Dp);" % (at, n_tangent),
+                "%sfor (int p = 0; p < NP; ++p) {" % at,
+                "%s  const s_t *const RSTR D = &Dp[p * %d];" % (at, size),
+                "%s  const s_t *const RSTR adj_q = &adjp[p * ND * ND];" % at,
+                "%s  const s_t weight = wp[p];" % at,
+            ]
+            + _sfem_soa_direct_hessian_pullback_lines(n_field_components, dim, "slab_tangent[p * %d + %%d]" % size, "%s  " % at)
+            + ["%s}" % at, "%s  } else {" % walk]
+            + slab_points(at)
+            + ["%s  }" % walk]
+        )
+    else:
+        lines.extend(slab_points("%s  " % walk))
+    lines.extend(
+        [
+            "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {" % walk,
+            "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {" % walk,
+        ]
+    )
+    lines.extend(
+        _tensor_product_shape_coordinate_lines(dim, "trial_shape", "trial", "%s      " % walk)
+    )
+    last = "trial_sz" if dim == 3 else "trial_sy"
+    lines.append(
+        "%s      const s_t b_last = %sshape_1d[q_last * NS1 + %s], g_last = %sgrad_1d[q_last * NS1 + %s];"
+        % (walk, reference_prefix, last, reference_prefix, last)
+    )
+    lines.append("%s      for (int p = 0; p < NP; ++p) {" % walk)
+    inner = "%s        " % walk
+    if dim == 3:
+        lines.extend(
+            [
+                "%sconst int qx = p %% NQ1, qy = p / NQ1;" % inner,
+                "%sconst s_t bx = %sshape_1d[qx * NS1 + trial_sx], gx = %sgrad_1d[qx * NS1 + trial_sx];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t by = %sshape_1d[qy * NS1 + trial_sy], gy = %sgrad_1d[qy * NS1 + trial_sy];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t r0 = gx * by * b_last, r1 = bx * gy * b_last, r2 = bx * by * g_last;" % inner,
             ]
         )
-    lines.extend(["%s  }" % indent, "%s}" % indent])
+    else:
+        lines.extend(
+            [
+                "%sconst int qx = p;" % inner,
+                "%sconst s_t bx = %sshape_1d[qx * NS1 + trial_sx], gx = %sgrad_1d[qx * NS1 + trial_sx];"
+                % (inner, reference_prefix, reference_prefix),
+                "%sconst s_t r0 = gx * b_last, r1 = bx * g_last;" % inner,
+            ]
+        )
+    lines.extend(
+        [
+            "%sconst s_t *const RSTR tangent_p = &slab_tangent[p * %d + trial_component * ND];"
+            % (inner, n_tangent * n_tangent),
+            # Written out over the trial gradient's components: as a loop over
+            # them, the slab walk was 6% slower on Grace (gcc 13).
+            "%sfor (int row = 0; row < NC * ND; ++row) {" % inner,
+            "%s  flux[row * NP + p] = %s;"
+            % (inner, " + ".join("tangent_p[row * NC * ND + %d] * r%d" % (l, l) for l in range(dim))),
+            "%s}" % inner,
+            "%s      }" % walk,
+            # The matrix is symmetric, so the column is written as the row it equals.
+            "%s      for (int component = 0; component < NC; ++component) {" % walk,
+            "%s        tensor_slab_test_scalar<s_t, NQ1, NS1, ND>(%sshape_1d, %sgrad_1d, q_last, &flux[component * ND * NP],"
+            % (walk, reference_prefix, reference_prefix),
+            "%s            &element_matrix[(trial_component * NS + trial_shape) * NDOFS + component * NS]);" % walk,
+            "%s      }" % walk,
+            "%s    }" % walk,
+            "%s  }" % walk,
+            "%s}" % walk,
+            "%s}" % indent,
+        ]
+    )
     return lines
 
 
-def _sfem_soa_direct_hessian_matrix_assembly_lines(
-    form,
-    dim,
-    quadrature_rule,
-    reference_inputs,
-    use_tensor_product_reference,
-    use_reference_gradient_vectors,
-    reference_prefix,
-    indent,
-    emit_tensor_product_static_constants=True,
-):
-    n_field_components = form_n_field_components(form, dim)
-    uses_current = form_reads_current(form, default=True)
+def _sfem_soa_direct_hessian_material(form, dim):
+    """The material's response to a trial gradient at a point's `gu`: linear in it, its
+    coefficients are the point's tangent (`_sfem_soa_direct_hessian_tangent_lines`)."""
     weak_form = form.weak_form
-    material = _weak_form_material_expression(
+    return _weak_form_material_expression(
         weak_form,
         form.name,
         _weak_form_deformation_gradient_substitutions(
@@ -8258,6 +8956,53 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
             for i in range(weak_form.n_field_components * dim)
         ),
     )
+
+
+def _sfem_soa_direct_hessian_point_state_lines(
+    form,
+    dim,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_prefix,
+    at,
+    uses_current,
+):
+    """What the tangent at point `q` reads: its integration-point fields and, where it depends
+    on the state (`uses_current`), the current gradient `gu`."""
+    point_streams = quadrature_fields.quadrature_field_streams(form)
+    out = list(quadrature_fields.point_base_lines(point_streams, at))
+    out.extend(quadrature_fields.load_lines(point_streams, at, quadrature_fields.SINGLE_ELEMENT))
+    if uses_current:
+        out.extend(
+            _sfem_soa_direct_hessian_current_gradient_lines(
+                form.weak_form,
+                dim,
+                form_n_field_components(form, dim),
+                reference_inputs,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+                reference_prefix,
+                at,
+            )
+        )
+    return out
+
+
+def _sfem_soa_direct_hessian_matrix_assembly_lines(
+    form,
+    dim,
+    quadrature_rule,
+    reference_inputs,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_prefix,
+    indent,
+    emit_tensor_product_static_constants=True,
+    project=False,
+):
+    uses_current = form_reads_current(form, default=True)
+    material = _sfem_soa_direct_hessian_material(form, dim)
     lines = [
         "%sfor (int entry = 0; entry < NDOFS * NDOFS; ++entry) {" % indent,
         "%s  element_matrix[entry] = s_t(0);" % indent,
@@ -8274,178 +9019,120 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         lines.extend(
             _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
         )
-    lines.append("%sfor (int q = 0; q < NQ; ++q) {" % indent)
-    if use_tensor_product_reference:
-        lines.extend(tensor_product_q_index_lines(dim, indent + "  "))
-        lines.append(
-            "%s  const s_t qw = %s;"
-            % (indent, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+    n_tangent = len(material)
+    # The projected tangent is projected point by point on a device, where a work item is a point's
+    # worth of registers already, and on the host for every point of the element at once, in
+    # lockstep across SIMD lanes (`project_abs_symmetric_lanes`): the points' tangents are
+    # gathered first, projected together, then contracted.
+    on_device = current_target().supports_device_kernels
+
+    def point_geometry(at, weight=True):
+        out = []
+        if use_tensor_product_reference:
+            out.extend(tensor_product_q_index_lines(dim, at))
+            if weight:
+                out.append(
+                    "%sconst s_t qw = %s;"
+                    % (at, tensor_product_quadrature_weight_expr(dim, "%sq_weight_1d" % reference_prefix))
+                )
+        elif weight:
+            out.append("%sconst s_t qw = %sq_weight[q];" % (at, reference_prefix))
+        # No work item opened: see `_sfem_soa_direct_hessian_point_geometry_lines`.
+        out.append("%sconst ptrdiff_t goff = q;" % at)
+        for component in range(dim * dim):
+            out.append(
+                "%sconst s_t %s = badj%d[goff];"
+                % (at, current_target().work_item_name("adj", component), component)
+            )
+        out.extend(
+            [
+                "%sconst s_t %s = bdet0[goff];" % (at, current_target().work_item_name("det", 0)),
+                "%sconst s_t idet = s_t(1) / %s;" % (at, current_target().work_item_name("det", 0)),
+            ]
+        )
+        return out
+
+    def point_state(at):
+        return _sfem_soa_direct_hessian_point_state_lines(
+            form,
+            dim,
+            reference_inputs,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+            reference_prefix,
+            at,
+            uses_current,
+        )
+
+    def point_contraction(at):
+        # The point's reference gradients, every shape, laid out [k][s].
+        out = ["%ss_t g_ref[ND * NS];" % at, "%sfor (int shape = 0; shape < NS; ++shape) {" % at]
+        if use_tensor_product_reference:
+            out.extend(_tensor_product_shape_coordinate_lines(dim, "shape", "point", "%s  " % at))
+        for k in range(dim):
+            out.append(
+                "%s  g_ref[%d * NS + shape] = %s;"
+                % (
+                    at,
+                    k,
+                    _sfem_soa_reference_gradient_expr_for_shape(
+                        dim,
+                        k,
+                        use_tensor_product_reference,
+                        use_reference_gradient_vectors,
+                        reference_inputs,
+                        "shape",
+                        coord_prefix="point",
+                        reference_prefix=reference_prefix,
+                    ),
+                )
+            )
+        out.extend(
+            [
+                "%s}" % at,
+                "%sconst s_t adj_q[ND * ND] = {%s};"
+                % (at, ", ".join(current_target().work_item_name("adj", c) for c in range(dim * dim))),
+                "%spoint_test_symmetric_scalar<s_t, NS, ND, NC>(g_ref, adj_q, qw * idet, D, element_matrix);" % at,
+            ]
+        )
+        return out
+
+    def one_pass(at, hook):
+        inner = "%s  " % at
+        return (
+            ["%sfor (int q = 0; q < NQ; ++q) {" % at]
+            + point_geometry(inner)
+            + point_state(inner)
+            + _sfem_soa_direct_hessian_tangent_lines(material, dim, inner, project=hook)
+            + point_contraction(inner)
+            + ["%s}" % at]
+        )
+
+    if project and not on_device:
+        at = "%s  " % indent
+        inner = "%s    " % indent
+        size = n_tangent * n_tangent
+        lines.extend(
+            ["%sif constexpr (PROJECT) {" % indent, "%ss_t Dq[NQ * %d];" % (at, size), "%sfor (int q = 0; q < NQ; ++q) {" % at]
+            + point_geometry(inner, weight=False)
+            + point_state(inner)
+            + ["%ss_t *const RSTR D = &Dq[q * %d];" % (inner, size)]
+            + _sfem_soa_direct_hessian_tangent_lines(material, dim, inner, declare=False)
+            + [
+                "%s}" % at,
+                "%sproject_abs_symmetric_lanes<s_t, %d, NQ>(Dq);" % (at, n_tangent),
+                "%sfor (int q = 0; q < NQ; ++q) {" % at,
+            ]
+            + point_geometry(inner)
+            + ["%sconst s_t *const RSTR D = &Dq[q * %d];" % (inner, size)]
+            + point_contraction(inner)
+            + ["%s}" % at, "%s} else {" % indent]
+            + one_pass(at, hook=False)
+            + ["%s}" % indent]
         )
     else:
-        lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
-    # No work item opened: see `_sfem_soa_direct_hessian_point_geometry_lines`.
-    lines.append("%s  const ptrdiff_t goff = q;" % indent)
-    for component in range(dim * dim):
-        lines.append(
-            "%s  const s_t %s = badj%d[goff];"
-            % (indent, current_target().work_item_name("adj", component), component)
-        )
-    lines.extend(
-        [
-            "%s  const s_t %s = bdet0[goff];"
-            % (indent, current_target().work_item_name("det", 0)),
-            "%s  const s_t idet = s_t(1) / %s;"
-            % (indent, current_target().work_item_name("det", 0)),
-        ]
-    )
-    if uses_current:
-        lines.extend(
-            _sfem_soa_direct_hessian_current_gradient_lines(
-                weak_form,
-                dim,
-                n_field_components,
-                reference_inputs,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                reference_prefix,
-                "%s  " % indent,
-            )
-        )
-    lines.extend(
-        [
-            "%s  for (int trial_component = 0; trial_component < NC; ++trial_component) {"
-            % indent,
-            "%s    for (int trial_shape = 0; trial_shape < NS; ++trial_shape) {"
-            % indent,
-        ]
-    )
-    if use_tensor_product_reference:
-        lines.extend(
-            _tensor_product_shape_coordinate_lines(
-                dim,
-                "trial_shape",
-                "trial",
-                "%s      " % indent,
-            )
-        )
-    for ref_component in range(dim):
-        lines.append(
-            "%s      const s_t trial_grad_ref%d = %s;"
-            % (
-                indent,
-                ref_component,
-                _sfem_soa_reference_gradient_expr_for_shape(
-                    dim,
-                    ref_component,
-                    use_tensor_product_reference,
-                    use_reference_gradient_vectors,
-                    reference_inputs,
-                    "trial_shape",
-                    coord_prefix="trial",
-                    reference_prefix=reference_prefix,
-                ),
-            )
-        )
-    # A field gradient has one row per field component and one column per
-    # spatial direction, so it is `NC * ND` entries
-    # strided by ND.  Both used to be spelled NC,
-    # which is right only for a displacement: a scalar field in two dimensions
-    # then declared `trial_grad[1]` and wrote index 1, which the compiler will
-    # tell you about under -Warray-bounds and which no material reached until
-    # laplace was written as an energy.
-    lines.extend(
-        [
-            "%s      s_t trial_grad[NC * ND];" % indent,
-            "%s      for (int i = 0; i < NC * ND; ++i) {" % indent,
-            "%s        trial_grad[i] = s_t(0);" % indent,
-            "%s      }" % indent,
-        ]
-    )
-    for phys_component in range(dim):
-        terms = [
-            "trial_grad_ref%d * %s"
-            % (
-                ref_component,
-                current_target().work_item_name("adj", ref_component * dim + phys_component),
-            )
-            for ref_component in range(dim)
-        ]
-        lines.append(
-            "%s      trial_grad[trial_component * ND + %d] = (%s) * idet;"
-            % (indent, phys_component, " + ".join(terms))
-        )
-    lines.append("%s      s_t material[NC * ND];" % indent)
-    local_material_lines = []
-    _append_cse_array_assignments(
-        local_material_lines,
-        tuple(material),
-        ["material[%d] =" % i for i in range(dim * dim)],
-        "weak_hess_tmp",
-    )
-    lines.extend("%s      %s" % (indent, line.strip()) for line in local_material_lines)
-    lines.extend(
-        [
-            "%s      for (int test_component = 0; test_component < NC; ++test_component) {"
-            % indent,
-            "%s        for (int test_shape = 0; test_shape < NS; ++test_shape) {"
-            % indent,
-        ]
-    )
-    if use_tensor_product_reference:
-        lines.extend(
-            _tensor_product_shape_coordinate_lines(
-                dim,
-                "test_shape",
-                "test",
-                "%s          " % indent,
-            )
-        )
-    for ref_component in range(dim):
-        lines.append(
-            "%s          const s_t test_grad_ref%d = %s;"
-            % (
-                indent,
-                ref_component,
-                _sfem_soa_reference_gradient_expr_for_shape(
-                    dim,
-                    ref_component,
-                    use_tensor_product_reference,
-                    use_reference_gradient_vectors,
-                    reference_inputs,
-                    "test_shape",
-                    coord_prefix="test",
-                    reference_prefix=reference_prefix,
-                ),
-            )
-        )
-    lines.append("%s          s_t entry = s_t(0);" % indent)
-    for ref_component in range(dim):
-        terms = [
-            "material[%s] * %s"
-            % (
-                c_sum(c_product("test_component", "ND"), k),
-                current_target().work_item_name("adj", ref_component * dim + k),
-            )
-            for k in range(dim)
-        ]
-        lines.append(
-            "%s          entry += test_grad_ref%d * qw * (%s);"
-            % (indent, ref_component, " + ".join(terms))
-        )
-    lines.extend(
-        [
-            "%s          const int row = test_component * NS + test_shape;"
-            % indent,
-            "%s          const int col = trial_component * NS + trial_shape;"
-            % indent,
-            "%s          element_matrix[row * NDOFS + col] += entry;" % indent,
-            "%s        }" % indent,
-            "%s      }" % indent,
-            "%s    }" % indent,
-            "%s  }" % indent,
-            "%s}" % indent,
-        ]
-    )
+        lines.extend(one_pass(indent, hook=project))
+    lines.append("%smirror_upper_triangle_scalar<s_t, NDOFS>(element_matrix);" % indent)
     return lines
 
 
@@ -8464,6 +9151,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
     reference_prefix,
     indent,
     constant_p1=False,
+    quadrature_streams=(),
+    project=False,
 ):
     args = [
         *("badj%d" % i for i in range(dim * dim)),
@@ -8488,6 +9177,8 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         )
         args.append(scalar_weight_name)
     args.extend(material_parameter_names)
+    # One element in hand, so each stream is offset to it and strided by the mesh.
+    args.extend(quadrature_fields.block_call_arguments(quadrature_streams, "element", "nelements"))
     if uses_current:
         args.append("bu_data")
     args.append("element_matrix")
@@ -8496,7 +9187,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         % (
             indent,
             function_name,
-            _block_template_arguments(constant_p1, ()),
+            _block_template_arguments(constant_p1, ("PROJECT",) if project else ()),
             ", ".join(args),
         ),
     )
@@ -8532,6 +9223,7 @@ def _sfem_soa_hessian_packed_crs_passes(
     n_field_components=None,
     assembly=None,
     constant_p1=False,
+    quadrature_streams=(),
 ):
     """The multi-pass packed CRS assembly: discover the pattern, then fill it.
 
@@ -8560,6 +9252,7 @@ def _sfem_soa_hessian_packed_crs_passes(
             "const s_t %s" % parameter
             for parameter in material_parameter_names
         )
+        packed_state_params.extend(quadrature_fields.mesh_parameters(quadrature_streams))
         if uses_current:
             packed_state_params.append("const ptrdiff_t u_stride")
             packed_state_params.extend(
@@ -8737,10 +9430,6 @@ def _sfem_soa_hessian_packed_crs_passes(
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
             lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
         lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-        lines.append(
-            "        s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
         lines.extend(
             [
                 "",
@@ -8818,6 +9507,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 reference_prefix,
                 "      ",
                     constant_p1=constant_p1,
+                quadrature_streams=quadrature_streams,
             )
         )
         lines.extend(
@@ -8955,12 +9645,65 @@ def _holding_one_element_hessian_matrix_assembly_function(
         )
     )
 
+    # The projected tangent is a BSR assembly's. A lowest-order simplex folds its
+    # point tangent into the closed form, which has none to project: projected, it
+    # takes the generic per-point kernel instead, at its one point.
+    projected = bool(
+        matrix_format_plan is not None
+        and matrix_format_plan.tangent_projection
+        and "bsr" in formats
+    )
     is_affine_assembly = geometry_mode == "affine"
+    # A device assembles a higher-order simplex's BSR a thread per element and point
+    # (`COOPERATIVE_ASSEMBLY_HEADER`): a thread per element held the element matrix in local memory,
+    # 5.5 times slower on TET10. The same element's other formats keep the element-matrix kernel.
+    cooperative = (
+        current_target().supports_device_kernels
+        and not is_affine_assembly
+        and not use_tensor_product_geometry
+        and not use_tensor_product_reference
+        and use_reference_gradient_vectors
+        and tuple(formats) == ("bsr",)
+    )
     function_base = _sfem_soa_hessian_matrix_public_function_base(
         prefix,
         quadrature_rule,
         geometry_mode,
     )
+    block_assembly = block_assembly_admits(
+        form,
+        dim,
+        n_nodes,
+        n_qp,
+        formats,
+        on_device=current_target().supports_device_kernels,
+        tensor_product=use_tensor_product_reference,
+        tensor_product_geometry=use_tensor_product_geometry,
+        affine=is_affine_assembly,
+        projected=projected,
+    )
+    if block_assembly:
+        # A block of threads per element (`TENSOR_PRODUCT_BSR_HESSIAN_HEADER`, included by the hessian
+        # header with the point tangent): no kernel here, so no namespace to close either; the entry
+        # points launch the library's.
+        return [
+            *_sfem_soa_hessian_matrix_public_wrappers(
+                function_base,
+                None,
+                dim,
+                formats,
+                material_parameter_names,
+                uses_current,
+                geometry_mode=geometry_mode,
+                tensor_product_launch=TensorProductBSRLaunch(
+                    _sfem_soa_tensor_product_point_tangent_name(local_prefix),
+                    quadrature_reference_owner(quadrature_rule, "shape_1d"),
+                    quadrature_reference_owner(quadrature_rule, "q_weight_1d"),
+                    quadrature_rule.tensor_product_n_qp_1d,
+                    quadrature_rule.tensor_product_n_shape_1d,
+                ),
+            ),
+        ]
     implementation_name = "%s_assemble_impl" % function_base
     reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
@@ -8981,8 +9724,19 @@ def _holding_one_element_hessian_matrix_assembly_function(
         )
     lines.extend(
         [
-            "template <typename s_t, typename g_t, int FORMAT>",
-            "static int %s(" % implementation_name,
+            # The matrix values are of their own type v_t (the BSR scatter's);
+            # the other formats are instantiated with v_t = s_t.
+            "template <typename s_t, typename v_t, typename g_t, int FORMAT%s>"
+            % (", %s" % PROJECT_TEMPLATE_PARAMETER if projected else ""),
+            # A device kernel is declared as the target declares one; the host
+            # keeps the spelling its tracked tree has.
+            (
+                current_target().cooperative_mesh_function_line(implementation_name, n_qp)
+                if cooperative
+                else current_target().mesh_function_line(implementation_name)
+                if current_target().supports_device_kernels
+                else "static int %s(" % implementation_name
+            ),
             "    const ptrdiff_t nelements,",
             "    const ptrdiff_t nnodes,",
             "    idx_t **const RSTR elements,",
@@ -9005,6 +9759,10 @@ def _holding_one_element_hessian_matrix_assembly_function(
         "    const s_t %s," % parameter
         for parameter in material_parameter_names
     )
+    lines.extend(
+        "    %s," % parameter
+        for parameter in quadrature_fields.mesh_parameters(quadrature_fields.quadrature_field_streams(form))
+    )
     if uses_current:
         lines.append("    const ptrdiff_t u_stride,")
         for d in range(dim):
@@ -9017,7 +9775,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
         [
             "    const count_t *const RSTR rowptr,",
             "    const idx_t *const RSTR colidx,",
-            "    s_t *const RSTR values,",
+            "    v_t *const RSTR values,",
             "    const int *const RSTR diag_offsets,",
             "    const ptrdiff_t ndiag,",
             "    const ptrdiff_t coo_nnz,",
@@ -9061,8 +9819,9 @@ def _holding_one_element_hessian_matrix_assembly_function(
     if not is_affine_assembly:
         for d in range(dim):
             lines.append(
-                "  const g_t *const RSTR %s = points[%d];"
-                % (_component_name(d), d)
+                kernel_local(
+                    _component_name(d), "points[%d]" % d, "const g_t *const RSTR"
+                )
             )
         lines.extend(
             _ordered_element_pointer_array_lines(
@@ -9084,154 +9843,244 @@ def _holding_one_element_hessian_matrix_assembly_function(
             emit_reference_basis=True,
         )
     )
-    lines.extend(
-        [
-            "",
-            *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
-            *source_builder.element_loop_lines(),
-            "    idx_t ev[NS];",
-            "    s_t element_matrix[NDOFS * NDOFS];",
-            *(
-                []
-                if is_affine_assembly
-                else ["    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent()]
-            ),
-            kernel_constant("ne", _work_item_block_stride(), indent="    "),
-        ]
-    )
-    if uses_current:
-        # No width: this kernel assembles one element, and the element-matrix
-        # kernel it hands the tile to takes it flat.
-        lines.append("    s_t bu_data[NS * NC];")
-    for stream in _soa_array_stream_names(_adjugate_input(dim)):
-        lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
-    lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
-    if not is_affine_assembly:
-        lines.append(
-            "    s_t *badj_streams[ND * ND] = {%s};"
-            % ", ".join("badj%d" % i for i in range(dim * dim))
-        )
-    lines.extend(
-        [
-            "",
-            "    for (int shape = 0; shape < NS; ++shape) {",
-            "      const idx_t node = elements[shape][element];",
-            *(
-                []
-                if is_affine_assembly or identity_stream_shape_order
-                else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]
-            ),
-            "      ev[shape] = node;",
-        ]
-    )
-    component_loop_body = [
-        *(
-            []
-            if is_affine_assembly
-            else [
-                "        bcoordinate_data[shape * ND + d]%s = s_t(points[d][%s]);"
-                % (
-                    _first_slot(),
-                    "node" if identity_stream_shape_order else "coordinate_node",
-                )
-            ]
-        ),
-        *(
-            ["        bu_data[shape * NC + d] = u_components[d][node * u_stride];"]
-            if uses_current
-            else []
-        ),
-    ]
-    if component_loop_body:
+    if cooperative:
         lines.extend(
-            ["      for (int d = 0; d < ND; ++d) {", *component_loop_body, "      }"]
-        )
-    lines.extend(
-        [
-            "    }",
-            "",
-        ]
-    )
-    if is_affine_assembly:
-        # One element's worth, because this is the mode a constant-P1 simplex
-        # takes and its Jacobian does not vary over the element: the buffers
-        # the direct kernel reads are `NQ * VS` entries with both at one.
-        lines.append("")
-        lines.extend(
-            "    badj%d[0] = s_t(%s[element]);"
-            % (component, abi_geometry_name("adj%d" % component))
-            for component in range(dim * dim)
-        )
-        lines.append(
-            "    bdet0[0] = s_t(%s[element]);" % abi_geometry_name("det0")
-        )
-    elif use_tensor_product_geometry:
-        lines.extend(
-            tensor_product_gradient_isoparametric_geometry_lines(
-                dim_name="ND",
-                dim=dim,
-                n_shape=n_nodes,
-                n_qp=quadrature_rule.n_qp,
-                local_prefix=local_prefix,
-                coordinate_streams="bcoordinate_data",
-                contiguous_coordinate_streams=True,
-                adjugate_target=lambda component, index: (
-                    "badj%d[%s]" % (component, index)
-                ),
-                determinant_target=lambda index: (
-                    "bdet0[%s]" % index
-                ),
-                adjugate_streams=tuple(
-                    "badj%d" % component
-                    for component in range(dim * dim)
-                ),
-                determinant_stream="bdet0",
-                shape_name=tensor_shape_name,
-                grad_name=tensor_grad_name,
+            _sfem_soa_cooperative_assembly_body_lines(
+                form,
+                dim,
+                n_field_components,
+                material_parameter_names,
+                uses_current,
+                _sfem_soa_direct_hessian_point_tangent_name(local_prefix),
+                reference_prefix,
+                projected,
+                formats,
             )
         )
     else:
-        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         lines.extend(
-            _sfem_soa_isoparametric_geometry_lines(
-                dim,
-                n_nodes,
-                quadrature_rule,
-                use_tensor_product_reference,
-                use_reference_gradient_vectors,
-                reference_inputs,
-                q_major=True,
-                reference_prefix=reference_prefix,
-                source_builder=source_builder,
-                coordinate_streams=coordinate_streams_name,
+            [
+                "",
+                *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
+                *source_builder.element_loop_lines(),
+                "    idx_t ev[NS];",
+                "    s_t element_matrix[NDOFS * NDOFS];",
+                *(
+                    []
+                    if is_affine_assembly
+                    else ["    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent()]
+                ),
+                kernel_constant("ne", _work_item_block_stride(), indent="    "),
+            ]
+        )
+        if uses_current:
+            # No width: this kernel assembles one element, and the element-matrix
+            # kernel it hands the tile to takes it flat.
+            lines.append("    s_t bu_data[NS * NC];")
+        for stream in _soa_array_stream_names(_adjugate_input(dim)):
+            lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
+        lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
+        # On the device a stored tangent assembles a window of rows at a time
+        # into a graph whose other rows are empty: an element none of whose
+        # rows it has adds nothing, and is left before its data is read.
+        skips_outside_rows = current_target().supports_device_kernels and "bsr" in formats
+        if skips_outside_rows:
+            lines.extend(
+                [
+                    "",
+                    "    for (int shape = 0; shape < NS; ++shape) ev[shape] = elements[shape][element];",
+                    "    if constexpr (FORMAT == %d) {" % dict(_MATRIX_FORMAT_IDS)["bsr"],
+                    "      bool touches = false;",
+                    "      for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[shape]] < rowptr[ev[shape] + 1];",
+                    "      if (!touches) continue;",
+                    "    }",
+                ]
             )
+        lines.extend(
+            [
+                "",
+                "    for (int shape = 0; shape < NS; ++shape) {",
+                (
+                    "      const idx_t node = ev[shape];"
+                    if skips_outside_rows
+                    else "      const idx_t node = elements[shape][element];"
+                ),
+                *(
+                    []
+                    if is_affine_assembly or identity_stream_shape_order
+                    else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]
+                ),
+                *([] if skips_outside_rows else ["      ev[shape] = node;"]),
+            ]
         )
-        lines.append("    }")
+        component_loop_body = [
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "        bcoordinate_data[shape * ND + d]%s = s_t(points[d][%s]);"
+                    % (
+                        _first_slot(),
+                        "node" if identity_stream_shape_order else "coordinate_node",
+                    )
+                ]
+            ),
+            *(
+                ["        bu_data[shape * NC + d] = u_components[d][node * u_stride];"]
+                if uses_current
+                else []
+            ),
+        ]
+        if component_loop_body:
+            lines.extend(
+                ["      for (int d = 0; d < ND; ++d) {", *component_loop_body, "      }"]
+            )
+        lines.extend(
+            [
+                "    }",
+                "",
+            ]
+        )
+        if is_affine_assembly:
+            # One element's worth, because this is the mode a constant-P1 simplex
+            # takes and its Jacobian does not vary over the element: the buffers
+            # the direct kernel reads are `NQ * VS` entries with both at one.
+            lines.append("")
+            lines.extend(
+                "    badj%d[0] = s_t(%s[element]);"
+                % (component, abi_geometry_name("adj%d" % component))
+                for component in range(dim * dim)
+            )
+            lines.append(
+                "    bdet0[0] = s_t(%s[element]);" % abi_geometry_name("det0")
+            )
+        elif use_tensor_product_geometry:
+            lines.extend(
+                tensor_product_gradient_isoparametric_geometry_lines(
+                    dim_name="ND",
+                    dim=dim,
+                    n_shape=n_nodes,
+                    n_qp=quadrature_rule.n_qp,
+                    local_prefix=local_prefix,
+                    coordinate_streams="bcoordinate_data",
+                    contiguous_coordinate_streams=True,
+                    adjugate_target=lambda component, index: (
+                        "badj%d[%s]" % (component, index)
+                    ),
+                    determinant_target=lambda index: (
+                        "bdet0[%s]" % index
+                    ),
+                    adjugate_streams=tuple(
+                        "badj%d" % component
+                        for component in range(dim * dim)
+                    ),
+                    determinant_stream="bdet0",
+                    shape_name=tensor_shape_name,
+                    grad_name=tensor_grad_name,
+                )
+            )
+        else:
+            lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
+            lines.extend(
+                _sfem_soa_isoparametric_geometry_lines(
+                    dim,
+                    n_nodes,
+                    quadrature_rule,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    q_major=True,
+                    reference_prefix=reference_prefix,
+                    source_builder=source_builder,
+                    coordinate_streams=coordinate_streams_name,
+                )
+            )
+            lines.append("    }")
 
-    lines.append("")
-    lines.extend(
-        _sfem_soa_direct_hessian_element_matrix_call_lines(
-            direct_hessian_function_name,
-            dim,
-            material_parameter_names,
-            uses_current,
-            use_tensor_product_reference,
-            use_reference_gradient_vectors,
-            reference_inputs,
-            tensor_shape_name,
-            tensor_grad_name,
-            tensor_weight_name,
-            scalar_weight_name,
-            reference_prefix,
-            "    ",
-            constant_p1=constant_p1_hessian is not None,
-        )
-    )
-    lines.append("")
-    lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
+        lines.append("")
+        if projected and constant_p1_hessian is not None:
+            # The closed form's point, spelled for the generic kernel: its constant
+            # reference gradients and weight as the tables that kernel reads.
+            gradients = constant_p1_simplex_reference_gradients(constant_p1_hessian.quadrature_rule)
+            weight = sp.nsimplify(constant_p1_hessian.quadrature_rule.weights[0])
+            lines.append("    if constexpr (PROJECT) {")
+            for component in range(dim):
+                lines.append(
+                    "      const s_t projected_%s[NS] = {%s};"
+                    % (
+                        _sfem_reference_gradient_vector_name(component),
+                        ", ".join("s_t(%s)" % sp.ccode(g[component]) for g in gradients),
+                    )
+                )
+            lines.append(
+                "      const s_t projected_q_weight[1] = {s_t(%s) / s_t(%s)};" % (sp.fraction(weight)[0], sp.fraction(weight)[1])
+            )
+            lines.extend(
+                _sfem_soa_direct_hessian_element_matrix_call_lines(
+                    _sfem_soa_direct_hessian_function_name(local_prefix, False),
+                    dim,
+                    material_parameter_names,
+                    uses_current,
+                    False,
+                    True,
+                    reference_inputs,
+                    tensor_shape_name,
+                    tensor_grad_name,
+                    tensor_weight_name,
+                    "projected_q_weight",
+                    "projected_",
+                    "      ",
+                    quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+                    project=True,
+                )
+            )
+            lines.append("    } else {")
+            lines.extend(
+                _sfem_soa_direct_hessian_element_matrix_call_lines(
+                    direct_hessian_function_name,
+                    dim,
+                    material_parameter_names,
+                    uses_current,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    tensor_shape_name,
+                    tensor_grad_name,
+                    tensor_weight_name,
+                    scalar_weight_name,
+                    reference_prefix,
+                    "      ",
+                    constant_p1=True,
+                    quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+                )
+            )
+            lines.append("    }")
+        else:
+            lines.extend(
+                _sfem_soa_direct_hessian_element_matrix_call_lines(
+                    direct_hessian_function_name,
+                    dim,
+                    material_parameter_names,
+                    uses_current,
+                    use_tensor_product_reference,
+                    use_reference_gradient_vectors,
+                    reference_inputs,
+                    tensor_shape_name,
+                    tensor_grad_name,
+                    tensor_weight_name,
+                    scalar_weight_name,
+                    reference_prefix,
+                    "    ",
+                    constant_p1=constant_p1_hessian is not None,
+                    quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+                    project=projected,
+                )
+            )
+        lines.append("")
+        lines.extend(_sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, "    "))
+        lines.append("  }")
     lines.extend(
         [
-            "  }",
             "",
             *source_builder.success_return_lines(),
             "}",
@@ -9267,6 +10116,7 @@ def _holding_one_element_hessian_matrix_assembly_function(
         uses_current,
         n_field_components=n_field_components,
         constant_p1=constant_p1_hessian is not None,
+        quadrature_streams=quadrature_fields.quadrature_field_streams(form),
     )
     lines.extend(
         [
@@ -9285,9 +10135,95 @@ def _holding_one_element_hessian_matrix_assembly_function(
             uses_current,
             crs_passes,
             geometry_mode=geometry_mode,
+            quadrature_streams=quadrature_fields.quadrature_field_streams(form),
+            projected=projected,
+            cooperative_points=n_qp if cooperative else None,
         )
     )
     return lines
+
+
+def _sfem_soa_cooperative_assembly_body_lines(
+    form,
+    dim,
+    n_field_components,
+    material_parameter_names,
+    uses_current,
+    point_tangent_name,
+    reference_prefix,
+    projected,
+    formats,
+):
+    """The body of a device BSR assembly a thread per element and quadrature point
+    (`COOPERATIVE_ASSEMBLY_HEADER`): the block's elements gathered into shared memory, their rows'
+    places in the BSR found once, each point's tangent formed (`point_tangent_name`), then the
+    elements' node-pair blocks added by the block's threads. No thread holds an element matrix."""
+    del n_field_components
+    gradients = [
+        "%s%s" % (reference_prefix, _sfem_reference_gradient_vector_name(component))
+        for component in range(dim)
+    ]
+    arguments = [
+        "q",
+        "adj",
+        "det",
+        *gradients,
+        "%sq_weight" % reference_prefix,
+        *material_parameter_names,
+        *quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_field_streams(form), "element", "nelements"
+        ),
+        *(["bu_data[le]"] if uses_current else []),
+        "T[le][q]",
+    ]
+    return [
+        "",
+        *_sfem_soa_matrix_format_assertion_lines(formats, "  "),
+        kernel_constant("NE", "sfem::cooperative::ELEMENTS", indent="  "),
+        "  __shared__ s_t T[NE][NQ][sfem::cooperative::n_packed<NC * ND>()];",
+        "  __shared__ s_t bcoordinate_data[NE][ND][NS];",
+        *(["  __shared__ s_t bu_data[NE][NS * NC];"] if uses_current else []),
+        "  __shared__ idx_t ev[NE][NS];",
+        "  __shared__ count_t pos[NE][NS][NS];",
+        "  const s_t *const grad_ref[ND] = {%s};" % ", ".join(gradients),
+        "  const int le = threadIdx.x / NQ;",
+        "  const int q = threadIdx.x % NQ;",
+        "  const ptrdiff_t first = (ptrdiff_t)blockIdx.x * NE;",
+        "  const ptrdiff_t element = first + le;",
+        "  const bool active = element < nelements;",
+        "  if (active) {",
+        "    for (int shape = q; shape < NS; shape += NQ) {",
+        "      const idx_t node = elements[shape][element];",
+        "      ev[le][shape] = node;",
+        "      for (int d = 0; d < ND; ++d) bcoordinate_data[le][d][shape] = s_t(points[d][node]);",
+        *(
+            ["      for (int c = 0; c < NC; ++c) bu_data[le][shape * NC + c] = u_components[c][node * u_stride];"]
+            if uses_current
+            else []
+        ),
+        "    }",
+        "  }",
+        "  __syncthreads();",
+        "  // An element none of whose rows the graph has (a window of the rows) adds nothing.",
+        "  bool touches = false;",
+        "  if (active) {",
+        "    for (int shape = 0; shape < NS; ++shape) touches |= rowptr[ev[le][shape]] < rowptr[ev[le][shape] + 1];",
+        "  }",
+        "  if (active) {",
+        "    for (int shape = q; shape < NS; shape += NQ) {",
+        "      sfem::cooperative::row_map<NS>(ev[le], shape, rowptr, colidx, pos[le]);",
+        "    }",
+        "  }",
+        "  if (active && touches) {",
+        "    s_t adj[ND * ND];",
+        "    s_t det;",
+        "    sfem::cooperative::point_geometry<s_t, NS, ND>(bcoordinate_data[le], grad_ref, q, adj, det);",
+        "    %s<s_t, NQ, NS%s>(%s);" % (point_tangent_name, ", PROJECT" if projected else "", ", ".join(arguments)),
+        "  }",
+        "  __syncthreads();",
+        "  const int count = (int)(nelements - first < NE ? nelements - first : NE);",
+        "  sfem::cooperative::pair_blocks_bsr<s_t, v_t, NS, NQ, NC, ND>(count, T, grad_ref, pos, values);",
+    ]
 
 
 def _sfem_soa_hessian_scatter_dispatch_lines(function_base, formats, indent):
@@ -9456,7 +10392,7 @@ def _sfem_soa_hessian_scatter_lines(function_base, dim, n_nodes, formats, n_fiel
     lines = ["namespace sfem {", "namespace codegen {", ""]
     if pattern_scattered_formats(formats):
         find_cols_lines = [
-            "static SFEM_INLINE void %s_find_cols(" % function_base,
+            "%s void %s_find_cols(" % (current_target().function_qualifier(), function_base),
             "    const idx_t *const RSTR targets,",
             "    const idx_t *const RSTR row,",
             "    const int lenrow,",
@@ -9520,6 +10456,7 @@ def _print_scatter_function(node):
     printer = CLikeKernelASTPrinter(
         atomic_update_pragma=target.atomic_update_pragma() or "",
         layout=SCATTER_LAYOUT,
+        atomic_add_lines=None if target.atomic_update_pragma() else target.scatter_add_lines,
     )
     return list(printer.print_node(node)) + [""]
 
@@ -9585,6 +10522,16 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
     The function can no longer fail, so it returns void and its caller does not
     fold a status -- which is the arrangement ``_scatter_block_diag_sym`` has
     always had.
+
+    The values are of their own type ``v_t``: a tangent stored in single
+    precision is assembled in place from the element matrix in ``s_t``, each
+    entry rounded once as it is added.
+
+    A row without entries is skipped: a graph that leaves rows out -- a window
+    of the rows, the others empty, which a stored tangent assembles and encodes
+    one window at a time -- takes only the blocks of the rows it has. Every row
+    of a full node graph holds at least its diagonal block, so on it nothing
+    is skipped.
     """
     # The block is the field's components, not the spatial dimension.
     n_field_components = dim if n_field_components is None else n_field_components
@@ -9609,7 +10556,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         BufferDeclNode("const int", "col", (), expr_ref("bj * NS + j")),
         ScatterNode(
             expr_ref("block[bi * NC + bj]"),
-            expr_ref("element_matrix[row * (NC * NS) + col]"),
+            expr_ref("v_t(element_matrix[row * (NC * NS) + col])"),
             "+=",
             atomic=atomic,
         ),
@@ -9619,6 +10566,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
         BufferDeclNode("static constexpr int", "NS", (), expr_ref(str(n_nodes))),
         BufferDeclNode("count_t", "entries", ("NS * NS",)),
         BufferDeclNode("idx_t", "ks", ("NS",)),
+        BufferDeclNode("bool", "has_row", ("NS",)),
         _counting_loop(
             "i",
             0,
@@ -9640,6 +10588,7 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                     (),
                     expr_ref("&%s[row_begin]" % column_index),
                 ),
+                AssignmentNode(expr_ref("has_row[i]"), expr_ref("lenrow > 0")),
                 CallNode(
                     "%s_find_cols" % function_base, ("ev", "cols", "lenrow", "ks")
                 ),
@@ -9651,30 +10600,35 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
             0,
             expr_ref("NS"),
             [
-                _counting_loop(
-                    "j",
-                    0,
-                    expr_ref("NS"),
-                    [
-                        BufferDeclNode(
-                            "s_t *const",
-                            "block",
-                            (),
-                            expr_ref("&%s[entries[i * NS + j] * NC * NC]" % value_stream),
-                        ),
+                IfNode(
+                    expr_ref("has_row[i]"),
+                    body=(
                         _counting_loop(
-                            "bi",
+                            "j",
                             0,
-                            expr_ref("NC"),
+                            expr_ref("NS"),
                             [
                                 BufferDeclNode(
-                                    "const int", "row", (), expr_ref("bi * NS + i")
+                                    "v_t *const",
+                                    "block",
+                                    (),
+                                    expr_ref("&%s[(ptrdiff_t)entries[i * NS + j] * NC * NC]" % value_stream),
                                 ),
-                                _counting_loop("bj", 0, expr_ref("NC"), accumulate),
+                                _counting_loop(
+                                    "bi",
+                                    0,
+                                    expr_ref("NC"),
+                                    [
+                                        BufferDeclNode(
+                                            "const int", "row", (), expr_ref("bi * NS + i")
+                                        ),
+                                        _counting_loop("bj", 0, expr_ref("NC"), accumulate),
+                                    ],
+                                ),
                             ],
                         ),
-                    ],
-                )
+                    ),
+                ),
             ],
         ),
     ]
@@ -9686,11 +10640,11 @@ def _sfem_soa_hessian_scatter_bsr_lines(function_base, dim, n_nodes, assembly=No
                 "const s_t *const RSTR element_matrix",
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
-                "s_t *const RSTR values",
+                "v_t *const RSTR values",
             ),
             body=tuple(body),
-            qualifier="static SFEM_INLINE",
-            template_params=("typename s_t",),
+            qualifier=current_target().function_qualifier(),
+            template_params=("typename s_t", "typename v_t"),
         )
     )
 
@@ -9876,7 +10830,7 @@ def _sfem_soa_hessian_scatter_block_diag_sym_lines(
                 "s_t *const RSTR %s" % value_stream,
             ),
             body=tuple(body),
-            qualifier="static SFEM_INLINE",
+            qualifier=current_target().function_qualifier(),
             template_params=("typename s_t",),
         )
     )
@@ -9903,6 +10857,10 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     uses_current,
     packed_crs_passes=(),
     geometry_mode="isoparametric",
+    quadrature_streams=(),
+    projected=False,
+    cooperative_points=None,
+    tensor_product_launch=None,
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -9926,8 +10884,30 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     geometry_mode=geometry_mode,
+                    quadrature_streams=quadrature_streams,
+                    cooperative_points=cooperative_points,
+                    tensor_product_launch=tensor_product_launch,
                 )
             )
+    if projected:
+        # The same BSR assembly on the projected tangent, under a verb of its
+        # own (`hessian_bsr_psd`), so the exact entry point keeps its name and
+        # its code.
+        lines.extend(
+            _sfem_soa_hessian_matrix_public_wrapper(
+                function_base.replace("_hessian_", "_hessian_bsr_psd_"),
+                implementation_name,
+                dim,
+                "bsr",
+                format_tags["bsr"],
+                material_parameter_names,
+                uses_current,
+                geometry_mode=geometry_mode,
+                quadrature_streams=quadrature_streams,
+                projected=True,
+                cooperative_points=cooperative_points,
+            )
+        )
     if "crs" in formats:
         if "one_pass" in packed_crs_passes:
             lines.extend(
@@ -9941,6 +10921,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     two_pass=False,
+                    quadrature_streams=quadrature_streams,
                 )
             )
         if "two_pass" in packed_crs_passes:
@@ -9955,6 +10936,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     material_parameter_names,
                     uses_current,
                     two_pass=True,
+                    quadrature_streams=quadrature_streams,
                 )
             )
     return lines
@@ -9967,6 +10949,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
     material_parameter_names,
     uses_current,
     two_pass,
+    quadrature_streams=(),
 ):
     n_field_components = dim
     params = _hessian_packed_crs_public_params(
@@ -9975,6 +10958,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         material_parameter_names,
         uses_current,
         two_pass,
+        quadrature_streams=quadrature_streams,
     )
     if True:
         common_args = [
@@ -9992,6 +10976,7 @@ def _sfem_soa_hessian_packed_crs_public_wrapper(
         fill_args = common_args + [
             "points",
             *material_parameter_names,
+            *(stream.name for stream in quadrature_streams),
         ]
         if uses_current:
             fill_args.append("u_stride")
@@ -10038,6 +11023,10 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
+    projected=False,
+    cooperative_points=None,
+    tensor_product_launch=None,
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -10046,6 +11035,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         material_parameter_names,
         uses_current,
         geometry_mode=geometry_mode,
+        quadrature_streams=quadrature_streams,
     )
     impl_args = _hessian_matrix_impl_args(
         matrix_format,
@@ -10053,19 +11043,33 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         material_parameter_names,
         uses_current,
         geometry_mode=geometry_mode,
+        quadrature_streams=quadrature_streams,
     )
     return runtime_typed_entry_point_lines(
         public_name,
         params,
-        lambda scalar_type, _positional: [
-            "  return sfem::codegen::%s<%s, geom_t, %d>(%s);"
-            % (
+        # The target's launch: on the host the call itself, on a device the
+        # kernel launch on the caller's stream.  Only BSR values have a type of
+        # their own; the other formats store the scalar.
+        # A cooperative kernel (`cooperative_points`, its points per element) is launched a block per
+        # `sfem::cooperative::ELEMENTS` elements.
+        lambda scalar_type, _positional, values_type=None: list(
+            _tensor_product_bsr_launch_lines(
+                tensor_product_launch, scalar_type, values_type or scalar_type, material_parameter_names, dim
+            )
+            if tensor_product_launch is not None
+            else (
+                current_target().mesh_launch_lines
+                if cooperative_points is None
+                else functools.partial(current_target().cooperative_mesh_launch_lines, n_qp=cooperative_points)
+            )(
                 implementation_name,
-                scalar_type,
-                format_tag,
-                ", ".join(cast_arguments(params, impl_args, scalar_type)),
-            ),
-        ],
+                "%s, %s, geom_t, %d%s"
+                % (scalar_type, values_type or scalar_type, format_tag, ", true" if projected else ""),
+                cast_arguments(params, impl_args, scalar_type, values_type),
+                indent="  ",
+            )
+        ),
         parameter_lines=parameter_list_lines,
     )
 
@@ -10077,6 +11081,7 @@ def _hessian_matrix_public_params(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     params = [
         "const ptrdiff_t nelements",
@@ -10088,6 +11093,7 @@ def _hessian_matrix_public_params(
         "const %s %s" % (scalar_type, parameter)
         for parameter in material_parameter_names
     )
+    params.extend(quadrature_fields.mesh_parameters(quadrature_streams, scalar_type))
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
@@ -10099,7 +11105,8 @@ def _hessian_matrix_public_params(
             [
                 "const count_t *const RSTR rowptr",
                 "const idx_t *const RSTR colidx",
-                "%s *const RSTR values" % scalar_type,
+                # A BSR tangent's values are a type of their own (v_t).
+                "%s *const RSTR values" % ("v_t" if matrix_format == "bsr" else scalar_type),
             ]
         )
     elif matrix_format == "dia":
@@ -10148,6 +11155,7 @@ def _hessian_packed_crs_public_params(
     material_parameter_names,
     uses_current,
     two_pass,
+    quadrature_streams=(),
 ):
     params = [
         argument.declaration for argument in PACKED_MESH_CORE_ARGUMENTS
@@ -10158,6 +11166,7 @@ def _hessian_packed_crs_public_params(
         "const %s %s" % (scalar_type, parameter)
         for parameter in material_parameter_names
     )
+    params.extend(quadrature_fields.mesh_parameters(quadrature_streams, scalar_type))
     if uses_current:
         params.append("const ptrdiff_t u_stride")
         params.extend(
@@ -10200,6 +11209,7 @@ def _hessian_matrix_impl_args(
     material_parameter_names,
     uses_current,
     geometry_mode="isoparametric",
+    quadrature_streams=(),
 ):
     n_field_components = dim
     args = [
@@ -10211,6 +11221,7 @@ def _hessian_matrix_impl_args(
             for param in _hessian_matrix_geometry_params(dim, geometry_mode)
         ),
         *material_parameter_names,
+        *(stream.name for stream in quadrature_streams),
     ]
     if uses_current:
         args.append("u_stride")
@@ -10425,6 +11436,17 @@ def _sfem_soa_diagnostics_header(
         '  std::fprintf(stderr,',
         '      "%s does not support element type %d with real type %d\\n",',
         "      name, element_type, real_type);",
+        "  return SFEM_FAILURE;",
+        "}",
+        "",
+        "//! Reports matrix values of a width this real type is not stored in.",
+        "static %s int unsupported_values_dispatch(" % host_inline,
+        "    const char *const name,",
+        "    const int real_type,",
+        "    const int values_type) {",
+        '  std::fprintf(stderr,',
+        '      "%s cannot store real type %d in matrix values of type %d\\n",',
+        "      name, real_type, values_type);",
         "  return SFEM_FAILURE;",
         "}",
         "",
@@ -11097,21 +12119,6 @@ def _sfem_soa_element_api_header(
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
-def _sibling_element_include(element_name, header):
-    """Another element's API header, seen from inside this element's directory.
-
-    Both sit in `d<dim>/<element>/` plus whatever folder the target claims for
-    its sources, so the number of steps up is the target's answer rather than a
-    constant: `../hex8/x.hpp` on the host, `../../hex8/cuda/x.hpp` on a device.
-    The mesh-order element delegates to its PROTEUS twin through exactly this
-    include, so a wrong count here breaks the delegation rather than a header.
-    """
-    subdirectory = current_target().source_subdirectory()
-    if not subdirectory:
-        return "../%s/%s" % (element_name, header)
-    return "../../%s/%s/%s" % (element_name, subdirectory, header)
-
-
 def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
     aliases = (
         ("quad4", "proteus_quad4", 2, 4),
@@ -11126,9 +12133,10 @@ def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
                 "element_name": element_name,
                 "proteus_name": proteus_name,
                 "target_prefix": "%s_%s" % (prefix[: -len(suffix)], proteus_name),
-                "include": _sibling_element_include(
-                    proteus_name,
-                    "%s_%s_element.hpp" % (prefix[: -len(suffix)], proteus_name),
+                "include": generated_include(
+                    current_target().header_name(
+                        "%s_%s_element" % (prefix[: -len(suffix)], proteus_name)
+                    )
                 ),
                 "shape_order": tensor_product_cartesian_shape_order(dim, n_nodes),
             }
@@ -11351,6 +12359,14 @@ def _sfem_soa_element_api_common_params(form, dim, include_coords):
         params.append("const s_t *const *const RSTR adj")
         params.append("const s_t *const RSTR det")
     params.extend(_form_material_parameter_declarations(form))
+    # The integration-point fields the form reads, laid out like the mesh
+    # kernels' -- [component][point][element], `nelements` apart -- so a caller
+    # hands the element API the same arrays it hands the operator.
+    params.extend(
+        quadrature_fields.mesh_parameters(
+            quadrature_fields.quadrature_read_streams(getattr(form, "dependencies", None))
+        )
+    )
     params.extend(
         "const s_t *const *const RSTR %s_streams" % stream_prefix
         for _role, stream_prefix in element_api_field_roles(form)
@@ -11440,6 +12456,11 @@ def _count_params():
     return tuple("const int %s" % name for name in _COUNT[_has_width()])
 
 
+def _unnamed_count_params():
+    """The same parameters for an overload that never reads the count."""
+    return tuple("const int" for _ in _COUNT[_has_width()])
+
+
 def _count_args():
     return list(_COUNT[_has_width()])
 
@@ -11510,6 +12531,14 @@ def _sfem_soa_element_api_block_call(
         *(reference_args + specialized_reference_args)[0],
         *form_material_parameter_names(form),
     ]
+    # Each read stream at the tile's first element, strided by the block.
+    args.extend(
+        quadrature_fields.block_call_arguments(
+            quadrature_fields.quadrature_read_streams(getattr(form, "dependencies", None)),
+            "evb",
+            "nelements",
+        )
+    )
     args.extend(
         "b%s_streams" % stream_prefix
         for _role, stream_prefix in element_api_field_roles(form)
@@ -11977,20 +13006,26 @@ def _quadrature_mesh_reference_alias_lines(
     use_reference_gradient_vectors,
     geometry_mode,
     emit_reference_basis=True,
+    integrated=True,
 ):
     lines = []
     reference_prefix = "%s_" % geometry_mode
+    # A quadrature output writes at the points and weights nothing, so its
+    # kernel takes no weights (`form_is_integrated`) and the operator names none.
+    weights = ("q_weight",) if integrated else ()
     if not emit_reference_basis:
-        lines.append(
-            "  const s_t *const %sq_weight = %s;"
-            % (
-                reference_prefix,
-                quadrature_reference_accessor(quadrature_rule, "q_weight"),
+        for name in weights:
+            lines.append(
+                "  const s_t *const %s%s = %s;"
+                % (
+                    reference_prefix,
+                    name,
+                    quadrature_reference_accessor(quadrature_rule, name),
+                )
             )
-        )
         return lines
     if use_tensor_product_reference:
-        for name in ("shape_1d", "grad_1d", "q_weight_1d"):
+        for name in ("shape_1d", "grad_1d") + tuple("%s_1d" % weight for weight in weights):
             lines.append(
                 "  const s_t *const %s = %s;"
                 % (
@@ -12010,13 +13045,15 @@ def _quadrature_mesh_reference_alias_lines(
                     quadrature_reference_accessor(quadrature_rule, reference_name),
                 )
             )
-        lines.append(
-            "  const s_t *const %sq_weight = %s;"
-            % (
-                reference_prefix,
-                quadrature_reference_accessor(quadrature_rule, "q_weight"),
+        for name in weights:
+            lines.append(
+                "  const s_t *const %s%s = %s;"
+                % (
+                    reference_prefix,
+                    name,
+                    quadrature_reference_accessor(quadrature_rule, name),
+                )
             )
-        )
         return lines
     for array_input in reference_inputs:
         if array_input.name != "grad_ref":
@@ -12029,13 +13066,15 @@ def _quadrature_mesh_reference_alias_lines(
                 quadrature_reference_accessor(quadrature_rule, array_input.name),
             )
         )
-    lines.append(
-        "  const s_t *const %sq_weight = %s;"
-        % (
-            reference_prefix,
-            quadrature_reference_accessor(quadrature_rule, "q_weight"),
+    for name in weights:
+        lines.append(
+            "  const s_t *const %s%s = %s;"
+            % (
+                reference_prefix,
+                name,
+                quadrature_reference_accessor(quadrature_rule, name),
+            )
         )
-    )
     return lines
 
 
@@ -12099,11 +13138,13 @@ def _cpp_scalar_literal(value, scalar_type="real_t"):
 #: The output parameter a block kernel declares, per body shape.  A scalar body
 #: is handed one accumulator; a per-shape body is handed the stream array.
 _BLOCK_OUTPUT_PARAMETER = {
-    FormAccumulation.SCALAR: lambda n_field_components: "s_t *const RSTR value",
+    FormAccumulation.SCALAR: lambda n_field_components: ("s_t *const RSTR value",),
     FormAccumulation.PER_SHAPE: (
-        lambda n_field_components: "s_t *const RSTR out_streams[NS * %d]"
-        % n_field_components
+        lambda n_field_components: ("s_t *const RSTR out_streams[NS * %d]"
+        % n_field_components,)
     ),
+    # Its outputs are integration-point streams, declared with the inputs.
+    FormAccumulation.PER_POINT: lambda n_field_components: (),
 }
 
 #: The per-point buffers a body needs beyond its gradients.  A scalar body forms
@@ -12111,12 +13152,14 @@ _BLOCK_OUTPUT_PARAMETER = {
 _POINT_BUFFERS = {
     FormAccumulation.SCALAR: (),
     FormAccumulation.PER_SHAPE: ("loperand_q",),
+    FormAccumulation.PER_POINT: (),
 }
 
 #: The same, per component, for the bodies that keep the loperand in lane-major
 #: scalars rather than one block.
 _LOPERAND_COMPONENTS = {
     FormAccumulation.SCALAR: lambda n_field_components, dim: (),
+    FormAccumulation.PER_POINT: lambda n_field_components, dim: (),
     FormAccumulation.PER_SHAPE: (
         lambda n_field_components, dim: range(n_field_components * dim)
     ),
@@ -12147,9 +13190,19 @@ def _per_shape_diagnostic_expressions(form, substitutions):
 #: expressions the body actually evaluates, which is the same fact the body
 #: emitters read -- a record that counted the wrong half would be wrong in a
 #: way nothing compiles against.
+def _per_point_diagnostic_expressions(form, substitutions):
+    """A quadrature output's cost is the tensors it evaluates."""
+    return tuple(
+        sp.sympify(component).xreplace(substitutions)
+        for _name, components in form.weak_form.quadrature_outputs
+        for component in components
+    )
+
+
 _DIAGNOSTIC_EXPRESSIONS = {
     FormAccumulation.SCALAR: _scalar_diagnostic_expressions,
     FormAccumulation.PER_SHAPE: _per_shape_diagnostic_expressions,
+    FormAccumulation.PER_POINT: _per_point_diagnostic_expressions,
 }
 
 
@@ -12162,6 +13215,10 @@ def _zero_fill_lines(output, source_builder, work_item, indent="    "):
     same text at two depths rather than two texts.
     """
     lines = []
+    if not output.block:
+        # Nothing is staged, so nothing is cleared: a per-point output writes
+        # its streams in place.
+        return lines
     subscripts = ""
     for depth, extent in enumerate(output.extents):
         index = "stream" if depth == 0 else "stream%d" % depth
@@ -12251,15 +13308,22 @@ _MESH_WEIGHT_CALL_ARGUMENT = {
 #: per-shape output is one pointer per field component beside its stride.  The
 #: shape is `plans.form_emission.mesh_output`; this is only the spelling.
 _OUTPUT_ABI_BUFFERS = {
-    False: lambda n_field_components, component_name: ("value",),
-    True: lambda n_field_components, component_name: tuple(
+    FormAccumulation.SCALAR: lambda n_field_components, component_name: ("value",),
+    FormAccumulation.PER_SHAPE: lambda n_field_components, component_name: tuple(
         "out%s" % component_name(d) for d in range(n_field_components)
     ),
+    # Written in place through its integration-point streams.
+    FormAccumulation.PER_POINT: lambda n_field_components, component_name: (),
 }
 
 #: What the block kernel is handed.  The scalar accumulator is one buffer; the
-#: per-shape output is the pointer array built above it.
-_OUTPUT_CALL_ARGUMENT = {False: "bvalue", True: "bout_streams"}
+#: per-shape output is the pointer array built above it; a per-point output is
+#: handed its streams with the inputs.
+_OUTPUT_CALL_ARGUMENT = {
+    FormAccumulation.SCALAR: ("bvalue",),
+    FormAccumulation.PER_SHAPE: ("bout_streams",),
+    FormAccumulation.PER_POINT: (),
+}
 
 
 def _output_stream_names(form, n_field_components, n_nodes):

@@ -104,6 +104,8 @@ generate_materials() {
     run_generator codegen.framework.generators.laplace "$@"
     run_generator codegen.framework.generators.neohookean_ogden "$@"
     run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt "$@"
+    run_generator codegen.framework.generators.linear_kelvin_voigt "$@"
+    run_generator codegen.framework.generators.vector_mass "$@"
     run_generator codegen.framework.generators.body_force "$@"
     run_generator codegen.framework.generators.neumann "$@"
     # shellcheck disable=SC2086
@@ -112,6 +114,8 @@ generate_materials() {
     run_generator codegen.framework.generators.navier_stokes "$@"
     run_generator codegen.framework.generators.saint_venant_kirchhoff "$@"
     run_generator codegen.framework.generators.modified_mooney_rivlin "$@"
+    run_generator codegen.framework.generators.mooney_rivlin_prony "$@"
+    run_generator codegen.framework.generators.continued_mooney_rivlin_prony "$@"
 }
 
 generate_materials
@@ -161,11 +165,11 @@ fi
 # never called, which is a device Op the factory cannot hand out.
 if [[ "${SFEM_GENERATE_CUDA:-1}" == "1" ]]; then
     printf '==> device op_registration\n'
-    DEVICE_MANIFESTS=("$ROOT_DIR"/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
+    DEVICE_MANIFESTS=("$ROOT_DIR"/src/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
     if [[ -e "${DEVICE_MANIFESTS[0]}" ]]; then
         if ! "$PYTHON" -m codegen.framework.generators.op_registration \
                 "${DEVICE_MANIFESTS[@]}" \
-                --out-dir "$ROOT_DIR/frontend/ops/generated/cuda" \
+                --out-dir "$ROOT_DIR/src/frontend/ops/generated/cuda" \
                 --function-name register_generated_device_ops; then
             printf '==> device op_registration FAILED\n'
             exit 1

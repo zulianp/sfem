@@ -13,7 +13,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 
 namespace {
@@ -252,7 +252,7 @@ namespace {
     };
 
     real_t free_gradient_norm(const std::shared_ptr<Function>& f, const real_t* const x, real_t* const g_work) {
-        auto            blas = make_openmp_blas<real_t>();
+        auto            blas = OpenMPBLAS<real_t>::create();
         const ptrdiff_t n    = f->space()->n_dofs();
         blas->zeros(n, g_work);
         f->gradient(x, g_work);
@@ -274,7 +274,7 @@ namespace {
                               real_t* const                            x_phys,
                               real_t* const                            g_work,
                               ApplyFn&&                                apply_once) {
-        auto blas = make_openmp_blas<real_t>();
+        auto blas = OpenMPBLAS<real_t>::create();
 
         auto residual_correct = [&](real_t* const delta) {
             // r = b - A delta; delta += M^{-1} r
@@ -401,7 +401,7 @@ int main(int argc, char** argv) {
     const ptrdiff_t ndofs  = fs->n_dofs();
     const ptrdiff_t nnodes = mesh->n_nodes();
 
-    auto blas = make_openmp_blas<real_t>();
+    auto blas = OpenMPBLAS<real_t>::create();
     auto x0   = create_host_buffer<real_t>(ndofs);
     blas->zeros(ndofs, x0->data());
     f->apply_constraints(x0->data());

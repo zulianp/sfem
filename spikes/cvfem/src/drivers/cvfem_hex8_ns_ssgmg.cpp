@@ -445,7 +445,7 @@ public:
 
     ptrdiff_t rows() const override { return p_->rows(); }
     ptrdiff_t cols() const override { return p_->cols(); }
-    sfem::ExecutionSpace execution_space() const override { return p_->execution_space(); }
+    sfem::ExecutionContext execution_context() const override { return p_->execution_context(); }
 
 private:
     std::shared_ptr<sfem::Operator<real_t>> p_;
@@ -627,7 +627,7 @@ private:
         }
         ptrdiff_t            rows() const override { return s_->rows(); }
         ptrdiff_t            cols() const override { return s_->cols(); }
-        sfem::ExecutionSpace execution_space() const override { return s_->execution_space(); }
+        sfem::ExecutionContext execution_context() const override { return s_->execution_context(); }
 
         void set_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override { s_->set_op(op); }
         void set_preconditioner_op(const std::shared_ptr<sfem::Operator<real_t>> &op) override {
@@ -737,7 +737,7 @@ private:
 
         ptrdiff_t rows() const override { return nnodes_ * 4; }
         ptrdiff_t cols() const override { return nnodes_ * 4; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
     private:
         ptrdiff_t           nnodes_;
@@ -837,7 +837,7 @@ private:
 
         ptrdiff_t rows() const override { return nnodes_ * 4; }
         ptrdiff_t cols() const override { return nnodes_ * 4; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
     private:
         sfem::CVFEMNavierStokes &op_;
@@ -1094,7 +1094,7 @@ private:
     // Semi-structured geometric multigrid, as a preconditioner for the Jacobian solve.
     //
     // sfem::create_gmg_data builds the hierarchy: it derefines the Function level by level,
-    // which calls derefine_op on the CVFEM operator, which reassembles itself on the coarse
+    // which calls derefine on the CVFEM operator, which reassembles itself on the coarse
     // space. That is rediscretisation rather than Galerkin coarsening, and it has to be --
     // the Rhie-Chow coefficient carries h^2/(2 mu), so the coarse pressure operator differs
     // from the fine one by about 8x per level in 3D and P^T A P would inherit the wrong one.
@@ -1298,7 +1298,7 @@ private:
             const ptrdiff_t nd  = g.data->functions[0]->space()->n_dofs();
             const ptrdiff_t nn0 = nd / N_FIELDS;
 
-            auto     &m0   = g.data->functions[0]->space()->mesh();
+            auto     &m0   = *g.data->functions[0]->space()->mesh();
             auto      b0   = m0.block(0);
             const int lvl  = smesh::semistructured_level(m0);
             const int nxe0 = (lvl + 1) * (lvl + 1) * (lvl + 1);
@@ -1708,9 +1708,9 @@ private:
 
                 auto dom_of = [](const std::shared_ptr<sfem::FunctionSpace> &sp) {
                     cvfem::Domain d;
-                    auto          m = sp->mesh_ptr();
+                    auto          m = sp->mesh();
                     if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) d.comm = m->comm();
-                    d.n_owned = sp->n_owned_dofs();
+                    d.n_owned = sp->n_dofs_owned();
                     d.n_local = sp->n_dofs();
                     return d;
                 };
@@ -1868,7 +1868,7 @@ private:
     // Is the derefined coarse operator the same operator as one built directly on the
     // coarse space?
     //
-    // The coarse operators come from derefine_op, walking down from the fine one. A driver
+    // The coarse operators come from derefine, walking down from the fine one. A driver
     // run at that refine level would instead construct the operator on that space from
     // scratch. Those two ought to be the same object, and if they are not, the hierarchy is
     // not solving a coarse version of the problem at all -- which would be a defect rather
@@ -2033,7 +2033,7 @@ private:
 
         ptrdiff_t rows() const override { return n_; }
         ptrdiff_t cols() const override { return n_; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
         // Number of coarse directions the factorisation could not resolve.
         ptrdiff_t                     n_dropped() const override { return n_dropped_; }
@@ -2164,7 +2164,7 @@ private:
         // local-length; the global extent is an implementation detail of the factorisation.
         ptrdiff_t            rows() const override { return n_local_; }
         ptrdiff_t            cols() const override { return n_local_; }
-        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+        sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
         ptrdiff_t                     n_dropped() const override { return lu_->n_dropped(); }
         const std::vector<ptrdiff_t> &dropped() const override { return lu_->dropped(); }
@@ -2184,7 +2184,7 @@ private:
             const std::shared_ptr<GmgLevels::BSR_t>    &a,
             const std::shared_ptr<sfem::FunctionSpace> &space,
             const ptrdiff_t                             n_local_dofs) {
-        auto mesh = space->mesh_ptr();
+        auto mesh = space->mesh();
 
         // SFEM_GMG_COARSE_MAT_SUM=1: is the matrix handed to the coarse factorisation the same
         // matrix however the domain was cut?
@@ -2293,7 +2293,7 @@ private:
                                                mesh->comm(),
                                                std::move(l2g_copy),
                                                n_local_dofs,
-                                               space->n_owned_dofs(),
+                                               space->n_dofs_owned(),
                                                n_global);
     }
 
@@ -2559,9 +2559,9 @@ private:
         // itself is made global.
         cvfem::Domain probe_dom;
         {
-            auto m = f_coarse->space()->mesh_ptr();
+            auto m = f_coarse->space()->mesh();
             if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) probe_dom.comm = m->comm();
-            probe_dom.n_owned = f_coarse->space()->n_owned_dofs();
+            probe_dom.n_owned = f_coarse->space()->n_dofs_owned();
             probe_dom.n_local = f_coarse->space()->n_dofs();
         }
         const int ncolors = cvfem::max(probe_dom, 1 + *std::max_element(color.begin(), color.end()));
@@ -2811,7 +2811,7 @@ private:
         if (smesh::Env::read<int>("SFEM_GMG_STATE_SUM", 0)) {
             for (int i = 0; i < nlevels; ++i) {
                 auto      sp = g.data->functions[i]->space();
-                auto      me = sp->mesh_ptr();
+                auto      me = sp->mesh();
                 const int bs = sp->block_size();
                 const bool dd = me->is_distributed() && me->comm() && me->comm()->size() > 1;
                 const ptrdiff_t nown = dd ? me->distributed()->n_nodes_owned() : sp->n_dofs() / bs;
@@ -3050,7 +3050,7 @@ private:
                     // are incomparable across partitions, and the ghost entries this rank
                     // also stores belong to somebody else.
                     if (smesh::Env::read<int>("SFEM_GMG_DIAG_OWNED_SUM", 0) && !galerkin_diag.empty()) {
-                        auto       cm   = fi->space()->mesh_ptr();
+                        auto       cm   = fi->space()->mesh();
                         const bool dist = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
                         const ptrdiff_t nown = dist ? cm->distributed()->n_nodes_owned() : nn;
 
@@ -3099,7 +3099,7 @@ private:
                     // sits on different nodes, which the plain sum would hide; the absolute sum
                     // moves when contributions cancel, which both of the others would hide.
                     if (smesh::Env::read<int>("SFEM_GMG_APPLY_OWNED_SUM", 0) && a_c) {
-                        auto              cm = fi->space()->mesh_ptr();
+                        auto              cm = fi->space()->mesh();
                         const auto *const px = fi->space()->points()->data()[0];
                         const auto *const py = fi->space()->points()->data()[1];
                         const auto *const pz = fi->space()->points()->data()[2];
@@ -3550,7 +3550,7 @@ private:
                 // is exonerated and the difference lives elsewhere in the cycle.
                 if (smesh::Env::read<int>("SFEM_SMOOTHER_APPLY_SUM", 0) && prec_op) {
                     auto              sp  = fi->space();
-                    auto              cm  = sp->mesh_ptr();
+                    auto              cm  = sp->mesh();
                     const auto *const px  = sp->points()->data()[0];
                     const auto *const py  = sp->points()->data()[1];
                     const auto *const pz  = sp->points()->data()[2];
@@ -3629,7 +3629,7 @@ private:
                 // Galerkin assembly consumes it as A_above and must not see the wrapper.
                 auto mg_op = lop;
                 {
-                    auto       me   = fi->space()->mesh_ptr();
+                    auto       me   = fi->space()->mesh();
                     const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                     if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
                         mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
@@ -3695,7 +3695,7 @@ private:
                 if (smesh::Env::read<int>("SFEM_GMG_FACE_CHECK", 0)) {
                     auto       pop  = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lvl_op);
                     const bool face = pop && pop->comm() && pop->comm()->size() > 1;
-                    auto       me   = fi->space()->mesh_ptr();
+                    auto       me   = fi->space()->mesh();
                     const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                     if (!dist || me->comm()->rank() == 0)
                         std::printf(
@@ -3703,7 +3703,7 @@ private:
                                 "level_owned_would_be %td  true_owned %td  n_local %td\n",
                                 i, face ? 1 : 0, lvl_op->rows(), lvl_sm->rows(),
                                 face ? lvl_op->rows() : lvl_sm->rows(),
-                                fi->space()->n_owned_dofs(), fi->space()->n_dofs());
+                                fi->space()->n_dofs_owned(), fi->space()->n_dofs());
                 }
 
                 g.mg->add_level(lvl_op,
@@ -3832,7 +3832,7 @@ private:
                     // factorisation that allgathers and the serial dense one are the same
                     // object to this probe, which is what makes 1 and 8 comparable at all.
                     if (smesh::Env::read<int>("SFEM_GMG_SOLVE_OWNED_SUM", 0) && lu) {
-                        auto              cm  = fi->space()->mesh_ptr();
+                        auto              cm  = fi->space()->mesh();
                         const auto *const px  = fi->space()->points()->data()[0];
                         const auto *const py  = fi->space()->points()->data()[1];
                         const auto *const pz  = fi->space()->points()->data()[2];
@@ -3912,7 +3912,7 @@ private:
                     // the local length, so level_alloc is unchanged.
                     auto coarse_mg_op = lop;
                     {
-                        auto       me   = fi->space()->mesh_ptr();
+                        auto       me   = fi->space()->mesh();
                         const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
                         if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
                             coarse_mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
@@ -3955,7 +3955,7 @@ private:
         // removes them. A higher cycle index visits the coarse levels more often per fine
         // sweep, which is the cheapest of the three cures to try and the only one needing no
         // new machinery.
-        g.mg->set_cycle_type(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1));
+        g.mg->set_cycle_type(static_cast<sfem::Multigrid<real_t>::CycleType>(smesh::Env::read<int>("SFEM_GMG_CYCLE", 1)));
         g.mg->set_max_it(1);  // one cycle per preconditioner application
         // Every caller hands the cycle a zero vector: FGMRES clears z_j before applying the
         // preconditioner, and the SFEM_GMG_CHECK=2 probe starts from zeros. So the finest
@@ -4016,7 +4016,7 @@ public:
 
     std::ptrdiff_t       rows() const override { return n_; }
     std::ptrdiff_t       cols() const override { return n_; }
-    sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+    sfem::ExecutionContext execution_context() const override { return sfem::EXECUTION_SPACE_HOST; }
 
 private:
     std::shared_ptr<sfem::Function> f_;
@@ -4993,7 +4993,7 @@ int main(int argc, char **argv) {
     // reach a number the space already publishes. The space is created with block_size
     // N_FIELDS, so the two agree by construction.
     const ptrdiff_t n_owned_nodes   = mesh->is_distributed() ? mesh->distributed()->n_nodes_owned() : nnodes;
-    const ptrdiff_t ndof_owned      = f->space()->n_owned_dofs();
+    const ptrdiff_t ndof_owned      = f->space()->n_dofs_owned();
     domain.n_owned                  = ndof_owned;
     domain.n_local                  = ndof;
     std::vector<real_t> p_exact;
@@ -7730,7 +7730,7 @@ int main(int argc, char **argv) {
         // unreadable.
         if (!wrote_step_mesh) {
             if (fs->has_semi_structured_mesh())
-                smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path(out_folder) / "mesh");
+                smesh::semistructured_export_as_standard(fs->mesh(), smesh::Path(out_folder) / "mesh");
             else
                 mesh->write(smesh::Path(out_folder) / "mesh");
             wrote_step_mesh = true;
@@ -8087,7 +8087,7 @@ int main(int argc, char **argv) {
         smesh::create_directory(out_dir);
         if (fs->has_semi_structured_mesh()) {
             mesh->write(out_dir / "coarse_mesh");
-            smesh::semistructured_export_as_standard(fs->mesh_ptr(), out_dir / "mesh");
+            smesh::semistructured_export_as_standard(fs->mesh(), out_dir / "mesh");
         } else {
             mesh->write(out_dir / "mesh");
         }

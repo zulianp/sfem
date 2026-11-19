@@ -15,7 +15,7 @@
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
 #include "sfem_mask.hpp"
-#include "sfem_openmp_blas.hpp"
+#include "sfem_BLAS_openmp.hpp"
 #include "smesh_env.hpp"
 #include "smesh_mesh_reorder.hpp"
 
@@ -40,7 +40,7 @@ namespace {
                          const real_t* const                      x,
                          real_t* const                            r_work,
                          real_t* const                            ax_work) {
-        auto            blas = make_openmp_blas<real_t>();
+        auto            blas = OpenMPBLAS<real_t>::create();
         const ptrdiff_t n    = A->rows();
         blas->zeros(n, ax_work);
         A->apply(x, ax_work);
@@ -59,7 +59,7 @@ namespace {
                              const std::shared_ptr<Operator<real_t>>&          A,
                              const std::function<int(const real_t*, real_t*)>& solve_once,
                              const std::function<int()>&                       get_iterations) {
-        auto blas = make_openmp_blas<real_t>();
+        auto blas = OpenMPBLAS<real_t>::create();
 
         // Warmup
         for (int w = 0; w < 1; w++) {
@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
     const ptrdiff_t ndofs  = fs->n_dofs();
     const ptrdiff_t nnodes = mesh->n_nodes();
 
-    auto blas = make_openmp_blas<real_t>();
+    auto blas = OpenMPBLAS<real_t>::create();
     auto x0   = create_host_buffer<real_t>(ndofs);
     blas->zeros(ndofs, x0->data());
     f->apply_constraints(x0->data());

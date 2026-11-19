@@ -78,27 +78,31 @@ variants:
       executable: "{python}"
       arguments:
         - "{suite_dir}/common/run_affine_modes.py"
-        - --kind
-        - linear
         - --driver
-        - "{build_dir}/linear_elasticity"
+        - "{build_dir}/playground"
         - --mesh
         - "{mesh}"
         - --input-dir
         - "{output}"
         - --output
         - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-13"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
         - deviatoric_extension
         - simple_shear
         - mixed_volumetric
       environment: &driver_environment
         OMP_NUM_THREADS: 1
-        SFEM_REORDER: 0
-        SFEM_USE_PACKED_MESH: 0
-        SFEM_OP_TYPE: MF
-        SFEM_VERBOSE: 0
-        SFEM_RTOL: 1.0e-13
-        SFEM_MAX_IT: 20000
     expected_output: &expected_output
       required:
         - {pattern: SFEM_AFFINE_MODE_COMPLETE, count: 3}
@@ -150,10 +154,33 @@ variants:
     resolution: {nx: 4, ny: 4, transform: aligned, backend: bsr}
     material_parameter_map: {mu: mu, lambda: lmbda}
     driver:
-      <<: *driver
-      environment:
-        <<: *driver_environment
-        SFEM_OP_TYPE: BSR
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=BSR"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-13"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - deviatoric_extension
+        - simple_shear
+        - mixed_volumetric
+      environment: *driver_environment
     expected_output: *expected_output
     tolerances: *variant_tolerances
 
@@ -163,10 +190,35 @@ variants:
     resolution: {nx: 4, ny: 4, transform: aligned, backend: cuda}
     material_parameter_map: {mu: mu, lambda: lmbda}
     driver:
-      <<: *driver
-      environment:
-        <<: *driver_environment
-        SFEM_EXECUTION_SPACE: DEVICE
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_affine_modes.py"
+        - --driver
+        - "{build_dir}/playground"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --set
+        - "mesh.packed=false"
+        - --set
+        - "solver.linear.format=MF"
+        - --set
+        - "solver.linear.preconditioner=none"
+        - --set
+        - "solver.linear.rtol=1.0e-13"
+        - --set
+        - "solver.linear.max_it=20000"
+        - --set
+        - "solver.newton.verbose=false"
+        - --set
+        - "execution_space=device"
+        - deviatoric_extension
+        - simple_shear
+        - mixed_volumetric
+      environment: *driver_environment
     expected_output: *expected_output
     tolerances: *variant_tolerances
     requires: [cuda_device]

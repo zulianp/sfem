@@ -547,7 +547,7 @@ int main(int argc, char *argv[]) {
     if (benchmark_repeats > 0) {
         auto direction = sfem::create_host_buffer<real_t>(space->n_dofs());
         auto action    = sfem::create_host_buffer<real_t>(space->n_dofs());
-        for (ptrdiff_t i = 0; i < direction->size(); ++i) {
+        for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(direction->size()); ++i) {
             direction->data()[i] = static_cast<real_t>((i % 17) - 8) * 1e-4;
         }
         op->update(time_integration.trial()->data(), time_integration.accepted()->data());

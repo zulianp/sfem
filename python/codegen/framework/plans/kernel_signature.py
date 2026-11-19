@@ -480,12 +480,10 @@ def _dependencies_use_direction(dependencies, default):
 #: The packed mesh traversal's arguments, in the order the C ABI takes them.
 #:
 #: Eleven sites across the three big emitters spelled this prologue out by hand,
-#: and the eleven do not all agree.  Nine of them -- every packed kernel in
-#: `emitters/energy_codegen.py` and `emitters/residual_codegen.py` -- take the
-#: sequence below.  The two in `emitters/inexact_apply_codegen.py` take
-#: `PACKED_MESH_REDUCE_ONLY_ARGUMENTS`, which is a different sequence, and the
-#: difference is not only which arguments are present: the ghost counts come
-#: before `ghost_ptr` there and after it here.
+#: and the eleven did not all agree.  Every packed kernel in
+#: `emitters/energy_codegen.py` and `emitters/residual_codegen.py` takes the
+#: sequence below; the inexact family's stored apply, which took another, is a
+#: library traversal now (`src/frontend/ops/inexact`).
 #:
 #: An ABI spelled independently in eleven places is an ABI that can drift, and a
 #: caller built against one order calling a kernel compiled for the other is a
@@ -524,31 +522,3 @@ def packed_mesh_ghost_reduce_arguments(scalar="s_t"):
     )
 
 
-#: What the inexact family's packed kernels take instead.
-#:
-#: Two arguments the sequence above carries are absent, and only one of the two
-#: absences had ever been written down.  `n_shared_nodes` exists so a one-pass
-#: kernel can tell which owned nodes need an atomic, and these kernels are
-#: two-pass only, so it would never be read; that reason was in the emitter's
-#: docstring.  `nnodes` is absent too, and no comment anywhere says why -- it is
-#: recorded here as an observation, not as a justification.
-#:
-#: The ordering difference has no stated reason either.  It is preserved because
-#: changing it changes a published C ABI, which is a decision about the library's
-#: interface rather than about where a decision lives.
-PACKED_MESH_REDUCE_ONLY_ARGUMENTS = (
-    KernelArgument("n_packs", "const ptrdiff_t n_packs", "pack"),
-    KernelArgument("n_elements_per_pack", "const ptrdiff_t n_elements_per_pack", "pack"),
-    KernelArgument("nelements", "const ptrdiff_t nelements", "pack"),
-    KernelArgument("max_nodes_per_pack", "const ptrdiff_t max_nodes_per_pack", "pack"),
-    KernelArgument("elements", "uint16_t **const RSTR elements", "pack"),
-    KernelArgument("owned_nodes_ptr", "const ptrdiff_t *const RSTR owned_nodes_ptr", "pack"),
-    KernelArgument("n_ghost_entries", "const ptrdiff_t n_ghost_entries", "ghost"),
-    KernelArgument("n_ghost_reduce_rows", "const ptrdiff_t n_ghost_reduce_rows", "ghost"),
-    KernelArgument("ghost_ptr", "const ptrdiff_t *const RSTR ghost_ptr", "ghost"),
-    KernelArgument("ghost_idx", "const idx_t *const RSTR ghost_idx", "ghost"),
-    KernelArgument("ghost_reduce_ptr", "const ptrdiff_t *const RSTR ghost_reduce_ptr", "ghost"),
-    KernelArgument("ghost_reduce_idx", "const ptrdiff_t *const RSTR ghost_reduce_idx", "ghost"),
-    KernelArgument("ghost_reduce_dest", "const idx_t *const RSTR ghost_reduce_dest", "ghost"),
-    KernelArgument("ghost_buf", "s_t *const RSTR ghost_buf", "ghost"),
-)

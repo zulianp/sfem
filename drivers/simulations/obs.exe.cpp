@@ -14,8 +14,8 @@
 
 #ifdef SFEM_ENABLE_CUDA
 #include "sfem_Function_incore_cuda.hpp"
-#include "sfem_cuda_blas.hpp"
-#include "sfem_cuda_solver.hpp"
+#include "sfem_BLAS_cuda.hpp"
+#include "sfem_solver_cuda.hpp"
 #endif
 
 #include "sfem_ssmgc.hpp"
@@ -77,6 +77,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     sdf->scale(smesh::Env::read("SFEM_SDF_SCALE", real_t(1.0)));
     auto contact_boundary = smesh::Sideset::create_from_file(comm, contact_boundary_path);
     auto contact_conds    = sfem::ContactConditions::create(fs, sdf, {contact_boundary}, es);
+    if (!contact_conds) return SFEM_FAILURE;
 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -108,8 +109,8 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     // Output to disk
     smesh::create_directory(output_path);
 
-    fs->mesh_ptr()->write(output_path / "coarse_mesh");
-    smesh::semistructured_export_as_standard(fs->mesh_ptr(), output_path / "mesh");
+    fs->mesh()->write(output_path / "coarse_mesh");
+    smesh::semistructured_export_as_standard(fs->mesh(), output_path / "mesh");
 
     auto out = f->output();
 

@@ -20,7 +20,7 @@
 # verify_report.sh takes VERIFY_GROUPS (default "unit mms bc port budget step pump nozzle").
 # Only two of those groups set SFEM_GMG=1 and therefore DEREFINE -- `port` (line 304) and
 # `budget` (line 350, ladder "2:4 2:8 4:8") -- and derefinement is the only thing the
-# coarse-packing fix touches: derefine_op clears pack_size so a coarse level never packs and
+# coarse-packing fix touches: derefine clears pack_size so a coarse level never packs and
 # never renumbers. Every other group runs SFEM_GMG=0 and cannot reach the changed code at all.
 #
 # WHAT THIS IS AND IS NOT. It is an early signal: do the derefining cases still run, converge,

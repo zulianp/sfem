@@ -1,0 +1,63 @@
+#!/bin/bash
+#SBATCH --job-name=strip
+#SBATCH --account=c40
+#SBATCH --partition=normal
+#SBATCH --nodes=1
+#SBATCH --exclusive
+#SBATCH --time=04:00:00
+#SBATCH --output=/ritom/scratch/cscs/zulianp/sfem-prony-md/runs/strip_%j.out
+#SBATCH --uenv=prgenv-gnu/24.11:v2
+#SBATCH --view=default
+# The strip wound by one full turn, its end held axially (cases/epdm_strip_turns.yaml), per history
+# format, on one mesh, for
+# the LDP paper's torsion section: two repeats in double, each reduced format with the remainder form
+# (<format>) and without it (<format>_plain, remainder_horizon 0), and float32 stress slots (<run>_s32);
+# with DIAG=1 the diagnostics build's runs (lost updates) instead. One Grace chip (72 threads) per run,
+# four at once. Submit one job per mesh:
+#   MESH=HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60 [TURNS=1] [BUILD=build-x28] [DIAG=1]
+# Two turns with the end held fail on TET10 near 1.3 turns (pilot 5305248).
+# Folders $OUT/<mesh>/<run> with OUT=runs/strip (DIAG: runs/strip_diag); meshes from make_meshes.py in
+# $OUT/meshes (TET10_60 is TET4_60 promoted by the case). A run whose folder exists is skipped.
+# BUILD names a build folder of the sfem tree; without it, SFEM_BUILD (DIAG: SFEM_DIAG_BUILD), else
+# build-x28. The machine: ../../ldp_containment/machine.sh.
+set -u
+SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
+. "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
+D=$SFEM_ROOT
+TURNS=${TURNS:-1}
+if [ "${DIAG:-0}" = 1 ]; then B=${BUILD:+$D/$BUILD}; B=${B:-$SFEM_DIAG_BUILD}; OUT=$SFEM_RUNS/strip_diag
+else B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}; OUT=$SFEM_RUNS/strip; fi
+MESHES=$SFEM_RUNS/strip/meshes
+[ -d $MESHES ] || $SFEM_PY $D/workflows/prony_torsion/strip/make_meshes.py $MESHES
+src=$MESH; extra=""
+[ $MESH = TET10_60 ] && { src=TET4_60; extra="--set mesh.promote_to_p2=true"; }
+go() {  # <run>
+  local run=$1 base=${1%_s32} stress=full fmt h=""
+  [ "$base" != "$run" ] && stress=float32
+  fmt=${base%_plain}; [ "$fmt" != "$base" ] && h="--set material.relaxation.iso.remainder_horizon=0"
+  fmt=${fmt%_[a-d]}
+  local W=$OUT/$MESH/$run
+  [ -e $W ] && { echo "$MESH $run: $W exists; skipped"; return; }
+  mkdir -p $W; cd $W || return
+  ln -s $MESHES/$src mesh; cp $D/workflows/prony_torsion/cases/epdm_strip_turns.yaml case.yaml
+  local start=$(date +%s.%N)
+  # shellcheck disable=SC2086
+  SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_HOST $B/playground case.yaml --set execution_space=host \
+      --set constraints.0.angle=$(echo "$TURNS * 6.283185307179586" | bc -l) \
+      --set material.relaxation.iso.history_storage=$fmt --set material.relaxation.iso.stress_storage=$stress $h $extra \
+      --set solver.newton.verbose=true > run.log 2>&1
+  echo "$MESH $run rc=$? wall=$(echo "$(date +%s.%N) - $start" | bc)s failed=$(grep -c 'attempt failed' run.log)" \
+       "projected=$(grep -c ' projected,' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
+}
+REDUCED="float32 int16_scaled float16_md"
+if [ "${DIAG:-0}" = 1 ]; then
+  RUNS="full_a"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
+else
+  RUNS="full_a full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
+  RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
+fi
+for run in $RUNS; do
+  sfem_throttle
+  go $run &
+done
+wait

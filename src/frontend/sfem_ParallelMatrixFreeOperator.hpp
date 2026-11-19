@@ -1,0 +1,64 @@
+#ifndef SFEM_PARALLEL_MATRIX_FREE_OPERATOR_HPP
+#define SFEM_PARALLEL_MATRIX_FREE_OPERATOR_HPP
+
+#include "sfem_Function.hpp"
+#include "sfem_ParallelOperator.hpp"
+#include "sfem_aliases.hpp"
+
+#include <functional>
+#include <memory>
+
+namespace sfem {
+
+    /// Matrix-free operator on distributed meshes.
+    ///
+    /// Buffer contract for @ref apply:
+    /// - @p x must provide @ref col_allocation_size() entries (owned + ghosts + aura).
+    ///   Owned DOFs are read; ghost/aura slots are filled by an in-place gather.
+    /// - @p y must provide @ref row_allocation_size() entries. The owned prefix is the
+    ///   result; ghost/aura slots are used as assembly scratch.
+    ///
+    /// Optional nonlinear @p state (constructor) must already have
+    /// @ref col_allocation_size() entries; @ref update_state gathers into it in place.
+    class ParallelMatrixFreeOperator final : public ParallelOperator<real_t> {
+    public:
+        ParallelMatrixFreeOperator(const std::shared_ptr<Function>       &function,
+                                   const std::shared_ptr<Buffer<real_t>> &state,
+                                   ExecutionSpace                         execution_space);
+        ~ParallelMatrixFreeOperator() override;
+
+        int update_state();
+        int apply(const real_t *const x, real_t *const y) override;
+        std::ptrdiff_t rows() const override;
+        std::ptrdiff_t cols() const override;
+        ExecutionContext execution_context() const override;
+
+        std::shared_ptr<Communicator> comm() const override;
+        std::ptrdiff_t                row_allocation_size() const override;
+        std::ptrdiff_t                col_allocation_size() const override;
+
+    private:
+        class Impl;
+        std::unique_ptr<Impl> impl_;
+    };
+
+    /// A function's product on the owned rows of a distributed mesh (y += A x, A over every local
+    /// element, aura included, so that the owned rows need no reduction) by the threads of the
+    /// caller's region. Thread 0 sends x's owned values and posts the receives of its ghost and
+    /// aura values, the team applies the elements away from the interface (`apply` with
+    /// OWNED_NOT_SHARED), thread 0 waits for the messages, and once every thread sees them the
+    /// team applies the others (SHARED_AND_AURA) and copies the constrained rows. x and y span
+    /// col/row_allocation_size(); y's rows beyond the owned ones are scratch.
+    using ScopedTeamApply = std::function<void(const Team &, const real_t *const, real_t *const, const ElementScope)>;
+    std::shared_ptr<ParallelOperator<real_t>> create_distributed_team_operator(const std::shared_ptr<Function> &function,
+                                                                               ScopedTeamApply                  apply,
+                                                                               std::function<int()>             prepare);
+
+    std::shared_ptr<ParallelOperator<real_t>> create_parallel_matrix_free_operator(
+            const std::shared_ptr<Function>       &function,
+            const std::shared_ptr<Buffer<real_t>> &state,
+            ExecutionSpace                         execution_space);
+
+}  // namespace sfem
+
+#endif  // SFEM_PARALLEL_MATRIX_FREE_OPERATOR_HPP

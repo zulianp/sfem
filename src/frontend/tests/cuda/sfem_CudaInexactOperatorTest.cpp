@@ -1,0 +1,496 @@
+// The stored-tangent (INEXACT) operator on the device, against the device's exact apply and the
+// host's stored one, element by element.
+//
+// The device stores keep the host's encodings in the device's layouts and kernel shapes, so their
+// operator is the host's: with f64 codes both are the exact apply to rounding; with the others the
+// codes agree up to the rare one that a different rounding of the same arithmetic puts on the other
+// side of a tie, so the two stored operators differ by far less than either differs from the exact
+// one.  The diagonal (Jacobi on the stored operator) is checked against the assembled one.  With
+// the tangent projection on, the device stores hold the projected tangent: the f64 ones apply the
+// host's projected BSR assembly.
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "sfem_API.hpp"
+#include "sfem_Function.hpp"
+#include "sfem_InexactInterface.hpp"
+#include "sfem_test.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_semistructured.hpp"
+
+namespace {
+    struct Case {
+        const char *store;
+        const char *encoding;
+        double      tolerance;  // against the exact apply
+        double      agreement;  // against the host's stored apply
+        const char *layout = "auto";  // bsr: auto (the device's rows), sell (format SELL)
+    };
+
+    const Case CASES[] = {
+            {"points", "f64", 1e-12, 1e-12},
+            {"points", "f32", 1e-5, 1e-5},
+            {"points", "f16", 5e-3, 1e-3},
+            {"points", "i8md", 5e-2, 1e-2},
+            {"element_matrix", "f64", 1e-12, 1e-12},
+            {"element_matrix", "f32", 1e-5, 1e-5},
+            {"element_matrix", "f16", 5e-3, 1e-3},
+            {"element_matrix", "i8pair", 5e-2, 1e-2},
+            {"bsr", "f32", 1e-5, 1e-5},
+            {"bsr", "f16", 5e-3, 1e-3},
+            {"bsr", "i8", 5e-2, 1e-2},
+            {"bsr", "f32", 1e-5, 1e-5, "sell"},
+            {"bsr", "f16", 5e-3, 1e-3, "sell"},
+            {"bsr", "i8", 5e-2, 1e-2, "sell"},
+    };
+
+    /// The slots of the device's SELL-32-1024 on graph g: the rows' off-diagonal counts sorted
+    /// within windows of 1024 rows, longest first, groups of 32 padded to their longest.
+    ptrdiff_t sell_slots(const std::shared_ptr<sfem::CRSGraph> &g) {
+        const ptrdiff_t      n  = g->n_nodes();
+        const count_t *const rp = g->rowptr()->data();
+        std::vector<count_t> len(n);
+        for (ptrdiff_t i = 0; i < n; ++i) len[i] = rp[i + 1] - rp[i] - 1;
+        for (ptrdiff_t w = 0; w < n; w += 1024) std::stable_sort(len.begin() + w, len.begin() + std::min(n, w + 1024), std::greater<count_t>());
+        ptrdiff_t slots = 0;
+        for (ptrdiff_t g0 = 0; g0 < n; g0 += 32) slots += 32 * (ptrdiff_t)*std::max_element(len.begin() + g0, len.begin() + std::min(n, g0 + 32));
+        return slots;
+    }
+
+    std::vector<real_t> pseudo_random(const ptrdiff_t n, const real_t amplitude, unsigned seed) {
+        std::vector<real_t> v(n);
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            seed = seed * 1664525u + 1013904223u;
+            v[i] = amplitude * ((real_t)(seed >> 8) / (real_t)(1u << 24) - real_t(0.5));
+        }
+        return v;
+    }
+
+    real_t relative_difference(const std::vector<real_t> &a, const std::vector<real_t> &b) {
+        real_t num = 0, den = 0;
+        for (size_t i = 0; i < a.size(); ++i) {
+            if (!std::isfinite(a[i])) return 1e30;
+            num += (a[i] - b[i]) * (a[i] - b[i]);
+            den += b[i] * b[i];
+        }
+        return std::sqrt(num / den);
+    }
+
+    sfem::SharedBuffer<real_t> on_device(const std::vector<real_t> &v) {
+        auto host = sfem::create_host_buffer<real_t>((ptrdiff_t)v.size());
+        std::copy(v.begin(), v.end(), host->data());
+        return smesh::to_device(host);
+    }
+
+    std::vector<real_t> from_device(const sfem::SharedBuffer<real_t> &d) {
+        auto host = smesh::to_host(d);
+        return std::vector<real_t>(host->data(), host->data() + host->size());
+    }
+
+    /// The stored apply (`diagonal`: the stored diagonal) at u, in h, on either side.
+    std::vector<real_t> stored(const std::shared_ptr<sfem::Op> &op,
+                               const bool                       device,
+                               const sfem::InexactOptions      &options,
+                               const std::vector<real_t>        &u,
+                               const std::vector<real_t>        &h,
+                               const bool                       diagonal = false) {
+        op->set_inexact_options(options);
+        if (!device) {
+            std::vector<real_t> out(h.size(), 0);
+            if (op->inexact_update(u.data()) != SFEM_SUCCESS) return {};
+            const int rc = diagonal ? op->inexact_diag(out.data()) : op->inexact_apply(h.data(), out.data());
+            return rc == SFEM_SUCCESS ? out : std::vector<real_t>{};
+        }
+        auto du  = on_device(u);
+        auto dh  = on_device(h);
+        auto out = on_device(std::vector<real_t>(h.size(), 0));
+        if (op->inexact_update(du->data()) != SFEM_SUCCESS) return {};
+        const int rc = diagonal ? op->inexact_diag(out->data()) : op->inexact_apply(dh->data(), out->data());
+        return rc == SFEM_SUCCESS ? from_device(out) : std::vector<real_t>{};
+    }
+
+    int check(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const material, const char *const label) {
+        auto host   = sfem::create_op(fs, material, sfem::EXECUTION_SPACE_HOST);
+        auto device = sfem::create_op(fs, material, sfem::EXECUTION_SPACE_DEVICE);
+        SFEM_TEST_ASSERT(host && device);
+        SFEM_TEST_ASSERT(host->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->inexact_supported());
+
+        const ptrdiff_t           ndofs = fs->n_dofs();
+        // Small enough that no element of the finer meshes inverts (0.05 does on TET10 4x4x3,
+        // where the exact apply is not finite either).
+        const std::vector<real_t> u     = pseudo_random(ndofs, 0.01, 7);
+        const std::vector<real_t> h     = pseudo_random(ndofs, 1, 11);
+        std::vector<real_t>       exact;
+        {
+            auto du  = on_device(u);
+            auto dh  = on_device(h);
+            auto out = on_device(std::vector<real_t>(ndofs, 0));
+            SFEM_TEST_ASSERT(device->apply(du->data(), dh->data(), out->data()) == SFEM_SUCCESS);
+            exact = from_device(out);
+        }
+
+        for (const Case &c : CASES) {
+            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding, "auto", "auto", c.layout);
+            const auto d       = stored(device, true, options, u, h);
+            const auto r       = stored(host, false, options, u, h);
+            SFEM_TEST_ASSERT(!d.empty() && !r.empty());
+            const real_t error = relative_difference(d, exact), agreement = relative_difference(d, r);
+            printf("%-14s %-15s %-7s %-4s rel diff %.3e (bound %.0e), host %.3e (bound %.0e), %zu bytes\n",
+                   label,
+                   c.store,
+                   c.encoding,
+                   c.layout,
+                   (double)error,
+                   c.tolerance,
+                   (double)agreement,
+                   c.agreement,
+                   device->inexact_bytes());
+            SFEM_TEST_ASSERT(error < c.tolerance);
+            SFEM_TEST_ASSERT(agreement < c.agreement);
+            if (!strcmp(c.store, "bsr")) {
+                // The paper's footprint (eq:tangent-footprint): a record per off-diagonal block, the node
+                // graph, a correction index per node (elasticity annihilates translations: no row is
+                // corrected, the difference form alone) and the corrections' count, and with f16 codes a
+                // scale per node and the window's maximum.
+                // SELL: a record per slot (padding included), and its rows, steps, columns and the
+                // rows' positions.
+                const auto      g    = fs->element_node_graph();
+                const bool      f16  = !strcmp(c.encoding, "f16");
+                const bool      sell = !strcmp(c.layout, "sell");
+                const ptrdiff_t rec  = !strcmp(c.encoding, "f32") ? 36 : (f16 ? 20 : 16);
+                const ptrdiff_t n = g->n_nodes(), nb = g->nnz(), ng = (n + 31) / 32, slots = sell ? sell_slots(g) : 0;
+                const ptrdiff_t formula = rec * (sell ? slots : nb - n) + 4 * nb + 4 * (n + 1) + 4 * n + 4 + (f16 ? 4 * (n + 1) : 0) +
+                                          (sell ? 4 * 32 * ng + 8 * (ng + 1) + 4 * slots + 4 * n : 0);
+                printf("%-14s %-15s %-7s %-4s footprint %zu bytes, formula %ld\n", label, c.store, c.encoding, c.layout,
+                       device->inexact_bytes(), (long)formula);
+                SFEM_TEST_ASSERT((ptrdiff_t)device->inexact_bytes() == formula);
+            }
+
+            const auto dd = stored(device, true, options, u, h, true);
+            const auto rd = stored(host, false, options, u, h, true);
+            SFEM_TEST_ASSERT(!dd.empty() && !rd.empty());
+            const real_t diagonal = relative_difference(dd, rd);
+            printf("%-14s %-15s %-7s %-4s diagonal against the host's %.3e\n", label, c.store, c.encoding, c.layout, (double)diagonal);
+            SFEM_TEST_ASSERT(diagonal < c.agreement);
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
+    std::shared_ptr<sfem::FunctionSpace> space(const std::shared_ptr<sfem::Mesh> &mesh) {
+        return sfem::FunctionSpace::create(mesh, 3);
+    }
+
+    /// u = (F - I) X, a sheared compression (det F = 0.6) under which the Prony material's tangent
+    /// is indefinite, plus a little noise (sfem_InexactOperatorTest.cpp).
+    std::vector<real_t> compressed(const std::shared_ptr<sfem::FunctionSpace> &fs) {
+        const real_t         F[3][3] = {{0.5, 0.3, 0}, {0, 1.1, 0}, {0, 0, 1.1}};
+        auto                 mesh    = fs->mesh();
+        const geom_t *const *x       = mesh->points()->data();
+        std::vector<real_t>  u       = pseudo_random(fs->n_dofs(), 0.002, 5);
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i)
+            for (int a = 0; a < 3; ++a)
+                for (int b = 0; b < 3; ++b) u[i * 3 + a] += (F[a][b] - (a == b)) * x[b][i];
+        return u;
+    }
+
+    /// The host's assembled tangent at u applied to h.
+    std::vector<real_t> bsr_apply(const std::shared_ptr<sfem::Op>           &op,
+                                  const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                  const std::vector<real_t>                  &u,
+                                  const std::vector<real_t>                  &h) {
+        auto                graph  = fs->element_node_graph();
+        const count_t      *rowptr = graph->rowptr()->data();
+        const idx_t        *colidx = graph->colidx()->data();
+        std::vector<real_t> values((size_t)graph->nnz() * 9, 0), out(h.size(), 0);
+        if (op->hessian_bsr(u.data(), rowptr, colidx, values.data()) != SFEM_SUCCESS) return {};
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i)
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k)
+                for (int d = 0; d < 3; ++d)
+                    for (int e = 0; e < 3; ++e) out[i * 3 + d] += values[(size_t)k * 9 + d * 3 + e] * h[colidx[k] * 3 + e];
+        return out;
+    }
+
+    /// The device's assembled tangent at u, applied to h on the host.
+    std::vector<real_t> device_bsr_apply(const std::shared_ptr<sfem::Op>           &op,
+                                         const std::shared_ptr<sfem::FunctionSpace> &fs,
+                                         const std::vector<real_t>                  &u,
+                                         const std::vector<real_t>                  &h) {
+        auto            graph    = fs->element_node_graph();
+        const ptrdiff_t nvals    = graph->nnz() * 9;
+        auto            d_rowptr = smesh::to_device(graph->rowptr());
+        auto            d_colidx = smesh::to_device(graph->colidx());
+        auto            d_values = sfem::create_buffer<real_t>(nvals, sfem::EXECUTION_SPACE_DEVICE);
+        auto            du       = on_device(u);
+        if (op->hessian_bsr(du->data(), d_rowptr->data(), d_colidx->data(), d_values->data()) != SFEM_SUCCESS) return {};
+        const auto      values = from_device(d_values);
+        const count_t  *rowptr = graph->rowptr()->data();
+        const idx_t    *colidx = graph->colidx()->data();
+        std::vector<real_t> out(h.size(), 0);
+        for (ptrdiff_t i = 0; i < graph->n_nodes(); ++i)
+            for (count_t k = rowptr[i]; k < rowptr[i + 1]; ++k)
+                for (int d = 0; d < 3; ++d)
+                    for (int e = 0; e < 3; ++e) out[i * 3 + d] += values[(size_t)k * 9 + d * 3 + e] * h[colidx[k] * 3 + e];
+        return out;
+    }
+
+    int check_projected(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+        auto host   = sfem::create_op(fs, "GeneratedMooneyRivlinProny", sfem::EXECUTION_SPACE_HOST);
+        auto device = sfem::create_op(fs, "GeneratedMooneyRivlinProny", sfem::EXECUTION_SPACE_DEVICE);
+        SFEM_TEST_ASSERT(host && device);
+        SFEM_TEST_ASSERT(host->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->initialize() == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(device->tangent_projection_supported());
+
+        const std::vector<real_t> u     = compressed(fs);
+        const std::vector<real_t> h     = pseudo_random(fs->n_dofs(), 1, 11);
+        const auto                plain = bsr_apply(host, fs, u, h);
+        const auto                unprojected = stored(device, true, sfem::InexactOptions::from_strings("points", "f64"), u, h);
+        SFEM_TEST_ASSERT(!plain.empty() && !unprojected.empty());
+        const real_t base = relative_difference(unprojected, plain);
+        printf("%-14s points f64 unprojected against the BSR apply %.3e\n", label, (double)base);
+        SFEM_TEST_ASSERT(base < 1e-12);
+        host->set_tangent_projection(true);
+        device->set_tangent_projection(true);
+        const auto projected = bsr_apply(host, fs, u, h);
+        SFEM_TEST_ASSERT(!plain.empty() && !projected.empty());
+        const real_t change = relative_difference(projected, plain);
+        printf("%-14s the projection changes the BSR apply by %.3e\n", label, (double)change);
+        SFEM_TEST_ASSERT(change > 1e-3);
+
+        // The device's BSR assembly is the host's, exact and projected.
+        device->set_tangent_projection(false);
+        const auto device_plain = device_bsr_apply(device, fs, u, h);
+        SFEM_TEST_ASSERT(!device_plain.empty());
+        const real_t exact = relative_difference(device_plain, plain);
+        printf("%-14s device BSR against the host's %.3e\n", label, (double)exact);
+        SFEM_TEST_ASSERT(exact < 1e-10);
+        device->set_tangent_projection(true);
+        const auto device_projected = device_bsr_apply(device, fs, u, h);
+        SFEM_TEST_ASSERT(!device_projected.empty());
+        const real_t assembled = relative_difference(device_projected, projected);
+        printf("%-14s device projected BSR against the host's %.3e\n", label, (double)assembled);
+        SFEM_TEST_ASSERT(assembled < 1e-10);
+
+        const Case cases[] = {{"points", "f64", 1e-10, 0}, {"element_matrix", "f64", 1e-10, 0}, {"bsr", "f16", 5e-3, 0}, {"bsr", "f16", 5e-3, 0, "sell"}};
+        for (const Case &c : cases) {
+            const auto options = sfem::InexactOptions::from_strings(c.store, c.encoding, "auto", "auto", c.layout);
+            const auto d       = stored(device, true, options, u, h);
+            const auto r       = stored(host, false, options, u, h);
+            SFEM_TEST_ASSERT(!d.empty() && !r.empty());
+            const real_t error = relative_difference(d, projected), agreement = relative_difference(d, r);
+            printf("%-14s %-15s %-7s projected rel diff %.3e (bound %.0e), host's store %.3e, host's store vs BSR %.3e, vs plain %.3e\n",
+                   label, c.store, c.encoding, (double)error, c.tolerance, (double)agreement,
+                   (double)relative_difference(r, projected), (double)relative_difference(d, plain));
+            SFEM_TEST_ASSERT(error < c.tolerance);
+        }
+
+        // Off again, the stores follow.
+        device->set_tangent_projection(false);
+        const auto back = stored(device, true, sfem::InexactOptions::from_strings("points", "f64"), u, h);
+        SFEM_TEST_ASSERT(!back.empty() && relative_difference(back, plain) < 1e-12);
+        return SFEM_TEST_SUCCESS;
+    }
+
+    // Curved cells: every node moved by a smooth field, so the Jacobian varies within each element.
+    void warp(const std::shared_ptr<sfem::Mesh> &mesh) {
+        geom_t **const  x = mesh->points()->data();
+        const ptrdiff_t n = mesh->n_nodes();
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            const geom_t a = x[0][i], b = x[1][i], c = x[2][i];
+            x[0][i] += geom_t(0.04) * std::sin(geom_t(3) * b + c);
+            x[1][i] += geom_t(0.04) * std::sin(geom_t(2) * c + a);
+            x[2][i] += geom_t(0.04) * std::sin(geom_t(3) * a + b);
+        }
+    }
+}  // namespace
+
+// Several blocks of the thread-per-element kernels (128 elements) and a partial last one.
+int test_hex8() {
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 9, 7, 5, 0, 0, 0, 1, 0.8, 0.7);
+    return check(space(mesh), "GeneratedNeoHookeanOgden", "HEX8");
+}
+
+int test_tet4() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 6, 5, 5, 0, 0, 0, 1, 1, 1);
+    return check(space(mesh), "GeneratedNeoHookeanOgden", "TET4");
+}
+
+int test_tet10() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    return check(space(smesh::promote_to(smesh::TET10, mesh)), "GeneratedNeoHookeanOgden", "TET10");
+}
+
+int test_proteus_hex27() {
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 3, 3, 2, 0, 0, 0, 1, 1, 1);
+    auto fs   = space(smesh::to_semistructured(2, mesh, true, false));
+    SFEM_TEST_ASSERT(fs != nullptr);
+    fs->set_semi_structured_basis(sfem::FunctionSpace::SemiStructuredBasis::HIGH_ORDER);
+    return check(fs, "GeneratedNeoHookeanOgden", "PROTEUS_HEX27");
+}
+
+int test_curved_hex8() {
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 6, 6, 5, 0, 0, 0, 1, 1, 1);
+    warp(mesh);
+    return check(space(mesh), "GeneratedNeoHookeanOgden", "curved HEX8");
+}
+
+int test_curved_tet10() {
+    auto mesh = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1));
+    warp(mesh);
+    return check(space(mesh), "GeneratedNeoHookeanOgden", "curved TET10");
+}
+
+int test_linear_elasticity() {
+    auto mesh = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 6, 6, 5, 0, 0, 0, 1, 1, 1);
+    return check(space(mesh), "GeneratedLinearElasticity", "HEX8 linear");
+}
+
+// The projected tangent (tangent_projection) in the device stores: affine, isoparametric, folded.
+// The assembled store's product with extra diagonal blocks (Op::set_inexact_extra), one kernel that
+// overwrites its output, against the plain product plus a contact block at every third node and a
+// shift times |reference|, added on the host: the composed contact tangent's passes, fused. A store
+// that cannot take them says so.
+int fused_extra(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+    auto op = sfem::create_op(fs, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op && op->initialize() == SFEM_SUCCESS);
+    const ptrdiff_t ndofs = fs->n_dofs(), nnodes = ndofs / 3;
+    const auto      u = pseudo_random(ndofs, 0.01, 7), h = pseudo_random(ndofs, 1, 11);
+    std::vector<idx_t>  contact_of(nnodes, -1);
+    ptrdiff_t           ncontact = 0;
+    for (ptrdiff_t i = 0; i < nnodes; i += 3) contact_of[i] = (idx_t)ncontact++;
+    const auto          blocks    = pseudo_random(6 * ncontact, 1, 13);
+    std::vector<real_t> reference = pseudo_random(ndofs, 1, 17);
+    for (auto &r : reference) r = std::abs(r);
+    const real_t shift = 0.3;
+
+    auto staged = sfem::create_host_buffer<idx_t>(nnodes);
+    std::copy(contact_of.begin(), contact_of.end(), staged->data());
+    auto d_contact = smesh::to_device(staged);
+    auto d_blocks = on_device(blocks), d_reference = on_device(reference);
+    sfem::inexact::DiagonalExtra extra;
+    extra.contact_of = d_contact->data();
+    extra.blocks     = d_blocks->data();
+    extra.shift      = shift;
+    extra.reference  = d_reference->data();
+
+    for (const char *const layout : {"auto", "sell"})
+    for (const char *const encoding : {"f32", "f16", "i8"}) {
+        op->set_inexact_options(sfem::InexactOptions::from_strings("bsr", encoding, "auto", "auto", layout));
+        auto du = on_device(u), dh = on_device(h);
+        SFEM_TEST_ASSERT(op->inexact_update(du->data()) == SFEM_SUCCESS);
+        auto plain = on_device(std::vector<real_t>(ndofs, 0));
+        SFEM_TEST_ASSERT(op->inexact_apply(dh->data(), plain->data()) == SFEM_SUCCESS);
+        std::vector<real_t> expected = from_device(plain);
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            if (contact_of[i] >= 0) sfem::inexact::packed_sym_apply(&blocks[6 * contact_of[i]], &h[i * 3], &expected[i * 3]);
+            for (int d = 0; d < 3; ++d) expected[i * 3 + d] += shift * (reference[i * 3 + d] * h[i * 3 + d]);
+        }
+        // Garbage in the output: the fused product overwrites it.
+        auto fused = on_device(std::vector<real_t>(ndofs, real_t(1e30)));
+        SFEM_TEST_ASSERT(op->set_inexact_extra(&extra, true));
+        SFEM_TEST_ASSERT(op->inexact_apply(dh->data(), fused->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(op->set_inexact_extra(nullptr, false));
+        const real_t difference = relative_difference(from_device(fused), expected);
+        printf("%-6s bsr %-3s %-4s fused extra against the plain product and the blocks: %.3e\n", label, encoding, layout, (double)difference);
+        SFEM_TEST_ASSERT(difference < 1e-13);
+    }
+    op->set_inexact_options(sfem::InexactOptions::from_strings("points", "f16"));
+    SFEM_TEST_ASSERT(!op->set_inexact_extra(&extra, true));
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_fused_extra() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 6, 5, 5, 0, 0, 0, 1, 1, 1);
+    if (fused_extra(space(mesh), "TET4") != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    auto coarse = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    return fused_extra(space(smesh::promote_to(smesh::TET10, coarse)), "TET10");
+}
+
+// The assembled store encoded a window of rows at a time (SFEM_QBSR_WINDOWS): as close to the exact
+// apply as in one window, and as symmetric. The blocks left of the diagonal are the transposes of the
+// records right of it; the implied diagonal blocks, -sum_j K_ij, are symmetric to the encoding's error,
+// in one window as in several, so x^T A y - y^T A x is what one window leaves.
+int windowed(const std::shared_ptr<sfem::FunctionSpace> &fs, const char *const label) {
+    auto op = sfem::create_op(fs, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_DEVICE);
+    SFEM_TEST_ASSERT(op && op->initialize() == SFEM_SUCCESS);
+    const ptrdiff_t ndofs = fs->n_dofs();
+    const auto      u = pseudo_random(ndofs, 0.01, 7), a = pseudo_random(ndofs, 1, 11), b = pseudo_random(ndofs, 1, 19);
+    std::vector<real_t> exact;
+    {
+        auto du = on_device(u), da = on_device(a), out = on_device(std::vector<real_t>(ndofs, 0));
+        SFEM_TEST_ASSERT(op->apply(du->data(), da->data(), out->data()) == SFEM_SUCCESS);
+        exact = from_device(out);
+    }
+    auto dot = [](const std::vector<real_t> &x, const std::vector<real_t> &y) {
+        double s = 0;
+        for (size_t i = 0; i < x.size(); ++i) s += (double)x[i] * (double)y[i];
+        return s;
+    };
+    for (const char *const layout : {"auto", "sell"})
+    for (const auto &c : {std::make_pair("f16", 5e-3), std::make_pair("i8", 5e-2)}) {
+        double single = 0;
+        const auto options = sfem::InexactOptions::from_strings("bsr", c.first, "auto", "auto", layout);
+        for (const char *const windows : {"1", "3"}) {
+            setenv("SFEM_QBSR_WINDOWS", windows, 1);
+            op->set_inexact_options(options);
+            const auto Aa = stored(op, true, options, u, a);
+            const auto Ab = stored(op, true, options, u, b);
+            unsetenv("SFEM_QBSR_WINDOWS");
+            SFEM_TEST_ASSERT(!Aa.empty() && !Ab.empty());
+            const double error = relative_difference(Aa, exact), asymmetry = std::abs(dot(b, Aa) - dot(a, Ab)) / std::abs(dot(b, Aa));
+            printf("%-6s bsr %-3s %-4s %s window(s): rel diff %.3e (bound %.0e), asymmetry %.3e\n", label, c.first, layout, windows, error,
+                   c.second, asymmetry);
+            SFEM_TEST_ASSERT(error < c.second);
+            if (windows[0] == '1') {
+                single = asymmetry;
+            } else {
+                SFEM_TEST_ASSERT(asymmetry <= 2 * single + 1e-12);
+            }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+int test_windowed() {
+    auto mesh = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 6, 5, 5, 0, 0, 0, 1, 1, 1);
+    if (windowed(space(mesh), "TET4") != SFEM_TEST_SUCCESS) return SFEM_TEST_FAILURE;
+    auto coarse = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    return windowed(space(smesh::promote_to(smesh::TET10, coarse)), "TET10");
+}
+
+int test_projected_prony() {
+    auto       tet4  = sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 4, 4, 3, 0, 0, 0, 1, 1, 1);
+    auto       tet10 = smesh::promote_to(smesh::TET10, sfem::Mesh::create_tet4_cube(sfem::Communicator::self(), 3, 3, 3, 0, 0, 0, 1, 1, 1));
+    auto       hex8  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 5, 4, 4, 0, 0, 0, 1, 1, 1);
+    const bool ok4   = check_projected(space(tet4), "TET4 projected") == SFEM_TEST_SUCCESS;
+    const bool ok10  = check_projected(space(tet10), "TET10 projected") == SFEM_TEST_SUCCESS;
+    const bool ok8   = check_projected(space(hex8), "HEX8 projected") == SFEM_TEST_SUCCESS;
+    SFEM_TEST_ASSERT(ok4 && ok10 && ok8);
+    return SFEM_TEST_SUCCESS;
+}
+
+int main(int argc, char *argv[]) {
+    SFEM_UNIT_TEST_INIT(argc, argv);
+    SFEM_RUN_TEST(test_hex8);
+    SFEM_RUN_TEST(test_tet4);
+    SFEM_RUN_TEST(test_tet10);
+    SFEM_RUN_TEST(test_proteus_hex27);
+    SFEM_RUN_TEST(test_curved_hex8);
+    SFEM_RUN_TEST(test_curved_tet10);
+    SFEM_RUN_TEST(test_linear_elasticity);
+    SFEM_RUN_TEST(test_projected_prony);
+    SFEM_RUN_TEST(test_fused_extra);
+    SFEM_RUN_TEST(test_windowed);
+    SFEM_UNIT_TEST_FINALIZE();
+    return SFEM_UNIT_TEST_ERR();
+}

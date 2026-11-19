@@ -171,9 +171,14 @@ def main() -> int:
     config = yaml.safe_load(case_path.read_text(encoding="utf-8"))
     tolerances = config["verification"]["tolerances"]
     oracle = config["oracle"]
-    c1 = float(config["driver"]["environment"]["SFEM_C1"])
-    c2 = float(config["driver"]["environment"]["SFEM_C2"])
-    kappa = float(config["driver"]["environment"]["SFEM_KAPPA"])
+    # The material is the one the driver is handed, as --param name=value.
+    arguments = [str(value) for value in config["driver"]["arguments"]]
+    parameters = dict(
+        arguments[i + 1].split("=", 1) for i, value in enumerate(arguments[:-1]) if value == "--param"
+    )
+    c1 = float(parameters["c1"])
+    c2 = float(parameters["c2"])
+    kappa = float(parameters["kappa"])
 
     radial_oracle = np.loadtxt(case_dir / oracle["radial_stress"], delimiter=",", comments="#")
     hoop_oracle = np.loadtxt(case_dir / oracle["hoop_stress"], delimiter=",", comments="#")

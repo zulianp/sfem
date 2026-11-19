@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 import sympy as sp
@@ -11,6 +12,8 @@ from codegen.framework.emitters.kernel_prologue import (
     retag_constants,
 )
 from codegen.framework.plans.conventions import (
+    with_team_element_range,
+    with_team_element_range_arguments,
     PREFIXES,
     abi_geometry_name,
     abi_mesh_fragment,
@@ -142,7 +145,7 @@ from codegen.framework.plans.evaluation_strategy import (
     EvaluationStrategy,
     evaluation_strategy,
 )
-from codegen.framework.plans.geometry_variants import packed_kernel_forms
+from codegen.framework.plans.geometry_variants import kernel_target, packed_kernel_forms
 from codegen.framework.plans.streams import field_stream_layout
 from codegen.framework.plans.geometry_quantities import (
     local_geometry_streams,
@@ -277,13 +280,15 @@ def _runtime_typed_entry_point(function, params, arguments, body):
     `body(scalar_type, arguments)` spells the call.
     """
     prepared = [param.replace("g_t", "geom_t") for param in params]
-    return runtime_typed_entry_point_lines(
-        function,
-        prepared,
-        lambda scalar_type, _positional: body(
-            scalar_type, cast_arguments(prepared, arguments, scalar_type)
-        ),
-    )
+
+    # With matrix values of their own type (v_t) the body is told it too.
+    def call(scalar_type, _positional, values_type=None):
+        cast = cast_arguments(prepared, arguments, scalar_type, values_type)
+        if values_type is None:
+            return body(scalar_type, cast)
+        return body(scalar_type, cast, values_type)
+
+    return runtime_typed_entry_point_lines(function, prepared, call)
 
 
 def _assert_geometry_plans_agree(emission_plan):
@@ -385,6 +390,18 @@ def _mesh_loop_lines():
         *target.parallel_element_loop_lines("static"),
         *mesh_loop_lines(target),
     )
+
+
+def _parallel_region_lines():
+    """The region a kernel opens to stage through thread scratch: nothing in a team
+    body, whose block every thread of its caller's region runs."""
+    pragma = _target().parallel_region_pragma()
+    return () if pragma is None else (pragma,)
+
+
+def _worksharing_for_lines(schedule=None):
+    pragma = _target().worksharing_for_pragma(schedule)
+    return () if pragma is None else (pragma,)
 
 
 def _atomic_update_pragma():
@@ -2094,7 +2111,7 @@ def generate_coupled_residual_sfem_files(
     operator_files = published_mesh_operator_files(
         published_here,
         published_patch_merit_kernels(
-            element_type,
+            specialization.quadrature_rule,
             unit_name,
             has_parallel_region=_target().parallel_region_pragma() is not None,
         ),
@@ -2953,6 +2970,8 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         kernel_constant("NQ1", "integer_root(NQ, ND)", indent="  "),
         "  static_assert(ipow(NQ1, ND) == NQ, \"NQ must be tensor-product compatible\");",
     ]
+    if uses_determinant:
+        lines.append(discard_unused("determinant"))
     for group in layout.groups:
         shape_name = "%s_NS" % group.name.upper()
         shape_1d_name = "%s_NS1" % group.name.upper()
@@ -3069,14 +3088,19 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     body = []
     if uses_determinant:
         hoisted.append(
-            "    const s_t *const RSTR det_q = determinant + q * geometry_stride;"
+            kernel_local(
+                "det_q",
+                "determinant + q * geometry_stride",
+                "const s_t *const RSTR",
+                indent="    ",
+            )
         )
     hoisted.extend(
         "    const s_t *const RSTR adj_q%d = adjugate[%d] + q * geometry_stride;" % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     if uses_determinant:
-        body.append('      const s_t det = det_q' + _ptr() + ';')
+        body.append(kernel_local("det", "det_q" + _ptr(), "const s_t", indent="      "))
     body.extend(
         ('      const s_t adj%d = adj_q%d' + _ptr() + ';') % (i, i)
         for i in _adjugate_components(dependencies, dim)
@@ -3969,7 +3993,15 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         staging_quadrature_body = []
         staging_lane_body = []
-        if uses_determinant:
+        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
+        # Only the geometry the staged state and tangent read: a constant material tangent
+        # (linear Kelvin-Voigt) reads none of it, and an unused load does not compile.
+        staged_text = " ".join(repr(node) for node in (*staging_aliases, *tangent_nodes))
+
+        def staged_reads(name):
+            return re.search(r"\b%s\b" % name, staged_text) is not None
+
+        if uses_determinant and staged_reads("det"):
             staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "det_q", (),
@@ -3980,6 +4012,8 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
             )
         for i in _adjugate_components(dependencies, dim):
+            if not staged_reads("adj%d" % i):
+                continue
             staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "adj_q%d" % i, (),
@@ -3991,7 +4025,6 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
                 )
             )
-        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
         staging_quadrature_body.extend(staging_hoists)
         staging_lane_body.extend(staging_aliases)
         staging_lane_body.extend(tangent_nodes)
@@ -6586,7 +6619,12 @@ def _operator_source(
             specialized_block_prefix or local_prefix,
             form,
         )
-        if True:
+        # Only where the caller's streams are host memory.  The entry point
+        # runs the block on the arrays it is handed, on the calling thread; a
+        # device target would hand that loop device pointers and ignore the
+        # stream it is given, and there is no element-SoA device kernel for it
+        # to launch instead.  The diagnostics above are published either way.
+        if not _target().supports_device_kernels:
             scalar_type = "s_t"
             params = list(
                 _local_kernel_count_params(_uses_constant_p1_expansion(rule))
@@ -6715,20 +6753,22 @@ def _operator_source(
             lines.extend(
                 _runtime_typed_entry_point(function, params, (), body)
             )
-        lines.extend(
-            _mesh_operator_source(
-                system,
-                prefix,
-                local_prefix,
-                affine_specialization,
-                specialization,
-                form,
-                dependencies,
-                coefficients,
-                basis_family,
-                geometry_family,
+        # The operator's product is a team body (`kernel_target`).
+        with use_target(kernel_target(form, _target())):
+            lines.extend(
+                _mesh_operator_source(
+                    system,
+                    prefix,
+                    local_prefix,
+                    affine_specialization,
+                    specialization,
+                    form,
+                    dependencies,
+                    coefficients,
+                    basis_family,
+                    geometry_family,
+                )
             )
-        )
         # The AoS wrapper forwards to the isoparametric SoA kernel, so it
         # goes wherever that goes.  `apply_variants` already records that AoS
         # only ever appears with isoparametric geometry.
@@ -6775,7 +6815,7 @@ def _operator_source(
         str(parameter) for parameter in form_dependencies["residual"].parameters
     )
     for kernel in published_patch_merit_kernels(
-        rule.element_type,
+        rule,
         unit_name,
         has_parallel_region=_target().parallel_region_pragma() is not None,
     ):
@@ -6901,54 +6941,56 @@ def _mixed_operator_source(
         ),
     )
     for form, coefficients, dependencies in form_data:
-        lines.extend(
-            _mixed_affine_function(
-                system,
-                prefix,
-                local_prefix,
-                element,
-                rule,
-                AFFINE_MODE,
-                # Through the target, as every other mesh operator's width
-                # is.  Passed raw, a device mixed kernel declared `VS = 16`
-                # and blocked its staging over sixteen elements while the
-                # micro-kernels it calls hold one, so it handed a scalar entry
-                # point a lane-blocked tile -- which nvcc rejects, and which
-                # would have computed the wrong numbers had it compiled.
-                current_target().effective_vector_size(
-                    cell_specialization.vector_size
-                ),
-                field_element_types,
-                form,
-                dependencies,
-                basis_family,
+        # The operator's product is a team body (`kernel_target`).
+        with use_target(kernel_target(form, _target())):
+            lines.extend(
+                _mixed_affine_function(
+                    system,
+                    prefix,
+                    local_prefix,
+                    element,
+                    rule,
+                    AFFINE_MODE,
+                    # Through the target, as every other mesh operator's width
+                    # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                    # and blocked its staging over sixteen elements while the
+                    # micro-kernels it calls hold one, so it handed a scalar entry
+                    # point a lane-blocked tile -- which nvcc rejects, and which
+                    # would have computed the wrong numbers had it compiled.
+                    current_target().effective_vector_size(
+                        cell_specialization.vector_size
+                    ),
+                    field_element_types,
+                    form,
+                    dependencies,
+                    basis_family,
+                )
             )
-        )
-        lines.extend(
-            _mixed_isoparametric_function(
-                system,
-                prefix,
-                local_prefix,
-                element,
-                rule,
-                ISOPARAMETRIC_MODE,
-                # Through the target, as every other mesh operator's width
-                # is.  Passed raw, a device mixed kernel declared `VS = 16`
-                # and blocked its staging over sixteen elements while the
-                # micro-kernels it calls hold one, so it handed a scalar entry
-                # point a lane-blocked tile -- which nvcc rejects, and which
-                # would have computed the wrong numbers had it compiled.
-                current_target().effective_vector_size(
-                    cell_specialization.vector_size
-                ),
-                field_element_types,
-                form,
-                coefficients,
-                dependencies,
-                basis_family,
-                geometry_family,
+            lines.extend(
+                _mixed_isoparametric_function(
+                    system,
+                    prefix,
+                    local_prefix,
+                    element,
+                    rule,
+                    ISOPARAMETRIC_MODE,
+                    # Through the target, as every other mesh operator's width
+                    # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                    # and blocked its staging over sixteen elements while the
+                    # micro-kernels it calls hold one, so it handed a scalar entry
+                    # point a lane-blocked tile -- which nvcc rejects, and which
+                    # would have computed the wrong numbers had it compiled.
+                    current_target().effective_vector_size(
+                        cell_specialization.vector_size
+                    ),
+                    field_element_types,
+                    form,
+                    coefficients,
+                    dependencies,
+                    basis_family,
+                    geometry_family,
+                )
             )
-        )
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
@@ -7085,6 +7127,7 @@ def _mixed_affine_function(
                 % (field_group.name, field_group.components)
             )
 
+    params = with_team_element_range(params, _target())
     impl = "%s_%s_%s_affine_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -7225,6 +7268,7 @@ def _mixed_affine_function(
     call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
     call_args.append("out_stride")
     call_args.extend("%s_out" % group.name for group in layout.groups)
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -7272,6 +7316,7 @@ def _mixed_isoparametric_function(
                 "s_t *const RSTR %s_out[%d]"
                 % (field_group.name, field_group.components)
             )
+    params = with_team_element_range(params, _target())
     impl = "%s_%s_%s_isoparametric_mesh_mixed_impl" % (prefix, element, form)
     block = "%s_%s_block" % (local_prefix, form)
     lines = [
@@ -7496,6 +7541,7 @@ def _mixed_isoparametric_function(
     call_args.extend(_mixed_mesh_dependency_call_args(layout, dependencies))
     call_args.append("out_stride")
     call_args.extend("%s_out" % group.name for group in layout.groups)
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -8098,6 +8144,7 @@ def _mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     for index, param in enumerate(params):
         lines.append(
             "    %s%s" % (param, "," if index + 1 < len(params) else "")
@@ -8375,6 +8422,7 @@ def _mesh_operator_source(
     )
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -8620,18 +8668,20 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     reduction = _crs_reduction_lines(
         assembly.reduction_policy,
         "%s[entries[i * NS + j]]" % value_stream,
-        "element_matrix[i * NS + j]",
+        "v_t(element_matrix[i * NS + j])",
         "      ",
         "",
     )
     return _crs_find_cols_lines(function_base, n_shape) + [
-        "template <typename s_t>",
+        # The values of their own type v_t: a BSR tangent may be stored in
+        # single precision (runtime_typed_abi.VALUES_TYPE_PARAMETER).
+        "template <typename s_t, typename v_t>",
         "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR %s," % row_pointer,
         "    const idx_t *const RSTR %s," % column_index,
-        "    s_t *const RSTR values) {",
+        "    v_t *const RSTR values) {",
         kernel_constant("NS", n_shape, indent="  "),
         "  count_t entries[NS * NS];",
         "  idx_t ks[NS];",
@@ -8713,14 +8763,14 @@ def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
         + col_header
         + [
             "        for (int col_shape = 0; col_shape < NS; ++col_shape) {",
-            "          s_t *const block = "
-            "&values[entries[row_shape * NS + col_shape] * NC * NC];",
+            "          v_t *const block = "
+            "&values[(ptrdiff_t)entries[row_shape * NS + col_shape] * NC * NC];",
         ]
         + [
             line
             for line in _scatter_add_lines(
                 "block[%s * NC + %s]" % (bi, bj),
-                "row[bj * NS + col_shape]",
+                "v_t(row[bj * NS + col_shape])",
                 "          ",
                 "",
             )
@@ -8736,13 +8786,14 @@ def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
 
 def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_streams, column_streams):
     return _crs_find_cols_lines(function_base, n_shape) + [
-        "template <typename s_t>",
+        # The values of their own type v_t, as in the scalar scatter.
+        "template <typename s_t, typename v_t>",
         "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
         "    const idx_t *const RSTR ev,",
         "    const s_t *const RSTR element_matrix,",
         "    const count_t *const RSTR rowptr,",
         "    const idx_t *const RSTR colidx,",
-        "    s_t *const RSTR values) {",
+        "    v_t *const RSTR values) {",
         kernel_constant("NS", n_shape, indent="  "),
         kernel_constant("NC", n_fields, indent="  "),
         kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
@@ -8881,10 +8932,25 @@ def _scalar_crs_precision_entry_points(
             )
         )
 
+    def _forward_values(implementation):
+        #: The implementation instantiated on the scalar and the values' type.
+        return lambda scalar_type, arguments, values_type: list(
+            _target().mesh_launch_lines(
+                implementation, "%s, %s" % (scalar_type, values_type), arguments, indent=""
+            )
+        )
+
     if "crs" in matrix_formats:
+        # A CRS matrix stores the scalar.
+        crs_params = [param.replace("v_t", "s_t") for param in params]
         lines.extend(
             _runtime_typed_entry_point(
-                function_base, params, matrix_arguments, _forward(impl)
+                function_base,
+                crs_params,
+                matrix_arguments,
+                lambda scalar_type, arguments: _forward_values(impl)(
+                    scalar_type, arguments, scalar_type
+                ),
             )
         )
     if "bsr" in matrix_formats:
@@ -8893,7 +8959,7 @@ def _scalar_crs_precision_entry_points(
                 function_base.replace("_hessian_crs_", "_hessian_bsr_"),
                 params,
                 matrix_arguments,
-                _forward(impl),
+                _forward_values(impl),
             )
         )
     if "crs" in matrix_formats and "one_pass" in packed_crs_passes:
@@ -9182,16 +9248,16 @@ def _element_matrix_kernel_for(strategy, kernels):
     return kernels.get(_ELEMENT_MATRIX_FALLBACK.get(strategy))
 
 
-def _assembly_geometry_stream_names(dim):
+def _assembly_geometry_stream_names(dependencies, dim):
     """The adjugate and determinant an assembly kernel stages, in ABI order.
 
-    The block kernel takes the adjugate and the determinant whatever the
-    element, so an affine assembly reads exactly those two streams; the metric
-    form is a matrix-free contraction and has no bearing here.
+    The streams the kernel it calls reads, from the plan that declares that
+    kernel: the determinant always, the adjugate where the form reads a
+    gradient.  A mass reads values alone, and an affine assembly that staged its
+    adjugate anyway filled a buffer nothing read.  The metric form is a
+    matrix-free contraction and has no bearing here.
     """
-    return tuple(
-        ["adj%d" % component for component in range(dim * dim)] + ["det0"]
-    )
+    return tuple(name for name, _ in local_geometry_streams(dependencies, dim))
 
 
 def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
@@ -9209,6 +9275,28 @@ def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
         return _holding_one_element_crs_matrix_assembly_source(
             *arguments, **keywords
         )
+
+
+def _drop_unread_adjugate_views(lines):
+    """Drop a `badjugate` view the code after it, up to the next one, never reads.
+
+    The element's adjugate is staged for every form, and a form that contracts only values -- a
+    mass -- passes the determinant alone: the view was declared and never read.
+    """
+    declaration = re.compile(r"^\s*const s_t \*const badjugate\[ND \* ND\] = ")
+    read = re.compile(r"\bbadjugate\b")
+    kept = []
+    for index, line in enumerate(lines):
+        if declaration.match(line):
+            following = []
+            for later in lines[index + 1 :]:
+                if declaration.match(later):
+                    break
+                following.append(later)
+            if not any(read.search(later) for later in following):
+                continue
+        kept.append(line)
+    return kept
 
 
 def _holding_one_element_crs_matrix_assembly_source(
@@ -9293,6 +9381,17 @@ def _holding_one_element_crs_matrix_assembly_source(
     # Asked here because `kept_reference_tables` below needs it: an affine loop
     # builds no Jacobian, so it reads no reference gradient either.
     builds_its_own_jacobian = geometry_mode != AFFINE_MODE
+    # The geometry the element's matrix is built from is whatever the kernel
+    # called for it reads: the element-matrix kernel, or the block it probes.
+    geometry_streams = _assembly_geometry_stream_names(
+        assembled_matrix_dependencies(dependencies)
+        if serves_this_matrix
+        else jacobian_action_dependencies(dependencies),
+        dim,
+    )
+    # A loop that maps the element builds the adjugate on its way to the
+    # determinant; an affine one stages it only for a kernel that reads it.
+    stages_adjugate = builds_its_own_jacobian or "adj0" in geometry_streams
     element_matrix_call = (
         element_matrix_kernel.name if serves_this_matrix else None
     )
@@ -9321,8 +9420,12 @@ def _holding_one_element_crs_matrix_assembly_source(
             )
         ]
     )
+    # The geometry stride: an affine loop stages the cached adjugate and determinant once per
+    # element, in slot 0, so every quadrature point reads that slot; a loop that maps the
+    # element stages one per point. A stride of 1 there read NQ - 1 slots nothing wrote -- unseen
+    # while every affine element assembled in closed form, which reads no geometry stream.
     element_matrix_call_args = (
-        list(_local_kernel_count_args(False, "1", "1"))
+        list(_local_kernel_count_args(False, "1", "1" if builds_its_own_jacobian else "0"))
         + _stream_call_arguments(
             local_kernel_stream_plans(
                 assembled_matrix_dependencies(dependencies),
@@ -9378,7 +9481,7 @@ def _holding_one_element_crs_matrix_assembly_source(
     if is_affine_assembly:
         params.extend(
             "const geom_t *const RSTR %s" % abi_geometry_name(stream)
-            for stream in _assembly_geometry_stream_names(dim)
+            for stream in geometry_streams
         )
     else:
         params.append("const geom_t *const *const RSTR points")
@@ -9393,7 +9496,9 @@ def _holding_one_element_crs_matrix_assembly_source(
         [
             "const count_t *const RSTR rowptr",
             "const idx_t *const RSTR colidx",
-            "s_t *const RSTR values",
+            # Of their own type: the BSR entry point stores them in v_t, the CRS
+            # one in s_t (_scalar_crs_precision_entry_points).
+            "v_t *const RSTR values",
         ]
     )
 
@@ -9426,7 +9531,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         )
     lines.extend(
         [
-            "template <typename s_t>",
+            "template <typename s_t, typename v_t>",
             _target().mesh_function_line(impl),
         ]
     )
@@ -9465,7 +9570,11 @@ def _holding_one_element_crs_matrix_assembly_source(
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
             *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS]%s;" % _wi_extent()]),
-            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            *(
+                ["    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ")]
+                if stages_adjugate
+                else []
+            ),
             "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
@@ -9559,6 +9668,7 @@ def _holding_one_element_crs_matrix_assembly_source(
             "    badjugate_data[%d][0] = s_t(%s[element]);"
             % (component, abi_geometry_name("adj%d" % component))
             for component in range(dim * dim)
+            if stages_adjugate
         )
         lines.append(
             "    bdeterminant[0] = s_t(%s[element]);" % abi_geometry_name("det0")
@@ -9661,10 +9771,11 @@ def _holding_one_element_crs_matrix_assembly_source(
             if direction_lines or output_lines
             else "%s_contiguous" % block
         )
-    lines.append(
-        "    const s_t *const badjugate[ND * ND] = {%s};"
-        % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
-    )
+    if stages_adjugate:
+        lines.append(
+            "    const s_t *const badjugate[ND * ND] = {%s};"
+            % ", ".join("badjugate_data[%d]" % i for i in range(dim * dim))
+        )
     call_args = ["1", "1"]
     call_args.extend(
         _stream_call_arguments(
@@ -10067,7 +10178,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         ]
     )
     _scalar_crs_precision_entry_points(
-        tuple(abi_geometry_name(stream) for stream in _assembly_geometry_stream_names(dim))
+        tuple(abi_geometry_name(stream) for stream in geometry_streams)
         if is_affine_assembly
         else ("points",),
         dependencies,
@@ -10084,7 +10195,7 @@ def _holding_one_element_crs_matrix_assembly_source(
         state_dependencies,
         system,
     )
-    return lines
+    return _drop_unread_adjugate_views(lines)
 
 
 def _isoparametric_mesh_operator_source(
@@ -10125,6 +10236,7 @@ def _isoparametric_mesh_operator_source(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
     params.extend(_mesh_stream_parameters(dependencies, system.fields))
+    params = with_team_element_range(params, _target())
     lines = [
         "namespace sfem {",
         "namespace codegen {",
@@ -10330,6 +10442,7 @@ def _isoparametric_mesh_operator_source(
     call_args = ["nelements", "nnodes", "elements", "points"]
     call_args.extend(map(str, dependencies.parameters))
     call_args.extend(_mesh_stream_arguments(dependencies, system.fields))
+    call_args = with_team_element_range_arguments(call_args, _target())
     lines.extend(
         _runtime_typed_entry_point(
             function,
@@ -10436,7 +10549,7 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel",
+            *_parallel_region_lines(),
             "  {",
             "    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);",
         ]
@@ -10458,7 +10571,7 @@ def _scalar_packed_jacobian_action_source(
             "    s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
             "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
-            "#pragma omp for schedule(static)",
+            *_worksharing_for_lines("static"),
             "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
             "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
             "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -10665,7 +10778,7 @@ def _scalar_packed_jacobian_action_source(
                 "    }",
                 "  }",
                 "",
-                "#pragma omp parallel for schedule(static)",
+                *_target().parallel_element_loop_lines("static"),
                 "  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {",
                 "    const idx_t dest = ghost_reduce_dest[row];",
                 "    const ptrdiff_t begin = ghost_reduce_ptr[row];",
@@ -10898,7 +11011,7 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             "",
-            "#pragma omp parallel",
+            *_parallel_region_lines(),
             "  {",
         ]
     )
@@ -10919,7 +11032,7 @@ def _scalar_packed_affine_jacobian_action_source(
             "    s_t *const RSTR pk_direction = sfem::codegen::thread_scratch<s_t>(2, (size_t)max_nodes_per_pack);",
             "    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)max_nodes_per_pack);",
             "",
-            "#pragma omp for schedule(static)",
+            *_worksharing_for_lines("static"),
             "    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {",
             "      const ptrdiff_t e_start = pack * n_elements_per_pack;",
             "      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);",
@@ -11311,10 +11424,10 @@ def _mesh_reference_alias_lines(
             reference for reference in references if reference.name in wanted
         )
     return [
-        "  const s_t *const %s = %s;"
-        % (
+        kernel_local(
             _mesh_reference_name(geometry_mode, reference.name),
             quadrature_reference_accessor(rule, reference.name),
+            "const s_t *const",
         )
         for reference in references
     ]

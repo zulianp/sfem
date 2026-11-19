@@ -1,0 +1,295 @@
+#include "sfem_GeneratedTwoPhaseFlow_cuda_c_abi.hpp"
+
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_maos(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output,
+        void *const stream
+);
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t C_kw1,
+        const real_t K_0,
+        const real_t K_1,
+        const real_t K_2,
+        const real_t K_3,
+        const real_t K_4,
+        const real_t K_5,
+        const real_t K_6,
+        const real_t K_7,
+        const real_t K_8,
+        const real_t P_r,
+        const real_t S_res,
+        const real_t dt,
+        const real_t kappa_T,
+        const real_t m,
+        const real_t mu_w,
+        const real_t p_wr,
+        const real_t porosity,
+        const real_t rho_w0,
+        const ptrdiff_t current_stride,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out,
+        void *const stream
+);
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t C_kw1,
+        const real_t K_0,
+        const real_t K_1,
+        const real_t K_2,
+        const real_t K_3,
+        const real_t K_4,
+        const real_t K_5,
+        const real_t K_6,
+        const real_t K_7,
+        const real_t K_8,
+        const real_t P_r,
+        const real_t S_res,
+        const real_t dt,
+        const real_t kappa_T,
+        const real_t m,
+        const real_t mu_w,
+        const real_t p_wr,
+        const real_t porosity,
+        const real_t rho_w0,
+        const ptrdiff_t current_stride,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out,
+        void *const stream
+);
+extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_esoa_diagnostics(
+        void
+);
+extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_esoa_diagnostics(
+        void
+);
+
+#if defined(SFEM_ENABLE_HIP)
+#include <unordered_map>
+#endif
+
+namespace {
+  //! Reorder a device table of connectivity rows on the device.
+  template <int N>
+  struct ConnectivityOrder {
+    int source[N];
+  };
+
+  template <typename T, int N>
+  __global__ void permute_connectivity(T *const *const elements,
+                                       const ConnectivityOrder<N> order,
+                                       T **const permuted) {
+    const int k = threadIdx.x;
+    if (k < N) permuted[k] = elements[order.source[k]];
+  }
+
+#if defined(SFEM_ENABLE_HIP)
+  //! The permuted table's storage under HIP: one per host thread and stream, kept for the
+  //! process and rewritten in stream order before each kernel that reads it. HIP 6.4 does
+  //! not capture a stream-ordered allocation into a graph (a crash in the runtime), and the
+  //! products of a captured solver run (the coarse CG's) allocate nothing this way. The first
+  //! call on a stream allocates, in relaxed capture mode: a capture under way on this thread
+  //! would otherwise refuse the allocation and be invalidated.
+  template <typename T, int N>
+  T **permuted_connectivity_table(const cudaStream_t stream) {
+    static thread_local std::unordered_map<cudaStream_t, T **> tables;
+    T **&table = tables[stream];
+    if (!table) {
+      cudaStreamCaptureMode mode = cudaStreamCaptureModeRelaxed;
+      cudaThreadExchangeStreamCaptureMode(&mode);
+      if (cudaMalloc((void **)&table, N * sizeof(T *)) != cudaSuccess) table = nullptr;
+      cudaThreadExchangeStreamCaptureMode(&mode);
+    }
+    return table;
+  }
+#endif
+}  // namespace
+
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_maos(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR parameters,
+        const void *const RSTR current,
+        const void *const RSTR direction,
+        void *const RSTR output,
+        void *const stream
+) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 8>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 8 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
+    const ConnectivityOrder<8> proteus_elements_order{{0, 1, 3, 2, 4, 5, 7, 6}};
+    permute_connectivity<idx_t, 8><<<1, 8, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, direction, output, stream);
+#if !defined(SFEM_ENABLE_HIP)
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
+    return status;
+}
+
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t C_kw1,
+        const real_t K_0,
+        const real_t K_1,
+        const real_t K_2,
+        const real_t K_3,
+        const real_t K_4,
+        const real_t K_5,
+        const real_t K_6,
+        const real_t K_7,
+        const real_t K_8,
+        const real_t P_r,
+        const real_t S_res,
+        const real_t dt,
+        const real_t kappa_T,
+        const real_t m,
+        const real_t mu_w,
+        const real_t p_wr,
+        const real_t porosity,
+        const real_t rho_w0,
+        const ptrdiff_t current_stride,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out,
+        void *const stream
+) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 8>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 8 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
+    const ConnectivityOrder<8> proteus_elements_order{{0, 1, 3, 2, 4, 5, 7, 6}};
+    permute_connectivity<idx_t, 8><<<1, 8, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+#if !defined(SFEM_ENABLE_HIP)
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
+    return status;
+}
+
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t C_kw1,
+        const real_t K_0,
+        const real_t K_1,
+        const real_t K_2,
+        const real_t K_3,
+        const real_t K_4,
+        const real_t K_5,
+        const real_t K_6,
+        const real_t K_7,
+        const real_t K_8,
+        const real_t P_r,
+        const real_t S_res,
+        const real_t dt,
+        const real_t kappa_T,
+        const real_t m,
+        const real_t mu_w,
+        const real_t p_wr,
+        const real_t porosity,
+        const real_t rho_w0,
+        const ptrdiff_t current_stride,
+        const void *const RSTR p_w,
+        const void *const RSTR p_c,
+        const ptrdiff_t direction_stride,
+        const void *const RSTR p_w_direction,
+        const void *const RSTR p_c_direction,
+        const ptrdiff_t out_stride,
+        void *const RSTR p_w_out,
+        void *const RSTR p_c_out,
+        void *const stream
+) {
+#if defined(SFEM_ENABLE_HIP)
+    idx_t **proteus_elements = permuted_connectivity_table<idx_t, 8>((cudaStream_t)stream);
+    if (!proteus_elements) return SFEM_FAILURE;
+#else
+    idx_t **proteus_elements = nullptr;
+    if (cudaMallocAsync((void **)&proteus_elements, 8 * sizeof(idx_t *), (cudaStream_t)stream) != cudaSuccess) return SFEM_FAILURE;
+#endif
+    const ConnectivityOrder<8> proteus_elements_order{{0, 1, 3, 2, 4, 5, 7, 6}};
+    permute_connectivity<idx_t, 8><<<1, 8, 0, (cudaStream_t)stream>>>(elements, proteus_elements_order, proteus_elements);
+    const int status = cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+#if !defined(SFEM_ENABLE_HIP)
+    cudaFreeAsync(proteus_elements, (cudaStream_t)stream);
+#endif
+    return status;
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_esoa_diagnostics(
+        void
+) {
+    return cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_esoa_diagnostics();
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * cu_two_phase_flow_form_2_p_w_p_c_hex8_residual_esoa_diagnostics(
+        void
+) {
+    return cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_residual_esoa_diagnostics();
+}

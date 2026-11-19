@@ -105,6 +105,7 @@ class FlopsModelTest(unittest.TestCase):
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
                 os.path.abspath(__file__))))),
             "..",
+            "src",
             "frontend",
             "ops",
             "generated",
@@ -185,6 +186,7 @@ class FlopsModelTest(unittest.TestCase):
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
                 os.path.abspath(__file__))))),
             "..",
+            "src",
             "frontend",
             "ops",
             "generated",

@@ -1,0 +1,675 @@
+/**
+ * @file sfem_Op.hpp
+ * @brief Base operator class for finite element operators
+ *
+ * This file defines the abstract base class for all finite element operators
+ * in the SFEM library. Operators represent discrete differential operators
+ * that can be applied to finite element functions.
+ */
+
+#pragma once
+
+#include "sfem_ElementScope.hpp"
+#include "sfem_ForwardDeclarations.hpp"
+#include "sfem_InexactOptions.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_TangentValues.hpp"
+#include "sfem_Team.hpp"
+#include "sfem_aliases.hpp"
+#include "sfem_defs.hpp"
+#include "sfem_logger.hpp"
+#include "smesh_glob.hpp"
+
+#include <cstddef>
+
+#ifdef SFEM_ENABLE_RYAML
+#include <ryml.hpp>
+#endif  // SFEM_ENABLE_RYAML
+
+namespace sfem {
+
+    namespace inexact {
+        struct DiagonalExtra;
+    }
+
+    /**
+     * @brief Abstract base class for finite element operators
+     *
+     * The Op class defines the interface for all finite element operators
+     * in the SFEM library. Operators can represent various differential
+     * operators like Laplacian, Linear Elasticity, Mass matrices, etc.
+     *
+     * Each operator must implement:
+     * - Hessian assembly (matrix form)
+     * - Gradient computation
+     * - Operator application (matrix-vector product)
+     * - Value computation (energy/functional evaluation)
+     *
+     * Operators can be linear or nonlinear, and support various matrix
+     * formats (CRS, BSR, diagonal, etc.).
+     */
+    class Op {
+    public:
+        virtual ~Op() = default;
+
+        /**
+         * @brief Get the name of the operator
+         * @return String identifier for the operator
+         */
+        virtual const char *name() const = 0;
+
+        /**
+         * @brief Check if the operator is linear
+         * @return true if linear, false if nonlinear
+         */
+        virtual bool is_linear() const = 0;
+
+        /**
+         * @brief Initialize the operator
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method is called after construction to perform any
+         * necessary setup, such as precomputing Jacobians or element matrices.
+         */
+        virtual int initialize(const std::vector<std::string> & /*block_names*/ = {}) { return SFEM_SUCCESS; }
+
+        virtual int update(const real_t *const /*x*/) { return SFEM_SUCCESS; }
+        virtual int update(const real_t *const SFEM_RESTRICT /*x_prev*/, const real_t *const SFEM_RESTRICT /*x_curr*/) {
+            return SFEM_SUCCESS;
+        }
+
+        /**
+         * @brief Whether this operator can apply from a stored linearization
+         * @return false unless the operator implements the inexact path
+         *
+         * An operator that supports it can have its tangent assembled once, at
+         * a state, and then applied many times without touching the state or
+         * the geometry again -- partial assembly.  The tangent is stored at the
+         * points of the rule the exact apply integrates with, so the stored
+         * apply is the exact one up to the rounding of its encoding
+         * (`InexactOptions`).
+         */
+        virtual bool inexact_supported() const { return false; }
+
+        /**
+         * @brief Whether the stored tangent has the major symmetry
+         *
+         * A tangent from an energy is a Hessian and symmetric; a residual's is
+         * a Jacobian and generally not (Kelvin-Voigt viscosity).  A solver on
+         * the stored operator asks, because CG on an unsymmetric operator is
+         * not a method.
+         */
+        virtual bool tangent_is_symmetric() const { return true; }
+
+        /**
+         * @brief Whether `set_tangent_projection` makes the assembled tangent positive semidefinite
+         *
+         * A linear operator has nothing to project; its tangent is taken as it is.
+         */
+        virtual bool tangent_projection_supported() const { return is_linear(); }
+
+        /**
+         * @brief The assembled tangents that follow projected to positive semidefinite, per
+         * quadrature point (`project_abs_symmetric`), or not
+         *
+         * The assembled (BSR) and stored (inexact) tangents are projected; the applies are the
+         * function's own.
+         */
+        virtual void set_tangent_projection(const bool /*on*/) {}
+
+        /**
+         * @brief What the stored tangent stores and how it is applied
+         *
+         * Takes effect at the next `inexact_update`; an operator without the
+         * stored path ignores it.
+         */
+        virtual void set_inexact_options(const InexactOptions & /*options*/) {}
+
+        /** @brief Bytes held by the stored tangent, 0 before `inexact_update`. */
+        virtual std::size_t inexact_bytes() const { return 0; }
+
+        /** @brief Bytes of the element geometry it caches (adjugates, determinants), where it runs. */
+        virtual std::size_t geometry_bytes() const { return 0; }
+
+        /**
+         * @brief diag += the stored operator's diagonal, for a Jacobi preconditioner on it
+         *
+         * Computed from what is stored -- the tensors, the element matrices or the assembled
+         * blocks -- and so the diagonal of the operator `inexact_apply` applies.
+         */
+        virtual int inexact_diag(real_t *const /*diag*/) { return SFEM_FAILURE; }
+
+        /**
+         * @brief Assemble the stored tangent at x, for the applies that follow
+         * @param x State to linearize about
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Explicit, and deliberately so.  The stored tangent stays valid until
+         * the next call, so the caller says when it is rebuilt rather than
+         * having the operator guess: a Newton step assembles once and then
+         * applies for every Krylov iteration, which is the whole reason the
+         * split pays.  Nothing invalidates it implicitly, so an operator whose
+         * state has moved without a call returns a tangent for the old state --
+         * which is why this is the caller's decision to make and not a cache
+         * that silently refreshes itself.
+         *
+         * `apply` continues to mean the exact operator.  The inexact apply is
+         * reached only through this path, so no existing caller changes
+         * behaviour by an operator gaining support for it.
+         *
+         * An implementation may treat a missing or stale precondition as fatal
+         * rather than returning: the generated Ops use SFEM_ERROR, which aborts,
+         * as they already do for a missing geometry cache.  Calling the inexact
+         * apply without having assembled a tangent is a programming error, not a
+         * condition to probe for.
+         */
+        virtual int inexact_update(const real_t *const /*x*/) { return SFEM_FAILURE; }
+
+        /**
+         * @brief Apply the stored tangent assembled by inexact_update
+         * @param h Input vector
+         * @param out Output vector (accumulated into)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Takes no state: the state was consumed by `inexact_update` and lives
+         * in the store.  That is the property the split exists for, and the
+         * signature says so.
+         */
+        virtual int inexact_apply(const real_t *const /*h*/, real_t *const /*out*/) { return SFEM_FAILURE; }
+
+        /// Extra diagonal blocks `inexact_apply` adds in its own pass, overwriting `out` when
+        /// `overwrite` (inexact::DiagonalExtra); null removes them. False where the stored
+        /// tangent cannot take them (only the assembled store can), and nothing is changed.
+        virtual bool set_inexact_extra(const inexact::DiagonalExtra * /*extra*/, const bool /*overwrite*/) { return false; }
+
+        /**
+         * @brief Whether the products (`team_apply`, `team_inexact_apply`) run on the threads
+         * of a parallel region their caller opened (sfem_TeamOperator.hpp).
+         *
+         * Every thread of the region calls them with the same arguments and its own team; on
+         * return the calling thread's share of the rows is complete. `apply` and
+         * `inexact_apply` are then one region around them.
+         */
+        virtual bool team_supported() const { return false; }
+
+        /// Outside any region, before the team products of a region: what can fail or
+        /// allocate (states, caches, scratch). The plain products call it themselves.
+        virtual int team_prepare() { return SFEM_SUCCESS; }
+
+        /// `apply` by the threads of the caller's region (team_supported), over the elements of
+        /// `scope` (sfem_ElementScope.hpp): a nodal term goes with every scope but
+        /// SHARED_AND_AURA, so that the two halves of a distributed product add up to ALL.
+        virtual int team_apply(const Team & /*team*/,
+                               const real_t *const /*x*/,
+                               const real_t *const /*h*/,
+                               real_t *const /*out*/,
+                               const ElementScope /*scope*/) {
+            SFEM_ERROR("%s has no team apply\n", name());
+            return SFEM_FAILURE;
+        }
+
+        /// `inexact_apply` by the threads of the caller's region (team_supported), over `scope`
+        /// as team_apply.
+        virtual int team_inexact_apply(const Team & /*team*/,
+                                       const real_t *const /*h*/,
+                                       real_t *const /*out*/,
+                                       const ElementScope /*scope*/) {
+            SFEM_ERROR("%s has no team inexact apply\n", name());
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the Hessian matrix in CRS format
+         * @param x Current solution vector
+         * @param rowptr Row pointer array for CRS format
+         * @param colidx Column index array for CRS format
+         * @param values Matrix values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method assembles the Hessian matrix in Compressed Row Storage (CRS) format.
+         * The matrix represents the second derivative of the operator with respect to the solution.
+         */
+        virtual int hessian_crs(const real_t *const  x,
+                                const count_t *const rowptr,
+                                const idx_t *const   colidx,
+                                real_t *const        values) = 0;
+
+        /**
+         * @brief Assemble the symmetric Hessian matrix in CRS format
+         * @param x Current solution vector
+         * @param rowptr Row pointer array for CRS format
+         * @param colidx Column index array for CRS format
+         * @param diag_values Diagonal values array (output)
+         * @param off_diag_values Off-diagonal values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method assembles the symmetric Hessian matrix, separating diagonal and off-diagonal entries.
+         */
+        virtual int hessian_crs_sym(const real_t *const  /*x*/,
+                                    const count_t *const /*rowptr*/,
+                                    const idx_t *const   /*colidx*/,
+                                    real_t *const        /*diag_values*/,
+                                    real_t *const        /*off_diag_values*/) {
+            SFEM_ERROR("hessian_crs_sym not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the symmetric Hessian matrix in block CRS format
+         * @param x Current solution vector
+         * @param rowptr Row pointer array for CRS format
+         * @param colidx Column index array for CRS format
+         * @param block_stride Block size (ptrdiff_t)
+         * @param diag_values Diagonal values array (output, real_t**)
+         * @param off_diag_values Off-diagonal values array (output, real_t**)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method assembles the symmetric Hessian matrix in block CRS format.
+         */
+        virtual int hessian_bcrs_sym(const real_t *const  /*x*/,
+                                     const count_t *const /*rowptr*/,
+                                     const idx_t *const   /*colidx*/,
+                                     const ptrdiff_t      /*block_stride*/,
+                                     real_t **const       /*diag_values*/,
+                                     real_t **const       /*off_diag_values*/) {
+            SFEM_ERROR("hessian_bcrs_sym not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the block diagonal symmetric Hessian matrix
+         * @param x Current solution vector
+         * @param values Block diagonal values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method assembles only the block diagonal entries of the symmetric Hessian matrix.
+         */
+        virtual int hessian_block_diag_sym(const real_t *const /*x*/, real_t *const /*values*/) {
+            SFEM_ERROR("hessian_block_diag_sym not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the block diagonal symmetric Hessian matrix in structure-of-arrays format
+         * @param x Current solution vector
+         * @param values Array of block diagonal values arrays (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * This method assembles the block diagonal entries in structure-of-arrays format.
+         */
+        virtual int hessian_block_diag_sym_soa(const real_t *const /*x*/, real_t **const /*values*/) {
+            SFEM_ERROR("hessian_block_diag_sym_soa not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the Hessian matrix in BSR format
+         * @param x Current solution vector
+         * @param rowptr Row pointer array for BSR format
+         * @param colidx Column index array for BSR format
+         * @param values Matrix values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int hessian_bsr(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) {
+            SFEM_ERROR("BSR assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /// hessian_bsr into values of `values_type` (sfem_TangentValues.hpp): real_t, or float for
+        /// a tangent assembled in single precision. An operator that assembles only real_t
+        /// values takes that type alone.
+        virtual int hessian_bsr_typed(const real_t *const          x,
+                                      const count_t *const         rowptr,
+                                      const idx_t *const           colidx,
+                                      const smesh::PrimitiveType values_type,
+                                      void *const                  values) {
+            if (tangent_values_type(values_type) == smesh::TypeToEnum<real_t>::value()) {
+                return hessian_bsr(x, rowptr, colidx, static_cast<real_t *>(values));
+            }
+            SFEM_ERROR("%s: BSR assembly into single-precision values not implemented\n", name());
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the Hessian matrix in DIA format
+         * @param x Current solution vector
+         * @param diag_offsets Diagonal offsets in node-block rows
+         * @param ndiag Number of diagonal offsets
+         * @param values Matrix values array (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int hessian_dia(const real_t *const /*x*/,
+                                const int *const /*diag_offsets*/,
+                                const ptrdiff_t /*ndiag*/,
+                                real_t *const /*values*/) {
+            SFEM_ERROR("DIA assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Assemble the diagonal of the Hessian matrix
+         * @param x Current solution vector
+         * @param values Diagonal values (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int hessian_diag(const real_t *const /*x*/, real_t *const /*values*/) {
+            SFEM_ERROR("Diagonal assembly not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /// Whether the Hessian is its diagonal (hessian_diag is the whole operator): a lumped mass.
+        /// A stored tangent then applies it in its own pass (InexactOptions::Inertia).
+        virtual bool hessian_is_diagonal() const { return false; }
+
+        /**
+         * @brief Compute the gradient of the operator
+         * @param x Current solution vector
+         * @param out Gradient vector (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int gradient(const real_t *const x, real_t *const out) = 0;
+
+        /**
+         * @brief Apply the operator (matrix-vector product)
+         * @param x Current solution vector (may be nullptr for linear operators)
+         * @param h Input vector
+         * @param out Output vector
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int apply(const real_t *const x, const real_t *const h, real_t *const out) = 0;
+
+        /**
+         * @brief Compute the value/energy of the operator
+         * @param x Current solution vector
+         * @param out Energy value (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int value(const real_t *x, real_t *const out) = 0;
+
+        virtual int gradient(const real_t *const x, real_t *const out, const ElementScope scope) {
+            if (scope == ElementScope::ALL) {
+                return gradient(x, out);
+            }
+            SFEM_ERROR("%s does not support ElementScope other than ALL\n", name());
+            return SFEM_FAILURE;
+        }
+
+        virtual int apply(const real_t *const x, const real_t *const h, real_t *const out, const ElementScope scope) {
+            if (scope == ElementScope::ALL) {
+                return apply(x, h, out);
+            }
+            SFEM_ERROR("%s does not support ElementScope other than ALL\n", name());
+            return SFEM_FAILURE;
+        }
+
+        virtual int value(const real_t *x, real_t *const out, const ElementScope scope) {
+            if (scope == ElementScope::ALL) {
+                return value(x, out);
+            }
+            SFEM_ERROR("%s does not support ElementScope other than ALL\n", name());
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Whether this operator's 0-form is a potential that may be summed.
+         *
+         * An energy or a recovered potential is an element integral: each
+         * element contributes a number, the numbers sum, and the total adds
+         * across operators -- which is what lets `value` be a term in a sum.
+         * Appending such a term is how a material without transient terms
+         * becomes transient: an inertia potential beside a static energy is
+         * one more term, not a different problem.
+         *
+         * A residual that is the gradient of nothing has no such integral, and
+         * answers false.  It is not a statement that the operator has no
+         * merit -- the residual merit always exists -- only that its 0-form is
+         * not additive: `1/2*||sum_op R_op||^2` is not `sum_op 1/2*||R_op||^2`.
+         *
+         * Pure, with no default, because both answers are common and a wrong
+         * one is silent: an operator that wrongly claims a potential has its
+         * number added to a sum it does not belong in.
+         */
+        virtual bool energy_or_potential_based() const = 0;
+
+        /**
+         * @brief Whether `gradient` reads the state at all.
+         *
+         * False is a promise that it does not -- a traction, a body force --
+         * so the operator is assembled once into the accumulator instead of
+         * once per trial step.  That promise is what takes the external terms
+         * out of the line search, and it is the cheap half of the saving.
+         *
+         * True is the safe answer and the default: an operator that reads `x`
+         * must be re-assembled wherever `x` moves.
+         */
+        virtual bool residual_depends_on_state() const { return true; }
+
+        /**
+         * @brief Whether this operator samples the merit itself.
+         *
+         * True means it implements `residual_merit_steps` as one pass over the
+         * mesh with the steps as an inner loop, and so should be handed the
+         * accumulator and asked to finish the sum.  Default false: an operator
+         * that has not been given such a kernel is served by the base
+         * implementation, correctly and slowly.
+         *
+         * At most one operator in a `Function` may answer true, since two
+         * norms cannot be composed.  It is not what `add_operator` refuses,
+         * though -- that rule is about operators with no potential, which
+         * mandate this merit rather than merely accelerate it.
+         */
+        virtual bool contracts_residual_merit() const { return false; }
+
+        /**
+         * @brief `out[step] += 1/2 * ||accumulator + gradient(x + steps[step]*h)||^2`.
+         *
+         * Every step in one pass over the mesh.  `accumulator` already holds
+         * every other operator's contribution, signs included, exactly as
+         * `Function::gradient` builds it, so this finishes a sum rather than
+         * starting one.
+         *
+         * The shape exists so the alpha-independent work -- geometry, the
+         * gathers, the reference tables -- is done once and the steps are an
+         * inner loop over values already in cache, which is what makes a
+         * twelve-point sampling line search cost about what one step costs.
+         * The square is node-wise and cannot be taken element-locally, so an
+         * implementation accumulates the steps' residuals into node storage
+         * before squaring; the packed layout makes that local to a pack.
+         */
+        virtual int residual_merit_steps(const real_t *const       x,
+                                         const real_t *const       h,
+                                         const int                 nsteps,
+                                         const real_t *const       steps,
+                                         const real_t *const       accumulator,
+                                         real_t *const             out);
+
+        /**
+         * @brief Compute the value/energy of the operator
+         * @param x Current solution vector
+         * @param h Input vector
+         * @param nsteps Number of steps
+         * @param steps Steps
+         * @param out Energy values per step (output)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int value_steps(const real_t       * /*x*/,
+                                const real_t       * /*h*/,
+                                const int           /*nsteps*/,
+                                const real_t *const /*steps*/,
+                                real_t *const       /*out*/) {
+            SFEM_ERROR("value_steps not implemented for this operator");
+            return SFEM_FAILURE;
+        }
+
+        /**
+         * @brief Report operator statistics or debug information
+         * @param x Current solution vector
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         */
+        virtual int report(const real_t *const /*x*/) { return SFEM_SUCCESS; }
+
+        /**
+         * @brief Set operator-specific options
+         * @param name Option name
+         * @param val Option value
+         */
+        virtual void set_option(const std::string & /*name*/, bool /*val*/) {}
+
+        virtual void set_value_in_block(const std::string & /*block_name*/,
+                                        const std::string & /*var_name*/,
+                                        const real_t /*value*/) {}
+
+        /**
+         * @brief Create a clone of this operator
+         * @return Shared pointer to the cloned operator, or nullptr if not supported
+         *
+         * This method allows operators to be cloned for use in different contexts.
+         * The default implementation returns nullptr, indicating that cloning is not supported.
+         * Derived classes should override this method if they support cloning.
+         */
+        virtual std::shared_ptr<Op> clone() const { return nullptr; }
+
+        /**
+         * @brief Create a level-of-refinement (LOR) version of this operator
+         * @param space Function space for the LOR operator
+         * @return Shared pointer to the LOR operator, or nullptr if not supported
+         */
+        virtual std::shared_ptr<Op> lor(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
+
+        /**
+         * @brief Create a derefined version of this operator
+         * @param space Function space for the derefined operator
+         * @return Shared pointer to the derefined operator, or nullptr if not supported
+         */
+        virtual std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> & /*space*/) { return nullptr; }
+
+        /**
+         * @brief Get the execution context of this operator: where it runs and, on the device, the stream
+         * its kernels are issued on
+         * @return Execution context
+         */
+        virtual ExecutionContext execution_context() const { return EXECUTION_SPACE_HOST; }
+
+        /**
+         * @brief Get the execution space of this operator
+         * @return Execution space (CPU, GPU, etc.)
+         */
+        ExecutionSpace execution_space() const { return execution_context().space(); }
+
+        /**
+         * @brief Set a field for operators that depend on external fields
+         * @param name Field name
+         * @param v Field values
+         * @param component Field component
+         */
+        virtual void set_field(const char * /*name*/, const std::shared_ptr<Buffer<real_t>> & /*v*/, const int /*component*/) {}
+
+        virtual bool is_no_op() const { return false; }
+
+        virtual void override_element_types(const std::vector<smesh::ElemType> & /*element_types*/) {}
+
+        virtual double flops() const { return flops_apply(); }
+        virtual double flops_value() const { return 0; }
+        virtual double flops_gradient() const { return 0; }
+        virtual double flops_apply() const { return 0; }
+
+        virtual size_t memory_traffic_bytes() const { return memory_traffic_bytes_apply(); }
+        virtual size_t memory_traffic_bytes_value() const { return 0; }
+        virtual size_t memory_traffic_bytes_gradient() const { return 0; }
+        virtual size_t memory_traffic_bytes_apply() const { return 0; }
+
+        virtual ptrdiff_t n_dofs_domain() const = 0;
+        virtual ptrdiff_t n_dofs_image() const  = 0;
+
+#ifdef SFEM_ENABLE_RYAML
+        virtual std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                     const ryml::ConstNodeRef             &node) {
+            SMESH_UNUSED(space);
+            SMESH_UNUSED(node);
+            SFEM_ERROR("create_from_yaml not implemented for this operator");
+            return nullptr;
+        }
+#endif  // SFEM_ENABLE_RYAML
+    };
+
+    /**
+     * @brief No-operation operator
+     *
+     * A trivial operator that does nothing. Useful as a placeholder
+     * or for testing purposes.
+     */
+    class NoOp final : public Op {
+    public:
+        const char *name() const override { return "NoOp"; }
+        bool        is_linear() const override { return true; }
+        //! It contributes nothing, so nothing of it belongs in either merit.
+        //! `true` keeps it summable: adding zero to a potential is still a
+        //! potential, while claiming it moves with the state would make it a
+        //! contractor and refuse a real one beside it.
+        bool energy_or_potential_based() const override { return true; }
+        bool contracts_residual_merit() const override { return false; }
+        int         hessian_crs(const real_t *const /*x*/,
+                                const count_t *const /*rowptr*/,
+                                const idx_t *const /*colidx*/,
+                                real_t *const /*values*/) override {
+            return SFEM_SUCCESS;
+        }
+        int gradient(const real_t *const /*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
+        int apply(const real_t *const /*x*/, const real_t *const /*h*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
+        int value(const real_t * /*x*/, real_t *const /*out*/) override { return SFEM_SUCCESS; }
+        int gradient(const real_t *const /*x*/, real_t *const /*out*/, const ElementScope) override { return SFEM_SUCCESS; }
+        int apply(const real_t *const /*x*/,
+                  const real_t *const /*h*/,
+                  real_t *const /*out*/,
+                  const ElementScope) override {
+            return SFEM_SUCCESS;
+        }
+        int value(const real_t * /*x*/, real_t *const /*out*/, const ElementScope) override { return SFEM_SUCCESS; }
+        std::shared_ptr<Op> clone() const override { return std::make_shared<NoOp>(); }
+        std::shared_ptr<Op> derefine(const std::shared_ptr<FunctionSpace> & /*space*/) override { return std::make_shared<NoOp>(); }
+        bool                is_no_op() const override { return true; }
+        ptrdiff_t           n_dofs_domain() const override { return -1; };
+        ptrdiff_t           n_dofs_image() const override { return -1; };
+
+#ifdef SFEM_ENABLE_RYAML
+        inline std::shared_ptr<Op> create_from_yaml(const std::shared_ptr<FunctionSpace> &, const ryml::ConstNodeRef &) override {
+            return std::make_shared<NoOp>();
+        }
+#endif  // SFEM_ENABLE_RYAML
+    };
+
+    /**
+     * @brief Create a no-operation operator
+     * @return Shared pointer to a NoOp instance
+     */
+    std::shared_ptr<Op> no_op();
+
+    /// `sum_i r_i^2` over an assembled residual, summed in a fixed order.
+    ///
+    /// Shared by `Op::residual_merit_steps` and `Function`, so the two cannot
+    /// reduce the same vector differently.  Deterministic because a line search
+    /// compares these numbers across runs.
+    real_t squared_residual_norm(const ptrdiff_t ndofs, const int block_size, const real_t *const values);
+
+    /// The plain product of a team operator: op.team_prepare(), then one region of n rows in
+    /// which every thread calls f(team), its own Team; the first failure any thread met.
+    template <typename F>
+    int op_team_region(Op &op, const ptrdiff_t n, F f) {
+        const int prepared = op.team_prepare();
+        if (prepared != SFEM_SUCCESS) return prepared;
+        int ret = SFEM_SUCCESS;
+#pragma omp parallel
+        {
+            const int err = f(Team::current(n));
+            if (err != SFEM_SUCCESS) {
+#pragma omp atomic write
+                ret = err;
+            }
+        }
+        return ret;
+    }
+
+}  // namespace sfem

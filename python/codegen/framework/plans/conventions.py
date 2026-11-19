@@ -140,6 +140,20 @@ def sfem_scalar_type_prelude(indent=""):
     ]
 
 
+def generated_include(path):
+    """How one generated file names another in an `#include`: by file name only.
+
+    `make install` copies every header into one flat `include/` directory, so a
+    directory in the spelling -- `../d2/quad4/x.hpp`, `reference/line_p1_q2.hpp`
+    -- names a path that does not exist once installed.  The build tree resolves
+    the bare name because every generated directory that holds a header is on
+    the include path (see the top-level CMakeLists.txt), and flattening is only
+    safe while file names are unique across the generated tree, which
+    `pipeline/driver.py _check_flat_file_names` enforces at generation time.
+    """
+    return str(path).replace("\\", "/").rsplit("/", 1)[-1]
+
+
 def optional_sfem_include(header, indent=""):
     """Include one of SFEM's headers where it is on the path, and carry on where
     it is not.
@@ -463,6 +477,55 @@ def diagnostics_tail(name):
             return tail
     return None
 
+#: The tail of a kernel's team entry point: the same kernel run by the threads of
+#: a parallel region its caller opened (a solver's region), every thread calling
+#: it with the same arguments.  The plain name opens that region around it.  A
+#: tail after the layout, so the name parses as its plain twin's and the
+#: dimension-generic dispatch carries it through (`..._3d_a_msoa_team`).
+ABI_TEAM_TAIL = "_team"
+
+#: The elements a team kernel walking the mesh is given, after `nelements`: its
+#: `_team` twin takes them, the plain name passes the whole mesh
+#: (`TargetPlatform.walks_an_element_range`).
+TEAM_ELEMENT_RANGE_PARAMETERS = ("const ptrdiff_t element_begin", "const ptrdiff_t element_end")
+TEAM_ELEMENT_RANGE_ARGUMENTS = ("element_begin", "element_end")
+WHOLE_MESH_ELEMENT_RANGE = ("0", "nelements")
+
+
+def _with_element_range(items, is_count, range_items, target):
+    """`items` with `range_items` after the element count (`is_count`), when `target` walks a
+    range (a team body) and the kernel walks elements rather than packs."""
+    items = list(items)
+    if not target.walks_an_element_range():
+        return items
+    if any(TEAM_ELEMENT_RANGE_ARGUMENTS[0] in item for item in items):
+        return items
+    if any("n_packs" in item for item in items):
+        return items
+    for index, item in enumerate(items):
+        if is_count(item):
+            return items[: index + 1] + list(range_items) + items[index + 1 :]
+    return items
+
+
+def with_team_element_range(params, target):
+    """`params` with the element range inserted after `nelements`, when `target`
+    walks one (a team body); unchanged otherwise, and for a kernel that walks
+    packs."""
+    return _with_element_range(
+        params,
+        lambda param: param.strip().rstrip(",") == "const ptrdiff_t nelements",
+        TEAM_ELEMENT_RANGE_PARAMETERS,
+        target,
+    )
+
+
+def with_team_element_range_arguments(arguments, target):
+    """The call's argument names to match `with_team_element_range`."""
+    return _with_element_range(
+        arguments, lambda name: name == "nelements", TEAM_ELEMENT_RANGE_ARGUMENTS, target
+    )
+
 #: The traversal a kernel name announces before its geometry token.  Unabbreviated
 #: for now: it is 0.08% of the tree and `packed` is the word every driver flag,
 #: plan field and benchmark column already uses.
@@ -513,12 +576,15 @@ ABI_TRAVERSAL_UNIT = {
 #: that they are not canonical, and they are listed here because they are what
 #: the tree publishes today.
 ABI_VERBS = (
+    "quadrature_output",
     "hessian_block_diag_sym",
     "objective_steps",
     "merit",
     "jacobian_action",
     "matrix_assembly",
-    "inexact_apply",
+    # The BSR assembly on the tangent projected to positive semidefinite: a
+    # kernel of its own beside the exact one (`MatrixFormatPlan.tangent_projection`).
+    "hessian_bsr_psd",
     "hessian_bsr",
     "hessian_crs",
     "objective",
@@ -529,11 +595,6 @@ ABI_VERBS = (
     "apply",
 )
 
-#: The store an inexact apply reads, which occupies the same slot a traversal
-#: does.  See `INEXACT.md`.
-ABI_INEXACT_MODES = ("tangent", "stored", "compressed")
-
-
 def unit_output_name(material_name, unit_name):
     """What a material's unit publishes its kernels under.
 
@@ -543,48 +604,12 @@ def unit_output_name(material_name, unit_name):
 
     This runs once, in `pipeline/driver.py`, as a unit is turned into an
     emission kernel.  Everything downstream reads the composed name off that
-    kernel rather than composing again -- `_unit_name` in
-    `emitters/inexact_apply_codegen.py` looks like a second spelling of this and
-    is not one, because what it is handed is the result, not the parts.
-    Composing twice yields `neohookean_ogden_neohookean_ogden_tet4`.
+    kernel rather than composing again.  Composing twice yields
+    `neohookean_ogden_neohookean_ogden_tet4`.
     """
     if unit_name:
         return "%s_%s" % (material_name, unit_name)
     return str(material_name)
-
-
-#: The verb phrase the inexact-apply family publishes under.  Two words, because
-#: the kernel is an apply and `inexact` says which apply it is.
-ABI_INEXACT_VERB_PHRASE = "inexact_apply"
-
-
-def inexact_apply_name(prefix, mode, traversal="", geometry="affine"):
-    """The published name of one inexact-apply kernel.
-
-    Thirteen sites in `emitters/inexact_apply_codegen.py` built this by
-    formatting `"%s_inexact_apply_%s_a_msoa"`, spelling three separate pieces of
-    ABI at each of them -- the verb phrase, the mode, and the mesh-SoA tail --
-    while `abi_qualifier` below parses that same name back out of the shipped
-    tree.  A name written in thirteen places and read in one is a name whose two
-    halves can disagree, and the reader is the half that raises.
-
-    `mode` is one of `ABI_INEXACT_MODES` and `traversal` is the optional second
-    occupant of the qualifier slot, the pair `abi_traversal` splits apart again.
-    Rejecting an unknown mode here is the point: the emitter used to interpolate
-    whatever it was handed, so a typo became a kernel nothing could route to.
-    """
-    if mode not in ABI_INEXACT_MODES:
-        raise ValueError(
-            "%r is not an inexact-apply mode; the family publishes %s"
-            % (mode, ", ".join(ABI_INEXACT_MODES))
-        )
-    qualifier = "%s_%s" % (mode, traversal) if traversal else mode
-    return "%s_%s_%s_%s" % (
-        prefix,
-        ABI_INEXACT_VERB_PHRASE,
-        qualifier,
-        abi_mesh_fragment(geometry),
-    )
 
 
 def abi_qualifier(name):
@@ -598,7 +623,7 @@ def abi_qualifier(name):
     error, and an empty slot is a plain kernel.
 
     The parse is total over the tree -- every published mesh-kernel name has a
-    verb from `ABI_VERBS`, and the slot after it holds one of six things.
+    verb from `ABI_VERBS`, and the slot after it holds a traversal or nothing.
     """
     classified = classify_abi_name(name)
     if classified is None or classified[0] != "mesh":
@@ -613,16 +638,7 @@ def abi_qualifier(name):
         if not slot:
             return ""
         traversals = tuple(short for _, short in ABI_TRAVERSAL_SPELLING)
-        # The slot may hold a store, a traversal, or -- since the inexact apply
-        # grew a packed variant -- a store followed by a traversal.  Two
-        # occupants, because they answer different questions about the same
-        # kernel: which store it reads, and how it walks the mesh.
-        known = tuple(
-            "%s_%s" % (mode, traversal)
-            for mode in ABI_INEXACT_MODES
-            for traversal in traversals
-        ) + traversals + ABI_INEXACT_MODES
-        for candidate in known:
+        for candidate in traversals:
             if slot == "_%s" % candidate:
                 return candidate
         raise ValueError(
@@ -630,21 +646,6 @@ def abi_qualifier(name):
             "geometry; the naming table and the emitters disagree" % (name, slot)
         )
     raise ValueError("no verb from the table appears in %s" % name)
-
-
-def abi_traversal(qualifier):
-    """The traversal half of a qualifier slot, or `""` when it holds none.
-
-    `stored_packed_two_pass` is one slot with two occupants; everything that
-    routes by traversal wants only the second.  Splitting it here rather than at
-    each consumer is what keeps the pair in one place.
-    """
-    for mode in ABI_INEXACT_MODES:
-        if qualifier == mode:
-            return ""
-        if qualifier.startswith("%s_" % mode):
-            return qualifier[len(mode) + 1 :]
-    return qualifier
 
 
 def abi_geometry(name):

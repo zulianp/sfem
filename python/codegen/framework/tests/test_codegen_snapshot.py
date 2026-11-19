@@ -32,7 +32,7 @@ class ShippedTreeTest(unittest.TestCase):
         tree = shipped_tree()
         self.assertTrue(os.path.isdir(tree), "%s is not a directory" % tree)
         self.assertEqual(os.path.basename(tree), "generated")
-        self.assertTrue(tree.endswith(os.path.join("frontend", "ops", "generated")))
+        self.assertTrue(tree.endswith(os.path.join("src", "frontend", "ops", "generated")))
 
     def test_the_tree_is_named_generated_so_headers_hoist(self):
         """`sfem.gen` hoists the shared headers by the output directory's name.

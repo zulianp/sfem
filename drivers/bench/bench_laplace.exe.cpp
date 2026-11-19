@@ -1,4 +1,5 @@
 #include <algorithm>
+#include "smesh_base.hpp"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -178,12 +179,12 @@ namespace {
                          const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             require_success(f->gradient(x, out), "bench_laplace gradient");
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
     double time_apply(const std::shared_ptr<sfem::Op>               &op,
@@ -195,12 +196,12 @@ namespace {
                       const std::shared_ptr<sfem::BLAS<real_t>> &blas) {
         blas->zeros(ndofs, out);
         sfem::device_synchronize();
-        const double t0 = MPI_Wtime();
+        const double t0 = smesh::time_seconds();
         for (int i = 0; i < repeat; ++i) {
             require_success(op->apply(state, direction, out), "bench_laplace apply");
         }
         sfem::device_synchronize();
-        return MPI_Wtime() - t0;
+        return smesh::time_seconds() - t0;
     }
 
     real_t max_abs_diff(const real_t *const left, const real_t *const right, const ptrdiff_t n) {

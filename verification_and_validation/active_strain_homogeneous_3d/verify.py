@@ -45,7 +45,7 @@ def main():
     }
     for mode, deformation in deformation_gradients().items():
         displacement, reaction, objective = read_mode_solution(
-            args.output / "solution", mode, "hyperelastic", mesh.dimension, mesh.n_points
+            args.output / "solution", mode, mesh.dimension, mesh.n_points
         )
         energy_density, first_piola = response(operator, deformation, active_gradient(), material)
         expected_displacement = mesh.points @ (deformation - np.eye(3)).T

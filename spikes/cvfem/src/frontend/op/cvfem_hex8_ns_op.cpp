@@ -51,7 +51,7 @@ namespace sfem {
         bool       semi_structured{false};
         SSMeshData ss;
 
-        // See coarser(): the operator derefine_op() built for the next level down.
+        // See coarser(): the operator derefine() built for the next level down.
         std::shared_ptr<CVFEMNavierStokes> coarser;
     };
 
@@ -275,7 +275,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::initialize");
 
         auto &d    = impl_->d;
-        auto  mesh = impl_->space->mesh_ptr();
+        auto  mesh = impl_->space->mesh();
 
         if (impl_->space->has_semi_structured_mesh()) {
             // Affine macro-elements only; see the note on is_semi_structured(). `geom` is
@@ -327,7 +327,7 @@ namespace sfem {
             //
             // Built on the MACRO mesh: (parent, lfi) is invariant under semi-structured
             // level changes, so this one mask is correct at every multigrid level and
-            // derefine_op -- which re-runs initialize() on the coarse space -- rebuilds an
+            // derefine -- which re-runs initialize() on the coarse space -- rebuilds an
             // equally valid one rather than needing the array transferred.
             impl_->ss.macro_face_mask.clear();
             if (smesh::Env::read<int>("SFEM_BOUNDARY_MASK", 0)) {
@@ -844,7 +844,7 @@ namespace sfem {
         SFEM_TRACE_SCOPE("CVFEMNavierStokes::sideset_flux_weighted");
         out = 0;
         if (!impl_->initialized) return SFEM_FAILURE;
-        auto mesh  = impl_->space->mesh_ptr();
+        auto mesh  = impl_->space->mesh();
         auto named = mesh->sidesets(sideset);
         if (named.empty() || !named.front()) {
             SFEM_ERROR("CVFEMNavierStokes::sideset_flux_weighted: sideset '%s' not found\n", sideset.c_str());
@@ -1122,8 +1122,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Op> CVFEMNavierStokes::derefine_op(const std::shared_ptr<FunctionSpace> &space) {
-        SFEM_TRACE_SCOPE("CVFEMNavierStokes::derefine_op");
+    std::shared_ptr<Op> CVFEMNavierStokes::derefine(const std::shared_ptr<FunctionSpace> &space) {
+        SFEM_TRACE_SCOPE("CVFEMNavierStokes::derefine");
         // Rediscretisation, not Galerkin coarsening. Not a stylistic choice: the
         // Rhie-Chow coefficient carries h^2/(2 mu) explicitly, so the coarse pressure
         // operator differs from the fine one by roughly 8x per level in 3D. Assembling
@@ -1301,7 +1301,7 @@ namespace sfem {
         // asked for a residual -- which is exactly why transient_diag_weight no longer
         // demands one.
         ret->set_time_step(dt_for_clone(), bdf_order_for_clone());
-        // The outflow setting must travel to the coarse levels. derefine_op re-runs
+        // The outflow setting must travel to the coarse levels. derefine re-runs
         // initialize() on the coarse space, which rebuilds the boundary and natural masks --
         // but only if it knows an outflow plane exists. Without this the coarse operator
         // keeps p_i*a on the outlet and has no pin, so it is singular, its solve returns
@@ -1342,8 +1342,8 @@ namespace sfem {
         // pairs address the same faces at every level. That level-invariance is the property
         // that makes sidesets the right carrier here -- a coordinate test would have to be
         // re-evaluated per level, and a node-indexed set would have to be filtered.
-        auto fine_mesh   = impl_->space->mesh_ptr();
-        auto coarse_mesh = space->mesh_ptr();
+        auto fine_mesh   = impl_->space->mesh();
+        auto coarse_mesh = space->mesh();
         if (fine_mesh && coarse_mesh) {
             for (const auto &kv : fine_mesh->sidesets()) coarse_mesh->add_sideset(kv.first, kv.second);
         }

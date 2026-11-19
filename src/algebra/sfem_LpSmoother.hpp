@@ -1,0 +1,43 @@
+#ifndef SFEM_LP_SMOOTHER_HPP
+#define SFEM_LP_SMOOTHER_HPP
+
+#include <cstddef>
+#include <memory>
+
+#include "sfem_aliases.hpp"
+#include "sfem_MatrixFreeLinearSolver.hpp"
+#include "sfem_BLAS_openmp.hpp"
+
+namespace sfem {
+    template <typename T>
+    class LpSmoother final : public Operator<T> {
+    public:
+        ptrdiff_t n_dofs{SFEM_PTRDIFF_INVALID};
+        std::shared_ptr<BLAS<T>> blas;
+        SharedBuffer<T> inv_diag;
+
+        void default_init() {
+            blas = OpenMPBLAS<T>::create();
+        }
+
+        /* Operator */
+        int apply(const T* const b, T* const x) override {
+            blas->xypaz(n_dofs, inv_diag->data(), b, 1, x);
+            return SFEM_SUCCESS;
+        }
+        inline std::ptrdiff_t rows() const override { return n_dofs; }
+        inline std::ptrdiff_t cols() const override { return n_dofs; }
+        ExecutionContext execution_context() const override { return blas ? blas->context() : ExecutionContext(EXECUTION_SPACE_INVALID); }
+    };
+
+    template <typename T>
+    std::shared_ptr<LpSmoother<T>> h_lpsmoother(const SharedBuffer<T>& inv_diag) {
+        auto ret = std::make_shared<LpSmoother<T>>();
+        ret->n_dofs = inv_diag->size();
+        ret->inv_diag = inv_diag;
+        ret->default_init();
+        return ret;
+    }
+}  // namespace sfem
+
+#endif  // SFEM_LP_SMOOTHER_HPP

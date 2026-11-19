@@ -254,9 +254,11 @@ def patch_orientation_table_lines(element_type, name="pm_orientation"):
     ]
 
 
-def _jacobian_adjugate_2(indent):
-    return [
-        "%s    const s_t det = jac[0] * jac[3] - jac[1] * jac[2];" % indent,
+def _jacobian_adjugate_2(indent, with_adjugate=True):
+    det = ["%s    const s_t det = jac[0] * jac[3] - jac[1] * jac[2];" % indent]
+    if not with_adjugate:
+        return det
+    return det + [
         "%s    s_t adj[4];" % indent,
         "%s    adj[0] =  jac[3];" % indent,
         "%s    adj[1] = -jac[1];" % indent,
@@ -265,7 +267,8 @@ def _jacobian_adjugate_2(indent):
     ]
 
 
-def _jacobian_adjugate_3(indent):
+def _jacobian_adjugate_3(indent, with_adjugate=True):
+    # The determinant is formed from the adjugate, so it is always there.
     return [
         "%s    s_t adj[9];" % indent,
         "%s    adj[0] = jac[4] * jac[8] - jac[5] * jac[7];" % indent,
@@ -453,18 +456,21 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         "%s    s_t %s[%d];" % (indent, name, n_fields * rule.n_shape)
         for name, _ in gathers
     )
-    lines.extend(
-        [
-            "%s    for (int j = 0; j < NS; ++j) {" % indent,
-            "%s      const idx_t node = elements[perm[j]][element];" % indent,
-            "%s      for (int c = 0; c < NC; ++c) {" % indent,
-        ]
-    )
-    lines.extend(
-        "%s        %s[j * NC + c] = %s[node * NC + c];" % (indent, name, source)
-        for name, source in gathers
-    )
-    lines.extend(["%s      }" % indent, "%s    }" % indent])
+    # A kernel that stages no state (a body force) has no gather loop at all,
+    # rather than one reading a node index into an empty body.
+    if gathers:
+        lines.extend(
+            [
+                "%s    for (int j = 0; j < NS; ++j) {" % indent,
+                "%s      const idx_t node = elements[perm[j]][element];" % indent,
+                "%s      for (int c = 0; c < NC; ++c) {" % indent,
+            ]
+        )
+        lines.extend(
+            "%s        %s[j * NC + c] = %s[node * NC + c];" % (indent, name, source)
+            for name, source in gathers
+        )
+        lines.extend(["%s      }" % indent, "%s    }" % indent])
     lines.extend(
         [
             "%s    // The Jacobian of the *permuted* element: its columns are the" % indent,
@@ -481,7 +487,13 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
             "%s    }" % indent,
         ]
     )
-    lines.extend(_JACOBIAN_ADJUGATE[dim](indent))
+    # The adjugate maps gradients; a kernel that stages none and contracts no
+    # test gradient needs only the determinant.
+    needs_adjugate = "gradient" in contracted_test_quantities(dependencies) or any(
+        "gradient" in patch_merit_staged_quantities(dependencies, role)
+        for role in patch_merit_staged_roles(dependencies)
+    )
+    lines.extend(_JACOBIAN_ADJUGATE[dim](indent, needs_adjugate))
     for role in patch_merit_staged_roles(dependencies):
         for name, _ in _ROLE_SPELLING[role]["gathers"]:
             for quantity in patch_merit_staged_quantities(dependencies, role):
@@ -725,6 +737,14 @@ def patch_merit_argument_names(system, rule, dependencies, parameters=()):
     return tuple(names)
 
 
+#: Only the combination in loop 2 reads a step length, so a residual the state
+#: does not enter keeps the parameter for the ABI and leaves it unnamed.
+_STEPS_PARAMETER_BY_USE = {
+    True: {},
+    False: {"const s_t *const RSTR steps": "const s_t *const RSTR"},
+}
+
+
 def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
                              element_type, function_name, material_lines,
                              parameters=()):
@@ -745,7 +765,14 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     buffers = patch_loop_one_buffers(dim, n_fields, dependencies)
-    declared = patch_merit_kernel_parameters(system, rule, dependencies, parameters)
+    declared = tuple(
+        _STEPS_PARAMETER_BY_USE[
+            bool(patch_merit_staged_quantities(dependencies, "current"))
+        ].get(param, param)
+        for param in patch_merit_kernel_parameters(
+            system, rule, dependencies, parameters
+        )
+    )
     lines = [
         "template <typename s_t, typename g_t, int NQ, int NS, int VS>",
         "static int %s(" % function_name,

@@ -32,11 +32,19 @@ if(APPLE)
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
     list(APPEND CMAKE_INSTALL_RPATH "@loader_path/../lib")
+    set(_SFEM_ORIGIN "@loader_path")
 elseif(UNIX)
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON)
     list(APPEND CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+    set(_SFEM_ORIGIN "$ORIGIN")
 endif()
+# libsfem installs to lib/, the subprojects to CMAKE_INSTALL_LIBDIR (lib64 on some Linux systems):
+# installed executables and libraries look in both.
+if(_SFEM_ORIGIN AND NOT CMAKE_INSTALL_LIBDIR STREQUAL "lib")
+    list(APPEND CMAKE_INSTALL_RPATH "${_SFEM_ORIGIN}/../${CMAKE_INSTALL_LIBDIR}")
+endif()
+unset(_SFEM_ORIGIN)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 

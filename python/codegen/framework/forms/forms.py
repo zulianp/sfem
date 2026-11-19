@@ -57,6 +57,8 @@ class FormDependencies:
     previous_symbols: tuple = ()
     direction_symbols: tuple = ()
     geometry_symbols: tuple = ()
+    #: Components of integration-point fields (`<name>_qp[k]`), read per point.
+    quadrature_symbols: tuple = ()
     symbols: tuple = ()
 
     def __post_init__(self):
@@ -65,6 +67,7 @@ class FormDependencies:
         previous_symbols = tuple(self.previous_symbols)
         direction_symbols = tuple(self.direction_symbols)
         geometry_symbols = tuple(self.geometry_symbols)
+        quadrature_symbols = tuple(self.quadrature_symbols)
         symbols = tuple(self.symbols)
         if not symbols:
             symbols = tuple(
@@ -73,6 +76,7 @@ class FormDependencies:
                     + previous_symbols
                     + direction_symbols
                     + geometry_symbols
+                    + quadrature_symbols
                     + parameters
                 )
             )
@@ -81,6 +85,7 @@ class FormDependencies:
         object.__setattr__(self, "previous_symbols", previous_symbols)
         object.__setattr__(self, "direction_symbols", direction_symbols)
         object.__setattr__(self, "geometry_symbols", geometry_symbols)
+        object.__setattr__(self, "quadrature_symbols", quadrature_symbols)
         object.__setattr__(self, "symbols", symbols)
         object.__setattr__(self, "current", bool(self.current or current_symbols))
         object.__setattr__(self, "previous", bool(self.previous or previous_symbols))

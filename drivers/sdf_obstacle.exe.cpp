@@ -48,23 +48,14 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     int SFEM_ELEMENT_REFINE_LEVEL = 0;
     SFEM_READ_ENV(SFEM_ELEMENT_REFINE_LEVEL, atoi);
 
-    int SFEM_USE_PROJECTED_CG = 0;
-    SFEM_READ_ENV(SFEM_USE_PROJECTED_CG, atoi);
-
-    int SFEM_TEST_AGAINST_LINEAR = 0;
-    SFEM_READ_ENV(SFEM_TEST_AGAINST_LINEAR, atoi);
-
     int SFEM_MAX_IT = 20;
     SFEM_READ_ENV(SFEM_MAX_IT, atoi);
 
-    int SFEM_CONTACT_LINEARIZATIONS = 1;
-    SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
+    // int SFEM_CONTACT_LINEARIZATIONS = 1;
+    // SFEM_READ_ENV(SFEM_CONTACT_LINEARIZATIONS, atoi);
 
     bool SFEM_USE_GPU = true;
     SFEM_READ_ENV(SFEM_USE_GPU, atoi);
-
-    int SFEM_EXPORT_CRS_MATRIX = false;
-    SFEM_READ_ENV(SFEM_EXPORT_CRS_MATRIX, atoi);
 
     int SFEM_MATRIX_FREE = 1;
     SFEM_READ_ENV(SFEM_MATRIX_FREE, atoi);
@@ -115,6 +106,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     f->add_operator(op);
 
     auto contact_conds = sfem::ContactConditions::create_from_file(fs, SFEM_CONTACT_CONDITIONS, es);
+    if (!contact_conds) return EXIT_FAILURE;
 
     ptrdiff_t ndofs = fs->n_dofs();
     auto      x     = sfem::create_buffer<real_t>(ndofs, es);
@@ -149,7 +141,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
         int  sym_block_size = (block_size == 3 ? 6 : 3);
         auto normal_prod    = sfem::create_buffer<real_t>(sym_block_size * contact_conds->n_constrained_dofs(), es);
         contact_conds->hessian_block_diag_sym(x->data(), normal_prod->data());
-        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(), normal_prod);
+        auto sbv = sfem::create_sparse_block_vector(contact_conds->node_mapping(es), normal_prod);
 
         auto sp = std::make_shared<sfem::ShiftedPenalty<real_t>>();
         sp->set_op(linear_op);
@@ -168,7 +160,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
         f->hessian_block_diag_sym(nullptr, diag->data());
         f->constraints_mask(mask->data());
 
-        auto sj = sfem::h_shiftable_block_sym_jacobi(diag, mask);
+        auto sj = sfem::create_shiftable_block_sym_jacobi(block_size, diag, mask, es);
         cg->set_preconditioner_op(sj);
 
         cg->set_atol(1e-12);
@@ -233,7 +225,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
 
     if (fs->has_semi_structured_mesh()) {
         smesh::Path path = output_path / "ssmesh";
-        smesh::semistructured_export_as_standard(fs->mesh_ptr(), path);
+        smesh::semistructured_export_as_standard(fs->mesh(), path);
     }
 
     auto output = f->output();
@@ -246,7 +238,7 @@ int solve_sdf_obstacle(const std::shared_ptr<sfem::Communicator> &comm, int argc
     double tock = smesh::time_seconds();
 
     ptrdiff_t nelements = m->n_elements();
-    ptrdiff_t nnodes    = fs->mesh().n_nodes();
+    ptrdiff_t nnodes    = fs->mesh()->n_nodes();
 
     if (!comm->rank()) {
         printf("----------------------------------------\n");
