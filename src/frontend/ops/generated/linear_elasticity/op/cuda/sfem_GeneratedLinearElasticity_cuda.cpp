@@ -8,6 +8,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -413,6 +414,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
     inexact::OpState inexact{EXECUTION_SPACE_DEVICE};
   };
 
@@ -1221,6 +1223,7 @@ namespace sfem {
     impl_->inexact.stream = stream;
     if (impl_->inexact.assembled()) {
       // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      impl_->inexact.assembles_window_rows = false;
       inexact::OpState::Inertia inertia;
       if (auto term = time_scheme_term(impl_->time_scheme)) {
         inertia.diagonal = term->hessian_is_diagonal();

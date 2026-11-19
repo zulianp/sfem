@@ -792,7 +792,9 @@ extern "C" int saint_venant_kirchhoff_hessian_bsr_2d_a_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int saint_venant_kirchhoff_hessian_bsr_2d_i_msoa(
@@ -810,7 +812,9 @@ extern "C" int saint_venant_kirchhoff_hessian_bsr_2d_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int saint_venant_kirchhoff_hessian_bsr_3d_a_msoa(
@@ -838,7 +842,9 @@ extern "C" int saint_venant_kirchhoff_hessian_bsr_3d_a_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int saint_venant_kirchhoff_hessian_bsr_3d_i_msoa(
@@ -857,7 +863,9 @@ extern "C" int saint_venant_kirchhoff_hessian_bsr_3d_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" void saint_venant_kirchhoff_hex27_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);

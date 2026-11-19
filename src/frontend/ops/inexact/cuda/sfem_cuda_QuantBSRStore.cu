@@ -411,11 +411,7 @@ namespace sfem {
                 /// the records' bytes (f16 4, i8 5). FF200 TET10: 1, 2, 4, 8 windows hold 323, 161, 81, 40
                 /// bytes per dof while the update runs and take 8.3, 8.4, 8.9, 11.3 ms; SFEM_QBSR_WINDOWS
                 /// (1 to 12) overrides it for such a study.
-                inline int window_count(const size_t record_bytes) {
-                    const char *const v = getenv("SFEM_QBSR_WINDOWS");
-                    if (v) return std::max(1, std::min(12, atoi(v)));
-                    return std::max(1, std::min(12, (int)std::ceil(2.0 * 9 * sizeof(float) / (double)record_bytes)));
-                }
+                inline int window_count(const size_t record_bytes) { return qbsr_window_count(9 * sizeof(float), (double)record_bytes); }
 
                 template <typename T, bool SYM, bool SELL>
                 class DeviceBsrStore final : public BsrStore {

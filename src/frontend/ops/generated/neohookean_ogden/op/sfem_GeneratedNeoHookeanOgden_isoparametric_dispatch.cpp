@@ -487,7 +487,9 @@ extern "C" int neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -503,7 +505,9 @@ extern "C" int neohookean_ogden_quad4_hessian_bsr_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_tri6_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -519,7 +523,9 @@ extern "C" int neohookean_ogden_tri6_hessian_bsr_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -536,7 +542,9 @@ extern "C" int neohookean_ogden_hex27_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -553,7 +561,9 @@ extern "C" int neohookean_ogden_hex8_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -570,7 +580,9 @@ extern "C" int neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -587,7 +599,9 @@ extern "C" int neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_tet10_hessian_bsr_i_msoa(
         const int scalar_bytes,
@@ -604,7 +618,9 @@ extern "C" int neohookean_ogden_tet10_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
@@ -1016,7 +1032,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_2d_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   const enum smesh::PrimitiveType resolved_real_type =
       (real_type == smesh::SMESH_DEFAULT)
@@ -1028,11 +1046,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_2d_i_msoa(
           : values_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+      return neohookean_ogden_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::QUAD4:
-      return neohookean_ogden_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+      return neohookean_ogden_quad4_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::TRI6:
-      return neohookean_ogden_tri6_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values);
+      return neohookean_ogden_tri6_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, rowptr, colidx, values, n2e_ptr, n2e_idx);
     default:
       break;
   }
@@ -1056,7 +1074,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_3d_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   const enum smesh::PrimitiveType resolved_real_type =
       (real_type == smesh::SMESH_DEFAULT)
@@ -1068,15 +1088,15 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int neohookean_ogden_hessian_bsr_3d_i_msoa(
           : values_type;
   switch (element_type) {
     case smesh::HEX27:
-      return neohookean_ogden_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::HEX8:
-      return neohookean_ogden_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::PROTEUS_HEX27:
-      return neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::PROTEUS_HEX8:
-      return neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
     case smesh::TET10:
-      return neohookean_ogden_tet10_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+      return neohookean_ogden_tet10_hessian_bsr_i_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
     default:
       break;
   }

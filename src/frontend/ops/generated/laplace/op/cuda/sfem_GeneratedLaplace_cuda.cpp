@@ -8,6 +8,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -387,6 +388,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
   };
 
   std::unique_ptr<Op> GPUGeneratedLaplace::create(const std::shared_ptr<FunctionSpace> &space) {

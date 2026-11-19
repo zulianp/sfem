@@ -2,7 +2,7 @@
 
 The inexact apply stores, at every point of the rule the exact operator
 integrates with, the material tangent pulled back to the reference cell and
-weighted (`docs/compressed_partial_assembly`):
+weighted (the compressed partial assembly paper, `xsesfsi_papers/quantized_ops`):
 
     S^q_{ikmn} = w_q * A_{ijkl}(F(xi_q)) adj_{nj} adj_{ml} / det
 

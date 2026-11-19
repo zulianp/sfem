@@ -24,35 +24,54 @@ namespace sfem {
         template <class Q>
         class BsrStoreImpl final : public BsrStore {
         public:
-            BsrStoreImpl(const std::shared_ptr<CRSGraph> &graph, std::string name)
+            /// `windowed`: the operator's assembly visits only the rows of a window's graph (owner computes,
+            /// owner_computes.hpp), so the store assembles by windows; otherwise in one piece, as a window
+            /// would cost a pass over every element.
+            BsrStoreImpl(const std::shared_ptr<CRSGraph> &graph, std::string name, const bool windowed)
                 : graph_(graph),
                   name_(std::move(name)),
+                  windowed_(windowed),
                   n_(graph->n_nodes()),
-                  quant_(graph->n_nodes(), graph->rowptr()->data(), graph->colidx()->data()) {
-                values_ = create_host_buffer<float>((size_t)graph->nnz() * 9);
-            }
+                  quant_(graph->n_nodes(), graph->rowptr()->data(), graph->colidx()->data()),
+                  window_rp_(create_host_buffer<count_t>((size_t)graph->n_nodes() + 1)) {}
 
+            /// Window by window (Q::update_windows, qbsr_window_count), as the device's store: the window's
+            /// graph has the node graph's rows of the window and no entries in the others, which the
+            /// assembly kernels skip; its single-precision values exist while the window is encoded.
             int update(const AssembleBSR &assemble) override {
-                const count_t *const rp = graph_->rowptr()->data();
-                const idx_t *const   ci = graph_->colidx()->data();
-                float *const         v  = values_->data();
-                const ptrdiff_t      nv = (ptrdiff_t)values_->size();
-                {
-                    SFEM_TRACE_SCOPE("inexact::BsrStore::assemble");
+                const count_t *const rp      = graph_->rowptr()->data();
+                const idx_t *const   ci      = graph_->colidx()->data();
+                count_t *const       wrp     = window_rp_->data();
+                const auto           windows = quant_.update_windows(
+                        rp,
+                        windowed_ ? qbsr_window_count(9.0 * sizeof(float) * (double)rp[n_], (double)std::max<size_t>(1, quant_.record_bytes()), true)
+                                  : 1);
+                count_t largest = 0;
+                for (size_t w = 0; w + 1 < windows.size(); ++w) largest = std::max(largest, rp[windows[w + 1]] - rp[windows[w]]);
+                auto values = create_host_buffer<float>((size_t)largest * 9);
+                float *const v = values->data();
+                rows_.clear();
+                blocks_.clear();
+                quant_.reserve_records();
+                for (size_t w = 0; w + 1 < windows.size(); ++w) {
+                    const ptrdiff_t r0 = windows[w], r1 = windows[w + 1];
+                    const count_t   k0 = rp[r0], nk = rp[r1] - k0;
+                    {
+                        SFEM_TRACE_SCOPE("inexact::BsrStore::assemble");
 #pragma omp parallel for
-                    for (ptrdiff_t k = 0; k < nv; ++k) v[k] = 0;
-                    if (assemble(rp, ci, smesh::SMESH_FLOAT32, v) != SFEM_SUCCESS) return SFEM_FAILURE;
+                        for (ptrdiff_t i = 0; i <= n_; ++i) wrp[i] = i <= r0 ? 0 : i <= r1 ? rp[i] - k0 : nk;
+#pragma omp parallel for
+                        for (ptrdiff_t k = 0; k < (ptrdiff_t)nk * 9; ++k) v[k] = 0;
+                        if (assemble(wrp, ci + k0, smesh::SMESH_FLOAT32, v) != SFEM_SUCCESS) return SFEM_FAILURE;
+                    }
+                    {
+                        SFEM_TRACE_SCOPE("inexact::BsrStore::correction");
+                        correction(rp, v, k0, r0, r1);
+                    }
+                    SFEM_TRACE_SCOPE("inexact::BsrStore::encode");
+                    quant_.encode_rows(rp, ci, v, k0, r0, r1);
                 }
-                {
-                    SFEM_TRACE_SCOPE("inexact::BsrStore::correction");
-                    correction(rp, v);
-                }
-                SFEM_TRACE_SCOPE("inexact::BsrStore::encode");
-                if constexpr (Q::upper) {
-                    quant_.encode_in_place(rp, ci, v);
-                } else {
-                    quant_.encode(rp, ci, v);
-                }
+                windows_ = (int)windows.size() - 1;
                 return SFEM_SUCCESS;
             }
 
@@ -103,13 +122,10 @@ namespace sfem {
                 });
             }
 
-            /// What the store holds: its structure and records, the corrections, and the single-precision
-            /// assembly the records are encoded from (the upper form's records live inside it).
+            /// What the store holds: its structure and records, the corrections and the window graph's row
+            /// pointers.
             std::size_t bytes() const override {
-                std::size_t ret = quant_.bytes() + rows_.size() * sizeof(idx_t) + blocks_.size() * sizeof(float) +
-                                  values_->size() * sizeof(float);
-                if constexpr (Q::upper) ret -= quant_.record_bytes();
-                return ret;
+                return quant_.bytes() + rows_.size() * sizeof(idx_t) + blocks_.size() * sizeof(float) + window_rp_->size() * sizeof(count_t);
             }
 
             void add_diagonal(real_t *const diag) const override {
@@ -118,23 +134,26 @@ namespace sfem {
                     for (int d = 0; d < 3; ++d) diag[(size_t)rows_[r] * 3 + d] += blocks_[r * 9 + d * 3 + d];
             }
 
-            std::string describe() const override { return name_ + ", " + std::to_string(rows_.size()) + " corrected rows"; }
+            std::string describe() const override {
+                return name_ + ", " + std::to_string(windows_) + " windows, " + std::to_string(rows_.size()) + " corrected rows";
+            }
 
         private:
             std::shared_ptr<CRSGraph> graph_;
             std::string                      name_;
+            bool                             windowed_{false};
             ptrdiff_t                        n_{0};
             Q                                quant_;
-            SharedBuffer<float>              values_;
+            SharedBuffer<count_t>            window_rp_;
+            int                              windows_{0};
             std::vector<idx_t>               rows_;
             std::vector<float>               blocks_;
             const real_t                    *diagonal_{nullptr};
 
-            /// The rows whose blocks do not sum to zero beyond the assembly's rounding, in row order:
-            /// each thread collects its own rows' sums, then they are joined in thread order.
-            void correction(const count_t *const rp, const float *const v) {
-                rows_.clear();
-                blocks_.clear();
+            /// The rows of [r0, r1) whose blocks do not sum to zero beyond the assembly's rounding, appended in
+            /// row order (v holds the window's blocks from k0): each thread collects its own rows' sums, then
+            /// they are joined in thread order.
+            void correction(const count_t *const rp, const float *const v, const count_t k0, const ptrdiff_t r0, const ptrdiff_t r1) {
                 std::vector<std::vector<idx_t>> rows;
                 std::vector<std::vector<float>> blocks;
 #pragma omp parallel
@@ -150,12 +169,12 @@ namespace sfem {
                         blocks.resize(rows.size());
                     }
 #pragma omp for schedule(static)
-                    for (ptrdiff_t i = 0; i < n_; ++i) {
+                    for (ptrdiff_t i = r0; i < r1; ++i) {
                         double R[9] = {0}, top = 0;
                         for (count_t k = rp[i]; k < rp[i + 1]; ++k)
                             for (int x = 0; x < 9; ++x) {
-                                R[x] += (double)v[(size_t)k * 9 + x];
-                                top = std::max(top, std::fabs((double)v[(size_t)k * 9 + x]));
+                                R[x] += (double)v[(size_t)(k - k0) * 9 + x];
+                                top = std::max(top, std::fabs((double)v[(size_t)(k - k0) * 9 + x]));
                             }
                         double sum = 0;
                         for (int x = 0; x < 9; ++x) sum = std::max(sum, std::fabs(R[x]));
@@ -179,26 +198,28 @@ namespace sfem {
         /// 16-bit column offsets for a symmetric one (about 10% smaller at the same speed on Grace),
         /// the full difference form otherwise.
         template <typename code_t>
-        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const char *const enc) {
+        inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph, const bool symmetric, const char *const enc,
+                                                          const bool windowed) {
             constexpr int VS = 16;
             if (symmetric) {
                 return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Upper, VS, uint16_t>>>(
-                        graph, std::string("bsr ") + enc + " upper");
+                        graph, std::string("bsr ") + enc + " upper", windowed);
             }
             return std::make_unique<BsrStoreImpl<SellMatrix<code_t, SellForm::Difference, VS, idx_t, false>>>(
-                    graph, std::string("bsr ") + enc + " difference");
+                    graph, std::string("bsr ") + enc + " difference", windowed);
         }
 
         inline std::unique_ptr<BsrStore> create_bsr_store(const std::shared_ptr<CRSGraph> &graph,
                                                           const InexactOptions::Encoding   encoding,
-                                                          const bool                       symmetric) {
+                                                          const bool                       symmetric,
+                                                          const bool                       windowed) {
             switch (encoding) {
                 case InexactOptions::Encoding::I8_BLOCK:
-                    return create_bsr_store<int8_t>(graph, symmetric, "i8");
+                    return create_bsr_store<int8_t>(graph, symmetric, "i8", windowed);
                 case InexactOptions::Encoding::F16:
-                    return create_bsr_store<half_t>(graph, symmetric, "f16");
+                    return create_bsr_store<half_t>(graph, symmetric, "f16", windowed);
                 case InexactOptions::Encoding::F32:
-                    return create_bsr_store<float>(graph, symmetric, "f32");
+                    return create_bsr_store<float>(graph, symmetric, "f32", windowed);
                 default:
                     SFEM_ERROR("inexact: the bsr store takes f32, f16 or i8\n");
                     return nullptr;

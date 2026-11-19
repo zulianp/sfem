@@ -1246,6 +1246,7 @@ def _inexact_definitions(
     impl_->inexact.state = x;
 %(stream_binding)s    if (impl_->inexact.assembled()) {
       // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      impl_->inexact.assembles_window_rows = %(bsr_window_rows)s;
 %(bsr_inertia)s      return impl_->inexact.update_bsr(
           impl_->space->element_node_graph(),
           tangent_is_symmetric(),
@@ -1295,6 +1296,15 @@ def _inexact_definitions(
         "inertia": inertia,
         "inertia_diagonal": inertia_diagonal,
         "bsr_inertia": _INEXACT_BSR_INERTIA[bool(holds_scheme)],
+        # Whether the BSR assembly visits only the rows of a window's graph (owner computes on the host):
+        # then the host store assembles by windows, otherwise in one piece.
+        "bsr_window_rows": "true"
+        if any(
+            _node_to_element_args(kernel_sources, "%s_hessian_bsr_%dd_%s_msoa" % (material.name, dim, geometry))
+            for dim in (2, 3)
+            for geometry in ("i", "a")
+        )
+        else "false",
         "bsr_inertia_argument": ", inertia" if holds_scheme else "",
         "stream_parameter": _INEXACT_STREAM_PARAMETER[device],
         "stream_argument": _INEXACT_STREAM_ARGUMENT[device],
@@ -1812,6 +1822,7 @@ def _hyperelastic_op(
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -2036,6 +2047,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
 %(inexact_impl_field)s%(tangent_projection_impl_field)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -5360,6 +5372,7 @@ def _coupled_energy_residual_op(
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -5535,6 +5548,7 @@ namespace sfem {
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
 %(previous_state_accessor)s
   };
 
@@ -6303,8 +6317,14 @@ def _coupled_cases(
                     ) % (
                         _coupled_dispatch_call(
                             energy_dispatch_stem, "hessian_bsr", dim, "i",
-                            "%s%s, %s" % (common_iso_values_dispatch, energy_apply_params,
-                                          energy_hessian_args),
+                            ", ".join(
+                                [
+                                    "%s%s, %s" % (common_iso_values_dispatch, energy_apply_params, energy_hessian_args),
+                                    *_node_to_element_args(
+                                        kernel_sources, "%s_hessian_bsr_%dd_i_msoa" % (energy_dispatch_stem, dim)
+                                    ),
+                                ]
+                            ),
                         ),
                         _coupled_dispatch_call(
                             residual_dispatch_stem, "hessian_bsr", dim, "i",
@@ -9186,6 +9206,15 @@ def _c_abi_function_declaration(kernel_sources, function_name, public_only=False
     return signature.declaration if signature else None
 
 
+def _node_to_element_args(kernel_sources, function_name):
+    """The node-to-element map an owner-computes BSR entry point takes after its values (the host's,
+    `owner_computes.hpp`), from the op's per-domain cache; nothing for an entry point without it."""
+    if "n2e_ptr" not in _c_abi_parameter_names(kernel_sources, function_name, public_only=True):
+        return []
+    lookup = "impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes())"
+    return ["%s.ptr" % lookup, "%s.idx" % lookup]
+
+
 def _c_abi_parameter_names(kernel_sources, function_name, public_only=False):
     signature = _c_abi_signatures(kernel_sources, public_only=public_only).get(
         function_name
@@ -11772,6 +11801,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     *parameter_args,
                     *current_args,
                     *tail_args,
+                    *_node_to_element_args(kernel_sources, affine_function),
                 ]
             ))
             projected_affine = "%s_%s_psd_%dd_a_msoa" % (material_name, operation, dim)
@@ -11797,6 +11827,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     *parameter_args,
                     *current_args,
                     *tail_args,
+                    *_node_to_element_args(kernel_sources, function),
                 ]
             ))
             projected_function = "%s_%s_psd_%dd_i_msoa" % (material_name, operation, dim)

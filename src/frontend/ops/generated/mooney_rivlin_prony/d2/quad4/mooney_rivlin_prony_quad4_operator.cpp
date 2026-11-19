@@ -79,7 +79,9 @@ extern "C" int mooney_rivlin_prony_proteus_quad4_hessian_bsr_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int mooney_rivlin_prony_proteus_quad4_hessian_bsr_psd_i_msoa(
         const int scalar_bytes,
@@ -98,7 +100,9 @@ extern "C" int mooney_rivlin_prony_proteus_quad4_hessian_bsr_psd_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int mooney_rivlin_prony_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
@@ -253,7 +257,9 @@ extern "C" int mooney_rivlin_prony_quad4_hessian_bsr_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[4] = {
         elements[0],
@@ -261,7 +267,7 @@ extern "C" int mooney_rivlin_prony_quad4_hessian_bsr_i_msoa(
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_prony_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, rowptr, colidx, values);
+    return mooney_rivlin_prony_proteus_quad4_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int mooney_rivlin_prony_quad4_hessian_bsr_psd_i_msoa(
@@ -281,7 +287,9 @@ extern "C" int mooney_rivlin_prony_quad4_hessian_bsr_psd_i_msoa(
         const void *const RSTR uy,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[4] = {
         elements[0],
@@ -289,7 +297,7 @@ extern "C" int mooney_rivlin_prony_quad4_hessian_bsr_psd_i_msoa(
         elements[3],
         elements[2]
     };
-    return mooney_rivlin_prony_proteus_quad4_hessian_bsr_psd_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, rowptr, colidx, values);
+    return mooney_rivlin_prony_proteus_quad4_hessian_bsr_psd_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, C01, C10, K, iso_relaxation_gamma, iso_history, u_stride, ux, uy, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int mooney_rivlin_prony_quad4_objective_steps_i_msoa(

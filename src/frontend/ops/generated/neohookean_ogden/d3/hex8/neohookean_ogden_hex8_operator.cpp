@@ -76,7 +76,9 @@ extern "C" int neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int neohookean_ogden_proteus_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
@@ -813,7 +815,9 @@ extern "C" int neohookean_ogden_hex8_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
     idx_t *proteus_elements[8] = {
         elements[0],
@@ -825,7 +829,7 @@ extern "C" int neohookean_ogden_hex8_hessian_bsr_i_msoa(
         elements[7],
         elements[6]
     };
-    return neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values);
+    return neohookean_ogden_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, values_bytes, nelements, nnodes, proteus_elements, points, lmbda, mu, u_stride, ux, uy, uz, rowptr, colidx, values, n2e_ptr, n2e_idx);
 }
 
 extern "C" int neohookean_ogden_hex8_objective_steps_i_msoa(

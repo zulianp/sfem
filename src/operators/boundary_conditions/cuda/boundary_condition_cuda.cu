@@ -439,29 +439,50 @@ namespace sfem {
                                          const int                         nsteps,
                                          const real_t *const               steps,
                                          real_t *const                     out,
+                                         ConstraintObjectiveScratch       *scratch,
                                          void *const                       stream) {
         if (n_dirichlet_nodes <= 0 || nsteps <= 0) return SFEM_SUCCESS;
         const int       kernel_block_size = 128;
         const ptrdiff_t n_blocks =
                 std::min(ptrdiff_t(1024), (n_dirichlet_nodes + kernel_block_size - 1) / kernel_block_size);
-        const cudaStream_t s = (cudaStream_t)stream;
-        real_t *d_steps = nullptr, *d_partial = nullptr;
-        if (cudaMallocAsync((void **)&d_steps, nsteps * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
-        if (cudaMallocAsync((void **)&d_partial, n_blocks * nsteps * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
-        cudaMemcpyAsync(d_steps, steps, nsteps * sizeof(real_t), cudaMemcpyHostToDevice, s);
+        const ptrdiff_t    n_partial = n_blocks * nsteps;
+        const cudaStream_t s         = (cudaStream_t)stream;
+        // Grown on the stream, which orders them after the kernels of earlier calls.
+        scratch->stream = stream;
+        if (nsteps > scratch->steps_capacity) {
+            if (scratch->d_steps) cudaFreeAsync(scratch->d_steps, s);
+            scratch->d_steps        = nullptr;
+            scratch->steps_capacity = 0;
+            if (cudaMallocAsync((void **)&scratch->d_steps, nsteps * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
+            scratch->steps_capacity = nsteps;
+        }
+        if (n_partial > scratch->partial_capacity) {
+            if (scratch->d_partial) cudaFreeAsync(scratch->d_partial, s);
+            scratch->d_partial        = nullptr;
+            scratch->partial_capacity = 0;
+            if (cudaMallocAsync((void **)&scratch->d_partial, n_partial * sizeof(real_t), s) != cudaSuccess) return SFEM_FAILURE;
+            scratch->h_partial.resize(n_partial);
+            scratch->partial_capacity = n_partial;
+        }
+        cudaMemcpyAsync(scratch->d_steps, steps, nsteps * sizeof(real_t), cudaMemcpyHostToDevice, s);
         constraint_objective_vec_steps_kernel<<<n_blocks, kernel_block_size, kernel_block_size * sizeof(real_t), s>>>(
-                n_dirichlet_nodes, dirichlet_nodes, block_size, component, value, values, x, h, nsteps, d_steps, d_partial);
-        std::vector<real_t> partial(n_blocks * nsteps);
-        cudaMemcpyAsync(partial.data(), d_partial, partial.size() * sizeof(real_t), cudaMemcpyDeviceToHost, s);
-        cudaFreeAsync(d_steps, s);
-        cudaFreeAsync(d_partial, s);
+                n_dirichlet_nodes, dirichlet_nodes, block_size, component, value, values, x, h, nsteps, scratch->d_steps,
+                scratch->d_partial);
+        cudaMemcpyAsync(scratch->h_partial.data(), scratch->d_partial, n_partial * sizeof(real_t), cudaMemcpyDeviceToHost, s);
         if (cudaStreamSynchronize(s) != cudaSuccess) return SFEM_FAILURE;
         // The blocks' sums in block order: the same total on every call.
         for (int k = 0; k < nsteps; ++k) {
             real_t acc = 0;
-            for (ptrdiff_t b = 0; b < n_blocks; ++b) acc += partial[b * nsteps + k];
+            for (ptrdiff_t b = 0; b < n_blocks; ++b) acc += scratch->h_partial[b * nsteps + k];
             out[k] += acc;
         }
         return SFEM_SUCCESS;
+    }
+
+    void d_constraint_objective_scratch_destroy(ConstraintObjectiveScratch *scratch) {
+        const cudaStream_t s = (cudaStream_t)scratch->stream;
+        if (scratch->d_steps) cudaFreeAsync(scratch->d_steps, s);
+        if (scratch->d_partial) cudaFreeAsync(scratch->d_partial, s);
+        *scratch = ConstraintObjectiveScratch{};
     }
 }  // namespace sfem

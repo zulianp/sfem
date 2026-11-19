@@ -315,7 +315,9 @@ extern "C" int laplace_tri3_hessian_bsr_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int laplace_tet4_hessian_bsr_a_msoa(
         const int scalar_bytes,
@@ -336,7 +338,9 @@ extern "C" int laplace_tet4_hessian_bsr_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 extern "C" int laplace_tri3_hessian_crs_a_msoa(
         const int scalar_bytes,
@@ -807,7 +811,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   const enum smesh::PrimitiveType resolved_real_type =
       (real_type == smesh::SMESH_DEFAULT)
@@ -819,7 +825,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_2d_a_msoa(
           : values_type;
   switch (element_type) {
     case smesh::TRI3:
-      return laplace_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, values);
+      return laplace_tri3_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, values, n2e_ptr, n2e_idx);
     default:
       break;
   }
@@ -847,7 +853,9 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   const enum smesh::PrimitiveType resolved_real_type =
       (real_type == smesh::SMESH_DEFAULT)
@@ -859,7 +867,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_hessian_bsr_3d_a_msoa(
           : values_type;
   switch (element_type) {
     case smesh::TET4:
-      return laplace_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, values);
+      return laplace_tet4_hessian_bsr_a_msoa((int)resolved_real_type, (int)resolved_values_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, rowptr, colidx, values, n2e_ptr, n2e_idx);
     default:
       break;
   }

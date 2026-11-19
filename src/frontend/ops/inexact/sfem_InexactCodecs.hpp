@@ -11,7 +11,7 @@
 namespace sfem {
     namespace inexact {
 
-        /// How a stored tangent is encoded (docs/compressed_partial_assembly, "Compression").
+        /// How a stored tangent is encoded (xsesfsi_papers/quantized_ops, "Compression").
         ///
         /// `Plain` keeps one scale per element and applies it to the element's outputs, which is
         /// the same number as scaling the decoded tangent, with `dim * n_nodes` multiplies rather

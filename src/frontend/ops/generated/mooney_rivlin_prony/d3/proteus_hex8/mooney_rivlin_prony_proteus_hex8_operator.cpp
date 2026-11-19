@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include "packed_thread_scratch.hpp"
+#include "owner_computes.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -4014,6 +4015,7 @@ template <typename s_t, typename v_t>
 static SFEM_INLINE void mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
+    const uint64_t owned,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
     v_t *const RSTR values) {
@@ -4027,7 +4029,7 @@ static SFEM_INLINE void mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    has_row[i] = lenrow > 0;
+    has_row[i] = lenrow > 0 && ((owned >> i) & 1u);
     mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
@@ -4041,7 +4043,6 @@ static SFEM_INLINE void mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_
           const int row = bi * NS + i;
           for (int bj = 0; bj < NC; ++bj) {
             const int col = bj * NS + j;
-#pragma omp atomic update
             block[bi * NC + bj] += v_t(element_matrix[row * (NC * NS) + col]);
           }
         }
@@ -4053,7 +4054,7 @@ static SFEM_INLINE void mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_
 template <typename s_t, typename v_t, typename g_t, int FORMAT, bool PROJECT = false>
 static int mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl(
     const ptrdiff_t nelements,
-    const ptrdiff_t,
+    const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
     const s_t C01,
@@ -4068,6 +4069,8 @@ static int mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl(
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
     v_t *const RSTR values,
+    const count_t *const RSTR n2e_ptr,
+    const element_idx_t *const RSTR n2e_idx,
     const int *const RSTR,
     const ptrdiff_t,
     const ptrdiff_t,
@@ -4087,8 +4090,7 @@ static int mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl(
 
   static_assert(FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");
-#pragma omp parallel for schedule(static)
-  for (ptrdiff_t element = 0; element < nelements; ++element) {
+  auto assemble_element = [&](const ptrdiff_t element, [[maybe_unused]] const uint64_t owned) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
     s_t bcoordinate_data[NS * ND];
@@ -4131,8 +4133,16 @@ static int mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl(
     mooney_rivlin_prony_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, PROJECT>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, C01, C10, K, iso_relaxation_gamma, iso_history + element, nelements, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
-      mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_scatter_bsr(ev, element_matrix, owned, rowptr, colidx, values);
     }
+  };
+  if constexpr (FORMAT == 1) {
+    sfem::codegen::owner_computes<NS>(nnodes, elements, rowptr, n2e_ptr, n2e_idx, assemble_element);
+  } else {
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    assemble_element(element, ~uint64_t(0));
+  }
   }
 
   return SFEM_SUCCESS;
@@ -4159,16 +4169,18 @@ extern "C" int mooney_rivlin_prony_proteus_hex8_hessian_bsr_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
       switch (values_bytes) {
         case (int)sizeof(double): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         case (int)sizeof(float): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, float, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, float, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         default:
           break;
@@ -4178,7 +4190,7 @@ extern "C" int mooney_rivlin_prony_proteus_hex8_hessian_bsr_i_msoa(
     case (int)sizeof(float): {
       switch (values_bytes) {
         case (int)sizeof(float): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 1>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         default:
           break;
@@ -4209,16 +4221,18 @@ extern "C" int mooney_rivlin_prony_proteus_hex8_hessian_bsr_psd_i_msoa(
         const void *const RSTR uz,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
       switch (values_bytes) {
         case (int)sizeof(double): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, double, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         case (int)sizeof(float): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, float, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<double, float, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const double *)iso_history, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (float *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         default:
           break;
@@ -4228,7 +4242,7 @@ extern "C" int mooney_rivlin_prony_proteus_hex8_hessian_bsr_psd_i_msoa(
     case (int)sizeof(float): {
       switch (values_bytes) {
         case (int)sizeof(float): {
-            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+            return sfem::codegen::mooney_rivlin_prony_proteus_hex8_hessian_i_msoa_assemble_impl<float, float, geom_t, 1, true>(nelements, nnodes, elements, points, C01, C10, K, iso_relaxation_gamma, (const float *)iso_history, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, n2e_ptr, n2e_idx, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
         }
         default:
           break;

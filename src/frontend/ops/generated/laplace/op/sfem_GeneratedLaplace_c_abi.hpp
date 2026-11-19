@@ -847,7 +847,9 @@ extern "C" int laplace_hessian_bsr_2d_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int laplace_hessian_bsr_2d_i_msoa(
@@ -861,7 +863,9 @@ extern "C" int laplace_hessian_bsr_2d_i_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int laplace_hessian_bsr_3d_a_msoa(
@@ -884,7 +888,9 @@ extern "C" int laplace_hessian_bsr_3d_a_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int laplace_hessian_bsr_3d_i_msoa(
@@ -898,7 +904,9 @@ extern "C" int laplace_hessian_bsr_3d_i_msoa(
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
-        void *const RSTR values
+        void *const RSTR values,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx
 );
 
 extern "C" int laplace_hessian_crs_2d_a_msoa(

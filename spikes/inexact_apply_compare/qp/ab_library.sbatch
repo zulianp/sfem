@@ -11,8 +11,9 @@
 #   STORES: pairs spike:library (default the paper's eight formats)
 # A reads its update and apply totals from its `qp:` line; B from the trace (smesh.trace.csv).
 # Each store runs A B B A, so a drift of the node over the job cancels in the sums.
-A_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-qp
-B_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-lib
+# A_TREE (the spike's builds), B_TREE (the library's tree: cases, runs/) and B_BUILD from the environment.
+A_TREE=${A_TREE:-/ritom/scratch/cscs/zulianp/sfem-pa-qp}
+B_TREE=${B_TREE:-/ritom/scratch/cscs/zulianp/sfem-pa-lib}
 E=$1; K=$2; M=$3
 A=$A_TREE/build-spike-$E/newton_qp
 B=$B_TREE/${B_BUILD:-build}/playground  # B_BUILD=build-native: the library compiled as the spike is (-march=native)
