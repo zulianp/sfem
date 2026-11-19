@@ -1,7 +1,7 @@
 // Sparse matrices of 3x3 blocks in SELL-C-sigma (Kreutzer et al. 2014), in difference form: the
 // assembled tangent of an operator whose state enters only through its gradient, stored without its
 // diagonal blocks.  The values are double, float, or quantized: int8 with one f32 scale per block or
-// f16 with one power-of-two scale for the whole matrix.  The format behind `solver.linear.format: SELL`
+// f16 with one power-of-two scale per update window of rows.  The format behind `solver.linear.format: SELL`
 // (SELLTangent) and the host side of the INEXACT operator's `bsr` store (sfem_QuantBSRStore.hpp);
 // the device matrix is cuda/sfem_SELL_cuda.hpp.  Two forms:
 //
@@ -27,7 +27,7 @@
 // adds -- are corrected exactly by `QuantBsrStore` (sfem_QuantBSRStore.hpp).
 //
 // Codes: int8 with one f32 scale per block (the block's largest entry maps to 127), f16 with one
-// power-of-two scale for the whole matrix, or the values themselves (float, double).
+// power-of-two scale per update window of rows (below), or the values themselves (float, double).
 //
 // Layout: VS rows side by side (SELL-C-sigma).  The rows are sorted by length, longest first, within
 // windows of SIGMA rows, cut into groups of VS, and each group is padded to its longest row; a step
@@ -36,12 +36,11 @@
 // vector at a time.  A padding block is the row's own column with zero codes.  The store owns its
 // structure, so its bytes are what the application reads.
 //
-// The codes and scales of a step form one record ([entry][lane] codes, then [lane] scales).  The
-// upper form can write the records over the assembled values themselves (encode_in_place): a
-// record holds 13 (int8) or 18 (f16) bytes per stored block against 36 bytes per assembled block,
-// and only about half the blocks are stored.  The windows are encoded in rounds, a round taking the
-// windows whose records end before the first value of the round's first window, so no record
-// overwrites a value not yet read; the remainder is encoded before the records.
+// The codes and scales of a step form one record ([entry][lane] codes, then [lane] scales).  Every
+// block is encoded from its own row (the upper form stores the blocks right of the diagonal), so the
+// rows can be assembled and encoded a window at a time (encode_rows): the update windows are whole
+// sorting windows and, in the upper form, whole parts, and an f16 window takes its own power-of-two
+// scale, so the single-precision matrix never exists in full (the device's update, sfem_cuda_QuantBSRStore.cu).
 #pragma once
 
 #include <algorithm>
@@ -71,7 +70,7 @@ struct SellMatrix {
     static constexpr int VS = VS_;
     static constexpr ptrdiff_t SIGMA = 32 * VS_;
     static constexpr bool per_block = std::is_same<code_t, int8_t>::value;      // a scale per block
-    static constexpr bool matrix_scaled = std::is_same<code_t, half_t>::value;  // one scale per matrix
+    static constexpr bool matrix_scaled = std::is_same<code_t, half_t>::value;  // one scale per update window
     static constexpr bool difference = true;
     static constexpr bool upper = F == SellForm::Upper;
     static constexpr bool offsets = !std::is_same<col_t, idx_t>::value;
@@ -86,18 +85,19 @@ struct SellMatrix {
     std::vector<count_t> group_ptr;  // steps of each group
     std::vector<col_t> colidx;      // [step][lane]
     // Step records: [entry][lane] codes (blocks row-major), then [lane] scales (int8), in the store's
-    // own buffer or over the assembled values (encode_in_place).
+    // own buffer.
     static constexpr size_t CODE_BYTES = 9 * (size_t)VS_ * sizeof(code_t);
     static constexpr size_t R = CODE_BYTES + (per_block ? (size_t)VS_ * sizeof(float) : 0);
     std::vector<uint8_t> own;
     uint8_t *rec = nullptr;
-    float scale = 1;                // the matrix's (f16; 1 otherwise)
+    std::vector<float> window_scale;  // f16: each sorting window's, its update window's scale
     // Upper: part p owns groups [part_group[p], part_group[p+1]) and rows [part_row[p], part_row[p+1]);
     // its remainder blocks are [rem_ptr[p], rem_ptr[p+1]) and its halo slots [halo_ptr[p], halo_ptr[p+1]),
     // slot s standing for row halo_row[s]; the slots that point into part p's rows are
     // halo_in[halo_in_ptr[p] .. halo_in_ptr[p+1]).
     std::vector<ptrdiff_t> part_group, part_row;
     std::vector<count_t> rem_ptr, halo_ptr, halo_in_ptr;
+    std::vector<count_t> rem_row_ptr;               // [row]: the row's first remainder block (encode_rows)
     std::vector<idx_t> rem_row, rem_col, rem_slot;  // rem_slot: -1 when the column is the part's own
     std::vector<code_t> rem_codes;                  // [block][entry]
     std::vector<float> rem_scales;                  // [block] (int8)
@@ -125,6 +125,7 @@ struct SellMatrix {
     // The structure from a node graph with sorted rows.
     SellMatrix(const ptrdiff_t n, const count_t *const rp, const idx_t *const ci) : n_rows(n) {
         n_groups = (n + VS - 1) / VS;
+        if (matrix_scaled) window_scale.assign((size_t)((n + SIGMA - 1) / SIGMA), 1.f);
 #ifdef _OPENMP
         const ptrdiff_t parts = upper ? omp_get_max_threads() : 0;
 #else
@@ -166,6 +167,7 @@ struct SellMatrix {
 
         // Remainder blocks and the rows beyond each part they reach.
         rem_ptr.assign((size_t)parts + 1, 0);
+        rem_row_ptr.assign((size_t)n + 1, 0);
         std::vector<std::vector<idx_t>> beyond((size_t)parts);
 #pragma omp parallel for schedule(static, 1)
         for (ptrdiff_t p = 0; p < parts; ++p) {
@@ -176,6 +178,7 @@ struct SellMatrix {
                 for (count_t k = rp[i]; k < rp[i + 1]; ++k)
                     if (ci[k] > i && !in_sell(i, ci[k], end)) {
                         ++c;
+                        ++rem_row_ptr[(size_t)i + 1];
                         if (ci[k] >= end) b.push_back(ci[k]);
                     }
             rem_ptr[(size_t)p + 1] = c;
@@ -187,6 +190,8 @@ struct SellMatrix {
             rem_ptr[(size_t)p + 1] += rem_ptr[(size_t)p];
             halo_ptr[(size_t)p + 1] = halo_ptr[(size_t)p] + (count_t)beyond[(size_t)p].size();
         }
+        // A row's remainder blocks follow those of the rows before it, as the parts' do.
+        for (ptrdiff_t i = 0; i < n; ++i) rem_row_ptr[(size_t)i + 1] += rem_row_ptr[(size_t)i];
         const size_t remainder = (size_t)rem_ptr[(size_t)parts], slots = (size_t)halo_ptr[(size_t)parts];
         rem_row.resize(remainder);
         rem_col.resize(remainder);
@@ -241,42 +246,67 @@ struct SellMatrix {
     std::size_t record_bytes() const { return (size_t)group_ptr[(size_t)n_groups] * R; }
 
     std::size_t bytes() const {
-        const std::size_t upper_bytes = (rem_ptr.size() + halo_ptr.size() + halo_in_ptr.size()) * sizeof(count_t) +
+        const std::size_t upper_bytes = (rem_ptr.size() + rem_row_ptr.size() + halo_ptr.size() + halo_in_ptr.size()) * sizeof(count_t) +
                                         (rem_row.size() + rem_col.size() + rem_slot.size()) * sizeof(idx_t) +
                                         rem_codes.size() * sizeof(code_t) + rem_scales.size() * sizeof(float) +
                                         (halo_row.size() + halo_in.size()) * sizeof(idx_t) + halo_y.size() * sizeof(double);
         return rows.size() * sizeof(idx_t) + group_ptr.size() * sizeof(count_t) + colidx.size() * sizeof(col_t) +
-               record_bytes() + upper_bytes;
+               record_bytes() + upper_bytes + window_scale.size() * sizeof(float);
     }
 
-    // values: the assembled matrix on (rp, ci), blocks row-major.  encode writes the records into the
-    // store's own buffer; encode_in_place (upper form) writes them over the values, which the
-    // application then reads and which must outlive it.
+    // The update's windows of rows, about equal in blocks: bounds[w] .. bounds[w + 1], from whole sorting
+    // windows and, in the upper form, whole parts (a part's rows take one f16 scale).
+    std::vector<ptrdiff_t> update_windows(const count_t *const rp, const int windows) const {
+        std::vector<ptrdiff_t> cuts;
+        if (upper) {
+            cuts.assign(part_row.begin(), part_row.end());
+        } else {
+            for (ptrdiff_t r = 0; r < n_rows; r += SIGMA) cuts.push_back(r);
+            cuts.push_back(n_rows);
+        }
+        std::vector<ptrdiff_t> bounds{0};
+        const double per = (double)rp[n_rows] / std::max(1, windows);
+        for (size_t c = 1; c + 1 < cuts.size(); ++c)
+            if (cuts[c] > bounds.back() && (double)rp[cuts[c]] >= per * (double)bounds.size()) bounds.push_back(cuts[c]);
+        bounds.push_back(n_rows);
+        return bounds;
+    }
+
+    // values: the assembled matrix on (rp, ci), blocks row-major.
     template <typename V>
     void encode(const count_t *const rp, const idx_t *const ci, const V *const values) {
-        own.resize(record_bytes());
-        encode_into(rp, ci, values, own.data());
-    }
-    template <typename V>
-    void encode_in_place(const count_t *const rp, const idx_t *const ci, V *const values) {
-        static_assert(upper, "in place: only the upper form reads each block once, and only its own");
-        std::vector<uint8_t>().swap(own);
-        encode_into(rp, ci, values, reinterpret_cast<uint8_t *>(values));
+        reserve_records();
+        encode_rows(rp, ci, values, 0, 0, n_rows);
     }
 
+    // The records' buffer, before the windows' encode_rows.
+    void reserve_records() {
+        if (own.size() != record_bytes()) own.resize(record_bytes());
+        rec = own.data();
+    }
+
+    // Rows [r0, r1) (whole update windows, update_windows) from values that hold the blocks of those rows
+    // only, block k at values[(k - k0) 9], k0 = rp[r0].
     template <typename V>
-    void encode_into(const count_t *const rp, const idx_t *const ci, const V *const values, uint8_t *const dest) {
+    void encode_rows(const count_t *const rp, const idx_t *const ci, const V *const values, const count_t k0, const ptrdiff_t r0,
+                     const ptrdiff_t r1) {
+        if (!upper && SYM && (r0 != 0 || r1 != n_rows)) {
+            SFEM_ERROR("SellMatrix::encode_rows: a symmetric difference form encodes K_ij from K_ji too, so all rows at once\n");
+        }
+        auto at = [&](const count_t k) { return &values[(size_t)(k - k0) * 9]; };
+        double matrix_inv = 1;
         if constexpr (matrix_scaled) {
             double top = 0;
 #pragma omp parallel for reduction(max : top)
-            for (ptrdiff_t i = 0; i < n_rows; ++i)
+            for (ptrdiff_t i = r0; i < r1; ++i)
                 for (count_t k = rp[i]; k < rp[i + 1]; ++k)
-                    if (upper ? ci[k] > i : (!difference || ci[k] != i))
-                        for (int x = 0; x < 9; ++x) top = std::max(top, std::fabs((double)values[(size_t)k * 9 + x]));
-            scale = (float)inexact::CodeTraits<half_t>::scale_for(top);
+                    if (upper ? ci[k] > i : ci[k] != i)
+                        for (int x = 0; x < 9; ++x) top = std::max(top, std::fabs((double)at(k)[x]));
+            const float sc = (float)inexact::CodeTraits<half_t>::scale_for(top);
+            for (ptrdiff_t w = r0 / SIGMA; w < (r1 + SIGMA - 1) / SIGMA; ++w) window_scale[(size_t)w] = sc;
+            matrix_inv = 1.0 / (double)sc;
         }
-        const double matrix_inv = 1.0 / (double)scale;
-        // One block's codes (and scale) from S, int8 with a per-block scale, f16 with the matrix's, or the
+        // One block's codes (and scale) from S, int8 with a per-block scale, f16 with the window's, or the
         // values themselves.
         auto put = [&](const double *const S, code_t *const c, const size_t stride, float *const sc) {
             if constexpr (per_block) {
@@ -292,46 +322,43 @@ struct SellMatrix {
                 for (int x = 0; x < 9; ++x) c[x * stride] = (code_t)S[x];
             }
         };
-        // The remainder first: in place, its values may lie under the records.
         if constexpr (upper) {
-            const ptrdiff_t parts = (ptrdiff_t)part_row.size() - 1;
-#pragma omp parallel for schedule(static, 1)
-            for (ptrdiff_t p = 0; p < parts; ++p) {
-                const ptrdiff_t end = part_row[(size_t)p + 1];
-                size_t e = (size_t)rem_ptr[(size_t)p];
-                for (ptrdiff_t i = part_row[(size_t)p]; i < end; ++i)
-                    for (count_t k = rp[i]; k < rp[i + 1]; ++k) {
-                        if (ci[k] <= i || in_sell(i, ci[k], end)) continue;
-                        double S[9];
-                        for (int x = 0; x < 9; ++x) S[x] = (double)values[(size_t)k * 9 + x];
-                        put(S, &rem_codes[e * 9], 1, per_block ? &rem_scales[e] : nullptr);
-                        ++e;
-                    }
+            // By rows: a window holds a few of the parts, and its rows are all the threads' work.
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t i = r0; i < r1; ++i) {
+                const ptrdiff_t end = part_end(i);
+                size_t          e   = (size_t)rem_row_ptr[(size_t)i];
+                for (count_t k = rp[i]; k < rp[i + 1]; ++k) {
+                    if (ci[k] <= i || in_sell(i, ci[k], end)) continue;
+                    double S[9];
+                    for (int x = 0; x < 9; ++x) S[x] = (double)at(k)[x];
+                    put(S, &rem_codes[e * 9], 1, per_block ? &rem_scales[e] : nullptr);
+                    ++e;
+                }
             }
         }
-        // The records of window w's groups, step s at base + (s - step0) * R.
+        // The records of sorting window w's groups.
         constexpr ptrdiff_t GW = SIGMA / VS;
-        auto window = [&](const ptrdiff_t w, uint8_t *const base, const size_t step0) {
+#pragma omp parallel for schedule(dynamic, 1)
+        for (ptrdiff_t w = r0 / SIGMA; w < (r1 + SIGMA - 1) / SIGMA; ++w) {
             for (ptrdiff_t g = w * GW; g < std::min(n_groups, (w + 1) * GW); ++g) {
                 const ptrdiff_t end = upper ? part_end(rows[(size_t)g * VS]) : 0;
                 for (int l = 0; l < VS; ++l) {
                     const idx_t i = rows[(size_t)g * VS + l];
                     size_t step = (size_t)group_ptr[(size_t)g];
-                    auto c_at = [&](const size_t st) { return reinterpret_cast<code_t *>(base + (st - step0) * R) + l; };
-                    auto s_at = [&](const size_t st) { return reinterpret_cast<float *>(base + (st - step0) * R + CODE_BYTES) + l; };
+                    auto c_at = [&](const size_t st) { return step_codes(st) + l; };
+                    auto s_at = [&](const size_t st) { return step_scales(st) + l; };
                     if (i >= 0) {
                         for (count_t k = rp[i]; k < rp[i + 1]; ++k) {
                             const idx_t j = ci[k];
                             if (upper ? !in_sell(i, j, end) : (difference && j == i)) continue;
                             double S[9];
                             if constexpr (upper || !SYM) {
-                                for (int x = 0; x < 9; ++x) S[x] = (double)values[(size_t)k * 9 + x];
+                                for (int x = 0; x < 9; ++x) S[x] = (double)at(k)[x];
                             } else {
                                 const count_t kt = (count_t)(std::lower_bound(ci + rp[j], ci + rp[j + 1], (idx_t)i) - ci);
                                 for (int r = 0; r < 3; ++r)
-                                    for (int c = 0; c < 3; ++c)
-                                        S[r * 3 + c] = 0.5 * ((double)values[(size_t)k * 9 + r * 3 + c] +
-                                                              (double)values[(size_t)kt * 9 + c * 3 + r]);
+                                    for (int c = 0; c < 3; ++c) S[r * 3 + c] = 0.5 * ((double)at(k)[r * 3 + c] + (double)at(kt)[c * 3 + r]);
                             }
                             if constexpr (!upper) colidx[step * VS + l] = j;
                             put(S, c_at(step), VS, per_block ? s_at(step) : nullptr);
@@ -347,31 +374,6 @@ struct SellMatrix {
                     }
                 }
             }
-        };
-        rec = dest;
-        const ptrdiff_t windows = (n_rows + SIGMA - 1) / SIGMA;
-        auto rec_begin = [&](const ptrdiff_t w) { return (size_t)group_ptr[(size_t)std::min(n_groups, w * GW)] * R; };
-        auto val_begin = [&](const ptrdiff_t w) { return (size_t)rp[std::min(n_rows, w * SIGMA)] * 9 * sizeof(V); };
-        const bool aliased = (const void *)dest == (const void *)values;
-        ptrdiff_t a = 0;
-        while (a < windows) {
-            ptrdiff_t b = windows;
-            if (aliased)
-                for (b = a; b < windows && rec_begin(b + 1) <= val_begin(a);) ++b;
-            if (b == a) {
-                // Window a alone, through a scratch: its records overlap its own values.
-                if (rec_begin(a + 1) > val_begin(a + 1)) {
-                    SFEM_ERROR("SellMatrix::encode_in_place: the records of window %td outgrow its values\n", a);
-                }
-                std::vector<uint8_t> scratch(rec_begin(a + 1) - rec_begin(a));
-                window(a, scratch.data(), (size_t)group_ptr[(size_t)(a * GW)]);
-                std::copy(scratch.begin(), scratch.end(), dest + rec_begin(a));
-                ++a;
-                continue;
-            }
-#pragma omp parallel for schedule(dynamic, 1)
-            for (ptrdiff_t w = a; w < b; ++w) window(w, dest + rec_begin(w), (size_t)group_ptr[(size_t)(w * GW)]);
-            a = b;
         }
     }
 
@@ -379,11 +381,11 @@ struct SellMatrix {
     // blocks of their row, which in the upper form are the stored blocks of the row and the
     // transposes of those stored in the rows above.  Serial: it is taken once per linearisation.
     void add_diagonal(double *const SFEM_RESTRICT diag) const {
-        const double matrix_scale = matrix_scaled ? (double)scale : 1.0;
         for (ptrdiff_t g = 0; g < n_groups; ++g)
             for (int l = 0; l < VS; ++l) {
                 const idx_t i = rows[(size_t)g * VS + l];
                 if (i < 0) continue;
+                const double matrix_scale = matrix_scaled ? (double)window_scale[(size_t)(i / SIGMA)] : 1.0;
                 for (count_t step = group_ptr[(size_t)g]; step < group_ptr[(size_t)g + 1]; ++step) {
                     const code_t *const b = step_codes((size_t)step);
                     const double         s = per_block ? (double)step_scales((size_t)step)[l] : matrix_scale;
@@ -398,7 +400,7 @@ struct SellMatrix {
             }
         if constexpr (upper) {
             for (size_t e = 0; e < rem_row.size(); ++e) {
-                const double s = per_block ? (double)rem_scales[e] : matrix_scale;
+                const double s = per_block ? (double)rem_scales[e] : matrix_scaled ? (double)window_scale[(size_t)(rem_row[e] / SIGMA)] : 1.0;
                 for (int d = 0; d < 3; ++d) {
                     const double v = s * (double)rem_codes[e * 9 + d * 3 + d];
                     diag[(size_t)rem_row[e] * 3 + d] -= v;
@@ -435,10 +437,10 @@ struct SellMatrix {
         const idx_t *const SFEM_RESTRICT rw = rows.data();
         const count_t *const SFEM_RESTRICT gp = group_ptr.data();
         const col_t *const SFEM_RESTRICT ci = colidx.data();
-        const tau out_scale = matrix_scaled ? tau(scale) : tau(1);
         ptrdiff_t first, last;
         team.share(n_groups, 1, &first, &last);
         for (ptrdiff_t g = first; g < last; ++g) {
+            const tau out_scale = matrix_scaled ? tau(window_scale[(size_t)(g / (SIGMA / VS))]) : tau(1);
             const idx_t *const SFEM_RESTRICT r = &rw[(size_t)g * VS];
             double xi0[VS], xi1[VS], xi2[VS];
             tau a0[VS], a1[VS], a2[VS];
@@ -493,7 +495,6 @@ struct SellMatrix {
         const idx_t *const SFEM_RESTRICT rw = rows.data();
         const count_t *const SFEM_RESTRICT gp = group_ptr.data();
         const col_t *const SFEM_RESTRICT ci = colidx.data();
-        const tau out_scale = matrix_scaled ? tau(scale) : tau(1);
         const ptrdiff_t parts = (ptrdiff_t)part_row.size() - 1;
         const idx_t *const SFEM_RESTRICT hr = halo_row.data();
         double *const SFEM_RESTRICT hy = halo_y.data();
@@ -504,6 +505,8 @@ struct SellMatrix {
         {
             for (ptrdiff_t p = first_part; p < last_part; ++p) {
                 const ptrdiff_t end = part_row[(size_t)p + 1];
+                // A part's rows lie in one update window, so in one f16 scale.
+                const tau out_scale = matrix_scaled && end > part_row[(size_t)p] ? tau(window_scale[(size_t)(part_row[(size_t)p] / SIGMA)]) : tau(1);
                 if constexpr (!ADD)
                     for (ptrdiff_t v = part_row[(size_t)p] * 3; v < end * 3; ++v) y[v] = 0;
                 for (ptrdiff_t v = (ptrdiff_t)halo_ptr[(size_t)p] * 3; v < (ptrdiff_t)halo_ptr[(size_t)p + 1] * 3; ++v) hy[v] = 0;

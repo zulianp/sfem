@@ -39,6 +39,11 @@ namespace sfem {
         InexactOptions::Encoding sell_encoding{InexactOptions::Encoding::F32};
         /// Its time scheme's inertia (`solver.linear.sell.inertia`): auto, fused, separate.
         InexactOptions::Inertia sell_inertia{InexactOptions::Inertia::AUTO};
+        /// A diagnostic (`solver.linear.error_probe`): each solve also applies the exact tangent
+        /// (matrix-free) to every Krylov direction p and to the step d, and prints per solve the
+        /// largest |p'(K~ - K)p| / p'Kp, the same ratio on d, and the relative residual of the step
+        /// on the exact tangent. About one matrix-free apply per iteration more; off by default.
+        bool error_probe{false};
     };
 
     /// The linearised step without constraints beyond the Dirichlet rows: K dx = -r by a Krylov

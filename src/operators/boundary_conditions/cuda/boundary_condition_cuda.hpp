@@ -2,6 +2,7 @@
 #define BOUNDARY_CONDITION_INCORE_CUDA_H
 
 #include <stddef.h>
+#include <vector>
 
 #include "boundary_condition.hpp"
 #include "sfem_base.hpp"
@@ -23,6 +24,21 @@ namespace sfem {
                                                V *const SFEM_RESTRICT             values,
                                                void *const                        stream);
 
+    /// The buffers of d_constraint_objective_vec_steps, owned by the caller and grown only when too
+    /// small: the line search evaluates the merit every trial step, and an allocation per evaluation
+    /// stalls on a GH200 node (cudaMallocAsync up to hundreds of milliseconds while the processes on
+    /// the other GPUs allocate).  The device buffers are stream-ordered (a cudaFree would wait for the
+    /// whole device, NCCL's kernels included).  Released by d_constraint_objective_scratch_destroy.
+    struct ConstraintObjectiveScratch {
+        real_t             *d_steps{nullptr};    ///< the step lengths, on the device
+        real_t             *d_partial{nullptr};  ///< the blocks' sums per step, on the device
+        std::vector<real_t> h_partial;           ///< their copy on the host
+        int                 steps_capacity{0};
+        ptrdiff_t           partial_capacity{0};
+        void               *stream{nullptr};     ///< the stream the device buffers are ordered on
+    };
+    void d_constraint_objective_scratch_destroy(ConstraintObjectiveScratch *scratch);
+
     /// out[s] += sum over the nodes of (x_i + steps[s] h_i - v_i)^2, v_i the node's entry of
     /// `values` or, when that is null, `value`; h null: x alone.  x, h, values and the nodes on the
     /// device, steps and out on the host (the host constraint_objective_nodes_to_value(s)_vec_steps).
@@ -37,6 +53,7 @@ namespace sfem {
                                          const int                         nsteps,
                                          const real_t *const               steps,
                                          real_t *const                     out,
+                                         ConstraintObjectiveScratch       *scratch,
                                          void *const                       stream);
 
     /// Up to `capacity` conditions' nodes and components, passed to one kernel by value.

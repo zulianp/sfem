@@ -11,13 +11,18 @@
 # spikes/inexact_apply_compare/qp/cases at the paper's sizes and steps, each operator format a run on one
 # Grace chip (host) or one GPU (device), SFEM_RUNS_PER_NODE at a time. The tetrahedral meshes are smesh's
 # cube (12 tetrahedra and a centre node per cell, the paper's), made once into SFEM_RUNS/cpa_meshes.
-#   CASES     stretch_1M stretch_10M twist (default all)
+#   CASES     stretch_1M stretch_10M twist (default all); sweep: the stretch case at the paper's sweep of
+#             sizes (stretch_s0 ... stretch_s4, the 1M case's step), a log per size
 #   ELEMENTS  TET4 TET10 HEX8 PROTEUS_HEX27 (default all)
 #   FORMATS   the paper's formats, by the paper's names: bsr64 bsr32 (BSR in double and single precision),
 #             bsro16 bsroi8 (the quantized matrix, SELL-C-sigma on both machines), ead16 eadi8p (the
 #             element matrix, fp16 difference form and int8 with a scale per node pair), f16 i8md (the
 #             point store, fp16 and int8 mean and deviation); default all eight
 #   SPACE     host | device
+#   (each run's section: its steps, the error probe's lines if on, rc, its peak memory, its trace totals)
+#   SET       further playground settings, key=value separated by spaces, for every run (e.g.
+#             "material.poisson_ratio=0.45 solver.linear.preconditioner=jacobi solver.linear.error_probe=true")
+#   DT        one step for every case instead of the paper's (e.g. the baseline's, for the robustness runs)
 #   OUT       a new folder (default SFEM_RUNS/cpa_newton_<space>); each case's log OUT/<case>_<element>.out
 #             has a section "== <format> <options>" per run with its steps and its trace totals, the run
 #             itself in OUT/<case>_<element>/<format>
@@ -37,6 +42,18 @@ export SFEM_PACKED_TWO_PASS=1
 # case element -> the mesh option and the step (the paper's logs, data/measured/newton_* and twist_*).
 setup() {  # <case> <element>: prints "<mesh option> <dt> <yaml>"
   local k=$1 e=$2 n dt
+  if [[ $k == stretch_s* ]]; then
+    local sizes
+    case $e in
+      HEX8) sizes="16 24 36 50 70" dt=0.25 ;;
+      PROTEUS_HEX27) sizes="8 12 18 25 35" dt=0.125 ;;
+      TET4) sizes="t16 t24 t36 t56" dt=0.25 ;;
+      TET10) sizes="t8 t12 t18 t28" dt=0.0625 ;;
+      *) return 1 ;;
+    esac
+    n=$(echo $sizes | cut -d' ' -f$((${k#stretch_s} + 1)))
+    [ -n "$n" ] || return 1
+  else
   case $k:$e in
     stretch_1M:TET4) n=t56 dt=0.25 ;;       stretch_10M:TET4) n=t120 dt=0.125 ;;
     stretch_1M:TET10) n=t28 dt=0.0625 ;;    stretch_10M:TET10) n=t60 dt=0.03125 ;;
@@ -46,6 +63,7 @@ setup() {  # <case> <element>: prints "<mesh option> <dt> <yaml>"
     twist:HEX8) n=70 dt=0.0625 ;;           twist:PROTEUS_HEX27) n=35 dt=0.03125 ;;
     *) return 1 ;;
   esac
+  fi
   local y=$C/$(echo "$e" | tr A-Z a-z | sed s/proteus_//)_${k%%_*}
   [ "${k%%_*}" = stretch ] && y=${y}_shear
   case $n in
@@ -90,46 +108,71 @@ pack() {  # <mesh option>: the paper's pack size, max(16, min(8192, elements/144
   echo $p
 }
 FORMATS=${FORMATS:-bsr64 bsr32 bsro16 bsroi8 ead16 eadi8p f16 i8md}
+CASES=${CASES:-stretch_1M stretch_10M twist}
+CASES=${CASES//sweep/stretch_s0 stretch_s1 stretch_s2 stretch_s3 stretch_s4}
+# Every run records its memory at each step's end (the playground's memory probe; host_peak_rss is the
+# process's high-water mark, device_pool_peak the stream-ordered pools'), its section ends with the peaks.
+EXTRA=()
+for kv in ${SET:-}; do EXTRA+=(--set "$kv"); done
+# Runs of a few seconds (the 1M case, the sweep) absorb one-off stalls of a second or two: each is run
+# REPEATS times (3 by default; the longer cases once), every repeat a section of the log, and the paper
+# takes each format's fastest.
+repeats() { case $1 in stretch_1M | stretch_s*) echo "${REPEATS:-3}" ;; *) echo "${REPEATS:-1}" ;; esac; }
 
-go() {  # <case> <element> <format>: one run into its folder, its section into a part log
-  local k=$1 e=$2 f=$3 s m dt y o d p
+go() {  # <case> <element> <format> <repeat>: one run into its folder, its section into a part log
+  local k=$1 e=$2 f=$3 r=$4 s m dt y o d p
   s=$(setup "$k" "$e") || return 0
   read -r m dt y <<< "$s"
+  dt=${DT:-$dt}
   o=$(options "$f") || { echo "newton: no format $f" >&2; return 0; }
   d=$OUT/${k}_$e/$f
+  [ "$r" -gt 1 ] && d=$d.r$r
   mkdir -p "$d"
   p=$(pack "$m")
+  # The playground resolves output paths against the case file's folder: the run's own, absolute.
+  local mem=(--set "output.history_csv=$d/history.csv" --set "output.probes=[{type: memory}]")
   {
-    echo "== $f $o"
+    echo "== $f $o ${EXTRA[*]}"
     # shellcheck disable=SC2086
     if [ "$SPACE" = device ]; then
-      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_GPU "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=device $o 2>&1)
+      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_GPU "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=device $o "${mem[@]}" "${EXTRA[@]}" 2>&1)
     else
-      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_HOST "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=host $o 2>&1)
-    fi | grep -E "^Playground|^step [0-9]|Abort|rror"
+      (cd "$d" && SMESH_ELEMENTS_PER_PACK=$p $SFEM_LAUNCH_HOST "$B/playground" "$y" --set "$m" --set time.dt=$dt --set execution_space=host $o "${mem[@]}" "${EXTRA[@]}" 2>&1)
+    fi | grep -E "^Playground|^step [0-9]|^error_probe|Abort|rror"
     echo "rc=${PIPESTATUS[0]}"
+    [ -f "$d/history.csv" ] && awk -F, 'NR == 1 { for (i = 1; i <= NF; i++) c[$i] = i; next }
+      { for (k in c) if (k ~ /peak|_now$|^bytes_tangent/ && $c[k] + 0 > m[k]) m[k] = $c[k] + 0 }
+      END { printf "memory"; for (k in m) printf " %s %.0f", k, m[k]; printf "\n" }' "$d/history.csv"
     [ -f "$d/smesh.trace.csv" ] && grep -E "^(NewtonSolver::(solve|step)|Function::inexact_(update|apply)|ConjugateGradient::apply|BSRTangent::assemble|SELLTangent::assemble)," "$d/smesh.trace.csv" | sed 's/^/  trace /'
   } > "$d.part" 2>&1
 }
-for k in ${CASES:-stretch_1M stretch_10M twist}; do
+for k in $CASES; do
   for e in ${ELEMENTS:-TET4 TET10 HEX8 PROTEUS_HEX27}; do
     setup "$k" "$e" > /dev/null || continue
-    for f in $FORMATS; do
-      [ "$e" = TET4 ] && [ "$f" = i8md ] && continue  # not in the paper
-      sfem_throttle
-      go "$k" "$e" "$f" &
+    for r in $(seq "$(repeats "$k")"); do
+      for f in $FORMATS; do
+        [ "$e" = TET4 ] && [ "$f" = i8md ] && continue  # not in the paper
+        sfem_throttle
+        go "$k" "$e" "$f" "$r" &
+      done
     done
   done
 done
 wait
 # One log per case and element, its header first (as the paper's newton.sbatch logs).
-for k in ${CASES:-stretch_1M stretch_10M twist}; do
+for k in $CASES; do
   for e in ${ELEMENTS:-TET4 TET10 HEX8 PROTEUS_HEX27}; do
     s=$(setup "$k" "$e") || continue
     read -r m dt y <<< "$s"
+    dt=${DT:-$dt}
     {
-      echo "node $(hostname) $e $y $m dt=$dt space=$SPACE"
-      for f in $FORMATS; do [ -f "$OUT/${k}_$e/$f.part" ] && cat "$OUT/${k}_$e/$f.part"; done
+      echo "node $(hostname) $e $y $m dt=$dt space=$SPACE ${SET:-}"
+      for f in $FORMATS; do
+        for r in $(seq "$(repeats "$k")"); do
+          q=$OUT/${k}_$e/$f; [ "$r" -gt 1 ] && q=$q.r$r
+          [ -f "$q.part" ] && cat "$q.part"
+        done
+      done
     } > "$OUT/${k}_$e.out"
     echo "${k}_$e: $(grep -c '^rc=0' "$OUT/${k}_$e.out") runs ok of $(grep -c '^== ' "$OUT/${k}_$e.out")"
   done

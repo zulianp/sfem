@@ -1,7 +1,10 @@
 #pragma once
 
+#include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -94,6 +97,20 @@ namespace sfem {
         /// beside the store, InertiaLeftOut); above, it needs y_i += R_i x_i. The host's and the device's
         /// stores decide alike.
         SFEM_HOST_DEVICE SFEM_INLINE bool row_sum_is_a_term(const double sum, const double top) { return sum > 64 * FLT_EPSILON * top; }
+
+        /// The windows of rows a quantized matrix is assembled and encoded in. The device: as many as keep a
+        /// window's single-precision values below half the records' bytes (values_bytes and record_bytes of
+        /// the whole matrix). The host (`host`): 4, as each window splits its rows into the threads' ranges
+        /// and the elements on their boundaries are computed by two threads, so the windows cost set-up --
+        /// HEX8 and TET10 at 1e7 dof on Grace, 1/4/8-12 windows: set-up 0.88-0.98 / 0.88-1.14 / 1.05-1.18 of
+        /// the one-piece store, peak memory 1.3-1.4 / 0.58-0.70 / 0.48-0.50 of it. SFEM_QBSR_WINDOWS (1 to
+        /// 12) overrides either for a study.
+        inline int qbsr_window_count(const double values_bytes, const double record_bytes, const bool host = false) {
+            const char *const v = getenv("SFEM_QBSR_WINDOWS");
+            if (v) return std::max(1, std::min(12, atoi(v)));
+            if (host) return 4;
+            return std::max(1, std::min(12, (int)std::ceil(2.0 * values_bytes / record_bytes)));
+        }
 
         /// out += B in, B packed as DiagonalExtra's blocks (node_obstacle_packed_sym_apply's arithmetic).
         SFEM_HOST_DEVICE SFEM_INLINE void packed_sym_apply(const real_t *const B, const real_t *const in, real_t *const out) {

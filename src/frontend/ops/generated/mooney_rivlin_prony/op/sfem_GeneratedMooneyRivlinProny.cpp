@@ -7,6 +7,7 @@
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_DerefinedTimeScheme.hpp"
 #include "sfem_OpTracer.hpp"
+#include "sfem_NodeToElementMaps.hpp"
 #include "sfem_Parameters.hpp"
 #include "smesh_kernel_data.hpp"
 #include "smesh_mesh.hpp"
@@ -434,6 +435,7 @@ namespace sfem {
     std::vector<SharedBuffer<real_t>> packed_ghost_buf;
     CheckedGraph crs_graph;
     CheckedGraph bsr_graph;
+    NodeToElementMaps node_to_element;  // the host's owner-computes BSR assembly
     inexact::OpState inexact;
     bool project_tangent{false};
   };
@@ -1208,26 +1210,26 @@ namespace sfem {
       if (dim == 2) {
         if (domain.element_type == smesh::TRI3) {
           if (impl_->project_tangent) {
-            return mooney_rivlin_prony_hessian_bsr_psd_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
+            return mooney_rivlin_prony_hessian_bsr_psd_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
           }
-          return mooney_rivlin_prony_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
+          return mooney_rivlin_prony_hessian_bsr_2d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
         if (impl_->project_tangent) {
-          return mooney_rivlin_prony_hessian_bsr_psd_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
+          return mooney_rivlin_prony_hessian_bsr_psd_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
-        return mooney_rivlin_prony_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values);
+        return mooney_rivlin_prony_hessian_bsr_2d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 2, current + 0, current + 1, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
       }
       else if (dim == 3) {
         if (domain.element_type == smesh::TET4) {
           if (impl_->project_tangent) {
-            return mooney_rivlin_prony_hessian_bsr_psd_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+            return mooney_rivlin_prony_hessian_bsr_psd_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
           }
-          return mooney_rivlin_prony_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+          return mooney_rivlin_prony_hessian_bsr_3d_a_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
         if (impl_->project_tangent) {
-          return mooney_rivlin_prony_hessian_bsr_psd_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+          return mooney_rivlin_prony_hessian_bsr_psd_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
         }
-        return mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        return mooney_rivlin_prony_hessian_bsr_3d_i_msoa(domain.element_type, real_type, values_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("C01"), domain.parameters->require_real_value("C10"), domain.parameters->require_real_value("K"), impl_->relaxation->gamma(domain.block->name(), "iso"), impl_->relaxation->history(domain.block->name(), "iso_history"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).ptr, impl_->node_to_element.of(domain, element_connectivity(domain), mesh->n_nodes()).idx);
       }
       SFEM_ERROR("mooney_rivlin_prony hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -1465,6 +1467,7 @@ namespace sfem {
     impl_->inexact.state = x;
     if (impl_->inexact.assembled()) {
       // The material's tangent alone: the inertia is applied beside the store (inexact_apply).
+      impl_->inexact.assembles_window_rows = true;
       inexact::OpState::Inertia inertia;
       if (auto term = time_scheme_term(impl_->time_scheme)) {
         inertia.diagonal = term->hessian_is_diagonal();

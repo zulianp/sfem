@@ -1074,6 +1074,7 @@ namespace sfem {
             linear.atol           = read<real_t>(ln, "atol", linear.atol);
             linear.max_it         = read<int>(ln, "max_it", linear.max_it);
             linear.storage_bytes  = read<int>(ln, "storage_bytes", linear.storage_bytes);
+            linear.error_probe    = read<bool>(ln, "error_probe", linear.error_probe);
             if (has(ln, "inexact")) linear.inexact = inexact_options_from_yaml(ln["inexact"]);
             // Format SELL's values (SELLTangent): the bsr store's encodings.
             {
