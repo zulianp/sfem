@@ -30,7 +30,7 @@ mkdir -p "$OUT"
 export SFEM_PACKED_TWO_PASS=1
 # The paper's formats (and the double-precision point store of its correctness check); ROWS overrides
 # them (bench_inexact's row names, comma-separated).
-export SFEM_BENCH_ROWS=${ROWS:-BSR f64,BSR f32,SELL f16,SELL i8,element_matrix f16,element_matrix i8pair,points f64,points f16,points i8md}
+export SFEM_BENCH_ROWS=${ROWS:-matrix-free,BSR f64,BSR f32,SELL f16,SELL i8,element_matrix f16,element_matrix i8pair,points f64,points f16,points i8md}
 sizes() {  # <element>: the paper's size, or its sweep
   case $1 in
     HEX8) [ "${SWEEP:-0}" = 1 ] && echo 16 24 36 50 70 100 150 200 || echo 150 ;;
