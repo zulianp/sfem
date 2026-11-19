@@ -13,7 +13,7 @@ namespace sfem {
     namespace inexact {
 
         /// The point store: the weighted, pulled-back tangent at every point of the rule (its P2
-        /// moments on TET10), encoded (docs/compressed_partial_assembly, "Compression").
+        /// moments on TET10), encoded (xsesfsi_papers/quantized_ops, "Compression").
         ///
         /// `M` is a generated unit (`<unit>_<element>_inexact`): its `element` gives the stages
         /// and tables, its `contraction` the packing of one tangent (45 numbers, or 81 without the

@@ -12,8 +12,9 @@
 #   STORES: triples spike:store:encoding (default the paper's GPU formats)
 # The device applies run asynchronously, so the comparison is on Newton's own totals: the solve and
 # its linearisations (each synchronises on the Krylov method's reductions).
-A_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-qp
-B_TREE=/ritom/scratch/cscs/zulianp/sfem-pa-lib
+# A_TREE (the spike's builds), B_TREE (the library's tree: cases, runs/) and B_BUILD from the environment.
+A_TREE=${A_TREE:-/ritom/scratch/cscs/zulianp/sfem-pa-qp}
+B_TREE=${B_TREE:-/ritom/scratch/cscs/zulianp/sfem-pa-lib}
 E=$1; K=$2; M=$3
 A=$A_TREE/build-spike-cuda-$E/qp/cuda/newton_qp_cuda
 B=$B_TREE/${B_BUILD-build-cuda}/playground

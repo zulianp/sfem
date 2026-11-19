@@ -6,9 +6,12 @@
 //
 // MESH reads a mesh folder (Mesh::create_from_file), e.g. a run's output mesh: the graph and the
 // element order of the case itself, which a cube's regular numbering does not have.
+// SFEM_BENCH_ROWS selects rows by name, comma-separated (e.g. "BSR f32,SELL i8,points f16"); unset,
+// every row runs.  The exact apply is the reference of every row's distance and always runs.
 // The mesh is the unit cube: n^3 hexahedra, n^3 cubes of tetrahedra (TET10 promoted), or n^3 macro
 // elements of degree 2.  The state is a smooth deformation (no element inverts), the increment white
-// noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call,
+// noise.  Every row reports the dofs, the thread count, the store's set-up and its apply per call (the
+// best of three averages of `repeats` calls),
 // MDOF/s, the bytes the operator accounts for per dof (BSR: its values, column indices and row
 // pointers; a store: its bytes()), on the device also the bytes it holds per dof as the device
 // reports them (free memory before its creation less after its first set-up, 2 MiB granules), its
@@ -18,6 +21,7 @@
 // The rows reproduce the format tables of spikes/inexact_apply_compare/qp/RESULTS_QP.md from the
 // library alone.
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -96,6 +100,14 @@ namespace {
         for (int r = 0; r < repeats; ++r) f();
         synchronize(es);
         return std::chrono::duration<double>(clock_type::now() - t0).count() / repeats;
+    }
+
+    /// The best of three averages of `repeats` calls: the paper's protocol for an application.
+    template <class F>
+    double best_seconds(const sfem::ExecutionSpace es, const int repeats, F &&f) {
+        double best = seconds(es, repeats, f);
+        for (int k = 1; k < 3; ++k) best = std::min(best, seconds(es, repeats, f));
+        return best;
     }
 
     sfem::SharedBuffer<real_t> in_space(const std::vector<real_t> &v, const sfem::ExecutionSpace es) {
@@ -207,6 +219,20 @@ int main(int argc, char *argv[]) {
     printf("%-26s %10s %10s %9s %9s %9s %9s %10s %16s\n", "operator", "set-up ms", "apply ms", "MDOF/s", "B/dof", "held B/dof",
            "scratch", "rel diff", "digest");
 
+    // The rows SFEM_BENCH_ROWS selects; all when it is unset.
+    std::vector<std::string> selected;
+    if (const char *const rows = getenv("SFEM_BENCH_ROWS")) {
+        std::string list = rows;
+        for (size_t a = 0; a <= list.size();) {
+            const size_t b = std::min(list.find(',', a), list.size());
+            if (b > a) selected.push_back(list.substr(a, b - a));
+            a = b + 1;
+        }
+    }
+    auto wanted = [&](const std::string &name) {
+        return selected.empty() || std::find(selected.begin(), selected.end(), name) != selected.end();
+    };
+
     double scratch = 0;
     auto   row     = [&](const char *name, const double setup, const double apply, const double bytes, const double held,
                    const std::vector<real_t> &out, const std::vector<real_t> &exact) {
@@ -219,11 +245,14 @@ int main(int argc, char *argv[]) {
     blas->zeros(ndofs, Y);
     f->apply(U, H, Y);
     const std::vector<real_t> exact = on_host(y, es);
-    const double              t_mf  = seconds(es, repeats, [&] { f->apply(U, H, Y); });
-    row("matrix-free", 0, t_mf, 0, 0, exact, {});
+    if (wanted("matrix-free")) {
+        const double t_mf = best_seconds(es, repeats, [&] { f->apply(U, H, Y); });
+        row("matrix-free", 0, t_mf, 0, 0, exact, {});
+    }
 
     // The assembled tangent, double and single precision values.
     for (const int bytes : {8, 4}) {
+        if (!wanted(bytes == 8 ? "BSR f64" : "BSR f32")) continue;
         const double free0   = device_free(es);
         auto         tangent = sfem::BSRTangent::create(f, op->execution_context(), bytes);
         const double setup   = seconds(es, 1, [&] { tangent->assemble(U); });
@@ -232,7 +261,7 @@ int main(int argc, char *argv[]) {
         blas->zeros(ndofs, Y);
         K->apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
-        const double t = seconds(es, repeats, [&] { K->apply(H, Y); });
+        const double t = best_seconds(es, repeats, [&] { K->apply(H, Y); });
         // Its values, column indices and row pointers, as the memory ledger counts them where they live.
         sfem::MemoryLedger ledger;
         tangent->account(ledger);
@@ -252,6 +281,9 @@ int main(int argc, char *argv[]) {
     for (const auto &fmt : formats) {
         const bool assembled = std::string(fmt[0]) == "bsr";
         if (assembled && !device && std::string(fmt[2]) == "sell") continue;  // the host's auto is SELL
+        const bool        sell = assembled && (!device || std::string(fmt[2]) == "sell");
+        const std::string name = (sell ? std::string("SELL") : std::string(fmt[0])) + " " + fmt[1];
+        if (!wanted(name)) continue;
         op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1], "auto", "auto", fmt[2]));
         const double free0 = device_free(es);
         pool_high(es, true);
@@ -261,9 +293,7 @@ int main(int argc, char *argv[]) {
         blas->zeros(ndofs, Y);
         op->inexact_apply(H, Y);
         const std::vector<real_t> out = on_host(y, es);
-        const double t = seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
-        const bool        sell = assembled && (!device || std::string(fmt[2]) == "sell");
-        const std::string name = (sell ? std::string("SELL") : std::string(fmt[0])) + " " + fmt[1];
+        const double t = best_seconds(es, repeats, [&] { op->inexact_apply(H, Y); });
         row(name.c_str(), setup, t, (double)op->inexact_bytes(), held, out, exact);
     }
     return EXIT_SUCCESS;
