@@ -147,7 +147,7 @@ static void build_pack_local_crs(PackedData               &p,
 // grad_t is the STORAGE type of the nodal gradient fields the correction reads -- scalar_t, or
 // float under the mixed-precision option (SFEM_GRAD_PRECISION / --grad-precision). The sweeps
 // convert at the gather and compute in scalar_t throughout.
-template <typename grad_t>
+template <bool ScatterProbe = false, typename grad_t>
 static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
                                                        PackedData     &p,
                                                        const scalar_t  rho,
@@ -164,8 +164,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
-    apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+    apply_residual_packed_defcor_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
+
+    if constexpr (ScatterProbe) {
+        if (!g_scatter_accumulate) return;
+    }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -187,11 +191,15 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
 // provides such enums) and it can be overriden at runtime." The two sweeps are separate
 // functions in packed/affine/ and packed/isoparametric/, and this is the only place that
 // chooses between them -- nothing below here tests the geometry.
+template <bool ScatterProbe = false>
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,
                                                 const scalar_t   mu,
-                                                const GeomKind   geom) {
+                                                const GeomKind   geom,
+                                                const scalar_t *ugrad = nullptr) {
+    if (ugrad && geom != GeomKind::Isoparam)
+        throw std::runtime_error("use the affine deferred-correction launcher for affine reconstruction");
     const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
     const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
     const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
@@ -215,11 +223,15 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
         apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
+                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), cvfem_hex8_rc_config_for(d), with_rc, ugrad);
     } else {
 #pragma omp parallel
-        apply_residual_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+        apply_residual_packed_affine_range<ScatterProbe>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
                 d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+    }
+
+    if constexpr (ScatterProbe) {
+        if (!g_scatter_accumulate) return;
     }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
@@ -294,7 +306,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 }
 
 // The front end chooses the geometry's sweep; see apply_residual_packed above.
-template <typename grad_t = scalar_t>
+template <typename grad_t = scalar_t, DarwishCacheMode Cache = DarwishCacheMode::Off>
 static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        PackedData            &p,
                                                        const scalar_t         rho,
@@ -310,12 +322,22 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        const grad_t *const SFEM_RESTRICT ugrad = nullptr,
                                                        const grad_t *const SFEM_RESTRICT vgrad = nullptr,
                                                        const int              limiter = 0,
-                                                       const scalar_t         venkat_c = scalar_t(0)) {
+                                                       const scalar_t         venkat_c = scalar_t(0),
+                                                       DarwishCacheExperiment<scalar_t> *cache = nullptr) {
+    if constexpr (Cache != DarwishCacheMode::Off) {
+        if (!cache || geom != GeomKind::Affine || limiter != 3 || !ugrad || !vgrad ||
+            d.rhie_chow_scale == scalar_t(0) || d.qgx.empty() ||
+            p.n_elements_per_pack % cvfem_hex8_vec_size<scalar_t>)
+            throw std::runtime_error("unsupported Darwish coefficient-cache scope");
+        if constexpr (Cache == DarwishCacheMode::Read) cache->require_ready(d.state_stamp);
+    }
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
+    if (geom == GeomKind::Isoparam && (ugrad || vgrad) && (!with_ho || limiter != 3))
+        throw std::runtime_error("isoparametric reconstruction requires both gradients and Darwish limiter 3");
     // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
     // this free after the first call, so --warmup absorbs the build and the timed loop
     // measures what the solver's Krylov iterations measure.
-    cvfem_hex8_build_rc_coeff(d, rho, mu);
+    if (geom == GeomKind::Affine) cvfem_hex8_build_rc_coeff(d, rho, mu);
     const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
     // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
@@ -330,13 +352,13 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
 if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
         apply_jacobian_action_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n);
+                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n, d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), cvfem_hex8_rc_config_for(d), with_rc, with_qg);
     } else {
 #pragma omp parallel
-        apply_jacobian_action_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+        apply_jacobian_action_packed_affine_range<Cache>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
                 d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n,
                 cvfem_hex8_rc_config_for(d),
-                d.adj_ptr, d.det_ptr);
+                d.adj_ptr, d.det_ptr, cache);
     }
 
     CVFEM_PHASE_CLOCK(_tg);

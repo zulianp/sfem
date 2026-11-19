@@ -101,3 +101,70 @@ scripts/cvrun.sh poiseuille ./build/cvfem_hex8_ns_ssgmg OMP_NUM_THREADS=72 -- ..
 The `*_sympy_kernels.hpp` headers in `src/upwind/` are emitted by the scripts in `python/`; see
 `python/README.md` for which script writes which header and how to check a regeneration
 against what is committed.
+
+## Jacobian state-gradient cache and derivative checks
+
+The benchmark now reuses velocity and pressure gradients at the fixed state.
+Every application still reconstructs the changing direction's gradients and
+retains the flux and reconstruction sensitivities. This brings the standalone
+benchmark into line with the reuse already present in the solver; it is not a
+new solver optimization. Refresh state gradients when the state or geometry
+changes.
+
+`--rebuild-state-gradients` restores the earlier per-application work for paired
+comparisons. The log and CSV identify the mode, and reconstruction timers reset
+after warmup. Historical exact-action rates in the paper remain explicitly
+labelled as rebuild-mode measurements.
+
+After building both precision targets, run:
+
+```bash
+ctest --test-dir build --output-on-failure \
+  -R '^cvfem_(jacobian_cache(_f32)?|jacobian_fd|jacobian_coupled|check_dump)$'
+```
+
+The cache checks compare complete outputs with changing directions in both
+precisions, rejecting malformed or nonfinite dumps before comparing them.
+The FP64 derivative checks cover perturbed affine interior states: velocity
+variations without Rhie--Chow, and all four fields with Rhie--Chow. The latter
+also requires deliberately omitted coupling sensitivities to fail. These are
+checks of the tested states and branches, not a proof at every limiter switch
+or a solver-convergence result. Boundary/transient consistency is a separate
+review.
+
+Only the lagged matrix-free action and the existing BSR SpMV apply the same
+operator. The consistent higher-order action includes reconstruction
+sensitivities absent from that matrix, so a timing ratio against it is not an
+equivalent-operator speedup.
+
+## Experimental fixed-state Darwish coefficient cache
+
+The packed affine benchmark accepts `--darwish-cache-experiment` with
+`--jac-action --conv-ho 3 --rhie-chow`. It caches four coefficients per face
+and velocity component. Direction gradients and the full Rhie–Chow derivative
+remain in each application. This is opt-in benchmark integration; the solver
+has not been changed. The ordinary path remains the default.
+
+`--darwish-cache-control` allocates and checks the same cache, then applies the
+direct action. `--darwish-cache-rebuild-check` checks changed velocity/pressure
+states, stale-cache refusal and restoration on small cases (`n <= 16`, without
+live vectors). CTest names are `cvfem_darwish_coefficients_test` and
+`cvfem_darwish_cache_{f64,f32}`; the shell gate uses one and two threads by default
+or `CACHE_TEST_THREADS="1 72"` on Grace.
+
+The cache belongs to a fixed state revision. Its owner must invalidate and
+rebuild it after changing the state, geometry, packing or physical parameters.
+Allocation, coefficient construction and the finite scan are reported separately
+from application time, together with additional allocated bytes. State-gradient
+storage is retained. The old model FLOP estimate is suppressed for this path.
+
+Perturbed FP64/FP32 fixtures pass the direct-action and independent atomic checks.
+An exactly unperturbed `n=8` diagnostic remains unresolved: on Grace the original,
+control and cached paths fail the packed/atomic comparison; locally the cached
+and control paths also fail their cache/direct check. No tolerance was relaxed.
+These checks must pass for any state used in a performance claim.
+
+`--retained-windows N` reads one positive repeat count per line on standard input,
+keeps arrays in one process, and checks each timed window against the independent
+reference. It uses a coordinate-based direction. See the paper README for the
+matched Grace protocol and external evidence archive.
