@@ -50,16 +50,16 @@ template <typename T> void check() {
 #include <algorithm>
 #define ALIGN_BYTES 64
 template<class T> constexpr size_t cvfem_hex8_vec_size=4;
-#include "kernels/microkernels/hex8/cvfem_darwish_cache_experiment.hpp"
+#include "frontend/staging/cvfem_darwish_cache_storage.hpp"
 int check_lifecycle() {
-    DarwishCacheExperiment<double> cache;
+    DarwishCacheStorage<double> cache;
     int refused=0;
     auto reject=[&](auto action) {try {action();} catch(const std::runtime_error &) {++refused;return;} throw std::runtime_error("invalid cache accepted");};
     reject([&]{cache.require_ready(1);});
     reject([&]{cache.allocate(0,1);});
     cache.allocate(8,1);
     reject([&]{cache.finish_build();});
-    for (auto &tile:cache.tiles) std::fill(std::begin(tile.coefficients),std::end(tile.coefficients),1.);
+    for (auto &tile:cache.tile_storage) std::fill(std::begin(tile.coefficients),std::end(tile.coefficients),1.);
     cache.mark_built(0);cache.mark_built(4);cache.finish_build();cache.require_ready(1);
     reject([&]{cache.require_ready(2);});
     cache.invalidate();reject([&]{cache.require_ready(1);});

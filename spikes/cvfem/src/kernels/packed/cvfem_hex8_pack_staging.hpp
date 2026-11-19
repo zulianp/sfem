@@ -136,23 +136,32 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const ptrdiff_t *const SF
     const auto *const py    = points[1];
     const auto *const pz    = points[2];
     const ptrdiff_t   owned = owned_nodes_ptr[pack];
+    // Without Rhie-Chow there is no gradient to stage: cvfem_hex8_pack_coords hands out no
+    // gradient arrays (pack_pgx and its siblings are null) and nothing reads them. The affine
+    // sweeps call this only with the term on; the isoparametric ones stage coordinates always,
+    // and storing zeros into the null gradient arrays there crashed every packed isoparametric
+    // run without Rhie-Chow. The loop with the gradient is the one the affine sweeps always ran.
+    if (!with_pg) {
+        fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+        return;
+    }
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         const ptrdiff_t g = owned + k;
         pack_x[k]         = scalar_t(px[g]);
         pack_y[k]         = scalar_t(py[g]);
         pack_z[k]         = scalar_t(pz[g]);
-        pack_pgx[k]       = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[k]       = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[k]       = with_pg ? pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[k]       = pgx[(size_t)g];
+        pack_pgy[k]       = pgy[(size_t)g];
+        pack_pgz[k]       = pgz[(size_t)g];
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         const idx_t g         = ghosts[k];
         pack_x[n_contiguous + k]     = scalar_t(px[g]);
         pack_y[n_contiguous + k]     = scalar_t(py[g]);
         pack_z[n_contiguous + k]     = scalar_t(pz[g]);
-        pack_pgx[n_contiguous + k]   = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[n_contiguous + k]   = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[n_contiguous + k]   = with_pg ? pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[n_contiguous + k]   = pgx[(size_t)g];
+        pack_pgy[n_contiguous + k]   = pgy[(size_t)g];
+        pack_pgz[n_contiguous + k]   = pgz[(size_t)g];
     }
 }
 

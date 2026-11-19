@@ -13,6 +13,7 @@
 #include "frontend/staging/cvfem_hex8_best_colored.hpp"
 #include "frontend/staging/cvfem_hex8_ecolored_launch.hpp"
 #include "frontend/staging/cvfem_hex8_packed_launch.hpp"
+#include "frontend/staging/cvfem_darwish_cache_storage.hpp"
 #include "frontend/staging/cvfem_hex8_store_launch.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
@@ -2325,7 +2326,7 @@ int main(int argc, char **argv) {
 
     const char *state_gradient_mode = jac_action && (rhie_chow || with_hograd)
                                          ? (rebuild_state_gradients ? "per_apply" : "cached") : "n/a";
-    DarwishCacheExperiment<scalar_t> experiment;
+    DarwishCacheStorage<scalar_t> experiment;
     DarwishCacheMode cache_mode = DarwishCacheMode::Off;
     auto jac_action_fn = [&]() {
         const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
@@ -2494,30 +2495,30 @@ int main(int argc, char **argv) {
         apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_atomic.data());
         if (colors.n_colors > 0)
             apply_transient_action_pass(d, rho, jac_dir.data(), jv_mf_colored.data());
-        // The atomic sweep runs the SCALAR isoparametric kernel, which takes a
-        // Hex8RhieChow; the packed and colored sweeps run the SIMD one, which does not. So
-        // with Rhie-Chow on and isoparametric geometry the two sides are honestly different
-        // operators and this comparison would report 3.2e-2 -- the term itself. That is the
-        // remaining staging gap in this family, and it is refused for a RUN
-        // (--rhie-chow --geom isoparam needs --layout atomic); here it only means there is
-        // nothing to compare the atomic action against. Packed against colored still holds,
-        // since both lack the term equally.
-        const bool     atomic_comparable = !(rhie_chow && geom_kind == GeomKind::Isoparam);
+        // With Rhie-Chow on isoparametric geometry, the packed action carries the term (its
+        // isoparametric SIMD sweep stages the pressure gradient since f48d4e80c) and so does the
+        // atomic one (the scalar isoparametric kernel), but the PACK-COLOURED isoparametric
+        // action still runs without it (apply_jacobian_action_packcolored_isoparam_range,
+        // with_rc = 0). Coloured against packed would report the term itself, about 2e-3 here;
+        // that comparison is skipped in this case, and the run-level refusal above keeps a
+        // coloured isoparametric action with Rhie-Chow from being timed.
+        const bool     colored_comparable = !(rhie_chow && geom_kind == GeomKind::Isoparam);
+        const bool     atomic_comparable  = true;
         const scalar_t mf_err      = vs_matrix ? max_abs_diff(jv_spmv.data(), jv_mf.data(), d.nnodes * N_FIELDS)
                                                 : scalar_t(0);
         const scalar_t atomic_err  = atomic_comparable
                                              ? max_abs_diff(jv_mf.data(), jv_mf_atomic.data(), d.nnodes * N_FIELDS)
                                              : scalar_t(0);
-        const scalar_t colored_err = colors.n_colors > 0
+        const scalar_t colored_err = colors.n_colors > 0 && colored_comparable
                                              ? max_abs_diff(jv_mf.data(), jv_mf_colored.data(), d.nnodes * N_FIELDS)
                                              : scalar_t(0);
         if (vs_matrix) std::printf("verify_jac_mf_action_vs_spmv_abs: %.6e\n", mf_err);
-        if (atomic_comparable)
-            std::printf("verify_jac_mf_atomic_action_vs_packed_abs: %.6e\n", atomic_err);
-        else
-            std::printf("verify_jac_mf_atomic_action_vs_packed_abs: skipped (the isoparametric SIMD "
-                        "kernel carries no Rhie-Chow term)\n");
-        if (colors.n_colors > 0) std::printf("verify_jac_mf_colored_action_vs_packed_abs: %.6e\n", colored_err);
+        std::printf("verify_jac_mf_atomic_action_vs_packed_abs: %.6e\n", atomic_err);
+        if (colors.n_colors > 0 && colored_comparable)
+            std::printf("verify_jac_mf_colored_action_vs_packed_abs: %.6e\n", colored_err);
+        else if (colors.n_colors > 0)
+            std::printf("verify_jac_mf_colored_action_vs_packed_abs: skipped (the pack-coloured "
+                        "isoparametric action carries no Rhie-Chow term)\n");
         if (colored_err > 1.0e-12) {
             std::fprintf(stderr, "HEX8 colored Jacobian-action mismatch\n");
             if (own_mpi) MPI_Finalize();
