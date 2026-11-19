@@ -15,7 +15,9 @@
 # and the storage at eight times the elements (collect_scale.sbatch, OUT/scale).
 # The TET4 step study checks the campaign's repeat against CHECK, the campaign collection's
 # valve_runs.csv (collect9.sbatch PUMP=LDP24A); it must exist.
-#   [OUT=runs/paper_la_studies] [CHECK=runs/paper_la/valve_runs.csv]
+# RUNS4 and RUNS10 name the step studies' runs per step (collect_dt.sbatch's RUNS; the defaults
+# below and collect_dt.sbatch's), so a study that adds runs (the packed grid codes) collects them.
+#   [OUT=runs/paper_la_studies] [CHECK=runs/paper_la/valve_runs.csv] [RUNS4="..."] [RUNS10="..."]
 set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
@@ -28,8 +30,8 @@ CHECK=${CHECK:-$SFEM_RUNS/paper_la/valve_runs.csv}
 [ -e $O ] && { echo "collect_la_studies: $O exists; give a new OUT"; exit 1; }
 [ -f $CHECK ] || { echo "collect_la_studies: no $CHECK (collect9.sbatch PUMP=LDP24A); give CHECK"; exit 1; }
 mkdir -p $O
-CASE=$CASE TAGS="la dt050 dt025 dt010 dt005 dt0025 dt00125" CHECK=$CHECK OUT=$O/dt bash $R/collect_dt.sbatch > $O/dt.out 2>&1; echo "dt rc=$?"
-CASE=$CASE TAGS="la dw025 dw010 dw005 dw0025" MESH=p2 RUNS="bsr32__full_a bsr32__full_b qbsr16__full_a bsr32__int16_scaled_s32_a" \
+CASE=$CASE TAGS="la dt050 dt025 dt010 dt005 dt0025 dt00125" CHECK=$CHECK RUNS="${RUNS4:-}" OUT=$O/dt bash $R/collect_dt.sbatch > $O/dt.out 2>&1; echo "dt rc=$?"
+CASE=$CASE TAGS="la dw025 dw010 dw005 dw0025" MESH=p2 RUNS="${RUNS10:-bsr32__full_a bsr32__full_b qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__qblock6_sr_s32_a bsr32__qblock7_sr_s32_a}" \
     OUT=$O/dt10 bash $R/collect_dt.sbatch > $O/dt10.out 2>&1; echo "dt10 rc=$?"
 mkdir -p $O/tk
 $PY $COL runs $O/tk/dt_fourterm_runs.csv $O/tk/dt_fourterm_series.csv dt_own_tk005 $CASE tk005_s0_bsr32__full_a tk005_s0_bsr32__full_b \

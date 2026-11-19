@@ -3,9 +3,13 @@
 //
 //   bench_prony_history <n_elements> <n_qp> [steps] [elements_per_mean] [remainder_horizon]
 //
-// The series is the LDP valves' EPDM (15 terms, workflows/ldp_containment/transient) at their step,
-// dt = 1e-4 s: four terms are stored and eleven relax within the step.  With a remainder horizon
+// The series is the LDP valves' EPDM before its fit to 70 EPDM 281 (15 terms) at their step,
+// dt = 1e-4 s: four terms are stored and eleven relax within the step.  SFEM_PRONY_G and
+// SFEM_PRONY_TAU (comma-separated weights and relaxation times) replace it, e.g. with the fitted
+// series of a case file (prony_la_bench.sbatch reads LDP24A/sim2.yaml).  With a remainder horizon
 // (seconds; 0, the default, for none) the terms slower than it are stored as remainders.
+// SFEM_HISTORY_TOLERANCE sets quant_block's tolerance and SFEM_HISTORY_ROUNDING (nearest or
+// stochastic) its rounding; both are reported per row.
 // The relaxed stress is synthetic and smooth: per component a level, varying along the elements
 // (as a field on a mesh ordered along a space-filling curve does) and by 1% over an element's
 // points, driven by a ramp and an oscillation in time.  Every row reports the elements, points and
@@ -19,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -43,7 +48,28 @@ namespace {
 #endif
     }
 
+    // A comma-separated list of numbers from the environment, or empty.
+    std::vector<real_t> env_list(const char *name) {
+        std::vector<real_t> out;
+        const char         *v = getenv(name);
+        if (!v) return out;
+        std::stringstream ss(v);
+        std::string       item;
+        while (std::getline(ss, item, ',')) {
+            if (!item.empty()) out.push_back((real_t)atof(item.c_str()));
+        }
+        return out;
+    }
+
     sfem::PronySeries epdm() {
+        const auto g = env_list("SFEM_PRONY_G"), tau = env_list("SFEM_PRONY_TAU");
+        if (!g.empty() || !tau.empty()) {
+            if (g.size() != tau.size() || g.empty()) {
+                fprintf(stderr, "SFEM_PRONY_G and SFEM_PRONY_TAU must list as many numbers\n");
+                exit(EXIT_FAILURE);
+            }
+            return sfem::PronySeries(g, tau);
+        }
         return sfem::PronySeries({2.83e-04, 3.12e-04, 4.45e-04, 1.03e-03, 6.09e-03, 6.74e-02, 2.22e-01, 1.90e-01, 1.12e-01,
                                   5.07e-02, 6.91e-02, 4.59e-02, 8.62e-02, 6.76e-02, 7.87e-02},
                                  {1.61e+03, 1.29e+01, 1.53e-01, 9.89e-04, 1.18e-06, 8.51e-09, 1.42e-10, 1.80e-12, 1.27e-14,
@@ -119,7 +145,7 @@ int main(int argc, char *argv[]) {
                                             sfem::HistoryStorage::QUANT_BLOCK};
 
     printf("format,space,elements,n_qp,threads,elements_per_mean,remainder_horizon,stored,bytes_history,bytes_reference,"
-           "bytes_frozen,begin_step_us,advance_us,advance_ns_per_value,frozen_rel_diff\n");
+           "bytes_frozen,begin_step_us,advance_us,advance_ns_per_value,frozen_rel_diff,history_rounding,history_tolerance\n");
     std::vector<real_t> reference;
     for (const auto storage : formats) {
         sfem::PronyRelaxation::Options options;
@@ -129,6 +155,7 @@ int main(int argc, char *argv[]) {
         options.remainder_horizon         = horizon;
         // quant_block's tolerance: SFEM_HISTORY_TOLERANCE, else the library's.
         if (const char *tol = getenv("SFEM_HISTORY_TOLERANCE")) options.history_tolerance = (real_t)atof(tol);
+        if (const char *r = getenv("SFEM_HISTORY_ROUNDING")) options.history_rounding = sfem::history_rounding_from_string(r);
         sfem::PronyRelaxation relaxation(epdm(), nc, nq, ne, options);
 
         double                     t_begin = 0, t_advance = 0;
@@ -164,7 +191,7 @@ int main(int argc, char *argv[]) {
 
         const int    timed  = steps - 1;
         const double values = double(relaxation.n_stored_terms()) * n;
-        printf("%s,%s,%td,%d,%d,%d,%g,%d,%zu,%zu,%zu,%.3f,%.3f,%.4f,%.3e\n",
+        printf("%s,%s,%td,%d,%d,%d,%g,%d,%zu,%zu,%zu,%.3f,%.3f,%.4f,%.3e,%s,%g\n",
                sfem::to_string(storage),
                es == sfem::EXECUTION_SPACE_DEVICE ? "device" : "host",
                ne,
@@ -179,7 +206,9 @@ int main(int argc, char *argv[]) {
                1e6 * t_begin / timed,
                1e6 * t_advance / timed,
                1e9 * t_advance / timed / values,
-               (double)(max_ref > 0 ? diff / max_ref : diff));
+               (double)(max_ref > 0 ? diff / max_ref : diff),
+               sfem::to_string(options.history_rounding),
+               (double)options.history_tolerance);
         fflush(stdout);
     }
     return EXIT_SUCCESS;
