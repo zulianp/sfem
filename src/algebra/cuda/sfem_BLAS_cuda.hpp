@@ -56,12 +56,20 @@ void d_zaxpby(const ptrdiff_t,
 
 namespace sfem {
 
+    /// Keeps the current device's stream-ordered pool from returning freed memory at every
+    /// synchronisation (CUDA's default release threshold is 0): a cudaMallocAsync then reuses the pool
+    /// instead of mapping memory in the driver, which on a GH200 node stalls for up to hundreds of
+    /// milliseconds while the processes on the other GPUs map and unmap theirs.  The pool holds at most
+    /// its high-water mark.  Once per process, at the first device BLAS: after smesh has chosen the
+    /// rank's GPU, before which CUDA must not start.
+    void keep_the_device_pool();
+
     /// The device BLAS: every operation is ordered on its context's stream, and the scalar results
     /// of the reductions come back through a reusable pinned slot, with no allocation per call.
     template <typename T>
     class GPUBLAS final : public BLAS<T> {
     public:
-        explicit GPUBLAS(const ExecutionContext& context) : BLAS<T>(context) {}
+        explicit GPUBLAS(const ExecutionContext& context) : BLAS<T>(context) { keep_the_device_pool(); }
 
         static std::shared_ptr<GPUBLAS<T>> create(const ExecutionContext& context = ExecutionContext::device()) {
             return std::make_shared<GPUBLAS<T>>(context);

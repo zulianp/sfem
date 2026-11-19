@@ -540,6 +540,16 @@ extern void d_ediv(const ptrdiff_t n, const real_t *const l, const real_t *const
 }
 
 namespace sfem {
+    void keep_the_device_pool() {
+        static const bool kept = [] {
+            int           device = 0;
+            cudaMemPool_t pool;
+            uint64_t      keep = UINT64_MAX;
+            return cudaGetDevice(&device) == cudaSuccess && cudaDeviceGetDefaultMemPool(&pool, device) == cudaSuccess &&
+                   cudaMemPoolSetAttribute(pool, cudaMemPoolAttrReleaseThreshold, &keep) == cudaSuccess;
+        }();
+        (void)kept;
+    }
 
     template <typename T>
     T *GPUBLAS<T>::allocate(const std::size_t n) {

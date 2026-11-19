@@ -86,6 +86,12 @@ namespace sfem {
         std::vector<struct DirichletConditions::Condition> conditions;
         //! The stream every kernel call is issued on (null: the default device stream).
         void *stream{nullptr};
+        //! The merit's buffers, kept across the line search's evaluations.
+        ConstraintObjectiveScratch objective_scratch;
+
+        GPUDirichletConditions(const GPUDirichletConditions &)            = delete;
+        GPUDirichletConditions &operator=(const GPUDirichletConditions &) = delete;
+        ~GPUDirichletConditions() override { d_constraint_objective_scratch_destroy(&objective_scratch); }
 
         GPUDirichletConditions(const std::shared_ptr<DirichletConditions> &dc) : space(dc->space()), h_dirichlet(dc) {
             for (auto &c : dc->conditions()) {
@@ -185,7 +191,7 @@ namespace sfem {
             for (auto &c : conditions) {
                 if (d_constraint_objective_vec_steps(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component,
                                                      c.value, c.values ? c.values->data() : nullptr, x, nullptr, 1, &zero,
-                                                     &acc, stream) != SFEM_SUCCESS) {
+                                                     &acc, &objective_scratch, stream) != SFEM_SUCCESS) {
                     return SFEM_FAILURE;
                 }
             }
@@ -198,7 +204,7 @@ namespace sfem {
             for (auto &c : conditions) {
                 if (d_constraint_objective_vec_steps(c.nodeset->size(), c.nodeset->data(), space->block_size(), c.component,
                                                      c.value, c.values ? c.values->data() : nullptr, x, h, nsteps, steps,
-                                                     out, stream) != SFEM_SUCCESS) {
+                                                     out, &objective_scratch, stream) != SFEM_SUCCESS) {
                     return SFEM_FAILURE;
                 }
             }
@@ -274,8 +280,6 @@ namespace sfem {
 
             return err;
         }
-
-        ~GPUDirichletConditions() {}
     };
 
     std::shared_ptr<Constraint> to_device(const std::shared_ptr<DirichletConditions> &dc) {
