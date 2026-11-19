@@ -114,14 +114,19 @@ CASES=${CASES//sweep/stretch_s0 stretch_s1 stretch_s2 stretch_s3 stretch_s4}
 # process's high-water mark, device_pool_peak the stream-ordered pools'), its section ends with the peaks.
 EXTRA=()
 for kv in ${SET:-}; do EXTRA+=(--set "$kv"); done
+# Runs of a few seconds (the 1M case, the sweep) absorb one-off stalls of a second or two: each is run
+# REPEATS times (3 by default; the longer cases once), every repeat a section of the log, and the paper
+# takes each format's fastest.
+repeats() { case $1 in stretch_1M | stretch_s*) echo "${REPEATS:-3}" ;; *) echo "${REPEATS:-1}" ;; esac; }
 
-go() {  # <case> <element> <format>: one run into its folder, its section into a part log
-  local k=$1 e=$2 f=$3 s m dt y o d p
+go() {  # <case> <element> <format> <repeat>: one run into its folder, its section into a part log
+  local k=$1 e=$2 f=$3 r=$4 s m dt y o d p
   s=$(setup "$k" "$e") || return 0
   read -r m dt y <<< "$s"
   dt=${DT:-$dt}
   o=$(options "$f") || { echo "newton: no format $f" >&2; return 0; }
   d=$OUT/${k}_$e/$f
+  [ "$r" -gt 1 ] && d=$d.r$r
   mkdir -p "$d"
   p=$(pack "$m")
   # The playground resolves output paths against the case file's folder: the run's own, absolute.
@@ -144,10 +149,12 @@ go() {  # <case> <element> <format>: one run into its folder, its section into a
 for k in $CASES; do
   for e in ${ELEMENTS:-TET4 TET10 HEX8 PROTEUS_HEX27}; do
     setup "$k" "$e" > /dev/null || continue
-    for f in $FORMATS; do
-      [ "$e" = TET4 ] && [ "$f" = i8md ] && continue  # not in the paper
-      sfem_throttle
-      go "$k" "$e" "$f" &
+    for r in $(seq "$(repeats "$k")"); do
+      for f in $FORMATS; do
+        [ "$e" = TET4 ] && [ "$f" = i8md ] && continue  # not in the paper
+        sfem_throttle
+        go "$k" "$e" "$f" "$r" &
+      done
     done
   done
 done
@@ -160,7 +167,12 @@ for k in $CASES; do
     dt=${DT:-$dt}
     {
       echo "node $(hostname) $e $y $m dt=$dt space=$SPACE ${SET:-}"
-      for f in $FORMATS; do [ -f "$OUT/${k}_$e/$f.part" ] && cat "$OUT/${k}_$e/$f.part"; done
+      for f in $FORMATS; do
+        for r in $(seq "$(repeats "$k")"); do
+          q=$OUT/${k}_$e/$f; [ "$r" -gt 1 ] && q=$q.r$r
+          [ -f "$q.part" ] && cat "$q.part"
+        done
+      done
     } > "$OUT/${k}_$e.out"
     echo "${k}_$e: $(grep -c '^rc=0' "$OUT/${k}_$e.out") runs ok of $(grep -c '^== ' "$OUT/${k}_$e.out")"
   done
