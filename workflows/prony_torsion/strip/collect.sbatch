@@ -18,14 +18,13 @@ COL=$PAPER_PY/collect_prony.py
 P=${OUT:-$SFEM_RUNS/paper_strip}
 [ -e $P ] && { echo "collect: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
-REDUCED="float32 int16_scaled float16_md"
-RUNS="full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
-RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
+. "$SFEM_ROOT/workflows/prony_torsion/strip/runs.sh"
+RUNS=$(strip_runs | sed 's/^full_a //')
 for m in HEX8_60 HEX8_120 HEX27_30 HEX27_60 TET4_60 TET10_60; do
   $PY $COL runs $P/strip_runs.csv $P/strip_series.csv strip_$m $SFEM_RUNS/strip/$m full_a $RUNS --sub results > $P/strip_$m.log 2>&1
   echo "strip $m rc=$?"
 done
-DRUNS=""; for f in $REDUCED; do DRUNS="$DRUNS $f ${f}_plain"; done
+DRUNS=$(DIAG=1 strip_runs | sed 's/^full_a //')
 for m in HEX8_120 HEX27_60 TET10_60 TET4_60; do
   [ -d $SFEM_RUNS/strip_diag/$m ] || continue
   $PY $COL runs $P/strip_diag.csv $P/strip_diag_series.csv diag_$m $SFEM_RUNS/strip_diag/$m full_a $DRUNS --sub results > $P/diag_$m.log 2>&1

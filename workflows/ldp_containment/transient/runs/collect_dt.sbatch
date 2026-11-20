@@ -36,7 +36,7 @@ finest=${TAGS##* }
 P=${OUT:-$SFEM_RUNS/paper_dt_$finest}
 [ -e $P ] && { echo "collect_dt: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
-RUNS=${RUNS:-bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__full_s32_a bsr32__float32_plain_s32_a}
+RUNS=${RUNS:-bsr32__full_a bsr32__full_b qbsr16__int16_scaled_s32_a qbsr16__full_a bsr32__int16_scaled_s32_a bsr32__full_s32_a bsr32__float32_plain_s32_a bsr32__qblock6_s32_a bsr32__qblock6_sr_s32_a bsr32__qblock7_sr_s32_a qbsr16__qblock6_sr_s32_a}
 all=""
 for tag in $TAGS; do for r in $RUNS; do [ -f $CASE/${tag}_${MESH}_$r/sim2/history.csv ] && all="$all ${tag}_${MESH}_$r"; done; done
 ref=${finest}_${MESH}_bsr32__full_a

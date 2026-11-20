@@ -11,7 +11,8 @@
 # The strip wound by one full turn, its end held axially (cases/epdm_strip_turns.yaml), per history
 # format, on one mesh, for
 # the LDP paper's torsion section: two repeats in double, each reduced format with the remainder form
-# (<format>) and without it (<format>_plain, remainder_horizon 0), and float32 stress slots (<run>_s32);
+# (<format>) and without it (<format>_plain, remainder_horizon 0), and float32 evaluated stresses
+# (<run>_s32), the lists in runs.sh (the packed grid codes qblock<k>, _sr stochastic rounding);
 # with DIAG=1 the diagnostics build's runs (lost updates) instead. One Grace chip (72 threads) per run,
 # four at once. Submit one job per mesh:
 #   MESH=HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60 [TURNS=1] [BUILD=build-x28] [DIAG=1]
@@ -31,11 +32,13 @@ MESHES=$SFEM_RUNS/strip/meshes
 [ -d $MESHES ] || $SFEM_PY $D/workflows/prony_torsion/strip/make_meshes.py $MESHES
 src=$MESH; extra=""
 [ $MESH = TET10_60 ] && { src=TET4_60; extra="--set mesh.promote_to_p2=true"; }
-go() {  # <run>
+go() {  # <run>: <format>[_sr][_plain][_s32] (runs.sh), qblock<k> quant_block at tolerance 1e-<k>
   local run=$1 base=${1%_s32} stress=full fmt h=""
   [ "$base" != "$run" ] && stress=float32
   fmt=${base%_plain}; [ "$fmt" != "$base" ] && h="--set material.relaxation.iso.remainder_horizon=0"
   fmt=${fmt%_[a-d]}
+  case $fmt in *_sr) h="$h --set material.relaxation.iso.history_rounding=stochastic"; fmt=${fmt%_sr} ;; esac
+  case $fmt in qblock[0-9]) h="$h --set material.relaxation.iso.history_tolerance=1e-${fmt#qblock}"; fmt=quant_block ;; esac
   local W=$OUT/$MESH/$run
   [ -e $W ] && { echo "$MESH $run: $W exists; skipped"; return; }
   mkdir -p $W; cd $W || return
@@ -49,13 +52,8 @@ go() {  # <run>
   echo "$MESH $run rc=$? wall=$(echo "$(date +%s.%N) - $start" | bc)s failed=$(grep -c 'attempt failed' run.log)" \
        "projected=$(grep -c ' projected,' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }
-REDUCED="float32 int16_scaled float16_md"
-if [ "${DIAG:-0}" = 1 ]; then
-  RUNS="full_a"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
-else
-  RUNS="full_a full_b"; for f in $REDUCED; do RUNS="$RUNS $f ${f}_plain"; done
-  RUNS="$RUNS full_a_s32 int16_scaled_s32 float16_md_s32"
-fi
+. "$D/workflows/prony_torsion/strip/runs.sh"
+RUNS=$(strip_runs)
 for run in $RUNS; do
   sfem_throttle
   go $run &
