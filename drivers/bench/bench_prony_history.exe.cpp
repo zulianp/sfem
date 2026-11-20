@@ -9,7 +9,8 @@
 // series of a case file (prony_la_bench.sbatch reads LDP24A/sim2.yaml).  With a remainder horizon
 // (seconds; 0, the default, for none) the terms slower than it are stored as remainders.
 // SFEM_HISTORY_TOLERANCE sets quant_block's tolerance and SFEM_HISTORY_ROUNDING (nearest or
-// stochastic) its rounding; both are reported per row.
+// stochastic) the rounding of the integer formats; the others, full storage (the reference of
+// frozen_rel_diff) among them, round to nearest. Both are reported per row.
 // The relaxed stress is synthetic and smooth: per component a level, varying along the elements
 // (as a field on a mesh ordered along a space-filling curve does) and by 1% over an element's
 // points, driven by a ramp and an oscillation in time.  Every row reports the elements, points and
@@ -155,7 +156,10 @@ int main(int argc, char *argv[]) {
         options.remainder_horizon         = horizon;
         // quant_block's tolerance: SFEM_HISTORY_TOLERANCE, else the library's.
         if (const char *tol = getenv("SFEM_HISTORY_TOLERANCE")) options.history_tolerance = (real_t)atof(tol);
-        if (const char *r = getenv("SFEM_HISTORY_ROUNDING")) options.history_rounding = sfem::history_rounding_from_string(r);
+        // Stochastic rounding applies to integer codes only: PronyRelaxation rejects it for the others.
+        if (const char *r = getenv("SFEM_HISTORY_ROUNDING")) {
+            if (sfem::is_integer(storage)) options.history_rounding = sfem::history_rounding_from_string(r);
+        }
         sfem::PronyRelaxation relaxation(epdm(), nc, nq, ne, options);
 
         double                     t_begin = 0, t_advance = 0;
