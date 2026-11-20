@@ -75,6 +75,10 @@ namespace sfem {
             total.iterations += report.iterations;
             total.linear_iterations += report.linear_iterations;
             total.capped_linear_solves += report.capped_linear_solves;
+            total.projections += report.projections;
+            total.curvature_caps += report.curvature_caps;
+            total.shifted_solves += report.shifted_solves;
+            total.max_shift = std::max(total.max_shift, report.max_shift);
             total.final_measure = report.final_measure;
             total.min_alpha     = std::min(total.min_alpha, report.min_alpha);
             if (!report.converged()) return total;

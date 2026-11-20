@@ -33,11 +33,14 @@ initial state:
 | `capped` | Linear or QP solves stopped by their iteration limit. |
 | `reference`, `final` | The convergence measure's reference (its first value) and its final value; `final / reference` is the `|r|/|r0|` printed per step. |
 | `min_alpha` | The smallest line-search step taken. |
+| `projections` | Newton iterations repeated on the projected tangent (`tangent_projection: on_failure`). |
+| `curvature_caps` | Obstacle QPs solved again with the curvature capped (`node_sdf`). |
+| `shifted`, `max_shift` | Of those, the QPs that then shifted the tangent's diagonal, and the largest fraction of it they shifted by (0: none). |
 
 then the probes' columns ([case reference](case-reference.md#output)): `ux, uy, uz` for a
 control point, `angle, released, torque` for a rotation, `reaction_x, reaction_y, reaction_z,
 touched` for contact, Prony history measures and bytes, `host_peak_rss, device_used_peak` for memory; each prefixed with the probe's `name` when it has
-one. Failed attempts are reported on the console only.
+one. Failed attempts are reported on the console only: the counts are the accepted attempt's.
 
 ## Console
 

@@ -286,9 +286,17 @@ int test_composed_tangent_fallback() {
         SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
         auto rows       = sfem::test::read_history(csv);
         steps[composed] = rows.size();
+        // history.csv counts the fallbacks: the curvature capped on every solve the cap stopped,
+        // a shift only after it.
+        int caps = 0, shifted = 0;
         for (auto &row : rows) {
             if (row["status"] >= 0) impulse[composed] += row["reaction_z"] * row["dt"];
+            caps += (int)row["curvature_caps"];
+            shifted += (int)row["shifted"];
+            SFEM_TEST_ASSERT((row["shifted"] > 0) == (row["max_shift"] > 0));
         }
+        printf("  %s: %d solves with the curvature capped, %d shifted\n", composed ? "composed" : "assembled", caps, shifted);
+        SFEM_TEST_ASSERT(caps > 0 && shifted <= caps);
         std::remove(csv.c_str());
     }
     printf("  assembled: %zu rows, impulse %.12g; composed: %zu rows, impulse %.12g\n", steps[0], impulse[0], steps[1], impulse[1]);

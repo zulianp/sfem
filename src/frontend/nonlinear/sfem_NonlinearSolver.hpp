@@ -39,6 +39,13 @@ namespace sfem {
         int    linear_iterations{0};
         /// Linearised solves that stopped on their cap rather than their tolerance.
         int    capped_linear_solves{0};
+        /// Iterations repeated on the projected tangent (NewtonOptions::tangent_projection: on_failure).
+        int    projections{0};
+        /// Linearised solves repeated with the obstacle's curvature capped, those that then shifted
+        /// the tangent's diagonal, and the largest fraction of it they shifted by.
+        int    curvature_caps{0};
+        int    shifted_solves{0};
+        real_t max_shift{0};
         real_t reference{0};
         real_t final_measure{0};
         real_t min_alpha{1};
