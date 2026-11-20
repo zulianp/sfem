@@ -1,6 +1,7 @@
 #include "sfem_Stepper.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 #include "sfem_Function.hpp"
@@ -88,6 +89,11 @@ namespace sfem {
 
         const real_t t_end = opts.t0 + opts.steps * opts.dt;
         const real_t tol   = real_t(1e-10) * opts.dt;
+        // A step ending this close to its interval's end ends on it. Step lengths that are
+        // remainders (target - t) carry rounding, and growth by max_growth doubles it on every
+        // remainder-and-grow cycle: after ~100 cycles a step falls short of the grid by ~1e-12 s and
+        // the next would be that sliver, which Newton cannot take (LDP24T, 2026-11-20).
+        const real_t snap  = real_t(1e-6) * opts.dt;
 
         StepRecord record;
         record.t      = opts.t0;
@@ -103,23 +109,25 @@ namespace sfem {
         real_t t    = opts.t0;
         int    step = 0;
         // The grid: interval k ends at t0 + k dt exactly, rather than at a sum that has gathered
-        // rounding. A cut step is followed by the rest of its interval, in steps of at most its
-        // length (and of max_growth times the last), so the run is back on the grid at the
-        // interval's end.
+        // rounding. After a cut the rest of the interval is split into equal steps, each at most
+        // max_growth times the last (and at most dt): the last one ends on the grid, no remainder is
+        // left over, and the run is back on full steps as soon as the growth bound allows.
         int    grid    = 0;
         bool   on_grid = true;
         real_t last_dt = opts.dt;
         while (t < t_end - tol) {
-            const real_t target = opts.t0 + (grid + 1) * opts.dt;
-            real_t       dt     = std::min(on_grid ? opts.dt : target - t, opts.max_growth * last_dt);
-            int          cuts   = 0;
+            const real_t target  = opts.t0 + (grid + 1) * opts.dt;
+            const real_t allowed = std::min(opts.dt, opts.max_growth * last_dt);
+            const real_t rest    = target - t;
+            real_t       dt      = rest / std::max(real_t(1), std::ceil(rest / allowed - real_t(1e-6)));
+            int          cuts    = 0;
 
             NonlinearReport report;
             int             attempts = 0;
             // The step, solved again while an observer asks for it (StepObserver::resolve).
             for (;;) {
                 for (;;) {
-                    const real_t t_new = t + dt >= target - tol ? target : t + dt;
+                    const real_t t_new = t + dt >= target - snap ? target : t + dt;
                     if (impl.set_time(t_new, tol) != SFEM_SUCCESS) return SFEM_FAILURE;
                     if (impl.scheme) impl.scheme->begin_step(t, dt);
                     for (auto &h : impl.histories) h->begin_step(t_new, dt, x_n->data());
@@ -160,7 +168,7 @@ namespace sfem {
                     dt /= 2;
                 }
                 record.step     = step + 1;
-                record.t        = t + dt >= target - tol ? target : t + dt;
+                record.t        = t + dt >= target - snap ? target : t + dt;
                 record.dt       = dt;
                 record.report   = report;
                 record.attempts = attempts;
@@ -173,7 +181,7 @@ namespace sfem {
                 attempts = 0;
             }
 
-            on_grid = t + dt >= target - tol;
+            on_grid = t + dt >= target - snap;
             t       = on_grid ? target : t + dt;
             grid += on_grid;
             last_dt = dt;

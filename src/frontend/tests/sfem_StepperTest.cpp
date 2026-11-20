@@ -1,7 +1,9 @@
 // The Stepper's sequence, recorded by stand-ins for the scheme, the history and the solver; and
 // the carried states of the library's schemes.
 
+#include <algorithm>
 #include <cmath>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -196,8 +198,8 @@ int test_cutback() {
     return SFEM_TEST_SUCCESS;
 }
 
-// Two cuts under a growth bound (BDF2's 2): the steps grow back by at most 2 and end on the grid,
-// t = 0.25, 0.75, 1, then 1.5, 2.
+// Two cuts under a growth bound (BDF2's 2): the rest of each interval in equal steps of at most twice
+// the last, ending on the grid: t = 0.25, then 0.625, 1 (two of 0.375), then 1.5, 2 (two of 0.5).
 int test_cutback_returns_to_the_grid() {
     auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 1, 0);
     Log  log;
@@ -215,7 +217,58 @@ int test_cutback_returns_to_the_grid() {
     for (auto &entry : log) {
         if (entry.rfind("converged", 0) == 0) converged.push_back(entry);
     }
-    SFEM_TEST_ASSERT(same(converged, {"converged(0.25,1)", "converged(0.75,2)", "converged(1,3)", "converged(1.5,4)", "converged(2,5)"}));
+    SFEM_TEST_ASSERT(same(converged, {"converged(0.25,1)", "converged(0.625,2)", "converged(1,3)", "converged(1.5,4)", "converged(2,5)"}));
+    return SFEM_TEST_SUCCESS;
+}
+
+// LDP24T's solid (2026-11-20): repeated cut-backs under BDF2's growth bound, the failed attempts as
+// that run had them. The old rule took the rest of an interval as min(rest, 2 * last): a growth step
+// and a remainder, again and again, each cycle doubling the rounding in the step lengths, until at
+// step 140 a step fell 7.2e-13 short of t = 0.0072 and the next was that sliver (Newton failed at
+// every halving of it). Now the rest is split into equal steps: no step is shorter than the cut-backs
+// make one (dt / 2^max_cutbacks), every interval ends on t0 + k dt, and the run completes.
+int test_cutbacks_leave_no_sliver() {
+    auto p = sfem::test::make_cube_problem("GeneratedLinearElasticity", 1, 0);
+    Log  log;
+
+    sfem::StepperOptions options;
+    options.dt           = 1e-4;
+    options.steps        = 100;
+    options.max_cutbacks = 8;
+    options.max_growth   = 2;
+    const std::vector<int> failures = {34,  50,  52,  58,  62,  64,  66,  68,  81,  82,  84,  85,  87,  88,  90,
+                                       92,  93,  94,  96,  98,  100, 101, 107, 108, 110, 112, 113, 115, 117, 118,
+                                       120, 129, 130, 132, 133, 134, 136, 138, 139, 141, 143, 144, 146};
+    sfem::Stepper stepper(p.f, std::make_shared<RecordingSolver>(log, failures), options);
+
+    class Steps final : public sfem::StepObserver {
+    public:
+        std::vector<real_t> t, dt;
+        int                 converged(const sfem::StepRecord &r) override {
+            t.push_back(r.t);
+            dt.push_back(r.dt);
+            return SFEM_SUCCESS;
+        }
+    };
+    auto steps = std::make_shared<Steps>();
+    stepper.add_observer(steps);
+
+    SFEM_TEST_ASSERT(stepper.run(p.x->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(!steps->t.empty() && steps->t.back() == options.t0 + options.steps * options.dt);
+    real_t shortest = options.dt;
+    int    on_grid  = 0;
+    for (size_t i = 0; i < steps->t.size(); ++i) {
+        shortest        = std::min(shortest, steps->dt[i]);
+        const real_t k  = std::round((steps->t[i] - options.t0) / options.dt);
+        const real_t tk = options.t0 + k * options.dt;
+        if (std::fabs(steps->t[i] - tk) < real_t(1e-6) * options.dt) {
+            // A step ending at an interval's end ends on it exactly.
+            SFEM_TEST_ASSERT(steps->t[i] == tk);
+            on_grid++;
+        }
+    }
+    SFEM_TEST_ASSERT(shortest >= options.dt / 256 * (1 - 1e-9));
+    SFEM_TEST_ASSERT(on_grid == options.steps);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -300,6 +353,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_sequence);
     SFEM_RUN_TEST(test_cutback);
     SFEM_RUN_TEST(test_cutback_returns_to_the_grid);
+    SFEM_RUN_TEST(test_cutbacks_leave_no_sliver);
     SFEM_RUN_TEST(test_release);
     SFEM_RUN_TEST(test_newmark_carried_state);
     SFEM_RUN_TEST(test_bdf2_carried_state);
