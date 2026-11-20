@@ -41,7 +41,7 @@ arguments a case names on a `# validate_args:` line.
 | `validate.prony_recovery: false` | `# validate_args: --no-prony-recovery` |
 
 The history (`output.history_csv`) has the columns `step, t, dt, status, attempts, newton,
-linear, capped, reference, final, min_alpha`, then `ux, uy, uz` (with `vx..az` under inertia
+linear, capped, reference, final, min_alpha, projections, curvature_caps, shifted, max_shift`, then `ux, uy, uz` (with `vx..az` under inertia
 unless `rates: false`) and `angle, released, torque`. Its first row is the initial state.
 Under torque control the `newton` and `linear` columns count every solve of the secant
 iteration; the spike counted the last one only.

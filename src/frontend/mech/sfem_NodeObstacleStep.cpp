@@ -74,6 +74,10 @@ namespace sfem {
         bool                                 projection_managed{false};
         bool                                 tangent_projected{false};
         bool                                 negative_curvature{false};
+        // The last solve's fallbacks: solved again with the curvature capped, and the fraction of
+        // its diagonal the tangent was last shifted by (0: not shifted).
+        bool                                 capped_curvature{false};
+        real_t                               shift{0};
 
         real_t kkt(const real_t *const r, real_t &penetration) {
             return contact->kkt_residual(r, k_ref->data(), projected->data(), &penetration);
@@ -335,7 +339,9 @@ namespace sfem {
 
         auto &impl      = *impl_;
         auto &tangent   = *impl.tangent;
-        impl.iterations = 0;
+        impl.iterations       = 0;
+        impl.capped_curvature = false;
+        impl.shift            = 0;
         impl.blas->copy(impl.ndofs, dx, impl.lift->data());
 
         int        status = impl.solve_qp(r);
@@ -364,6 +370,7 @@ namespace sfem {
                            impl.tangent_projected ? "projected" : "capped");
             }
             if (impl.options.curvature && tangent.set_curvature(x, r, impl.k_ref->data(), capped) != SFEM_SUCCESS) return SFEM_FAILURE;
+            impl.capped_curvature = impl.options.curvature;
 
             // The material's tangent can be indefinite too (a hyperelastic block under
             // compression, on a mesh fine enough that c0 M no longer outweighs it): shift its
@@ -380,7 +387,8 @@ namespace sfem {
                 if (shift == 0) tangent.diagonal(impl.diag->data());
                 const real_t next = shift == 0 ? real_t(1e-2) : 10 * shift;
                 tangent.shift_diagonal(next - shift, impl.diag->data());
-                shift = next;
+                shift      = next;
+                impl.shift = shift;
                 if (log_enabled(LOG_CONTACT, LOG_VERBOSE)) {
                     log_printf(LOG_CONTACT, LOG_VERBOSE, LOG_EVENT, "contact QP: tangent shifted by %g of its diagonal", (double)shift);
                 }
@@ -436,6 +444,10 @@ namespace sfem {
     }
 
     bool NodeObstacleStep::met_negative_curvature() const { return impl_->negative_curvature; }
+
+    bool NodeObstacleStep::capped_curvature() const { return impl_->capped_curvature; }
+
+    real_t NodeObstacleStep::diagonal_shift() const { return impl_->shift; }
 
     void NodeObstacleStep::reaction(real_t *const out) const { impl_->contact->reaction(out); }
 

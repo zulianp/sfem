@@ -71,6 +71,9 @@ namespace sfem {
         void set_tangent_projection(const bool on) override;
         /// The last solve's QP met a direction of no positive curvature.
         bool met_negative_curvature() const override;
+        /// The last solve's fallbacks: the curvature capped, the diagonal shifted.
+        bool   capped_curvature() const override;
+        real_t diagonal_shift() const override;
         void account(MemoryLedger &ledger) const override;
         /// The obstacle's gap is linearised: Newton measures every iterate.
         bool solves_linear_function_exactly() const override { return false; }

@@ -70,6 +70,11 @@ namespace sfem {
         /// linearisation is indefinite at the iterate.
         virtual bool met_negative_curvature() const { return false; }
 
+        /// Whether the last `solve` was repeated with the obstacle's curvature capped, and the
+        /// largest fraction of its diagonal the tangent was shifted by (0: none).
+        virtual bool capped_curvature() const { return false; }
+        virtual real_t diagonal_shift() const { return 0; }
+
         /// Whether a converged solve of a linear function lands on its solution: true when the
         /// linearisation is the function's own, false for a constraint the step linearises (an
         /// obstacle's gap), whose iterate Newton must measure like any other.

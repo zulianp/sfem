@@ -67,6 +67,14 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        /// What the last linearised solve fell back on, into the report's totals.
+        void count_fallbacks(NonlinearReport &report) const {
+            const real_t shift = step->diagonal_shift();
+            report.curvature_caps += step->capped_curvature();
+            report.shifted_solves += shift > 0;
+            report.max_shift = std::max(report.max_shift, shift);
+        }
+
         std::shared_ptr<Merit> merit() {
             if (auto own = step->merit()) return own;
             if (!default_merit) default_merit = create_merit(f, options.merit);
@@ -207,6 +215,7 @@ namespace sfem {
                 log.linear_iterations = impl.step->iterations();
                 report.linear_iterations += log.linear_iterations;
                 report.capped_linear_solves += log.linear_capped;
+                impl.count_fallbacks(report);
                 report.iterations = ++count;
 
                 if (!std::isfinite(impl.reductions->norm2(dx))) return NonlinearReport::Status::STEP_FAILED;
@@ -216,6 +225,7 @@ namespace sfem {
                     // every rank): the iteration again from x on the projected tangent, rather than
                     // along the truncated direction CG returned.
                     projected = true;
+                    ++report.projections;
                     impl.step->set_tangent_projection(true);
                     continue;
                 }
@@ -246,6 +256,7 @@ namespace sfem {
                             // The tangent is indefinite here: the iteration again from x, on the
                             // projected tangent.
                             projected = true;
+                            ++report.projections;
                             impl.step->set_tangent_projection(true);
                             known = false;
                             continue;
@@ -342,6 +353,7 @@ namespace sfem {
             log.linear_iterations = impl.step->iterations();
             report.linear_iterations += log.linear_iterations;
             report.capped_linear_solves += log.linear_capped;
+            impl.count_fallbacks(report);
             report.iterations = count;
             if (!std::isfinite(impl.reductions->norm2(dx))) {
                 report.status = NonlinearReport::Status::STEP_FAILED;
