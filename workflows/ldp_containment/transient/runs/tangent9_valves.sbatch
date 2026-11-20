@@ -14,7 +14,7 @@
 # or FF200 (ldp_cases/FF200_ExodusMesh, prony3_sim1 and p2_sim1). TET10 reads db/solid_p2.
 # A run is <tangent>__<history>[_p<P>][_plain][_s32]_<repeat>, its folder
 # $CASE/<PREFIX>_<run>, PREFIX la_{s0|p2} (LDP24A) or tp9_{s0|p2} (FF200):
-#   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16 (stored: bsr f16), em32, em16, em8p
+#   tangent  bsr64, bsr32 (BSR f64/f32), qbsr16 (stored: bsr f16, rows layout), em32, em16, em8p
 #            (element_matrix f32/f16/i8pair), pt32, pt16, pt8md (points f32/f16/i8md); -np: the
 #            tangent projection off
 #   history  full, float32, float16, int16_scaled, int8_scaled, float16_md, int8_md, qblock5, qblock6,
@@ -52,7 +52,9 @@ tangent_args() {  # <tangent>
   case $t in
     bsr64) a="--set solver.linear.format=BSR --set solver.linear.storage_bytes=8" ;;
     bsr32) a="--set solver.linear.format=BSR --set solver.linear.storage_bytes=4" ;;
-    qbsr16) a="$I=bsr $E=f16" ;;
+    # The rows layout on both meshes: on the valves' TET10 (1.1M block rows) it is 10% faster and 19%
+    # smaller than the SELL that `auto` takes from 2^20 block rows (bench_inexact "rows f16", GH200).
+    qbsr16) a="$I=bsr $E=f16 --set solver.linear.inexact.layout=rows" ;;
     em32) a="$I=element_matrix $E=f32" ;;
     em16) a="$I=element_matrix $E=f16" ;;
     em8p) a="$I=element_matrix $E=i8pair" ;;
