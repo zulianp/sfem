@@ -466,6 +466,16 @@ if(NOT SFEM_ENABLE_MINIMAL)
         #     endif()
         # endif()
         list(APPEND SFEM_TARGETS bench_packed_laplacian_cuda)
+
+        # The device assembly strategies of the stored tangent (coop, patch) on a TET10 mesh.
+        if(NOT SFEM_ENABLE_HIP)
+            add_executable(bench_patch_assembly_cuda
+                bench/cuda/bench_patch_assembly.cpp
+                bench/cuda/bench_patch_assembly.cu)
+            target_link_libraries(bench_patch_assembly_cuda PRIVATE sfem)
+            target_include_directories(bench_patch_assembly_cuda PRIVATE $<TARGET_PROPERTY:sfem,INCLUDE_DIRECTORIES>)
+            list(APPEND SFEM_TARGETS bench_patch_assembly_cuda)
+        endif()
     endif()
 endif()
 

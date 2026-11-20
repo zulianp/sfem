@@ -286,12 +286,15 @@ int main(int argc, char *argv[]) {
                                       {"points", "i8md", "auto"},      {"element_matrix", "f64", "auto"}, {"element_matrix", "f32", "auto"},
                                       {"element_matrix", "f16", "auto"}, {"element_matrix", "i8pair", "auto"}, {"bsr", "f32", "auto"},
                                       {"bsr", "f16", "auto"},          {"bsr", "i8", "auto"},           {"bsr", "f32", "sell"},
-                                      {"bsr", "f16", "sell"},          {"bsr", "i8", "sell"}};
+                                      {"bsr", "f16", "sell"},          {"bsr", "i8", "sell"},           {"bsr", "f32", "rows"},
+                                      {"bsr", "f16", "rows"}};
     for (const auto &fmt : formats) {
         const bool assembled = std::string(fmt[0]) == "bsr";
-        if (assembled && !device && std::string(fmt[2]) == "sell") continue;  // the host's auto is SELL
+        if (assembled && !device && std::string(fmt[2]) != "auto") continue;  // the host's auto is SELL
         const bool        sell = assembled && (!device || std::string(fmt[2]) == "sell");
-        const std::string name = (sell ? std::string("SELL") : std::string(fmt[0])) + " " + fmt[1];
+        const bool        rows = assembled && std::string(fmt[2]) == "rows";
+        // "bsr": the device's auto layout (SELL from InexactStore::sell_min_block_rows), "rows" forced.
+        const std::string name = (sell ? std::string("SELL") : rows ? std::string("rows") : std::string(fmt[0])) + " " + fmt[1];
         if (!wanted(name)) continue;
         op->set_inexact_options(sfem::InexactOptions::from_strings(fmt[0], fmt[1], "auto", "auto", fmt[2]));
         const double free0 = device_free(es);
