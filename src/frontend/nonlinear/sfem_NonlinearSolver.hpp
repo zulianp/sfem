@@ -46,6 +46,9 @@ namespace sfem {
         int    curvature_caps{0};
         int    shifted_solves{0};
         real_t max_shift{0};
+        /// Solves whose reference is the start's residual to first order, r(x) + K(x) increment:
+        /// moving the prescribed values alone made the start unevaluable (NewtonSolver).
+        int    linearized_references{0};
         real_t reference{0};
         real_t final_measure{0};
         real_t min_alpha{1};
