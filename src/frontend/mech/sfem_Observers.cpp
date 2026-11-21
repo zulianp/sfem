@@ -866,7 +866,7 @@ namespace sfem {
             if (!csv) return SFEM_SUCCESS;
 
             fprintf(csv,
-                    "%d,%.17g,%.17g,%s,%d,%d,%d,%d,%.17g,%.17g,%.17g,%d,%d,%d,%.17g",
+                    "%d,%.17g,%.17g,%s,%d,%d,%d,%d,%.17g,%.17g,%.17g,%d,%d,%d,%.17g,%d",
                     record.step,
                     (double)record.t,
                     (double)record.dt,
@@ -881,7 +881,8 @@ namespace sfem {
                     record.report.projections,
                     record.report.curvature_caps,
                     record.report.shifted_solves,
-                    (double)record.report.max_shift);
+                    (double)record.report.max_shift,
+                    record.report.linearized_references);
             for (real_t v : sampled) fprintf(csv, ",%.17g", (double)v);
             fprintf(csv, "\n");
             fflush(csv);
@@ -906,7 +907,7 @@ namespace sfem {
     int StepHistory::initial(const StepRecord &record) {
         auto &impl = *impl_;
         if (impl.csv) {
-            fprintf(impl.csv, "step,t,dt,status,attempts,newton,linear,capped,reference,final,min_alpha,projections,curvature_caps,shifted,max_shift");
+            fprintf(impl.csv, "step,t,dt,status,attempts,newton,linear,capped,reference,final,min_alpha,projections,curvature_caps,shifted,max_shift,linearized_references");
             for (auto &p : impl.probes) {
                 for (auto &c : p->columns()) fprintf(impl.csv, ",%s", c.c_str());
             }

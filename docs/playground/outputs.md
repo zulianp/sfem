@@ -36,6 +36,7 @@ initial state:
 | `projections` | Newton iterations repeated on the projected tangent (`tangent_projection: on_failure`). |
 | `curvature_caps` | Obstacle QPs solved again with the curvature capped (`node_sdf`). |
 | `shifted`, `max_shift` | Of those, the QPs that then shifted the tangent's diagonal, and the largest fraction of it they shifted by (0: none). |
+| `linearized_references` | Solves whose `reference` is the start's residual to first order, `r(x) + K(x) increment`: setting the moved prescribed values alone inverted elements, so the start could not be evaluated. |
 
 then the probes' columns ([case reference](case-reference.md#output)): `ux, uy, uz` for a
 control point, `angle, released, torque` for a rotation, `reaction_x, reaction_y, reaction_z,

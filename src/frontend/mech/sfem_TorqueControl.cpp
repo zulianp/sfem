@@ -79,6 +79,7 @@ namespace sfem {
             total.curvature_caps += report.curvature_caps;
             total.shifted_solves += report.shifted_solves;
             total.max_shift = std::max(total.max_shift, report.max_shift);
+            total.linearized_references += report.linearized_references;
             total.final_measure = report.final_measure;
             total.min_alpha     = std::min(total.min_alpha, report.min_alpha);
             if (!report.converged()) return total;
