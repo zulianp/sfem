@@ -75,6 +75,7 @@ namespace sfem {
             total.iterations += report.iterations;
             total.linear_iterations += report.linear_iterations;
             total.capped_linear_solves += report.capped_linear_solves;
+            total.linearized_references += report.linearized_references;
             total.final_measure = report.final_measure;
             total.min_alpha     = std::min(total.min_alpha, report.min_alpha);
             if (!report.converged()) return total;

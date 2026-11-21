@@ -274,8 +274,8 @@ namespace sfem {
         // Newton itself: the tangent at x, a fraction of the increment in the constrained entries
         // of dx and the interior following it, taken whole, then Newton with the boundary held
         // there. A fraction whose solve fails is halved and tried again from the last converged
-        // state, at most `increment_halvings` times. The tolerance keeps its reference at the
-        // state with the boundary set.
+        // state, at most `increment_halvings` times. The tolerance and the divergence test keep
+        // their reference at the state with the boundary set (the start).
         if (!impl.increment) impl.increment = create_buffer<real_t>(ndofs, impl.f->execution_space());
         real_t *const increment = impl.increment->data();
         impl.blas->copy(ndofs, x, increment);
@@ -304,7 +304,25 @@ namespace sfem {
             report.status = NonlinearReport::Status::NON_FINITE;
             return report;
         }
-        if (!std::isfinite(report.reference)) report.reference = at_x.reference;
+        if (!std::isfinite(report.reference)) {
+            // The start cannot be evaluated: the boundary moved alone inverts elements next to it
+            // (a large increment against the mesh). Its residual to first order from x stands in,
+            // r(x) + K(x) increment on the free rows, the force the increment puts on them. Not
+            // x's own residual: x is the last converged state, whose residual is at the solver's
+            // resolution and would make every iterate of the step look diverged.
+            if (impl.f->apply(x, increment, r) != SFEM_SUCCESS) {
+                report.status = NonlinearReport::Status::STEP_FAILED;
+                return report;
+            }
+            impl.f->set_value_to_constrained_dofs(0, r);
+            log.measure      = impl.step->measure(start, r);
+            report.reference = log.measure.reference;
+            ++report.linearized_references;
+            if (!std::isfinite(report.reference)) {
+                report.status = NonlinearReport::Status::NON_FINITE;
+                return report;
+            }
+        }
         tol           = std::max(opts.atol, opts.rtol * report.reference);
         log.x         = start;
         log.tolerance = tol;

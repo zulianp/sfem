@@ -33,6 +33,7 @@ initial state:
 | `capped` | Linear or QP solves stopped by their iteration limit. |
 | `reference`, `final` | The convergence measure's reference (its first value) and its final value; `final / reference` is the `|r|/|r0|` printed per step. |
 | `min_alpha` | The smallest line-search step taken. |
+| `linearized_references` | Solves whose `reference` is the start's residual to first order, `r(x) + K(x) increment`: setting the moved prescribed values alone inverted elements, so the start could not be evaluated. |
 
 then the probes' columns ([case reference](case-reference.md#output)): `ux, uy, uz` for a
 control point, `angle, released, torque` for a rotation, `reaction_x, reaction_y, reaction_z,
