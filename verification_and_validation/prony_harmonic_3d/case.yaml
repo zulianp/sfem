@@ -1,0 +1,71 @@
+schema_version: 2
+id: prony_harmonic_3d
+name: Three-dimensional harmonic Prony response (virtual DMA)
+kind: verification
+family: viscoelastic
+dimension: 3
+tier: medium
+
+source:
+  description: Prony-series Mooney-Rivlin driven by eps0 sin(omega t) from rest; the replayed recursion, its transfer function and the generalized Maxwell complex modulus
+  reference: README.md
+oracle: {type: analytical, implementation: oracle.py}
+geometry: {length: 1.0, height: 1.0, depth: 1.0}
+# One frequency below the spectrum, one at each relaxation time (omega tau_i = 1), one above.
+loading: {omegas: [0.1, 1.0, 10.0, 100.0, 1000.0]}
+time: {cycles: 4, steps_per_period: [64, 128, 256]}
+material: {c10: 1.0, c01: 0.5, bulk_modulus: 0.0}
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --element, "{element}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}", --amplitude, "{resolution_amplitude}"]
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances: &tolerances
+    # The simulated reaction against the recursion replayed on the same steps, every frequency.
+    algorithmic_reaction_max_relative_error: 1.0e-8
+    # Where the coarsest step resolves the fastest relaxation time (dt <= tau_min: here
+    # omega >= 10), against the recursion at 8192 steps per period: the reaction and the last
+    # cycle's dissipation at 256 steps per period, and the rate over the three levels. Coarser
+    # steps converge more slowly (the midpoint rule at first order), which the diagnostics record.
+    continuum_reaction_relative_l2: 2.0e-4
+    dissipation_relative_error: 1.0e-3
+    temporal_rate_deficit: 0.0
+
+variants:
+  - &base
+    id: hex8_linear
+    operator: GeneratedMooneyRivlinProny
+    element: HEX8
+    resolution: {nx: 4, ny: 1, nz: 1, amplitude: 1.0e-5, integrator: linear, prony_g: "0.3,0.25,0.2", prony_tau: "0.01,0.1,1.0"}
+    driver: &driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_prony_harmonic.py", --case, "{resolved_case}", --driver, "{build_dir}/playground", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution", --set, "solver.newton.atol=1.0e-14", --set, "solver.newton.rtol=0", --set, "solver.newton.max_it=20", --set, "solver.linear.format=BSR", --set, "solver.linear.preconditioner=none", --set, "solver.linear.rtol=1.0e-14", --set, "solver.linear.atol=1.0e-16", --set, "solver.linear.max_it=20000", --set, "solver.newton.verbose=false", --set, "mesh.packed=false"]
+      environment:
+        OMP_NUM_THREADS: 1
+    expected_output: &expected
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 15}
+        - {pattern: SFEM_PRONY_HARMONIC_COMPLETE, count: 1}
+      forbidden: [Newton did not converge, "nan"]
+    # Small strain: G' + i G'' fitted to the whole history against the recursion's transfer
+    # function at every frequency and level, and against the continuous G*(omega) at 256 steps
+    # per period where the steps resolve tau_min.
+    tolerances: &moduli
+      discrete_modulus_max_relative_error: 1.0e-4
+      storage_modulus_max_relative_error: 1.0e-3
+      loss_modulus_max_relative_error: 1.0e-3
+  - <<: *base
+    id: hex8_midpoint
+    resolution: {nx: 4, ny: 1, nz: 1, amplitude: 1.0e-5, integrator: midpoint, prony_g: "0.3,0.25,0.2", prony_tau: "0.01,0.1,1.0"}
+  - <<: *base
+    id: tet4_linear
+    element: TET4
+    resolution: {nx: 4, ny: 1, nz: 1, amplitude: 1.0e-5, integrator: linear, prony_g: "0.3,0.25,0.2", prony_tau: "0.01,0.1,1.0"}
+  # Finite strain, +-30 %: the recursion replayed is still exact, the moduli are not defined.
+  - <<: *base
+    id: hex8_linear_large
+    resolution: {nx: 4, ny: 1, nz: 1, amplitude: 0.3, integrator: linear, prony_g: "0.3,0.25,0.2", prony_tau: "0.01,0.1,1.0"}
+    tolerances: *tolerances

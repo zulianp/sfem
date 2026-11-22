@@ -31,7 +31,7 @@ solid-related source file.
 | Hyperelastic | `GeneratedSaintVenantKirchhoff` | Generated 2D/3D simplex and tensor-product families | Required in the homogeneous mode cases. |
 | Viscoelastic | `GeneratedMooneyRivlinKelvinVoigtNewmark` | Generated 2D and 3D element families | Canonical finite-strain Kelvin-Voigt target in both dimensions. |
 | Viscoelastic | `GeneratedLinearKelvinVoigt` | Generated element families; semi-structured hex in the micro basis | Cover with the analytical damped-mode case. |
-| Viscoelastic | `GeneratedMooneyRivlinProny` | 3D `HEX8`; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants. |
+| Viscoelastic | `GeneratedMooneyRivlinProny` | 3D `HEX8`, `TET4`; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants, harmonic driving (complex modulus), and a damped bar mode with inertia. |
 
 `Hyperelasticity` is a generic/plugin-facing operator rather than a distinct
 constitutive law, so it does not receive a separate physics case.
@@ -49,7 +49,7 @@ outside this material-focused catalog.
 | 2D hyperelastic | `hyperelastic_modes_2d` | `cylindrical_pressure_vessel` |
 | 3D hyperelastic | `hyperelastic_modes_3d` | `inflated_spherical_shell_3d` |
 | 2D viscoelastic | `finite_strain_kv_creep_2d` | Same case includes the complete transient history. |
-| 3D viscoelastic | `finite_strain_kv_creep_3d` | `linear_kv_damped_mode_3d`, `prony_relaxation_3d` |
+| 3D viscoelastic | `finite_strain_kv_creep_3d`, `prony_harmonic_3d` | `linear_kv_damped_mode_3d`, `prony_relaxation_3d`, `prony_bar_mode_3d` |
 
 ## Case Definitions
 
@@ -272,6 +272,38 @@ outside this material-focused catalog.
 - **Prerequisite:** a driver path that initializes, advances, and commits
   `GeneratedMooneyRivlinProny` history while reading the prescribed deformation history
   from YAML-referenced files.
+
+### VE-3D-04: `prony_harmonic_3d`
+
+- **Type:** history-variable and frequency-response verification (virtual DMA); medium gate.
+- **Target:** `GeneratedMooneyRivlinProny` on `HEX8` and `TET4`, with the linear-interpolation
+  and midpoint integrators.
+- **Setup:** homogeneous constrained uniaxial strain `eps0 sin(omega t)` from rest at five
+  frequencies across a three-term spectrum, 64, 128 and 256 steps per period, four cycles; a
+  small-strain (`1e-5`) and a finite-strain (`0.3`) amplitude.
+- **Oracle:** the Prony recursion replayed on the prescribed stretches (exact at any amplitude);
+  its transfer function, the algorithm's complex modulus; the recursion at 8192 steps per period
+  and the generalized Maxwell `G*(omega)` as the continuum.
+- **Pass conditions:** replayed reaction to `1e-8`; fitted `G' + i G''` against the transfer
+  function to `1e-4` at every frequency and step; where the steps resolve `tau_min`, reaction
+  L2 to `2e-4`, dissipation per cycle to `1e-3`, `G'` and `G''` against `G*` to `1e-3`, and a
+  temporal rate of at least `1.8`.
+- **Failure modes exposed:** the step weights, the history's commit and its stress measure,
+  the Piola transformation at finite strain, and the integrator's large-step behaviour.
+
+### VE-3D-05: `prony_bar_mode_3d`
+
+- **Type:** analytical transient verification with inertia; medium gate.
+- **Target:** `GeneratedMooneyRivlinProny` on `HEX8` under Newmark, both integrators.
+- **Setup:** the bar of VE-3D-02, at rest with the velocity `v0 sin(pi x/L)`, ringing freely;
+  64 and 16 elements.
+- **Oracle:** the mode's `2 + n` state system (Wagner and Adhikari 2003) with the mesh's exact
+  wave number, integrated exactly in time; Newmark with the Prony recursion replayed on the mode.
+- **Pass conditions:** amplitude against the replayed scheme to `1e-7` at every step; history
+  L2 to `3e-3`, fitted frequency and decay to `1e-3`, temporal rate at least `1.8`; continuum
+  frequency and decay to the mesh's `O(h^2)`.
+- **Failure modes exposed:** the coupling of the history to Newmark's implicit step, mass and
+  stiffness scaling, and damping from the series rather than a viscosity.
 
 ### HE-3D-03: `active_strain_homogeneous_3d`
 
