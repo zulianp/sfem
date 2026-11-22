@@ -1039,6 +1039,8 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
             }
+            newton_options.project_below_alpha =
+                    read<real_t>(nn, "project_below_alpha", newton_options.project_below_alpha);
             verbose                          = read<bool>(nn, "verbose", true);
             // A linear problem is solved by its first step, which needs no merit to judge it.
             newton_options.line_search.enabled = !f->is_linear();
@@ -1106,6 +1108,7 @@ namespace sfem {
                 obstacle.qp_max_it = read<int>(qp, "max_it", obstacle.qp_max_it);
                 obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
                 obstacle.qp_accept_capped = read<bool>(qp, "accept_capped", obstacle.qp_accept_capped);
+                obstacle.qp_capped_projects = read<bool>(qp, "capped_projects", obstacle.qp_capped_projects);
                 obstacle.curvature = read<bool>(child(config.root(), "obstacle"), "curvature", obstacle.curvature);
                 // The step's tangent, in the format an unconstrained step's would take.
                 obstacle.tangent.format        = linear.format;

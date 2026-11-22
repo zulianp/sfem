@@ -247,6 +247,16 @@ namespace sfem {
                     case LineSearchResult::Status::ACCEPTED:
                     case LineSearchResult::Status::BEST_DECREASE:
                     case LineSearchResult::Status::NONMONOTONE:
+                        if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected &&
+                            log.line_search.alpha < opts.project_below_alpha) {
+                            // A direction the merit decreases along only for a tiny step: the
+                            // tangent is indefinite here, as for no decrease at all.
+                            projected = true;
+                            ++report.projections;
+                            impl.step->set_tangent_projection(true);
+                            known = false;
+                            continue;
+                        }
                         break;
                     case LineSearchResult::Status::AT_RESOLUTION:
                         return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;

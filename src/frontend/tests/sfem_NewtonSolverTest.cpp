@@ -128,8 +128,12 @@ namespace {
 
         int iterations() const override { return 0; }
 
+        bool tangent_projection_supported() const override { return true; }
+        void set_tangent_projection(const bool on) override { projected = on; }
+
         std::vector<real_t> measures;
         real_t              direction{0};
+        bool                projected{false};
 
     private:
         ptrdiff_t ndofs_;
@@ -237,12 +241,42 @@ int test_cg_stops_on_negative_curvature() {
     return SFEM_TEST_SUCCESS;
 }
 
+// tangent_projection: on_failure with project_below_alpha: a step the line search shortened below
+// the fraction repeats the iteration on the projected tangent; at 0 (the default) it is taken.
+int test_projects_below_alpha() {
+    auto p = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+    const ptrdiff_t n = p.fs->n_dofs();
+    for (const real_t below : {real_t(0), real_t(0.5)}) {
+        auto step       = std::make_shared<ScriptedStep>(n);
+        step->direction = -1e-3;  // a descent direction for the residual's merit, any step length
+        sfem::NewtonOptions options;
+        options.tangent_projection  = sfem::TangentProjection::ON_FAILURE;
+        options.line_search.steps   = {real_t(0.25)};
+        options.project_below_alpha = below;
+        options.max_it              = 3;
+        auto report                 = run(p, step, options);
+        printf("  project_below_alpha %g: %s, %d projections, min alpha %g\n",
+               double(below), sfem::to_string(report.status), report.projections, double(report.min_alpha));
+        if (below == 0) {
+            SFEM_TEST_ASSERT(report.projections == 0);
+            SFEM_TEST_ASSERT(!step->projected);
+        } else {
+            // Projected once, and kept: no step is taken whole.
+            SFEM_TEST_ASSERT(report.projections == 1);
+            SFEM_TEST_ASSERT(step->projected);
+        }
+        SFEM_TEST_ASSERT(report.min_alpha == real_t(0.25));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_linear_one_iteration);
     SFEM_RUN_TEST(test_neohookean_quadratic);
     SFEM_RUN_TEST(test_fails_fast);
     SFEM_RUN_TEST(test_cg_stops_on_negative_curvature);
+    SFEM_RUN_TEST(test_projects_below_alpha);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
