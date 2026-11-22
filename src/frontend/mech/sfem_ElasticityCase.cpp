@@ -38,6 +38,7 @@ namespace sfem {
                 "mesh.sidesets[].plane.radius",
                 "mesh.sidesets[].file",
                 "material.*",
+                "material_extra.*",
                 "loads.body_force.density",
                 "loads.body_force.g",
                 "loads.neumann.*",

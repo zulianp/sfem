@@ -430,6 +430,17 @@ namespace sfem {
                 return SFEM_FAILURE;
             }
             f->add_operator(material);
+            // A further energy summed with the material's, e.g. its volumetric part on an element's own
+            // (reduced) rule: GeneratedNeoHookeanOgden with mu = 0 is lambda/2 (ln J)^2, integrated on 4
+            // points on affine TET10 where the material takes 11 (selective reduced integration).
+            if (has(root, "material_extra")) {
+                auto extra = create_op_from_yaml(fs, root["material_extra"], es);
+                if (!extra) {
+                    fprintf(stderr, "Playground: unable to create material_extra\n");
+                    return SFEM_FAILURE;
+                }
+                f->add_operator(extra);
+            }
 
             auto loads = child(root, "loads");
             if (has(loads, "body_force")) {
