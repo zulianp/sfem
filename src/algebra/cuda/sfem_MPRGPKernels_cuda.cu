@@ -548,7 +548,12 @@ namespace sfem {
                 SFEM_TRACE_SCOPE("MPRGPRunGraph::build");
                 stream = static_cast<cudaStream_t>(r.stream);
                 SFEM_CUDA_CHECK(cudaMallocHost(&host, 4 * sizeof(T)));
-#if defined(SFEM_ENABLE_HIP)
+#if defined(__HIP_PLATFORM_SPIRV__)
+                // chipStar does not capture the per-thread default stream, the solver's
+                // (base/hip/sfem_gpu_runtime_spirv.hpp), and a graph of its would only replay the
+                // calls: cg_run issues the iteration's launches themselves.
+                return true;
+#elif defined(SFEM_ENABLE_HIP)
                 SFEM_CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeThreadLocal));
                 iteration(r);
                 run_decide_kernel<T><<<1, 1, 0, stream>>>(r.control, r.work + LOOP, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
@@ -577,6 +582,7 @@ namespace sfem {
                 // said once.
                 const cudaError_t ended = cudaStreamEndCapture(stream, &captured);
 #endif
+#if !defined(__HIP_PLATFORM_SPIRV__)
                 const cudaError_t instantiated = ended == cudaSuccess && captured ? cudaGraphInstantiate(&exec, graph, 0) : ended;
                 if (instantiated != cudaSuccess || !captured) {
                     static bool said = false;
@@ -589,6 +595,7 @@ namespace sfem {
                     return false;
                 }
                 return true;
+#endif
             }
         };
 
@@ -605,7 +612,15 @@ namespace sfem {
 
             T* const loop = r.work + LOOP;
             run_start_kernel<T><<<1, 1, 0, run->stream>>>(loop, T(iterations));
-#if defined(SFEM_ENABLE_HIP)
+#if defined(__HIP_PLATFORM_SPIRV__)
+            // The iteration while the run goes on, as HIP's graph below: its state read back after each.
+            do {
+                run->iteration(r);
+                run_decide_kernel<T><<<1, 1, 0, run->stream>>>(r.control, loop, r.gamma, r.atol, r.rtol, r.norm_gp0, r.max_it);
+                SFEM_CUDA_CHECK(cudaMemcpyAsync(run->host, loop, 4 * sizeof(T), cudaMemcpyDeviceToHost, run->stream));
+                SFEM_CUDA_CHECK(cudaStreamSynchronize(run->stream));
+            } while (run->host[2] == T(0));
+#elif defined(SFEM_ENABLE_HIP)
             // The iteration graph while the run goes on: its state read back after each.
             do {
                 SFEM_CUDA_CHECK(cudaGraphLaunch(run->exec, run->stream));

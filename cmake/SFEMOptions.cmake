@@ -13,7 +13,8 @@ option(SFEM_ENABLE_CUDA "Enable CUDA support" OFF)
 option(SFEM_ENABLE_CUDA_LINEINFO "Enable cuda line info for profiling" OFF)
 # With SFEM_ENABLE_CUDA=ON, which turns the device path on, SFEM_ENABLE_HIP=ON compiles the same
 # device sources with HIP instead of CUDA, for AMD GPUs (base/hip/sfem_gpu_runtime.hpp). gfx942 is
-# MI300A. smesh, SCCD, SSDF and sresample follow.
+# MI300A. smesh, SCCD, SSDF and sresample follow. With -DCMAKE_HIP_PLATFORM=spirv (CMake 4.3 or later)
+# the HIP compiler is chipStar's, for Intel GPUs (Aurora), and SFEM_HIP_ARCHITECTURES is not used.
 option(SFEM_ENABLE_HIP "Build the device path with HIP, for AMD GPUs" OFF)
 set(SFEM_HIP_ARCHITECTURES "gfx942" CACHE STRING "HIP (AMD GPU) architectures to build for")
 # The vendor libraries' sparse products and BLAS (hipSPARSE and hipBLAS under HIP) instead of SFEM's

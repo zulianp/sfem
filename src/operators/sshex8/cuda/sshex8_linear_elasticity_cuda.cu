@@ -1488,7 +1488,7 @@ int cu_affine_sshex8_linear_elasticity_apply_tensor_product_opt_tpl(
 }
 #endif  // !SFEM_ENABLE_HIP
 
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
 // The level-8 apply on AMD's FP64 matrix cores (v_mfma_f64_16x16x4f64, gfx90a and later): a block of
 // four wavefronts per macro element. Its 512 micro elements share one 24x24 element matrix K (affine),
 // so the apply is the GEMM Y = U K^T, U the 512 x 24 gathered displacements (a row per micro element,
@@ -2203,20 +2203,27 @@ static int cu_sshex8_linear_elasticity_level8_kernel() {
     static int kernel = -1;
 
     if (kernel < 0) {
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
         // The TP kernels (4, 6) multiply on NVIDIA's double-precision tensor cores (mma PTX); AMD's
         // FP64 matrix cores take the same GEMM in kernel 7. MI300A, 44^3 macro elements (44 M nodes):
         // 7.66 ms against 15.3 (5, gather), 54.1 (0), 49.6 (2) and 49.5 ms (3).
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 7;
+#elif defined(SFEM_ENABLE_HIP)
+        // chipStar (Intel GPUs) has neither matrix-unit kernel (4 and 6 are mma PTX, 7 AMD's): the
+        // gather kernel, which kernel 7 falls back to on AMD GPUs without matrix cores.
+        int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 5;
 #else
         // GH200, 44^3 macro elements: 6.66 ms against 9.59 (4), 10.9 (5); MaMAL 136 M alternated
         // three times on one node: 16.94-17.36 s against 19.29-19.39 s, the same iterations.
         int SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL = 6;
 #endif
         SFEM_READ_ENV(SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL, atoi);
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
         const bool valid = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL >= 0 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL <= 7 &&
                            SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL != 4 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL != 6;
+#elif defined(SFEM_ENABLE_HIP)
+        const bool valid = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL >= 0 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL <= 5 &&
+                           SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL != 4;
 #else
         const bool valid = SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL >= 0 && SFEM_HEX8_LINEAR_ELASTICITY_LEVEL8_KERNEL <= 6;
 #endif
@@ -2272,7 +2279,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                            stream);
         }
         case 4: {
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
             if (cu_sshex8_linear_elasticity_level4_kernel() == 7 && cu_sshex8_linear_elasticity_mfma_usable<real_t>()) {
                 return cu_affine_sshex8_linear_elasticity_apply_level4_mfma_tpl<real_t>(nelements,
                                                                                        elements,
@@ -2403,7 +2410,7 @@ static int cu_affine_sshex8_linear_elasticity_apply_tpl(const int               
                                                               (real_t *)outz,
                                                               stream);
                 }
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
                 case 7: {
                     if (!cu_sshex8_linear_elasticity_mfma_usable<real_t>()) {
                         return my_kernel_level8_gather<real_t, 8>(nelements,

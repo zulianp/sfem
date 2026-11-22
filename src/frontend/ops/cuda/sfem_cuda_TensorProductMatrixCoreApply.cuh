@@ -106,7 +106,7 @@ namespace sfem {
             det    = J00 * (J11 * J22 - J12 * J21) - J01 * (J10 * J22 - J12 * J20) + J02 * (J10 * J21 - J11 * J20);
         }
 
-#if defined(SFEM_ENABLE_HIP)
+#if defined(SFEM_ENABLE_HIP) && !defined(__HIP_PLATFORM_SPIRV__)
         namespace hip {
             using sfem::tensor_product::MATRIX_CORE_DECLINED;
             using sfem::tensor_product::matrix_core_apply_enabled;
@@ -421,7 +421,7 @@ namespace sfem {
 
         }  // namespace hip
         using hip::matrix_core_apply;
-#else
+#elif !defined(__HIP_PLATFORM_SPIRV__)
         namespace cuda {
             // NVIDIA's FP64 tensor cores, mma.sync m8n8k4 (sm_80 and later). Fragments (PTX ISA): A(i, k)
             // in lane 4 i + k, B(k, j) in lane 4 j + k, D(i, j) in slot j % 2 of lane 4 i + j / 2. A warp
@@ -725,6 +725,27 @@ namespace sfem {
             }
         }  // namespace cuda
         using cuda::matrix_core_apply;
+#else
+        namespace spirv {
+            /// chipStar (Intel GPUs) has no FP64 matrix instruction to program: always declined, and the
+            /// caller launches its own kernel.
+            template <class Basis, class Quadrature, int NS1, int NQ1, int NC, bool ISOPARAMETRIC, class P, typename g_t>
+            int matrix_core_apply(const ptrdiff_t,
+                                  idx_t **const,
+                                  const MatrixCoreAffineGeometry<g_t> &,
+                                  const g_t *const *const,
+                                  const MatrixCoreParameters<P::n_parameters> &,
+                                  const ptrdiff_t,
+                                  const double *const *const,
+                                  const ptrdiff_t,
+                                  const double *const *const,
+                                  const ptrdiff_t,
+                                  double *const *const,
+                                  cudaStream_t) {
+                return MATRIX_CORE_DECLINED;
+            }
+        }  // namespace spirv
+        using spirv::matrix_core_apply;
 #endif
     }  // namespace tensor_product
 }  // namespace sfem

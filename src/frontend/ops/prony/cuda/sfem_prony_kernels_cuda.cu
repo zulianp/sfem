@@ -746,6 +746,7 @@ namespace sfem {
         return ret;
     }
 
+#if !defined(__HIP_PLATFORM_SPIRV__)
     namespace {
         /// The pool of a call's work buffers, apart from the default pool where the packed
         /// store's code areas live from one step to the next: emptied after every call, so it is
@@ -764,13 +765,22 @@ namespace sfem {
             return pools[device];
         }
     }  // namespace
+#endif
 
     void *cu_prony_pool_allocate(const std::size_t bytes, void *const stream, const bool persistent) {
         const cudaStream_t s    = (cudaStream_t)stream;
         void              *data = nullptr;
         // A zero-sized request still yields a distinct pointer to release.
         const std::size_t n  = bytes > 0 ? bytes : 1;
+#if defined(__HIP_PLATFORM_SPIRV__)
+        // chipStar (HIP on SPIR-V, Intel GPUs) implements no memory pools: a call's work buffers come
+        // from the stream-ordered allocator like the persistent ones, their peak is not tracked, and
+        // there is no pool to trim.
+        (void)persistent;
+        const cudaError_t ok = cudaMallocAsync(&data, n, s);
+#else
         const cudaError_t ok = persistent ? cudaMallocAsync(&data, n, s) : cudaMallocFromPoolAsync(&data, n, work_pool(), s);
+#endif
         if (ok != cudaSuccess || cudaMemsetAsync(data, 0, n, s) != cudaSuccess) {
             SFEM_ERROR("cu_prony_pool_allocate: allocating %zu bytes failed\n", bytes);
         }
@@ -780,9 +790,13 @@ namespace sfem {
     void cu_prony_pool_release(void *const data, void *const stream) { cudaFreeAsync(data, (cudaStream_t)stream); }
 
     std::size_t cu_prony_work_pool_peak() {
+#if defined(__HIP_PLATFORM_SPIRV__)
+        return 0;
+#else
         cuuint64_t high = 0;
         if (cudaMemPoolGetAttribute(work_pool(), cudaMemPoolAttrUsedMemHigh, &high) != cudaSuccess) return 0;
         return (std::size_t)high;
+#endif
     }
 
     void cu_prony_stream_synchronize(void *const stream) {
@@ -790,7 +804,11 @@ namespace sfem {
     }
 
     void cu_prony_pool_trim(void *const stream) {
+#if defined(__HIP_PLATFORM_SPIRV__)
+        if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess) {
+#else
         if (cudaStreamSynchronize((cudaStream_t)stream) != cudaSuccess || cudaMemPoolTrimTo(work_pool(), 0) != cudaSuccess) {
+#endif
             SFEM_ERROR("cu_prony_pool_trim: returning the work pool's memory failed\n");
         }
     }
