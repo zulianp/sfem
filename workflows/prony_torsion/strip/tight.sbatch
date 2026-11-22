@@ -13,7 +13,8 @@
 # iterations), then e_u of the campaign's runs and of these against the tight double run
 # (set strip_tolerance) into P/strip_tolerance_{runs,series}.csv (P: runs/paper_strip; the job stops
 # if they exist). A run whose folder exists is kept. BUILD as campaign.sbatch's.
-#   [MESH=TET10_60] [BUILD=build-x28] [P=runs/paper_strip]
+# STRIP_TAG and EXTRA as campaign.sbatch's.
+#   [MESH=TET10_60] [BUILD=build-x28] [P=runs/paper_strip] [STRIP_TAG=] [EXTRA=]
 set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
@@ -22,7 +23,7 @@ MESH=${MESH:-TET10_60}
 B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}
 src=$MESH; extra=""
 [ $MESH = TET10_60 ] && { src=TET4_60; extra="--set mesh.promote_to_p2=true"; }
-OUT=$SFEM_RUNS/strip/$MESH
+OUT=$SFEM_RUNS/strip${STRIP_TAG:-}/$MESH
 P=${P:-$SFEM_RUNS/paper_strip}
 [ -e $P/strip_tolerance_runs.csv ] && { echo "tight: $P/strip_tolerance_runs.csv exists; give a new P"; exit 1; }
 go() {  # <run> <format>
@@ -32,7 +33,7 @@ go() {  # <run> <format>
   ln -s $SFEM_RUNS/strip/meshes/$src mesh; cp $D/workflows/prony_torsion/cases/epdm_strip_turns.yaml case.yaml
   SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_HOST $B/playground case.yaml --set execution_space=host \
       --set material.relaxation.iso.history_storage=$2 --set solver.newton.atol=1e-9 --set solver.newton.max_it=60 \
-      --set solver.newton.verbose=true $extra > run.log 2>&1
+      --set solver.newton.verbose=true $extra ${EXTRA:-} > run.log 2>&1
   echo "$MESH $1_tight rc=$? failed=$(grep -c 'attempt failed' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }
 go full_a full &
