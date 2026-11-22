@@ -15,12 +15,13 @@
 #   FF200 (the default; ldp_cases/FF200_ExodusMesh, TAG tp9, strokes to 0.18 s): the blocks' elements,
 #     the TET10 mesh's tangent bytes, the transient runs (collect_transient.py) and the torsion rows of
 #     runs/paper_data8; into runs/paper_data_<TAG> (DATA).
-#   LDP24A (ldp_cases/LDP24A_r100, TAG la, strokes to 0.1655 s): the tangent's bytes from both
+#   LDP24A (ldp_cases/LDP24A_r100, TAG la, strokes to T_END, 0.1655 s by default): the tangent's bytes from both
 #     meshes' node graphs, the blocks' elements of the campaign's mesh and of the refined one, and the
 #     strokes' references (collect_transient.py, <out>/strokes); into runs/paper_la (OUT).
 # TAG names the campaign's folders (tangent9_valves.sbatch's PREFIX without _s0/_p2). The output
 # folder is a new one: the job stops if it exists.
-#   [PUMP=FF200|LDP24A] [TAG=<campaign>] [DATA=<folder under runs> | OUT=<path>] [PAPER_PY=xsesfsi_papers/ldp_containment/python]
+#   [PUMP=FF200|LDP24A] [TAG=<campaign>] [T_END=<s>] [DATA=<folder under runs> | OUT=<path>] [PAPER_PY=xsesfsi_papers/ldp_containment/python]
+# T_END (LDP24A): when a run has finished, for a campaign over fewer strokes than four.
 set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
@@ -32,7 +33,7 @@ PUMP=${PUMP:-FF200}
 case $PUMP in
   FF200)  CASE=$LDP_CASES/FF200_ExodusMesh; TAG=${TAG:-tp9}; T_END=0.18
           P=${OUT:-$SFEM_RUNS/${DATA:-paper_data_$TAG}} ;;
-  LDP24A) CASE=$LDP_CASES/LDP24A_r100; TAG=${TAG:-la}; T_END=0.1655
+  LDP24A) CASE=$LDP_CASES/LDP24A_r100; TAG=${TAG:-la}; T_END=${T_END:-0.1655}
           P=${OUT:-$SFEM_RUNS/${DATA:-paper_la}} ;;
   *) echo "collect9: unknown PUMP $PUMP"; exit 1 ;;
 esac
