@@ -41,7 +41,7 @@ Of the jobs named in this section, `kernels.sbatch` and `profile_perf_alps.sbatc
 
 ## Retired 2026-10-09: everything not feeding the paper or verification
 
-`jobs/` now holds only the jobs that produce the paper's data (`wip/paper/data/`, one job per
+`jobs/` now holds only the jobs that produce the paper's data (xsesfsi_papers `packed_format/data/`, one job per
 file prefix), the verification and validation gates, and the two Alps tools `docs/README_alps.md`
 documents; `jobs/README.md` lists them. The 170 jobs below moved here with `git mv`. None
 is called by code: every reference from `src/`, `scripts/` or `python/` is a provenance comment.

@@ -6,15 +6,15 @@ that produce the paper's data, the verification and validation gates, and the tw
 `docs/README_alps.md` documents. Everything else is in `subpar/jobs/`, with what it measured and
 where its answer is recorded.
 
-**Rule.** A job whose output feeds `wip/paper` gets a row in the first table. A job written to
+**Rule.** A job whose output feeds the paper (xsesfsi_papers `packed_format`) gets a row in the first table. A job written to
 answer one question moves to `subpar/jobs/` once its answer is recorded in a perf note, a document
 or the code.
 
-## The paper (`wip/paper`)
+## The paper (xsesfsi_papers `packed_format`, formerly `wip/paper`)
 
-`wip/paper/python/perf_figures.py` reads `wip/paper/data/` by file prefix and takes the newest file
+`packed_format/python/perf_figures.py` (xsesfsi_papers) reads `packed_format/data/` by file prefix and takes the newest file
 for each, so every prefix has exactly one producing job. Copy a job's `.out` (or the campaign CSV)
-into `wip/paper/data/` under its prefix and job id, then `make -C wip/paper figures`.
+into `packed_format/data/` under its prefix and job id, then `make -C packed_format figures`.
 
 | job | data prefix | paper element |
 |---|---|---|

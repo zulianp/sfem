@@ -132,6 +132,9 @@ struct Hex8UGradPackT {
     // node-to-centroid vectors from the element Jacobian the sweep already holds, as the Rhie-Chow
     // pack beside this one does for its edge vector.
     alignas(ALIGN_BYTES) scalar_t g[CVFEM_HEX8_N_NODES][9][cvfem_hex8_vec_size<scalar_t>];
+    // Experimental coefficients belong to one fixed-state benchmark session.
+    const scalar_t *darwish_read{nullptr};
+    scalar_t *darwish_build{nullptr};
     int      limiter{0};
     scalar_t venkat_c{0};
 };
@@ -140,6 +143,7 @@ struct Hex8UGradPackT {
 // keeps working; a single-precision sweep spells Hex8UGradPackT<float> and gets a
 // pack with twice the lanes.
 using Hex8UGradPack = Hex8UGradPackT<scalar_t>;
+#include "kernels/microkernels/hex8/cvfem_darwish_cache_experiment.hpp"
 
 template <typename scalar_t>
 struct Hex8RhieChowPackT {
@@ -2140,7 +2144,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const
 // So the redundancy stays, deliberately. Do not re-derive the fusion from a load count.
 template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false, bool HO = false,
           int LIM = 0,
-          typename scalar_t = ::scalar_t>
+          typename scalar_t = ::scalar_t, DarwishCacheMode Cache = DarwishCacheMode::Off>
 static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(const scalar_t rho,
                                                      const scalar_t                      half,
                                                      const scalar_t                      one,
@@ -2240,6 +2244,20 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
         // the correction, so they are untouched by its derivative too.
         scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
         if constexpr (HO) {
+            if constexpr (Cache == DarwishCacheMode::Read) {
+                constexpr int W = cvfem_hex8_vec_size<scalar_t>;
+                const scalar_t *coef = ho->darwish_read + S * 12 * W;
+                const auto correction = [&](const int c, const scalar_t vi, const scalar_t vj)
+                        __attribute__((always_inline)) {
+                    return coef[(c * 4 + 0) * W + lane] * dmdot +
+                           coef[(c * 4 + 1) * W + lane] * hov->g[I][c * 3 + S / 4][lane] +
+                           coef[(c * 4 + 2) * W + lane] * hov->g[J][c * 3 + S / 4][lane] +
+                           coef[(c * 4 + 3) * W + lane] * (vj - vi);
+                };
+                hx = correction(0, du.ux[I][lane], du.ux[J][lane]);
+                hy = correction(1, du.uy[I][lane], du.uy[J][lane]);
+                hz = correction(2, du.uz[I][lane], du.uz[J][lane]);
+            } else {
             cvfem_hex8_scs_defcor_jv<cvfem_hex8_vec_size<scalar_t>, LIM>(
                     &ho->g[0][0][0], &hov->g[0][0][0],
                     &u.ux[0][0], &u.uy[0][0], &u.uz[0][0],
@@ -2247,6 +2265,31 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
                     S / 4, I, J, mpos, mneg, dpos, dneg,
                     LIM == 2 ? veps2[(S / 4) * cvfem_hex8_vec_size<scalar_t> + lane] : scalar_t(0),
                     isc, /*off=*/lane, hx, hy, hz);
+            }
+            if constexpr (LIM == 3) {
+                if constexpr (Cache == DarwishCacheMode::Build) {
+                    constexpr int W = cvfem_hex8_vec_size<scalar_t>;
+                    scalar_t *coef = ho->darwish_build + S * 12 * W;
+                    const scalar_t *fields[3] = {&u.ux[0][0], &u.uy[0][0], &u.uz[0][0]};
+                    for (int c = 0; c < 3; ++c) {
+                        const scalar_t ui = fields[c][I * W + lane], uj = fields[c][J * W + lane];
+                        const scalar_t ai = ho->g[I][c * 3 + S / 4][lane];
+                        const scalar_t aj = ho->g[J][c * 3 + S / 4][lane];
+                        scalar_t oi, oj, di, dj, bi, bj;
+                        const scalar_t si = isc[(I * 3 + c) * W + lane];
+                        const scalar_t sj = isc[(J * 3 + c) * W + lane];
+                        // Basis directions recover the existing linearization, including its bands.
+                        cvfem_darwish_moukalled_inc_and_d(ui, uj, ai, scalar_t(0), scalar_t(0), scalar_t(1), si, oi, di);
+                        cvfem_darwish_moukalled_inc_and_d(uj, ui, aj, scalar_t(0), scalar_t(0), scalar_t(1), sj, oj, dj);
+                        cvfem_darwish_moukalled_inc_and_d(ui, uj, ai, scalar_t(0), scalar_t(1), scalar_t(0), si, oi, bi);
+                        cvfem_darwish_moukalled_inc_and_d(uj, ui, aj, scalar_t(0), scalar_t(1), scalar_t(0), sj, oj, bj);
+                        coef[(c * 4 + 0) * W + lane] = d_pos * oi + d_neg * oj;
+                        coef[(c * 4 + 1) * W + lane] = mpos * di;
+                        coef[(c * 4 + 2) * W + lane] = mneg * dj;
+                        coef[(c * 4 + 3) * W + lane] = mpos * bi - mneg * bj;
+                    }
+                }
+            }
         }
         out.rx[I][lane] += fx + hx;
         out.ry[I][lane] += fy + hy;
@@ -2557,7 +2600,7 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t           
 }
 
 template <bool RC = false, bool QG = false, bool EPS = false, bool HO = false, int LIM = 0,
-          typename scalar_t = ::scalar_t>
+          typename scalar_t = ::scalar_t, DarwishCacheMode Cache = DarwishCacheMode::Off>
 // FLATTEN, for the reason cvfem_hex8_conv_all_simd carries it: the face kernel's own flatten does
 // not stop this function -- the one that owns the lane loop -- from outlining it. Apple clang had
 // been saying so on every build, 72 times, as "loop not vectorized: the optimizer was unable to
@@ -2588,18 +2631,18 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_jv_simd(con
                                                     const scalar_t *const SFEM_RESTRICT edx = nullptr,
                                                     const scalar_t *const SFEM_RESTRICT edy = nullptr,
                                                     const scalar_t *const SFEM_RESTRICT edz = nullptr) {
-    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
-    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM, scalar_t, Cache>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, veps2, isc, edx, edy, edz);
 }
 
 template <typename scalar_t>
@@ -3020,7 +3063,7 @@ static SFEM_INLINE void cvfem_hex8_action_geom_simd(const scalar_t              
     }
 }
 
-template <typename scalar_t>
+template <typename scalar_t, DarwishCacheMode Cache = DarwishCacheMode::Off>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         const scalar_t                        rho_s,
         const scalar_t                        mu_s,
@@ -3097,7 +3140,8 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
     // The state's increments' rounding scales, for the limiter derivatives' bands.
     alignas(ALIGN_BYTES) scalar_t isc[CVFEM_HEX8_N_NODES * 3 * cvfem_hex8_vec_size<scalar_t>];
     if (ho_on) {
-        cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>, true>(&ho->g[0][0][0], edx, edy, edz, isc);
+        if constexpr (Cache != DarwishCacheMode::Read)
+            cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>, true>(&ho->g[0][0][0], edx, edy, edz, isc);
         cvfem_hex8_defcor_ref_increments<cvfem_hex8_vec_size<scalar_t>>(&hov->g[0][0][0], edx, edy, edz);
         if (ho->limiter == 2)
             cvfem_hex8_defcor_venkat_eps2<cvfem_hex8_vec_size<scalar_t>>(ho->venkat_c, edx, edy, edz, veps2);
@@ -3110,7 +3154,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
 // HO arms instantiate the four values; without the correction there is no limiter to select, so
 // LIM stays 0 and the non-HO instantiation count is unchanged.
 #define CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, HO_, LIM_)                                     \
-    cvfem_hex8_conv_all_jv_simd<RC_, QG_, EPS_, HO_, LIM_>(rho, half, one, Ax0, Ay0, Az0, Ax1,  \
+    cvfem_hex8_conv_all_jv_simd<RC_, QG_, EPS_, HO_, LIM_, scalar_t, Cache>(rho, half, one, Ax0, Ay0, Az0, Ax1,  \
                                                      Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out,   \
                                                      ueps, ho, hov, veps2, isc, edx, edy, edz)
 #define CVFEM_HEX8_CONV_ALL_JV(RC_, QG_, EPS_, HO_)                                             \
@@ -3126,7 +3170,9 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
             }                                                                                   \
         }                                                                                       \
     } while (0)
-    if (rc && rc_scale != scalar_t(0)) {
+    if constexpr (Cache != DarwishCacheMode::Off) {
+        CVFEM_HEX8_CONV_ALL_JV_L(true, true, false, true, 3);
+    } else if (rc && rc_scale != scalar_t(0)) {
         if (has_qg) {
             if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, true, true, true);
                           else       CVFEM_HEX8_CONV_ALL_JV(true, true, true, false); }

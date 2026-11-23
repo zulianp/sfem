@@ -100,7 +100,8 @@ static void run(S out[NN * CVFEM_HEX8_N_FIELDS]) {
             pack_elems, ghost_buf.data(), ghost_idx.data(), ghost_ptr,
             /*max_actual_nodes_per_pack=*/NN, /*n_elements_per_pack=*/NE,
             /*n_ghost_entries=*/1, owned_nodes_ptr, S(1), S(1),
-            rx.data(), ry.data(), rz.data(), rc.data(), packed_scratch_n(NN));
+            rx.data(), ry.data(), rz.data(), rc.data(), packed_scratch_n(NN),
+            /*pgx, pgy, pgz=*/nullptr, nullptr, nullptr, Hex8RcConfigT<S>{}, /*with_rc=*/0);
 
     for (int a = 0; a < NN; ++a) {
         out[a * CVFEM_HEX8_N_FIELDS + 0] = rx[a];

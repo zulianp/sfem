@@ -136,23 +136,32 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const ptrdiff_t *const SF
     const auto *const py    = points[1];
     const auto *const pz    = points[2];
     const ptrdiff_t   owned = owned_nodes_ptr[pack];
+    // Without Rhie-Chow there is no gradient to stage: cvfem_hex8_pack_coords hands out no
+    // gradient arrays (pack_pgx and its siblings are null) and nothing reads them. The affine
+    // sweeps call this only with the term on; the isoparametric ones stage coordinates always,
+    // and storing zeros into the null gradient arrays there crashed every packed isoparametric
+    // run without Rhie-Chow. The loop with the gradient is the one the affine sweeps always ran.
+    if (!with_pg) {
+        fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+        return;
+    }
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         const ptrdiff_t g = owned + k;
         pack_x[k]         = scalar_t(px[g]);
         pack_y[k]         = scalar_t(py[g]);
         pack_z[k]         = scalar_t(pz[g]);
-        pack_pgx[k]       = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[k]       = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[k]       = with_pg ? pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[k]       = pgx[(size_t)g];
+        pack_pgy[k]       = pgy[(size_t)g];
+        pack_pgz[k]       = pgz[(size_t)g];
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         const idx_t g         = ghosts[k];
         pack_x[n_contiguous + k]     = scalar_t(px[g]);
         pack_y[n_contiguous + k]     = scalar_t(py[g]);
         pack_z[n_contiguous + k]     = scalar_t(pz[g]);
-        pack_pgx[n_contiguous + k]   = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[n_contiguous + k]   = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[n_contiguous + k]   = with_pg ? pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[n_contiguous + k]   = pgx[(size_t)g];
+        pack_pgy[n_contiguous + k]   = pgy[(size_t)g];
+        pack_pgz[n_contiguous + k]   = pgz[(size_t)g];
     }
 }
 
@@ -361,7 +370,9 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
                                                        const scalar_t *const SFEM_RESTRICT pack_pgz,
                                                        const ptrdiff_t                     begin,
                                                        const int                           nlanes,
-                                                       Hex8RhieChowPackT<scalar_t>                   &rc) {
+                                                       Hex8RhieChowPackT<scalar_t>                   &rc,
+                                                       const Hex8RcTauT<scalar_t> &tau = {}) {
+    rc.tau = tau;
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -585,7 +596,7 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 // fields arrive STAGED IN THE PACK (ug, vg), filled by the sweep per pack like every other field,
 // so this reads no global array and no standard connectivity. The pack-coloured sweep passes
 // empty packs and with_ho false, so that branch folds away for it.
-template <typename scalar_t, typename idx_t, typename pack_idx_t>
+template <DarwishCacheMode Cache = DarwishCacheMode::Off, typename scalar_t, typename idx_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
         const Hex8PackExtentT<idx_t>              &x,
         const Hex8PackCoordsT<scalar_t>           &pk,
@@ -610,7 +621,7 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
         // The limiter and its coefficient, read by the higher-order correction. They travel in
         // the gradient pack, which is where the element kernel looks for them.
         const int                                  limiter,
-        const scalar_t                             venkat_c) {
+        const scalar_t                             venkat_c, DarwishCacheExperiment<scalar_t> *cache = nullptr) {
     Hex8InputPackT<scalar_t>    u_pack;
     Hex8InputPackT<scalar_t>    du_pack;
     Hex8ResidualPackT<scalar_t> outp;
@@ -654,11 +665,14 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
             }
             if (with_qg)
                 cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
+            if constexpr (Cache == DarwishCacheMode::Read) hop.darwish_read = cache->read(begin);
+            if constexpr (Cache == DarwishCacheMode::Build) hop.darwish_build = cache->build(begin);
             if (with_ho) {
-                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
+                if constexpr (Cache != DarwishCacheMode::Read)
+                    cvfem_hex8_gather_ugrad_from_pack(pack_elems, ug.g, begin, nlanes, hop);
                 cvfem_hex8_gather_ugrad_from_pack(pack_elems, vg.g, begin, nlanes, hovp);
             }
-            cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
+            cvfem_hex8_ns_upwind_jacobian_action_simd<scalar_t, Cache>(rho,
                                                       mu,
                                                       cof0,
                                                       cof1,
@@ -679,15 +693,13 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_affine(
                                                       scalar_t(0),
                                                       with_ho ? &hop : nullptr,
                                                       with_ho ? &hovp : nullptr);
+            if constexpr (Cache == DarwishCacheMode::Build) cache->mark_built(begin);
             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
         }
 }
 
 
-// ONE PACK'S LANE LOOP FOR THE JACOBIAN ACTION, ISOPARAMETRIC. The Jacobian comes per
-// sub-control surface from the coordinates the pack staged, so this takes no adjugate table and
-// no Rhie-Chow -- the isoparametric SIMD kernel carries no such term, which is why the driver
-// refuses --rhie-chow on this geometry for a pack-based layout.
+// Isoparametric actions use staged coordinates and optional RC gradients.
 template <typename scalar_t, typename idx_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
         const Hex8PackExtentT<idx_t>       &x,
@@ -697,11 +709,17 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
         const scalar_t *const SFEM_RESTRICT pack_dir,
         scalar_t *const SFEM_RESTRICT       pack_out,
         const scalar_t                      rho,
-        const scalar_t                      mu) {
+        const scalar_t                      mu,
+        const Hex8PackQGradT<scalar_t> *qg = nullptr,
+        const Hex8RcConfigT<scalar_t> *rc_cfg = nullptr,
+        const bool with_rc = false, const bool with_qg = false,
+        const scalar_t *ugrad = nullptr, const scalar_t *vgrad = nullptr) {
     Hex8InputPackT<scalar_t>    u_pack;
     Hex8InputPackT<scalar_t>    du_pack;
     Hex8ResidualPackT<scalar_t> outp;
     Hex8CoordPackT<scalar_t>    xyz;
+    Hex8RhieChowPackT<scalar_t> rcp;
+    Hex8UGradPackT<scalar_t> ho, hv;
         for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
             const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
             gather_hex8_isoparam_action_simd_from_pack(pack_elems,
@@ -715,7 +733,17 @@ static SFEM_INLINE void cvfem_hex8_action_lanes_isoparam(
                                                        u_pack,
                                                        du_pack,
                                                        xyz);
-            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack, outp);
+            if (with_rc) cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
+                begin, nlanes, rcp, rc_cfg->tau);
+            if (with_qg) cvfem_hex8_gather_qg_from_pack(pack_elems, qg->x, qg->y, qg->z,
+                begin, nlanes, rcp);
+            if (ugrad && vgrad) {
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, ugrad, begin, nlanes, ho);
+                cvfem_hex8_gather_ugrad_from_pack(pack_elems, vgrad, begin, nlanes, hv);
+            }
+            cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack,
+                outp, scalar_t(0), with_rc ? &rcp : nullptr,
+                with_rc ? rc_cfg->scale : scalar_t(0), with_qg, ugrad ? &ho : nullptr, vgrad ? &hv : nullptr);
             scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
         }
 }
