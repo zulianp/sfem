@@ -1,8 +1,10 @@
 // NewtonSolver: one step for a linear problem, quadratic convergence for a nonlinear one, and
 // stopping as soon as it knows it is failing.
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #include "sfem_API.hpp"
@@ -123,21 +125,56 @@ namespace {
 
         int solve(const real_t *const, const real_t *const r, real_t *const dx) override {
             for (ptrdiff_t i = 0; i < ndofs_; ++i) dx[i] = direction * r[i];
+            carried.push_back(carries_increment);
             return SFEM_SUCCESS;
         }
+
+        void set_carries_increment(const bool on) override { carries_increment = on; }
+
+        std::shared_ptr<sfem::Merit> merit() override { return own_merit; }
 
         int iterations() const override { return 0; }
 
         bool tangent_projection_supported() const override { return true; }
         void set_tangent_projection(const bool on) override { projected = on; }
 
-        std::vector<real_t> measures;
-        real_t              direction{0};
-        bool                projected{false};
+        std::vector<real_t>          measures;
+        real_t                       direction{0};
+        bool                         projected{false};
+        bool                         carries_increment{false};
+        // Whether each solve carried the increment, in order.
+        std::vector<int>             carried;
+        // Null: the function's merit.
+        std::shared_ptr<sfem::Merit> own_merit;
 
     private:
         ptrdiff_t ndofs_;
         size_t    calls_{0};
+    };
+
+    // A merit whose values are scripted: `values` at each iterate Newton measures it at, `trials`
+    // at each step the line search tries, in order (the last repeated); its slope -1 along every
+    // direction.
+    class ScriptedMerit final : public sfem::Merit {
+    public:
+        const char *name() const override { return "scripted"; }
+
+        int evaluate(const real_t *const, const real_t *const, const int nsteps, const real_t *const, real_t *const out) override {
+            for (int i = 0; i < nsteps; ++i) out[i] = trials[std::min(trial_++, trials.size() - 1)];
+            return SFEM_SUCCESS;
+        }
+
+        real_t at(const real_t *const, const real_t *const) override { return values[std::min(value_++, values.size() - 1)]; }
+
+        real_t slope(const real_t *const, const real_t *const, const real_t *const, const real_t) override { return -1; }
+
+        bool batched() const override { return false; }
+
+        std::vector<real_t> values, trials;
+
+    private:
+        size_t value_{0};
+        size_t trial_{0};
     };
 
     sfem::NonlinearReport run(sfem::test::CubeProblem &p, const std::shared_ptr<ScriptedStep> &step, sfem::NewtonOptions options) {
@@ -260,11 +297,12 @@ int test_projects_below_alpha() {
 
         sfem::NewtonSolver  newton(p.f, step, options);
         std::vector<real_t> measures, alphas;
-        std::vector<int>    projected;
+        std::vector<int>    projected, discarded;
         newton.add_monitor([&](const sfem::NewtonIteration &it) {
             measures.push_back(it.measure.value);
             alphas.push_back(it.line_search.alpha);
             projected.push_back(it.projected);
+            discarded.push_back(it.discarded);
         });
         auto report = newton.solve(sfem::StepContext(), p.x->data());
         printf("  tangent_projection %s, project_below_alpha %g: %s after %d iterations, %d projections\n",
@@ -286,6 +324,7 @@ int test_projects_below_alpha() {
             SFEM_TEST_ASSERT(step->projected);
             SFEM_TEST_ASSERT(measures[1] == measures[0]);
             SFEM_TEST_ASSERT(alphas[1] == 0);
+            SFEM_TEST_ASSERT(discarded[1] && !discarded[2] && !discarded[3]);
             SFEM_TEST_ASSERT(!projected[1] && projected[2] && projected[3]);
             SFEM_TEST_ASSERT(alphas[2] == real_t(0.25) && alphas[3] == real_t(0.25));
             SFEM_TEST_ASSERT(measures[2] < measures[1]);
@@ -295,9 +334,134 @@ int test_projects_below_alpha() {
             SFEM_TEST_ASSERT(!step->projected);
             for (int k = 1; k < 4; ++k) {
                 SFEM_TEST_ASSERT(alphas[k] == real_t(0.25));
-                SFEM_TEST_ASSERT(!projected[k]);
+                SFEM_TEST_ASSERT(!projected[k] && !discarded[k]);
                 SFEM_TEST_ASSERT(measures[k] < measures[k - 1]);
             }
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// project_below_alpha with fixed_iterations: a step shortened below the fraction on the last
+// iteration is taken, no iteration being left to repeat it projected; with max_it a cap instead,
+// it is discarded as on any other iteration. One iteration, a quarter of the direction.
+int test_below_alpha_last_fixed_iteration() {
+    for (const bool fixed : {true, false}) {
+        auto p          = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+        auto step       = std::make_shared<ScriptedStep>(p.fs->n_dofs());
+        step->direction = -1e-3;
+        sfem::NewtonOptions options;
+        options.tangent_projection  = sfem::TangentProjection::ON_FAILURE;
+        options.line_search.steps   = {real_t(0.25)};
+        options.project_below_alpha = real_t(0.5);
+        options.max_it              = 1;
+        options.fixed_iterations    = fixed;
+
+        sfem::NewtonSolver  newton(p.f, step, options);
+        std::vector<real_t> measures, alphas;
+        std::vector<int>    discarded;
+        newton.add_monitor([&](const sfem::NewtonIteration &it) {
+            measures.push_back(it.measure.value);
+            alphas.push_back(it.line_search.alpha);
+            discarded.push_back(it.discarded);
+        });
+        auto report = newton.solve(sfem::StepContext(), p.x->data());
+        printf("  fixed_iterations %d: %s after %d iterations, %d projections\n",
+               fixed,
+               sfem::to_string(report.status),
+               report.iterations,
+               report.projections);
+
+        SFEM_TEST_ASSERT(report.iterations == 1);
+        SFEM_TEST_ASSERT(measures.size() == 2);
+        if (fixed) {
+            SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::ITERATIONS_DONE);
+            SFEM_TEST_ASSERT(report.projections == 0);
+            SFEM_TEST_ASSERT(!step->projected);
+            SFEM_TEST_ASSERT(alphas[1] == real_t(0.25) && !discarded[1]);
+            SFEM_TEST_ASSERT(measures[1] < measures[0]);
+        } else {
+            SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::MAX_IT);
+            SFEM_TEST_ASSERT(report.projections == 1);
+            SFEM_TEST_ASSERT(alphas[1] == 0 && discarded[1]);
+            SFEM_TEST_ASSERT(measures[1] == measures[0]);
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
+// The iteration repeated after a discarded step (project_below_alpha) does not push its iterate's
+// merit into the nonmonotone window again: a second copy would push out the older, larger merit
+// that the repeated iteration's step needs as its reference. A scripted merit, a window of two,
+// the steps 1 and 1/4:
+//  - from 10, the full step to 5 is accepted;
+//  - from 5, only 1/4 decreases it (to 4.9): below 1/2, discarded, the iteration repeated;
+//  - from 5 again, the projected direction raises it (7 and 6), within Armijo of 10, the
+//    window's largest: a nonmonotone full step. With 5 in the window twice, 10 is out of it, and
+//    the line search finds no decrease.
+int test_discarded_step_keeps_window() {
+    auto p          = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+    auto step       = std::make_shared<ScriptedStep>(p.fs->n_dofs());
+    auto merit      = std::make_shared<ScriptedMerit>();
+    merit->values   = {10, 5, 5};
+    merit->trials   = {5, 6, real_t(4.9), 7, 6};
+    step->own_merit = merit;
+    sfem::NewtonOptions options;
+    options.tangent_projection         = sfem::TangentProjection::ON_FAILURE;
+    options.line_search.steps          = {1, real_t(0.25)};
+    options.line_search.nonmonotone    = 2;
+    options.project_below_alpha        = real_t(0.5);
+    options.max_it                     = 3;
+
+    sfem::NewtonSolver                          newton(p.f, step, options);
+    std::vector<sfem::LineSearchResult::Status> statuses;
+    std::vector<real_t>                         alphas;
+    std::vector<int>                            discarded;
+    newton.add_monitor([&](const sfem::NewtonIteration &it) {
+        statuses.push_back(it.line_search.status);
+        alphas.push_back(it.line_search.alpha);
+        discarded.push_back(it.discarded);
+    });
+    auto report = newton.solve(sfem::StepContext(), p.x->data());
+    printf("  %s after %d iterations, %d projections\n", sfem::to_string(report.status), report.iterations, report.projections);
+
+    SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::MAX_IT);
+    SFEM_TEST_ASSERT(report.iterations == 3);
+    SFEM_TEST_ASSERT(report.projections == 1);
+    SFEM_TEST_ASSERT(statuses.size() == 4);
+    SFEM_TEST_ASSERT(statuses[1] == sfem::LineSearchResult::Status::ACCEPTED && alphas[1] == 1);
+    SFEM_TEST_ASSERT(discarded[2] && alphas[2] == 0);
+    SFEM_TEST_ASSERT(statuses[3] == sfem::LineSearchResult::Status::NONMONOTONE && alphas[3] == 1 && !discarded[3]);
+    return SFEM_TEST_SUCCESS;
+}
+
+// The correction that carries a prescribed boundary increment is solved with the step told so
+// (LinearizedStep::set_carries_increment), and Newton's iterations after it without: the cube
+// from rest, its stretch prescribed, two fixed iterations after the increment. From the stretched
+// state there is no increment, and no solve carries one.
+int test_increment_announced() {
+    for (const bool from_rest : {true, false}) {
+        auto p = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+        if (from_rest) std::fill(p.x->data(), p.x->data() + p.fs->n_dofs(), real_t(0));
+        auto step      = std::make_shared<ScriptedStep>(p.fs->n_dofs());
+        step->measures = {1};
+        sfem::NewtonOptions options;
+        options.line_search.enabled = false;
+        options.fixed_iterations    = true;
+        options.max_it              = 2;
+        auto report                 = run(p, step, options);
+        printf("  from %s: %s, solves carrying the increment:", from_rest ? "rest" : "the stretch", sfem::to_string(report.status));
+        for (const int c : step->carried) printf(" %d", c);
+        printf("\n");
+
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::ITERATIONS_DONE);
+        SFEM_TEST_ASSERT(!step->carries_increment);
+        if (from_rest) {
+            SFEM_TEST_ASSERT(step->carried.size() == 3);
+            SFEM_TEST_ASSERT(step->carried[0] && !step->carried[1] && !step->carried[2]);
+        } else {
+            SFEM_TEST_ASSERT(step->carried.size() == 2);
+            SFEM_TEST_ASSERT(!step->carried[0] && !step->carried[1]);
         }
     }
     return SFEM_TEST_SUCCESS;
@@ -310,6 +474,9 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_fails_fast);
     SFEM_RUN_TEST(test_cg_stops_on_negative_curvature);
     SFEM_RUN_TEST(test_projects_below_alpha);
+    SFEM_RUN_TEST(test_below_alpha_last_fixed_iteration);
+    SFEM_RUN_TEST(test_discarded_step_keeps_window);
+    SFEM_RUN_TEST(test_increment_announced);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

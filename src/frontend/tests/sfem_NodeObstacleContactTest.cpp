@@ -494,7 +494,7 @@ int test_union_device_matches_host() {
 // NodeObstacleStep with qp_capped_projects and Newton managing the projection (tangent_projection:
 // on_failure): a QP that max_it stopped on the tangent itself reports negative curvature, for
 // Newton to repeat the iteration projected, and returns without its fallbacks; one that carries
-// the boundary's increment (dx nonzero on the constrained dofs), which Newton takes whole, falls
+// the boundary's increment (set_carries_increment, dx nonzero on the constrained dofs), which Newton takes whole, falls
 // back (the curvature capped) as without the option. With qp_accept_capped too, capped_projects
 // comes first, and on the projected tangent the capped QP is the step. The cube of the Newton
 // tests, stretched along x, above the half-space z < -0.1, its QP capped at one iteration.
@@ -535,7 +535,9 @@ int test_capped_qp_projects() {
         SFEM_TEST_ASSERT(step->linearize(p.x->data(), r->data()) == SFEM_SUCCESS);
         std::fill(dx->data(), dx->data() + n, real_t(0));
         if (c[2]) p.f->set_value_to_constrained_dofs(real_t(0.01), dx->data());
+        step->set_carries_increment(c[2]);
         const int status = step->solve(p.x->data(), r->data(), dx->data());
+        step->set_carries_increment(false);
         printf("  capped_projects %d, accept_capped %d, increment %d, projected %d: negative curvature %d, curvature capped %d\n",
                c[0], c[1], c[2], c[3], step->met_negative_curvature(), step->capped_curvature());
         SFEM_TEST_ASSERT(status != SFEM_SUCCESS);

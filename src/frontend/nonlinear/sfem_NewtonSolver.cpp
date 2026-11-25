@@ -196,6 +196,7 @@ namespace sfem {
                 }
                 log.tolerance = tol;
                 impl.notify(log);
+                log.discarded = false;
 
                 if (!std::isfinite(log.measure.value)) return NonlinearReport::Status::NON_FINITE;
                 if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::Status::CONVERGED;
@@ -254,16 +255,19 @@ namespace sfem {
                     case LineSearchResult::Status::BEST_DECREASE:
                     case LineSearchResult::Status::NONMONOTONE:
                         if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected &&
-                            log.line_search.alpha < opts.project_below_alpha) {
+                            log.line_search.alpha < opts.project_below_alpha && !(opts.fixed_iterations && it + 1 == opts.max_it)) {
                             // A direction the merit decreases along only for a tiny step: the
                             // tangent is indefinite here, as for no decrease at all. The step is
-                            // not taken: the next iterate's monitor shows x where it was.
+                            // not taken: the next iterate's monitor shows x where it was, the step
+                            // discarded. On the last of fixed iterations no iteration is left to
+                            // repeat, and the short step is taken.
                             projected             = true;
                             ++report.projections;
                             impl.step->set_tangent_projection(true);
                             known                 = false;
                             repeated              = true;
                             log.line_search.alpha = 0;
+                            log.discarded         = true;
                             continue;
                         }
                         break;
@@ -363,7 +367,9 @@ namespace sfem {
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::step");
                 impl.blas->zaxpby(ndofs, s, increment, 0, increment, dx);
+                impl.step->set_carries_increment(true);
                 log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
+                impl.step->set_carries_increment(false);
             }
             if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) {
                 report.status = NonlinearReport::Status::STEP_FAILED;
@@ -384,6 +390,7 @@ namespace sfem {
             log.line_search        = LineSearchResult();
             log.line_search.status = LineSearchResult::Status::ACCEPTED;
             log.line_search.alpha  = 1;
+            log.discarded          = false;
 
             const auto status = iterate(linear && !log.linear_capped);
             if (status == NonlinearReport::Status::CONVERGED || status == NonlinearReport::Status::CONVERGED_AT_RESOLUTION ||

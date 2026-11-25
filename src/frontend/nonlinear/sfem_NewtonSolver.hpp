@@ -53,7 +53,8 @@ namespace sfem {
         /// failure of the tangent itself, the iteration repeated on the projected one. On an
         /// indefinite tangent the direction can stay a descent direction for the merit only
         /// barely, and Newton then creeps on with tiny steps instead of failing. 0: only a
-        /// direction without decrease (or negative curvature) projects.
+        /// direction without decrease (or negative curvature) projects. On the last of
+        /// fixed_iterations the short step is taken: no iteration is left to repeat.
         real_t project_below_alpha{0};
     };
 
@@ -67,6 +68,9 @@ namespace sfem {
         bool                     linear_capped{false};
         /// The direction was computed on the projected tangent.
         bool                     projected{false};
+        /// The step was not taken (project_below_alpha): the iterate is the one before it, and the
+        /// iteration is repeated on the projected tangent. line_search.alpha is 0.
+        bool                     discarded{false};
         LineSearchResult         line_search;
         const real_t            *x{nullptr};
         const real_t            *residual{nullptr};

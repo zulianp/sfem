@@ -74,6 +74,8 @@ namespace sfem {
         bool                                 projection_managed{false};
         bool                                 tangent_projected{false};
         bool                                 negative_curvature{false};
+        // The solve carries the boundary's increment (set_carries_increment).
+        bool                                 carries_increment{false};
         // The last solve's fallbacks: solved again with the curvature capped, and the fraction of
         // its diagonal the tangent was last shifted by (0: not shifted).
         bool                                 capped_curvature{false};
@@ -350,13 +352,13 @@ namespace sfem {
         // end: negative curvature that no conjugate direction met.
         impl.negative_curvature = impl.qp->met_negative_curvature() || impl.qp->met_divergence();
         if (!impl.negative_curvature && capped && impl.options.qp_capped_projects && impl.projection_managed &&
-            !impl.tangent_projected) {
+            !impl.tangent_projected && !impl.carries_increment) {
             // So does one that max_it stopped on the tangent itself (qp_capped_projects), but not
-            // a step that carries the boundary's increment (dx arrived nonzero): Newton takes that
-            // one whole, with no line search to judge it and no iteration to repeat, so it keeps
-            // the fallbacks below. Every rank stops the QP at the same iteration, and the norm is
-            // global: every rank takes the same branch.
-            impl.negative_curvature = !(impl.reductions->norm2(impl.lift->data()) > 0);
+            // a step that carries the boundary's increment (set_carries_increment): Newton takes
+            // that one whole, with no line search to judge it and no iteration to repeat, so it
+            // keeps the fallbacks below. Every rank stops the QP at the same iteration, and Newton
+            // sets the flag on every rank: every rank takes the same branch.
+            impl.negative_curvature = true;
         }
         if (status != SFEM_SUCCESS && impl.negative_curvature && impl.projection_managed && !impl.tangent_projected) {
             // The material's tangent is indefinite here: Newton repeats the iteration on the
@@ -427,6 +429,8 @@ namespace sfem {
         const bool  stored = format == op_type::INEXACT && impl_->f->inexact_stores_every_tangent();
         return (format == op_type::BSR || stored) && impl_->f->tangent_projection_supported();
     }
+
+    void NodeObstacleStep::set_carries_increment(const bool on) { impl_->carries_increment = on; }
 
     void NodeObstacleStep::set_tangent_projection(const bool on) {
         impl_->projection_managed = true;

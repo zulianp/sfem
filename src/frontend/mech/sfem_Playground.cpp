@@ -1212,6 +1212,8 @@ namespace sfem {
                                    (double)it.measure.value,
                                    (double)it.tolerance);
                     } else {
+                        // A step discarded below project_below_alpha reads ", discarded, projected": the
+                        // iteration is repeated projected, and a grep for " projected," counts it.
                         log_printf(LOG_SOLID,
                                    LOG_VERBOSE,
                                    LOG_PROGRESS,
@@ -1220,9 +1222,9 @@ namespace sfem {
                                    (double)it.measure.value,
                                    it.linear_iterations,
                                    it.linear_capped ? " (max iterations)" : "",
-                                   it.projected ? " projected" : "",
+                                   it.discarded ? ", discarded, projected" : it.projected ? " projected" : "",
                                    (double)it.line_search.alpha,
-                                   to_string(it.line_search.status));
+                                   it.discarded ? "below project_below_alpha" : to_string(it.line_search.status));
                     }
                 });
             }
