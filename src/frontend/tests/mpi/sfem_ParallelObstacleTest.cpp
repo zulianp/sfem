@@ -67,12 +67,14 @@ output: {probes: [{type: contact}]}
     }
 
     // max over owned nodes of |u_distributed - u_serial| against max |u_serial|, over all ranks;
-    // the Newton iterations of both solves, all steps, in `iterations`. `distributed_only` applies
-    // to the distributed solve alone (e.g. its execution space).
+    // the Newton iterations of both solves, all steps, in `iterations`, and those on the projected
+    // tangent in `projected` (when given). `distributed_only` applies to the distributed solve
+    // alone (e.g. its execution space).
     int compare(const std::vector<std::string> &overrides,
                 real_t *const                   relative,
                 int                             iterations[2],
-                const std::vector<std::string> &distributed_only = {}) {
+                const std::vector<std::string> &distributed_only = {},
+                int *const                      projected        = nullptr) {
         auto world  = sfem::Communicator::world();
         auto serial = assemble(sfem::Communicator::self(), overrides);
         auto both   = overrides;
@@ -82,6 +84,11 @@ output: {probes: [{type: contact}]}
         iterations[0] = iterations[1] = 0;
         serial->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[0] += it.iteration > 0; });
         dist->newton().add_monitor([&](const sfem::NewtonIteration &it) { iterations[1] += it.iteration > 0; });
+        if (projected) {
+            projected[0] = projected[1] = 0;
+            serial->newton().add_monitor([&](const sfem::NewtonIteration &it) { projected[0] += it.iteration > 0 && it.projected; });
+            dist->newton().add_monitor([&](const sfem::NewtonIteration &it) { projected[1] += it.iteration > 0 && it.projected; });
+        }
         // Every rank reaches every collective below: a failure on one rank is reported by all.
         const char *failed = nullptr;
         if (serial->run() != SFEM_SUCCESS) failed = "the serial run";
@@ -149,6 +156,40 @@ int test_release_matches_serial() {
     }
     SFEM_TEST_ASSERT(relative < 1e-8);
     SFEM_TEST_ASSERT(its[0] == its[1]);
+    return SFEM_TEST_SUCCESS;
+}
+
+// obstacle.qp.capped_projects with tangent_projection: on_failure: the QP, capped at three
+// iterations on the tangent itself, counts as negative curvature on every rank alike, and Newton
+// repeats the iteration on the projected tangent, as on one rank. The utopia scheme's box, in
+// GeneratedMooneyRivlinProny (whose tangent can be projected; its history needs a time step: one
+// quasi-static step).
+int test_capped_qp_projects_matches_serial() {
+    real_t relative     = 1;
+    int    its[2]       = {0, 0};
+    int    projected[2] = {0, 0};
+    SFEM_TEST_ASSERT(compare({"material={type: GeneratedMooneyRivlinProny, C10: 1, C01: 0.5, K: 20}",
+                              "regime=quasi_static",
+                              "time={dt: 1, t_end: 1}",
+                              "solver.newton.tangent_projection=on_failure",
+                              "obstacle.qp={max_it: 3, capped_projects: true}"},
+                             &relative,
+                             its,
+                             {},
+                             projected) == SFEM_SUCCESS);
+    if (sfem::Communicator::world()->rank() == 0) {
+        printf("  capped_projects: %d ranks against one, %.3g relative, %d and %d Newton, %d and %d projected\n",
+               sfem::Communicator::world()->size(),
+               (double)relative,
+               its[1],
+               its[0],
+               projected[1],
+               projected[0]);
+    }
+    SFEM_TEST_ASSERT(relative < 1e-8);
+    SFEM_TEST_ASSERT(its[0] == its[1]);
+    SFEM_TEST_ASSERT(projected[0] > 0);
+    SFEM_TEST_ASSERT(projected[0] == projected[1]);
     return SFEM_TEST_SUCCESS;
 }
 
@@ -494,6 +535,7 @@ int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_utopia_scheme_matches_serial);
     SFEM_RUN_TEST(test_release_matches_serial);
+    SFEM_RUN_TEST(test_capped_qp_projects_matches_serial);
     SFEM_RUN_TEST(test_inexact_matches_serial);
     SFEM_RUN_TEST(test_block_read_and_output_match_serial);
     SFEM_RUN_TEST(test_strokes_match_serial);

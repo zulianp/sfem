@@ -182,6 +182,9 @@ namespace sfem {
         // there). `solved`: the step that led to x solved a linear problem.
         auto iterate = [&](bool solved) -> NonlinearReport::Status {
             bool known = false;
+            // The iteration is repeated from the same x (project_below_alpha), whose merit the
+            // nonmonotone window already holds.
+            bool repeated = false;
             for (int it = 0;; ++it) {
                 log.iteration = count;
 
@@ -193,6 +196,7 @@ namespace sfem {
                 }
                 log.tolerance = tol;
                 impl.notify(log);
+                log.discarded = false;
 
                 if (!std::isfinite(log.measure.value)) return NonlinearReport::Status::NON_FINITE;
                 if ((log.measure.value <= tol || solved) && log.measure.admissible) return NonlinearReport::Status::CONVERGED;
@@ -233,8 +237,11 @@ namespace sfem {
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
                     const real_t slope = merit->slope(x, r, dx, m0);
-                    recent.push_back(m0);
-                    if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    if (!repeated) {
+                        recent.push_back(m0);
+                        if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    }
+                    repeated               = false;
                     const real_t reference = *std::max_element(recent.begin(), recent.end());
                     log.line_search        = line_search.search(*merit, x, dx, m0, slope, reference);
                 } else {
@@ -247,6 +254,22 @@ namespace sfem {
                     case LineSearchResult::Status::ACCEPTED:
                     case LineSearchResult::Status::BEST_DECREASE:
                     case LineSearchResult::Status::NONMONOTONE:
+                        if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected &&
+                            log.line_search.alpha < opts.project_below_alpha && !(opts.fixed_iterations && it + 1 == opts.max_it)) {
+                            // A direction the merit decreases along only for a tiny step: the
+                            // tangent is indefinite here, as for no decrease at all. The step is
+                            // not taken: the next iterate's monitor shows x where it was, the step
+                            // discarded. On the last of fixed iterations no iteration is left to
+                            // repeat, and the short step is taken.
+                            projected             = true;
+                            ++report.projections;
+                            impl.step->set_tangent_projection(true);
+                            known                 = false;
+                            repeated              = true;
+                            log.line_search.alpha = 0;
+                            log.discarded         = true;
+                            continue;
+                        }
                         break;
                     case LineSearchResult::Status::AT_RESOLUTION:
                         return NonlinearReport::Status::CONVERGED_AT_RESOLUTION;
@@ -362,7 +385,9 @@ namespace sfem {
             {
                 SFEM_TRACE_SCOPE("NewtonSolver::step");
                 impl.blas->zaxpby(ndofs, s, increment, 0, increment, dx);
+                impl.step->set_carries_increment(true);
                 log.linear_capped = !impl.reductions->all(impl.step->solve(x, r, dx) == SFEM_SUCCESS);
+                impl.step->set_carries_increment(false);
             }
             if (impl.f->space()->synchronize(dx, impl.f->execution_space()) != SFEM_SUCCESS) {
                 report.status = NonlinearReport::Status::STEP_FAILED;
@@ -383,6 +408,7 @@ namespace sfem {
             log.line_search        = LineSearchResult();
             log.line_search.status = LineSearchResult::Status::ACCEPTED;
             log.line_search.alpha  = 1;
+            log.discarded          = false;
 
             const auto status = iterate(linear && !log.linear_capped);
             if (status == NonlinearReport::Status::CONVERGED || status == NonlinearReport::Status::CONVERGED_AT_RESOLUTION ||

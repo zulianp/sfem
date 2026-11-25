@@ -1039,6 +1039,20 @@ namespace sfem {
                     return SFEM_FAILURE;
                 }
             }
+            newton_options.project_below_alpha =
+                    read<real_t>(nn, "project_below_alpha", newton_options.project_below_alpha);
+            // A fraction of the step: 1 or more would project after every damped step.
+            if (!(newton_options.project_below_alpha >= 0 && newton_options.project_below_alpha < 1)) {
+                fprintf(stderr, "Playground: solver.newton.project_below_alpha must be in [0, 1)\n");
+                return SFEM_FAILURE;
+            }
+            if (has(nn, "project_below_alpha") && newton_options.tangent_projection != TangentProjection::ON_FAILURE &&
+                mesh->comm()->rank() == 0 && log_enabled(LOG_SETUP, LOG_NORMAL)) {
+                log_printf(LOG_SETUP,
+                           LOG_NORMAL,
+                           LOG_SUMMARY,
+                           "Playground: solver.newton.project_below_alpha is ignored without tangent_projection: on_failure");
+            }
             verbose                          = read<bool>(nn, "verbose", true);
             // A linear problem is solved by its first step, which needs no merit to judge it.
             newton_options.line_search.enabled = !f->is_linear();
@@ -1106,6 +1120,14 @@ namespace sfem {
                 obstacle.qp_max_it = read<int>(qp, "max_it", obstacle.qp_max_it);
                 obstacle.qp_rtol   = read<real_t>(qp, "rtol", obstacle.qp_rtol);
                 obstacle.qp_accept_capped = read<bool>(qp, "accept_capped", obstacle.qp_accept_capped);
+                obstacle.qp_capped_projects = read<bool>(qp, "capped_projects", obstacle.qp_capped_projects);
+                if (obstacle.qp_capped_projects && newton_options.tangent_projection != TangentProjection::ON_FAILURE &&
+                    mesh->comm()->rank() == 0 && log_enabled(LOG_SETUP, LOG_NORMAL)) {
+                    log_printf(LOG_SETUP,
+                               LOG_NORMAL,
+                               LOG_SUMMARY,
+                               "Playground: obstacle.qp.capped_projects is ignored without solver.newton.tangent_projection: on_failure");
+                }
                 obstacle.curvature = read<bool>(child(config.root(), "obstacle"), "curvature", obstacle.curvature);
                 // The step's tangent, in the format an unconstrained step's would take.
                 obstacle.tangent.format        = linear.format;
@@ -1190,6 +1212,8 @@ namespace sfem {
                                    (double)it.measure.value,
                                    (double)it.tolerance);
                     } else {
+                        // A step discarded below project_below_alpha reads ", discarded, projected": the
+                        // iteration is repeated projected, and a grep for " projected," counts it.
                         log_printf(LOG_SOLID,
                                    LOG_VERBOSE,
                                    LOG_PROGRESS,
@@ -1198,9 +1222,9 @@ namespace sfem {
                                    (double)it.measure.value,
                                    it.linear_iterations,
                                    it.linear_capped ? " (max iterations)" : "",
-                                   it.projected ? " projected" : "",
+                                   it.discarded ? ", discarded, projected" : it.projected ? " projected" : "",
                                    (double)it.line_search.alpha,
-                                   to_string(it.line_search.status));
+                                   it.discarded ? "below project_below_alpha" : to_string(it.line_search.status));
                     }
                 });
             }

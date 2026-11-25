@@ -40,12 +40,17 @@ namespace sfem {
         virtual int linearize(const real_t *const x, const real_t *const r) = 0;
 
         /// dx arrives zero but on the constrained dofs, where it holds the increment the correction
-        /// must make there (nonzero only on the first iteration of a step whose prescribed values
-        /// moved), and keeps it.
+        /// must make there (nonzero only in the solve set_carries_increment announces), and keeps it.
         /// The correction dx at x: K dx = -r, or the constrained problem it stands for. Returns
         /// SFEM_SUCCESS when the inner solver met its tolerance; a solve stopped by its cap
         /// returns SFEM_FAILURE with its last iterate in dx, for the line search to judge.
         virtual int solve(const real_t *const x, const real_t *const r, real_t *const dx) = 0;
+
+        /// On around the solve of the correction that carries a prescribed boundary increment
+        /// (the first of a step whose prescribed values moved), off for Newton's iterations: Newton
+        /// takes that correction whole, with no line search to judge it and no iteration to repeat.
+        /// The same on every rank.
+        virtual void set_carries_increment(const bool /*on*/) {}
 
         /// A merit of its own, or null for the function's (energy or residual).
         virtual std::shared_ptr<Merit> merit() { return nullptr; }

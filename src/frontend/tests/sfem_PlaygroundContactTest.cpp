@@ -593,6 +593,58 @@ solver: {newton: {max_it: 4, fixed_iterations: true, verbose: false, line_search
     return SFEM_TEST_SUCCESS;
 }
 
+// obstacle.qp.capped_projects with tangent_projection: on_failure, read from the case: a QP that
+// max_it stopped on the tangent itself repeats the iteration on the projected tangent. The box 10%
+// inside the plane, four of Utopia's damped steps (no merit to fail), its QPs capped at three
+// iterations: without the option nothing is projected, and a capped QP is solved again (curvature
+// capped, diagonal shifted); with it the first iteration is repeated projected. With accept_capped too, capped_projects comes first, and accept_capped takes the
+// capped QP on the projected tangent: no QP is solved again, each within its cap.
+int test_capped_qp_projects() {
+    const char *const yaml = R"(
+mesh:
+  box: {n: [4, 4, 4]}
+  sidesets: [{name: top, plane: {axis: z, at: max}}]
+material: {type: GeneratedMooneyRivlinProny, C10: 1, C01: 0.5, K: 20}
+dirichlet_conditions:
+  - {type: sideset, format: name, name: top, component: [0, 1, 2], value: [0, 0, 0]}
+obstacle:
+  backend: node_sdf
+  direction: z
+  shape: {type: plane, plane: 0.1}
+regime: quasi_static
+time: {dt: 1, t_end: 1}
+solver:
+  newton: {max_it: 4, fixed_iterations: true, verbose: false, tangent_projection: on_failure,
+           line_search: {rule: damped, damping: 0.8}}
+)";
+    const std::string history = "sfem_capped_qp_projects_history.csv";
+    const char *const qps[]   = {"{max_it: 3}", "{max_it: 3, capped_projects: true}",
+                                 "{max_it: 3, capped_projects: true, accept_capped: true}"};
+    for (int c = 0; c < 3; ++c) {
+        auto pg = assemble(yaml, {std::string("obstacle.qp=") + qps[c], "output.history_csv=" + history});
+        SFEM_TEST_ASSERT(pg != nullptr);
+        SFEM_TEST_ASSERT(pg->run() == SFEM_SUCCESS);
+        int projections = 0, linear = 0, newton = 0;
+        for (auto &row : sfem::test::read_history(history)) {
+            if (row["status"] < 0) continue;
+            projections += (int)row["projections"];
+            linear += (int)row["linear"];
+            newton += (int)row["newton"];
+        }
+        printf("  qp %s: %d Newton iterations, %d QP iterations, %d projections\n", qps[c], newton, linear, projections);
+        std::remove(history.c_str());
+        SFEM_TEST_ASSERT(newton > 0);
+        // Projected at the first iteration, and kept: the damped steps are never whole.
+        SFEM_TEST_ASSERT(projections == (c == 0 ? 0 : 1));
+        if (c == 2) {
+            SFEM_TEST_ASSERT(linear <= 3 * newton);
+        } else {
+            SFEM_TEST_ASSERT(linear > 3 * newton);
+        }
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 // TET10 (a TET4 cube promoted by the playground) pressed onto a plane by a traction of 0.5 on its
 // unit top face: every node of the TRI6 faces is a contact node, and the obstacle's force balances
 // the load, the QP's tangent assembled (BSR) or stored (INEXACT, auto: bsr f16 on the host). The
@@ -663,6 +715,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_disc_traction);
     SFEM_RUN_TEST(test_release_from_penetration);
     SFEM_RUN_TEST(test_utopia_scheme);
+    SFEM_RUN_TEST(test_capped_qp_projects);
     SFEM_RUN_TEST(test_ssmgc_free_flight_matches_node_sdf);
     SFEM_RUN_TEST(test_ssmgc_refusals);
     SFEM_RUN_TEST(test_memory_probe);

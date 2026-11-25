@@ -28,6 +28,14 @@ namespace sfem {
         real_t qp_rtol{real_t(1e-10)};
         /// A QP stopped by qp_max_it is the step as it stands, not a failure to retry.
         bool qp_accept_capped{false};
+        /// With Newton managing the tangent's projection (tangent_projection: on_failure), a QP on
+        /// the tangent itself that qp_max_it stopped counts as negative curvature: the iteration is
+        /// repeated on the projected tangent. MPRGP converges on a positive definite operator; on
+        /// an indefinite one it can stall without meeting a negative curvature direction. It comes
+        /// before qp_accept_capped, which then takes a capped QP on the projected tangent. Not in
+        /// the step that carries the boundary's increment (LinearizedStep::set_carries_increment),
+        /// which Newton takes whole: there a capped QP falls back as without this option.
+        bool qp_capped_projects{false};
         /// The obstacle's curvature in the tangent.
         bool curvature{true};
         /// The QP's tangent: assembled (BSR, with its storage_bytes) or applied term by term
@@ -63,6 +71,9 @@ namespace sfem {
         StepMeasure            measure(const real_t *const x, const real_t *const r) override;
         int                    linearize(const real_t *const x, const real_t *const r) override;
         int                    solve(const real_t *const x, const real_t *const r, real_t *const dx) override;
+        /// The solve that carries the boundary's increment keeps a capped QP's fallbacks
+        /// (qp_capped_projects does not apply to it).
+        void                   set_carries_increment(const bool on) override;
         std::shared_ptr<Merit> merit() override;
         int                    iterations() const override;
         /// The material's tangent projected to positive semidefinite (NewtonOptions::tangent_projection):

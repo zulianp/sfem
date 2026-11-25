@@ -11,6 +11,8 @@
 
 #include "sfem_API.hpp"
 #include "sfem_NodeObstacleContact.hpp"
+#include "sfem_NodeObstacleStep.hpp"
+#include "sfem_elasticity_test_problem.hpp"
 #include "sfem_node_obstacle_kernels.hpp"
 #include "sfem_test.hpp"
 #include "smesh_grid.hpp"
@@ -489,8 +491,65 @@ int test_union_device_matches_host() {
 }
 #endif
 
+// NodeObstacleStep with qp_capped_projects and Newton managing the projection (tangent_projection:
+// on_failure): a QP that max_it stopped on the tangent itself reports negative curvature, for
+// Newton to repeat the iteration projected, and returns without its fallbacks; one that carries
+// the boundary's increment (set_carries_increment, dx nonzero on the constrained dofs), which Newton takes whole, falls
+// back (the curvature capped) as without the option. With qp_accept_capped too, capped_projects
+// comes first, and on the projected tangent the capped QP is the step. The cube of the Newton
+// tests, stretched along x, above the half-space z < -0.1, its QP capped at one iteration.
+int test_capped_qp_projects() {
+    auto            p    = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+    auto            comm = sfem::Communicator::world();
+    const ptrdiff_t n    = p.fs->n_dofs();
+    auto            sdf  = smesh::create_sdf(comm, 41, 41, 41, -1, -1, -1, 2, 2, 2, [](const geom_t, const geom_t, const geom_t z) -> geom_t {
+        return -z - geom_t(0.1);
+    });
+    auto nodes = sfem::create_host_buffer<idx_t>(p.mesh->n_nodes());
+    for (ptrdiff_t i = 0; i < p.mesh->n_nodes(); ++i) nodes->data()[i] = (idx_t)i;
+    auto contact = std::make_shared<sfem::NodeObstacleContact>(sdf, comm, nodes, p.mesh->points(), n, n, 2);
+
+    auto r  = sfem::create_host_buffer<real_t>(n);
+    auto dx = sfem::create_host_buffer<real_t>(n);
+    p.f->gradient(p.x->data(), r->data());
+    p.f->set_value_to_constrained_dofs(0, r->data());
+
+    sfem::StepContext context;
+    context.dt = 1;
+    // {capped_projects, accept_capped, increment carried, projected}: negative curvature, fallback.
+    const bool cases[][6] = {{false, false, false, false, false, true},
+                             {true, false, false, false, true, false},
+                             {true, false, true, false, false, true},
+                             {true, true, false, false, true, false},
+                             {true, true, false, true, false, false}};
+    for (const auto &c : cases) {
+        sfem::NodeObstacleStepOptions options;
+        options.qp_max_it          = 1;
+        options.qp_capped_projects = c[0];
+        options.qp_accept_capped   = c[1];
+        auto step                  = sfem::NodeObstacleStep::create(p.f, contact, nullptr, options);
+        SFEM_TEST_ASSERT(step != nullptr);
+        step->set_tangent_projection(c[3]);
+        SFEM_TEST_ASSERT(step->begin_step(context) == SFEM_SUCCESS);
+        step->measure(p.x->data(), r->data());
+        SFEM_TEST_ASSERT(step->linearize(p.x->data(), r->data()) == SFEM_SUCCESS);
+        std::fill(dx->data(), dx->data() + n, real_t(0));
+        if (c[2]) p.f->set_value_to_constrained_dofs(real_t(0.01), dx->data());
+        step->set_carries_increment(c[2]);
+        const int status = step->solve(p.x->data(), r->data(), dx->data());
+        step->set_carries_increment(false);
+        printf("  capped_projects %d, accept_capped %d, increment %d, projected %d: negative curvature %d, curvature capped %d\n",
+               c[0], c[1], c[2], c[3], step->met_negative_curvature(), step->capped_curvature());
+        SFEM_TEST_ASSERT(status != SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(step->met_negative_curvature() == c[4]);
+        SFEM_TEST_ASSERT(step->capped_curvature() == c[5]);
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
+    SFEM_RUN_TEST(test_capped_qp_projects);
     SFEM_RUN_TEST(test_gap_and_frames);
     SFEM_RUN_TEST(test_scaled_frames);
     SFEM_RUN_TEST(test_shift_cutoff_release);
