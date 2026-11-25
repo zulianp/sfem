@@ -12,6 +12,8 @@
 // the header, and the defaults HIP declares (hip/hip_runtime_api.h), added by redeclaration. chipStar
 // main (2714ed9, November 2026) still declares them without defaults; should a release add them, the
 // redeclarations below fail to compile ("redefinition of default argument") and are to be removed.
+// They cannot be guarded on chipStar's version: chipStarConfig.hh's CHIPSTAR_*_VERSION read 1.1.00 in
+// v1.1, v1.2.1, v1.3.0 and main alike, and HIP_VERSION is the HIP API chipStar follows.
 
 #include <hip/hip_runtime.h>
 #include <hip/spirv_spt.h>
