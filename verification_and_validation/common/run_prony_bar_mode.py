@@ -17,22 +17,8 @@ if str(SUITE_DIR) not in sys.path:
 
 from common import playground
 from common.mesh import read_mesh
+from common.prony import material_config
 from common.transient import TIME_LEVELS, write_modal_initial_fields
-
-
-def material_config(config):
-    material = config["material"]
-    resolution = config["selected_variant"]["resolution"]
-    g = [float(value) for value in str(resolution["prony_g"]).split(",")]
-    tau = [float(value) for value in str(resolution["prony_tau"]).split(",")]
-    group = {"prony": [{"g": gi, "tau": ti} for gi, ti in zip(g, tau)], "integrator": str(resolution["integrator"])}
-    return {
-        "type": "GeneratedMooneyRivlinProny",
-        "C10": float(material["c10"]),
-        "C01": float(material["c01"]),
-        "K": float(material["bulk_modulus"]),
-        "relaxation": {"iso": group},
-    }
 
 
 def main():

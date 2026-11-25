@@ -1,11 +1,15 @@
 import importlib.util
 import unittest
 from pathlib import Path
+import sys
 
 import numpy as np
 
 
 SUITE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SUITE_DIR))
+
+from common.prony import step_weights  # noqa: E402
 
 
 def load_module(name, relative_path):
@@ -18,6 +22,18 @@ def load_module(name, relative_path):
 HARMONIC = load_module("prony_harmonic_oracle", "prony_harmonic_3d/oracle.py")
 BAR = load_module("prony_bar_oracle", "prony_bar_mode_3d/oracle.py")
 G, TAU = "0.3,0.25,0.2", "0.01,0.1,1.0"
+
+
+class StepWeightTests(unittest.TestCase):
+    def test_weights_agree_to_second_order_in_dt_over_tau(self):
+        # linear: g (1 - x/2 + x^2/6 - ...), midpoint: g (1 - x/2 + x^2/8 - ...), x = dt/tau.
+        g, tau = np.asarray([0.3, 0.2]), np.asarray([0.05, 0.3])
+        for x in (1.0e-2, 1.0e-3):
+            dt = x * tau[0]
+            alpha, linear = step_weights(g, tau, dt, "linear")
+            _, midpoint = step_weights(g, tau, dt, "midpoint")
+            np.testing.assert_allclose(alpha, np.exp(-dt / tau), rtol=1.0e-15)
+            np.testing.assert_allclose((linear - midpoint) / g, (dt / tau) ** 2 / 24.0, rtol=2.0 * x)
 
 
 class HarmonicOracleTests(unittest.TestCase):

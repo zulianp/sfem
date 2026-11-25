@@ -17,27 +17,12 @@ if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
 from common import playground
+from common.prony import material_config
 from common.transient import TIME_LEVELS
 
 
 def frequency_label(index):
     return f"w{index}"
-
-
-def material_config(config):
-    """The operator YAML: the case's Mooney-Rivlin parameters and the variant's series and integrator."""
-    material = config["material"]
-    resolution = config["selected_variant"]["resolution"]
-    g = [float(value) for value in str(resolution["prony_g"]).split(",")]
-    tau = [float(value) for value in str(resolution["prony_tau"]).split(",")]
-    group = {"prony": [{"g": gi, "tau": ti} for gi, ti in zip(g, tau)], "integrator": str(resolution["integrator"])}
-    return {
-        "type": "GeneratedMooneyRivlinProny",
-        "C10": float(material["c10"]),
-        "C01": float(material["c01"]),
-        "K": float(material["bulk_modulus"]),
-        "relaxation": {"iso": group},
-    }
 
 
 def run_level(args, config, output, omega, steps_per_period, cycles):

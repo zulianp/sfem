@@ -10,14 +10,16 @@ source:
   description: Prony-series Mooney-Rivlin driven by eps0 sin(omega t) from rest; the replayed recursion, its transfer function and the generalized Maxwell complex modulus
   reference: README.md
 oracle: {type: analytical, implementation: oracle.py}
-geometry: {length: 1.0, height: 1.0, depth: 1.0}
+# The mesh spans [0, L] x [0, 1] x [0, 1]: generate_bar_mesh fixes a unit square cross-section,
+# so the right face's reaction resultant is P_11.
+geometry: {length: 1.0}
 # One frequency below the spectrum, one at each relaxation time (omega tau_i = 1), one above.
 loading: {omegas: [0.1, 1.0, 10.0, 100.0, 1000.0]}
 time: {cycles: 4, steps_per_period: [64, 128, 256]}
 material: {c10: 1.0, c01: 0.5, bulk_modulus: 0.0}
 
 mesh:
-  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --element, "{element}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}", --amplitude, "{resolution_amplitude}"]
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --element, "{element}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}", --length, "{geometry_length}", --amplitude, "{resolution_amplitude}"]
 inputs:
   - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
 verification:

@@ -300,8 +300,9 @@ outside this material-focused catalog.
 - **Oracle:** the mode's `2 + n` state system (Wagner and Adhikari 2003) with the mesh's exact
   wave number, integrated exactly in time; Newmark with the Prony recursion replayed on the mode.
 - **Pass conditions:** amplitude against the replayed scheme to `1e-7` at every step; history
-  L2 to `3e-3`, fitted frequency and decay to `1e-3`, temporal rate at least `1.8`; continuum
-  frequency and decay to the mesh's `O(h^2)`.
+  L2 at the finest step to `4e-4` (about twice the scheme's own error there), fitted frequency
+  and decay to `1e-3`, temporal rate at least `1.8`; continuum frequency and decay to the mesh's
+  `O(h^2)`.
 - **Failure modes exposed:** the coupling of the history to Newmark's implicit step, mass and
   stiffness scaling, and damping from the series rather than a viscosity.
 

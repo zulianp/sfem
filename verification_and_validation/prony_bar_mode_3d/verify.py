@@ -14,9 +14,10 @@ if str(SUITE_DIR) not in sys.path:
 
 from common.mesh import read_mesh
 from common.metrics import relative_l2_error
+from common.prony import check_series
 from common.reporting import build_verification_report, make_check, write_verification_report
 from common.transient import TIME_LEVELS, read_field_history
-from oracle import amplitude, check_series, modal_parameters, newmark_amplitude, wave_number_squared
+from oracle import amplitude, modal_parameters, newmark_amplitude, wave_number_squared
 
 
 def project_mode(mesh, displacement, length):

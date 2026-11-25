@@ -3,7 +3,7 @@
 A homogeneous constrained uniaxial strain `eps(t) = eps0 sin(omega t)` is prescribed from rest
 while `GeneratedMooneyRivlinProny` advances its history, and the right face's reaction is
 recorded every step: the force-displacement record of a dynamic mechanical analysis. Five
-frequencies cover the spectrum (`omega tau_i` from 0.001 to 100,000), each at 64, 128 and 256
+frequencies cover the spectrum (`omega tau_i` from 0.001 to 1000), each at 64, 128 and 256
 steps per period over four cycles.
 
 Three oracles (`oracle.py`), from exact to continuum:

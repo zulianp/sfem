@@ -21,27 +21,14 @@ consistent mass, with k2_h = 12/h^2 (1 - cos(pi h/L))/(4 + 2 cos(pi h/L)): the s
 oracle carries no spatial error, and the continuum one differs by O(h^2).
 
 `newmark_amplitude` replays the fully discrete scheme on the mode: Newmark (beta, gamma) with
-the Prony recursion H_i <- alpha_i H_i + b_i (q_{n+1} - q_n) of the material, solved for q_{n+1}.
+the Prony recursion H_i <- alpha_i H_i + b_i (q_{n+1} - q_n) of the material, solved for q_{n+1};
+alpha_i and b_i are the material's step weights (common/prony.py).
 """
 
 import numpy as np
 from scipy.linalg import expm
 
-
-def parse_series(values):
-    if isinstance(values, str):
-        values = values.split(",")
-    result = np.asarray([float(value) for value in values], dtype=np.float64)
-    if result.ndim != 1 or not len(result) or np.any(~np.isfinite(result)):
-        raise ValueError("Prony series must contain finite values")
-    return result
-
-
-def check_series(g, tau):
-    g, tau = parse_series(g), parse_series(tau)
-    if g.shape != tau.shape or np.sum(g) >= 1.0 or np.any(g <= 0) or np.any(tau <= 0):
-        raise ValueError("invalid Prony coefficients")
-    return g, tau
+from common.prony import check_series, step_weights
 
 
 def moduli(material):
@@ -100,17 +87,6 @@ def amplitude(times, material, g, tau, k2, v0):
             x = step @ x
         return out
     return np.asarray([(expm(A * t) @ x0)[0] for t in times])
-
-
-def step_weights(g, tau, dt, integrator="linear"):
-    g, tau = check_series(g, tau)
-    x = float(dt) / tau
-    alpha = np.exp(-x)
-    if integrator == "linear":
-        return alpha, g * (-np.expm1(-x) / x)
-    if integrator == "midpoint":
-        return alpha, g * np.exp(-x / 2.0)
-    raise ValueError(f"unknown integrator {integrator}")
 
 
 def newmark_amplitude(steps, dt, material, g, tau, k2, v0, integrator="linear", beta=0.25, gamma=0.5):

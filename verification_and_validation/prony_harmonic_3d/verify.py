@@ -12,24 +12,27 @@ if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
 from common.metrics import relative_l2_error
+from common.prony import check_series
 from common.reporting import build_verification_report, make_check, write_verification_report
 from common.run_prony_harmonic import frequency_label
 from common.transient import TIME_LEVELS
 from oracle import (
     algorithmic_reaction,
     axial_modulus,
-    check_series,
     complex_modulus,
     discrete_complex_modulus,
     harmonic_fit,
 )
 
 # The continuum reference: the recursion replayed at this many steps per period, an O(dt^2)
-# error of about 5e-8 of the hereditary stress, far below every level's.
+# error of about 5e-8 of the hereditary stress, far below every level's. Each level's
+# steps_per_period must divide it, so that every level's step lands on a reference step.
 REFERENCE_STEPS_PER_PERIOD = 8192
 
 
 def reaction_history(folder, expected_times):
+    """The right face's axial reaction resultant at every step. generate_bar_mesh makes a unit
+    square cross-section, so under the homogeneous strain this resultant is P_11 itself."""
     path = Path(folder) / "quantities.yaml"
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     entries = data.get("material_objective_history") if isinstance(data, dict) else None
@@ -74,6 +77,10 @@ def main():
     omegas = [float(value) for value in config["loading"]["omegas"]]
     levels = [int(value) for value in config["time"]["steps_per_period"]]
     cycles = int(config["time"]["cycles"])
+    for steps_per_period in levels:
+        if steps_per_period <= 0 or REFERENCE_STEPS_PER_PERIOD % steps_per_period:
+            raise ValueError(f"steps_per_period {steps_per_period} does not divide the reference's "
+                             f"{REFERENCE_STEPS_PER_PERIOD}: the level's steps would not land on reference steps")
     m_iso, m_vol = axial_modulus(c10, c01, K)
     # The continuum checks hold where the coarsest step resolves the fastest relaxation time.
     resolved = [2.0 * np.pi / omega / levels[0] <= float(np.min(tau)) * (1.0 + 1.0e-12) for omega in omegas]

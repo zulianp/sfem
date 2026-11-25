@@ -20,41 +20,18 @@ Three oracles, from exact to continuum:
 - `complex_modulus` and `continuum_linear_reaction`: the generalized Maxwell model in continuous
   time, G*(omega)/G0 = g_inf + sum_i g_i i omega tau_i/(1 + i omega tau_i), and the exact response
   to eps0 sin(omega t) applied from rest, transient included. The discrete results converge to
-  these as dt^2.
+  these as dt^2 once dt resolves the fastest relaxation time (dt <= tau_min). With longer steps
+  the observed rate is lower: the linear interpolation approaches second order only as dt/tau_min
+  shrinks, and the midpoint weight g_i exp(-dt/(2 tau_i)) vanishes for dt >> tau_i, so that rule
+  starts at about first order.
+
+The step weights alpha_i, b_i and the series checks are shared with prony_bar_mode_3d
+(common/prony.py).
 """
 
 import numpy as np
 
-
-def parse_series(values):
-    if isinstance(values, str):
-        values = values.split(",")
-    result = np.asarray([float(value) for value in values], dtype=np.float64)
-    if result.ndim != 1 or not len(result) or np.any(~np.isfinite(result)):
-        raise ValueError("Prony series must contain finite values")
-    return result
-
-
-def check_series(g, tau):
-    g = parse_series(g)
-    tau = parse_series(tau)
-    if g.shape != tau.shape or np.sum(g) >= 1.0 or np.any(g <= 0) or np.any(tau <= 0):
-        raise ValueError("invalid Prony coefficients")
-    return g, tau
-
-
-def step_weights(g, tau, dt, integrator="linear"):
-    """alpha_i and b_i of one step of length dt."""
-    g, tau = check_series(g, tau)
-    x = float(dt) / tau
-    alpha = np.exp(-x)
-    if integrator == "linear":
-        b = g * (-np.expm1(-x) / x)
-    elif integrator == "midpoint":
-        b = g * np.exp(-x / 2.0)
-    else:
-        raise ValueError(f"unknown integrator {integrator}")
-    return alpha, b
+from common.prony import check_series, parse_series, step_weights
 
 
 def isochoric_axial_piola(stretch, c10, c01):
@@ -129,9 +106,3 @@ def harmonic_fit(times, reaction, eps0, omega, tau, m_iso, m_vol=0.0):
     coefficients, *_ = np.linalg.lstsq(A, rhs, rcond=None)
     scale = float(m_iso) * float(eps0)
     return coefficients[0] / scale, coefficients[1] / scale
-
-
-def dissipation_per_cycle(eps0, omega, g, tau, c10, c01):
-    """The energy dissipated per unit volume over one steady cycle, pi eps0^2 M0 G''/G0."""
-    m_iso, _ = axial_modulus(c10, c01)
-    return np.pi * float(eps0) ** 2 * m_iso * complex_modulus(omega, g, tau).imag
