@@ -1,0 +1,75 @@
+schema_version: 2
+id: prony_bar_mode_3d
+name: Three-dimensional Prony-viscoelastic bar mode
+kind: verification
+family: viscoelastic
+dimension: 3
+tier: medium
+
+source:
+  description: Free axial mode of a Prony-series Mooney-Rivlin bar, its state-space solution exact in time on the mesh, and Newmark with the Prony recursion replayed on the mode
+  reference: README.md
+oracle: {type: semi-analytical, implementation: oracle.py}
+# The mesh spans [0, L] x [0, 1] x [0, 1]: generate_bar_mesh fixes a unit square cross-section,
+# which the free mode does not depend on.
+geometry: {length: 1.0}
+# From rest with the velocity v0 sin(pi x/L): strain amplitudes near 1e-5, linear response.
+initial_conditions: {modal_velocity: 2.0e-5}
+time: {duration: 3.2, time_steps: [0.01, 0.005, 0.0025]}
+material: {c10: 1.0, c01: 0.5, bulk_modulus: 2.0, density: 1.0}
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}", --length, "{geometry_length}"]
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances: &tolerances
+    # The modal amplitude against Newmark with the material's recursion on the mode, every level.
+    discrete_amplitude_max_relative_error: 1.0e-7
+    # Against the mesh's mode exact in time (no spatial error): history, fitted frequency and
+    # decay at the finest step, and the rate over the three. The scheme's own errors at
+    # dt = 0.0025, worst of the variants: history 2.05e-4, frequency 2.4e-5, decay 1.6e-4; each
+    # tolerance is about 2-2.5 times that.
+    amplitude_history_relative_l2: 4.0e-4
+    frequency_relative_error: 6.0e-5
+    decay_relative_error: 4.0e-4
+    temporal_rate_deficit: 0.0
+    # Against the continuum's mode (k = pi/L): the spatial error of the mesh, O(h^2). At 64
+    # elements, worst of the variants: frequency 8.4e-5, decay 5.0e-5. The decay error is small
+    # only because the time-step error (1.0-1.6e-4) cancels the spatial one (about 1.1e-4) at
+    # dt = 0.0025, so its tolerance is about twice the spatial error alone, not the measured sum.
+    continuum_frequency_relative_error: 2.0e-4
+    continuum_decay_relative_error: 2.5e-4
+    # The field stays the sine: axial residual and lateral motion over the whole displacement.
+    off_mode_fraction_max: 1.0e-4
+
+variants:
+  - &base
+    id: hex8_linear
+    operator: GeneratedMooneyRivlinProny
+    element: HEX8
+    resolution: {nx: 64, ny: 1, nz: 1, integrator: linear, prony_g: "0.3,0.2", prony_tau: "0.05,0.3"}
+    driver: &driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_prony_bar_mode.py", --case, "{resolved_case}", --driver, "{build_dir}/playground", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution", --set, "solver.newton.atol=1.0e-13", --set, "solver.newton.rtol=1.0e-9", --set, "solver.newton.max_it=20", --set, "solver.linear.format=BSR", --set, "solver.linear.preconditioner=jacobi", --set, "solver.linear.rtol=1.0e-13", --set, "solver.linear.atol=1.0e-20", --set, "solver.linear.max_it=20000", --set, "solver.newton.verbose=false", --set, "mesh.packed=false"]
+      environment:
+        OMP_NUM_THREADS: 1
+    expected_output: &expected
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
+        - {pattern: SFEM_PRONY_BAR_MODE_COMPLETE, count: 1}
+      forbidden: [Newton did not converge, "nan"]
+    tolerances: *tolerances
+  - <<: *base
+    id: hex8_midpoint
+    resolution: {nx: 64, ny: 1, nz: 1, integrator: midpoint, prony_g: "0.3,0.2", prony_tau: "0.05,0.3"}
+  # Sixteen elements: the mesh's mode still exact, the continuum's frequency and decay both
+  # 1.7e-3 away.
+  - <<: *base
+    id: hex8_linear_nx16
+    resolution: {nx: 16, ny: 1, nz: 1, integrator: linear, prony_g: "0.3,0.2", prony_tau: "0.05,0.3"}
+    tolerances:
+      continuum_frequency_relative_error: 5.0e-3
+      continuum_decay_relative_error: 4.0e-3

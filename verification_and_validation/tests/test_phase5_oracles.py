@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,8 @@ import numpy as np
 
 
 SUITE_DIR = Path(__file__).resolve().parents[1]
+# prony_relaxation_3d's oracle imports common.prony.
+sys.path.insert(0, str(SUITE_DIR))
 
 
 def load_module(name, relative_path):

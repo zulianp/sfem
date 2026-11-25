@@ -1,0 +1,10 @@
+dirichlet_conditions:
+  - {type: nodeset, format: file, path: "{mesh}/sets/left.int32.raw", value: 0, component: 0}
+  # eps0 x sin(2 pi t / period): the runner sets the period of each frequency.
+  - type: nodeset
+    format: file
+    path: "{mesh}/sets/right.int32.raw"
+    value: {path: "{mesh}/boundary_values/right_x.float64.raw"}
+    component: 0
+    profile: {type: sine, value: 1, start_time: 0, period: 1}
+  - {type: nodeset, format: file, path: "{mesh}/sets/all.int32.raw", value: [0, 0], component: [1, 2]}

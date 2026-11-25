@@ -16,10 +16,11 @@ are explicitly named and remain independent from SFEM's generated kernels.
 | `fields.py` | Scalar/vector nodal files for generated boundary values and initial fields. |
 | `mechanics.py` | First-order element quadrature, kinematics, stress transformations, energy integration, and boundary resultants. |
 | `metrics.py` | Absolute, relative, weighted, maximum, and interpolated curve errors with explicit norm floors. |
-| `convergence.py` | Spatial and temporal log-log convergence fits. |
+| `convergence.py` | Spatial and temporal log-log convergence fits, and the rates between consecutive levels. |
 | `reporting.py` | Strict construction, serialization, and validation of per-variant `verification.json`. |
 | `affine.py` | Affine mesh, boundary-field, result-reading, and physical-check helpers. |
 | `hyperelastic.py` | Independent closed-form hyperelastic energy and first-Piola oracles. |
+| `prony.py` | Prony-series parsing, the step weights of the linear and midpoint recursions, the `GeneratedMooneyRivlinProny` operator YAML, and the harmonic case's reference steps per period. |
 
 ## Conventions
 

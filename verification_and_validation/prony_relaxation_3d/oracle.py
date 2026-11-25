@@ -2,14 +2,7 @@
 
 import numpy as np
 
-
-def parse_series(values):
-    if isinstance(values, str):
-        values = values.split(",")
-    result = np.asarray([float(value) for value in values], dtype=np.float64)
-    if result.ndim != 1 or not len(result) or np.any(~np.isfinite(result)):
-        raise ValueError("Prony series must contain finite values")
-    return result
+from common.prony import parse_series
 
 
 def wlf_shift(temperature, c1, c2, reference_temperature):
