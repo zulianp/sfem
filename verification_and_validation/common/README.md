@@ -20,6 +20,7 @@ are explicitly named and remain independent from SFEM's generated kernels.
 | `reporting.py` | Strict construction, serialization, and validation of per-variant `verification.json`. |
 | `affine.py` | Affine mesh, boundary-field, result-reading, and physical-check helpers. |
 | `hyperelastic.py` | Independent closed-form hyperelastic energy and first-Piola oracles. |
+| `prony.py` | Prony-series parsing, the step weights of the linear and midpoint recursions, and the `GeneratedMooneyRivlinProny` operator YAML. |
 
 ## Conventions
 
