@@ -10,7 +10,8 @@ mu_0 g_i of its fast terms (all but the --slow slowest); SFEM_MATERIAL (a YAML f
 times, the weights g_i and mu_0 = 2 (C10 + C01) are read: the type, K (nu = 0.4), C01/C10 = 4 and
 history_storage full are this script's, so the misfit before is that of the given material only if it
 has these; if not, it warns, and fit.yaml says base_normalised: true and lists base_differences. Free
-are mu_inf = mu_0 g_inf and the slow terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (scipy) to
+are mu_inf = mu_0 g_inf and the slow terms' absolute weights a_i = mu_0 g_i, fitted in log space by
+least squares (scipy) to
   - the uniaxial, equibiaxial and planar tests (measured_tests.py: one HEX8 element following each
     measured strain history, quasi-static), the stress at every measured instant over the test's
     largest measured stress, each test weighted 1/sqrt(its samples);
