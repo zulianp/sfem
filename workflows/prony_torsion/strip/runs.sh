@@ -1,5 +1,6 @@
 # shellcheck shell=bash
-# The strip campaign's runs, shared by campaign.sbatch, collect.sbatch and tight.sbatch so they stay in step.
+# The strip campaign's runs, shared by campaign.sbatch, collect.sbatch and tight.sbatch so they stay in step,
+# and the stamp (strip_stamp).
 #   REDUCED  the reduced history formats, each with the remainder form (<format>) and without it
 #            (<format>_plain): float32, int16_scaled, float16_md, and the packed grid codes
 #            qblock5/6/7 (quant_block at history_tolerance 1e-5, 1e-6, 1e-7), _sr with stochastic
@@ -18,11 +19,19 @@ strip_runs() {  # the main campaign's runs; DIAG=1: the diagnostics build's (los
   fi
   echo "$runs"
 }
-# EXTRA: options added to every run (campaign.sbatch, tight.sbatch), split like a shell command line
-# by python's shlex: quotes group words, nothing expands (no braces, $, ~ or globs), no newlines.
-strip_extra() {  # <folder>: opts=(the newton output and EXTRA's words); refuse if <folder>'s runs had others
-  local dir=$1 f=$1/extra.txt words want="" n i a
-  words=$(python3 -I -c 'import os, shlex, sys
+# The stamp runs/strip<tag>/stamp.txt: what all of a tag's runs share, TURNS and EXTRA's words, one
+# per line (TURNS=1, EXTRA=--set, ...; REDUCED and S32 choose runs, they change none, so are not in
+# it). The tag's first job writes it; campaign.sbatch (DIAG=1 too)
+# and tight.sbatch stop on another, collect.sbatch without one. EXTRA (options added to every run) is
+# split like a shell command line by python's shlex: quotes group words, nothing expands (braces, $, ~
+# and globs stay), '#' is no comment, no newlines. Runs from before the stamp: accepted only in the
+# untagged runs/strip and runs/strip_diag, as TURNS=1 without EXTRA; a tagged folder needs the stamp
+# written by hand (3f487e44 and 91244183 ran EXTRA without one), e.g.
+#   printf 'TURNS=1\nEXTRA=--set\nEXTRA=material.C10=1e5\n' > runs/strip_soft/stamp.txt
+strip_stamp() {  # TURNS, EXTRA, STRIP_TAG: opts=(newton output, EXTRA's words), or 1 if refused
+  local tag=${STRIP_TAG:-} dir=$SFEM_RUNS/strip${STRIP_TAG:-} f words want n i a old tmp
+  f=$dir/stamp.txt
+  words=$($SFEM_PY -I -c 'import os, shlex, sys
 e = os.environ.get("EXTRA", "")
 if "\n" in e:
     sys.exit("EXTRA has a newline")
@@ -33,16 +42,22 @@ except ValueError as x:
 print(len(w))
 for a in w:
     print(a)') || return 1
-  opts=(--set solver.newton.verbose=true)
-  { read -r n; i=0; while [ "$i" -lt "$n" ]; do IFS= read -r a; opts+=("$a"); want="$want$a"$'\n'; i=$((i+1)); done; } <<< "$words"
-  # <folder>/extra.txt: EXTRA's words, one per line, written by the folder's first job (set -C: once)
+  opts=(--set solver.newton.verbose=true); want="TURNS=$TURNS"$'\n'
+  { read -r n; i=0; while [ "$i" -lt "$n" ]; do IFS= read -r a; opts+=("$a"); want="${want}EXTRA=$a"$'\n'; i=$((i+1)); done; } <<< "$words"
   mkdir -p "$dir" || return 1
-  [ ! -e "$f" ] && [ -z "$(ls -A "$dir")" ] && ( set -C; printf '%s' "$want" > "$f" ) 2> /dev/null
-  if [ -e "$f" ]; then
-    printf '%s' "$want" | cmp -s - "$f" && return
-    echo "$dir ran with other EXTRA options ($f); give another STRIP_TAG"; return 1
+  # runs from before the stamp: listed before the stamp is looked for, since a job makes runs only
+  # after its stamp is in place (the meshes and stamp temporaries are not runs)
+  old=$( { ls -A "$dir"; ls -A "$SFEM_RUNS/strip_diag$tag" 2> /dev/null; } | grep -v -e '^meshes$' -e '^stamp\.txt$' -e '^\.stamp\.')
+  if [ ! -e "$f" ]; then
+    if [ -n "$old" ] && { [ -n "$tag" ] || [ "$want" != "TURNS=1"$'\n' ]; }; then
+      echo "$dir: runs from before stamps, TURNS and EXTRA unknown; write $f by hand (runs.sh) or give another STRIP_TAG"
+      return 1
+    fi
+    tmp=$dir/.stamp.${HOSTNAME:-host}.$$  # written whole, then linked: two first jobs, one stamp
+    printf '%s' "$want" > "$tmp" && ln "$tmp" "$f" 2> /dev/null; rm -f "$tmp"
+    [ -e "$f" ] || { echo "cannot write $f"; return 1; }
   fi
-  # a folder from before extra.txt: its runs had no EXTRA
-  [ "$n" = 0 ] || { echo "$dir has runs without EXTRA; give another STRIP_TAG"; return 1; }
-  : > "$f"
+  printf '%s' "$want" | cmp -s - "$f" && return
+  echo "$f holds other TURNS or EXTRA than this job's:"; cat "$f"
+  echo "give another STRIP_TAG, or delete $f if none of the tag's runs has started"; return 1
 }

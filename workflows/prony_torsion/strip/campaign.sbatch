@@ -23,9 +23,10 @@
 # build-x28. The machine: ../../ldp_containment/machine.sh. STRIP_TAG suffixes the run folders
 # (runs/strip<tag>, runs/strip_diag<tag>; the meshes stay in runs/strip/meshes), EXTRA adds options to
 # every run, e.g. another material. EXTRA is split like a shell command line by python's shlex: quotes
-# group words, nothing expands, no newlines. It needs a STRIP_TAG (existing runs are skipped, so
-# materials would mix); $OUT/extra.txt keeps a tag's options and a job with others stops. Set it in the
-# environment, not with sbatch --export (which splits at commas):
+# group words, nothing expands, '#' is no comment, no newlines. It needs a STRIP_TAG (existing runs are
+# skipped, so materials would mix); runs/strip<tag>/stamp.txt keeps the tag's TURNS and EXTRA, also for
+# DIAG=1, and a job with others stops (runs.sh). Set EXTRA in the environment, not with sbatch --export
+# (which splits at commas):
 #   STRIP_TAG=_soft EXTRA="--set material.C10=1e5 --set 'material.relaxation.iso.prony=[{g: 0.2, tau: 1}]'"
 set -u
 [ -n "${EXTRA:-}" ] && [ -z "${STRIP_TAG:-}" ] && { echo "campaign: EXTRA needs a STRIP_TAG"; exit 1; }
@@ -33,10 +34,13 @@ SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 D=$SFEM_ROOT
 TURNS=${TURNS:-1}
+case ${MESH:-} in HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60) ;; *) echo "campaign: MESH=${MESH:-}?"; exit 1 ;; esac
+case $TURNS in ''|*[!0-9.]*) echo "campaign: TURNS=$TURNS?"; exit 1 ;; esac
 if [ "${DIAG:-0}" = 1 ]; then B=${BUILD:+$D/$BUILD}; B=${B:-$SFEM_DIAG_BUILD}; OUT=$SFEM_RUNS/strip_diag${STRIP_TAG:-}
 else B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}; OUT=$SFEM_RUNS/strip${STRIP_TAG:-}; fi
 . "$D/workflows/prony_torsion/strip/runs.sh"
-strip_extra "$OUT" || exit 1
+[ -x $B/playground ] || { echo "campaign: no $B/playground"; exit 1; }
+strip_stamp || exit 1
 MESHES=$SFEM_RUNS/strip/meshes
 [ -d $MESHES ] || $SFEM_PY $D/workflows/prony_torsion/strip/make_meshes.py $MESHES
 src=$MESH; extra=""

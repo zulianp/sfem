@@ -9,8 +9,8 @@ mu_0 g_i of its fast terms (all but the --slow slowest); SFEM_MATERIAL (a YAML f
 `material` block, as stress_strain.py) gives another starting series. Of that file only the relaxation
 times, the weights g_i and mu_0 = 2 (C10 + C01) are read: the type, K (nu = 0.4), C01/C10 = 4 and
 history_storage full are this script's, so the misfit before is that of the given material only if it
-has these. Free are mu_inf = mu_0 g_inf and the slow
-terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (scipy) to
+has these; if not, it warns, and fit.yaml says base_normalised: true and lists base_differences. Free
+are mu_inf = mu_0 g_inf and the slow terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (scipy) to
   - the uniaxial, equibiaxial and planar tests (measured_tests.py: one HEX8 element following each
     measured strain history, quasi-static), the stress at every measured instant over the test's
     largest measured stress, each test weighted 1/sqrt(its samples);
@@ -48,6 +48,48 @@ def base_series():
     series = sorted(((float(p["tau"]), float(p["g"])) for p in m["relaxation"]["iso"]["prony"]), reverse=True)
     mu0 = 2 * (float(m["C10"]) + float(m["C01"]))
     return [(tau, mu0 * g) for tau, g in series], mu0 * (1 - sum(g for _, g in series))
+
+
+def number(v):
+    """v as a float if it is a number or a string of one (YAML reads 1e5 as a string), else None."""
+    if isinstance(v, bool):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def differences(given, own, path):
+    """The keys where two material blocks differ, numbers by more than 1e-3 relative (K from C10 and C01
+    given to 7 digits is off by 4e-5 in simulation 2: mu_inf is 0.2 % of mu_0)."""
+    if isinstance(given, dict) and isinstance(own, dict):
+        out = []
+        for k in sorted(set(given) | set(own), key=str):
+            out += differences(given.get(k), own.get(k), "%s.%s" % (path, k))
+        return out
+    if isinstance(given, list) and isinstance(own, list) and len(given) == len(own):
+        out = []
+        for i in range(len(given)):
+            out += differences(given[i], own[i], "%s.%d" % (path, i))
+        return out
+    g, o = number(given), number(own)
+    if g is not None and o is not None:
+        return [] if math.isclose(g, o, rel_tol=1e-3) else [path]
+    return [] if given == own else [path]
+
+
+def base_differences():
+    """Where the starting material differs from the one this script makes of its series (empty: none)."""
+    m = yaml.safe_load(BASE.read_text())["material"]
+    series, mu_inf = base_series()
+    given = dict(m)
+    if isinstance(m.get("relaxation"), dict) and isinstance(m["relaxation"].get("iso"), dict):
+        iso = dict(m["relaxation"]["iso"])
+        iso["prony"] = sorted(iso.get("prony", []), key=lambda p: float(p["tau"]), reverse=True)
+        iso.setdefault("history_storage", "full")  # the solver's default
+        given["relaxation"] = dict(m["relaxation"], iso=iso)
+    return differences(given, material(mu_inf, series), "material")
 
 
 def material(mu_inf, weights):
@@ -109,6 +151,11 @@ def main():
     dma = [r for r in ({k: float(v) for k, v in r.items()} for r in csv.DictReader(open(a.measurements / "dma.csv")))
            if r["temperature"] == a.dma_temp]
     series, mu_inf0 = base_series()
+    changed = base_differences()
+    if changed:
+        print("fit_series: warning: %s differs from this script's material in %s; the fit starts from its series"
+              " with this script's type, K (nu %g), C01/C10 4 and history_storage" % (BASE, ", ".join(changed), NU),
+              file=sys.stderr)
     slow, fast = series[:a.slow], series[a.slow:]
     x0 = np.log([mu_inf0] + [w for _, w in slow])
     evals = a.out / "evals"
@@ -163,6 +210,7 @@ def main():
     fit = least_squares(fun, x0, diff_step=1e-3, x_scale=1.0, max_nfev=60)
     res, after, mu_inf, weights = residual(fit.x)
     out = {"material": material(mu_inf, weights), "base": str(BASE.resolve()),
+           "base_normalised": bool(changed), "base_differences": changed,
            "mu_inf": mu_inf, "slow_weights": [{"tau": tau, "a": w} for tau, w in weights[:a.slow]],
            "cost_before": float(log[0][0]), "status": int(fit.status), "message": str(fit.message), "nfev": int(fit.nfev),
            "cost": float(sum(v * v for v in res)), "before": before, "after": after}

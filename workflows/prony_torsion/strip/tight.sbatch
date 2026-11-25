@@ -13,8 +13,8 @@
 # iterations), then e_u of the campaign's runs and of these against the tight double run
 # (set strip_tolerance) into P/strip_tolerance_{runs,series}.csv (P: runs/paper_strip<tag>; the job
 # stops if they exist). A run whose folder exists is kept. BUILD as campaign.sbatch's.
-# STRIP_TAG and EXTRA as campaign.sbatch's (EXTRA: split by python's shlex, needs a STRIP_TAG, must
-# match runs/strip<tag>/extra.txt).
+# STRIP_TAG and EXTRA as campaign.sbatch's (EXTRA: split by python's shlex, needs a STRIP_TAG); the
+# case's one turn, so the tag's stamp must hold TURNS=1 and this EXTRA (runs.sh).
 #   [MESH=TET10_60] [BUILD=build-x28] [P=runs/paper_strip<tag>] [STRIP_TAG=] [EXTRA=]
 set -u
 [ -n "${EXTRA:-}" ] && [ -z "${STRIP_TAG:-}" ] && { echo "tight: EXTRA needs a STRIP_TAG"; exit 1; }
@@ -22,14 +22,16 @@ SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 D=$SFEM_ROOT
 MESH=${MESH:-TET10_60}
+case $MESH in HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60) ;; *) echo "tight: MESH=$MESH?"; exit 1 ;; esac
 B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}
+[ -x $B/playground ] || { echo "tight: no $B/playground"; exit 1; }
 src=$MESH; extra=""
 [ $MESH = TET10_60 ] && { src=TET4_60; extra="--set mesh.promote_to_p2=true"; }
 . "$D/workflows/prony_torsion/strip/runs.sh"
-strip_extra "$SFEM_RUNS/strip${STRIP_TAG:-}" || exit 1
 OUT=$SFEM_RUNS/strip${STRIP_TAG:-}/$MESH
 P=${P:-$SFEM_RUNS/paper_strip${STRIP_TAG:-}}
 [ -e $P/strip_tolerance_runs.csv ] && { echo "tight: $P/strip_tolerance_runs.csv exists; give a new P"; exit 1; }
+TURNS=1 strip_stamp || exit 1
 go() {  # <run> <format>
   local W=$OUT/$1_tight
   [ -e $W ] && { echo "$MESH $1_tight: $W exists; kept"; return; }
