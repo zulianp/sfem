@@ -37,9 +37,11 @@ verification:
     decay_relative_error: 4.0e-4
     temporal_rate_deficit: 0.0
     # Against the continuum's mode (k = pi/L): the spatial error of the mesh, O(h^2). At 64
-    # elements, worst of the variants: frequency 8.4e-5, decay 5.0e-5.
+    # elements, worst of the variants: frequency 8.4e-5, decay 5.0e-5. The decay error is small
+    # only because the time-step error (1.0-1.6e-4) cancels the spatial one (about 1.1e-4) at
+    # dt = 0.0025, so its tolerance is about twice the spatial error alone, not the measured sum.
     continuum_frequency_relative_error: 2.0e-4
-    continuum_decay_relative_error: 1.2e-4
+    continuum_decay_relative_error: 2.5e-4
     # The field stays the sine: axial residual and lateral motion over the whole displacement.
     off_mode_fraction_max: 1.0e-4
 

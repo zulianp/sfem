@@ -302,8 +302,9 @@ outside this material-focused catalog.
 - **Pass conditions:** amplitude against the replayed scheme to `1e-7` at every step; at the
   finest step, history L2 to `4e-4`, fitted frequency to `6e-5` and decay to `4e-4` (two to two
   and a half times the scheme's own error there); temporal rate at least `1.8`; continuum
-  frequency to `2e-4` and decay to `1.2e-4` at 64 elements, `5e-3` and `4e-3` at 16 (the mesh's
-  `O(h^2)`, two and a half to three times the measured).
+  frequency to `2e-4` and decay to `2.5e-4` at 64 elements, `5e-3` and `4e-3` at 16 (the mesh's
+  `O(h^2)`, two to three times the spatial error; the measured continuum decay error is smaller
+  because the time-step error cancels part of it at the finest step).
 - **Failure modes exposed:** the coupling of the history to Newmark's implicit step, mass and
   stiffness scaling, and damping from the series rather than a viscosity.
 
