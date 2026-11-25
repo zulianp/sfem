@@ -22,8 +22,13 @@
 # BUILD names a build folder of the sfem tree; without it, SFEM_BUILD (DIAG: SFEM_DIAG_BUILD), else
 # build-x28. The machine: ../../ldp_containment/machine.sh. STRIP_TAG suffixes the run folders
 # (runs/strip<tag>, runs/strip_diag<tag>; the meshes stay in runs/strip/meshes), EXTRA adds options to
-# every run (another material: --set material.C10=... --set material.relaxation.iso.prony=[...]).
+# every run, e.g. another material. EXTRA is split into shell words, so quote a value with spaces; it
+# needs a STRIP_TAG (existing runs are skipped, so materials would mix). Set it in the environment, not
+# with sbatch --export (which splits at commas):
+#   STRIP_TAG=_soft EXTRA="--set material.C10=1e5 --set 'material.relaxation.iso.prony=[{g: 0.2, tau: 1}]'"
 set -u
+[ -n "${EXTRA:-}" ] && [ -z "${STRIP_TAG:-}" ] && { echo "campaign: EXTRA needs a STRIP_TAG"; exit 1; }
+set -f; eval "opts=(--set solver.newton.verbose=true ${EXTRA:-})" || exit 1; set +f
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 D=$SFEM_ROOT
@@ -50,7 +55,7 @@ go() {  # <run>: <format>[_sr][_plain][_s32] (runs.sh), qblock<k> quant_block at
   SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_HOST $B/playground case.yaml --set execution_space=host \
       --set constraints.0.angle=$(echo "$TURNS * 6.283185307179586" | bc -l) \
       --set material.relaxation.iso.history_storage=$fmt --set material.relaxation.iso.stress_storage=$stress $h $extra \
-      --set solver.newton.verbose=true ${EXTRA:-} > run.log 2>&1
+      "${opts[@]}" > run.log 2>&1
   echo "$MESH $run rc=$? wall=$(echo "$(date +%s.%N) - $start" | bc)s failed=$(grep -c 'attempt failed' run.log)" \
        "projected=$(grep -c ' projected,' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }

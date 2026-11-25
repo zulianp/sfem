@@ -5,7 +5,8 @@
                   [--dma-weight 1]
 
 The relaxation times stay those of the series in simulation 2's case file; so do the absolute weights
-mu_0 g_i of its fast terms (all but the --slow slowest). Free are mu_inf = mu_0 g_inf and the slow
+mu_0 g_i of its fast terms (all but the --slow slowest); SFEM_MATERIAL (a YAML file with a
+`material` block, as stress_strain.py) gives another starting series. Free are mu_inf = mu_0 g_inf and the slow
 terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (scipy) to
   - the uniaxial, equibiaxial and planar tests (measured_tests.py: one HEX8 element following each
     measured strain history, quasi-static), the stress at every measured instant over the test's
@@ -15,7 +16,7 @@ terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (sc
 K stays tied to mu_inf by nu = 0.4, C01/C10 stays 4. <measurements> holds uniaxial.csv, equibiax.csv,
 pureshear.csv and dma.csv (epdm281_extract.py). The case files' fit (job 5316026) ran with --slow 4 on
 the 15-term series scaled by 0.6375; it left the 1610 s term a weight of 1.6e-9, which was then dropped. <out> must not exist; writes <out>/fit.yaml (the
-material block, the parameters, and the misfit before and after) and <out>/evals.csv.
+material block, the starting file, the parameters, and the misfit before and after) and <out>/evals.csv.
 """
 
 import argparse
@@ -32,14 +33,15 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from measured_tests import TESTS, run  # noqa: E402
-from stress_strain import ROOT, SIM2  # noqa: E402
+from stress_strain import MATERIAL_FILE, ROOT, SIM2  # noqa: E402
 
 NU = 0.4
+BASE = Path(MATERIAL_FILE) if MATERIAL_FILE else SIM2
 
 
 def base_series():
-    """Simulation 2's (tau_i, mu_0 g_i) slowest first, and its mu_inf, in Pa."""
-    m = yaml.safe_load(SIM2.read_text())["material"]
+    """Simulation 2's (or SFEM_MATERIAL's) (tau_i, mu_0 g_i) slowest first, and its mu_inf, in Pa."""
+    m = yaml.safe_load(BASE.read_text())["material"]
     series = sorted(((float(p["tau"]), float(p["g"])) for p in m["relaxation"]["iso"]["prony"]), reverse=True)
     mu0 = 2 * (float(m["C10"]) + float(m["C01"]))
     return [(tau, mu0 * g) for tau, g in series], mu0 * (1 - sum(g for _, g in series))
@@ -157,7 +159,7 @@ def main():
     _, before, _, _ = residual(x0)
     fit = least_squares(fun, x0, diff_step=1e-3, x_scale=1.0, max_nfev=60)
     res, after, mu_inf, weights = residual(fit.x)
-    out = {"material": material(mu_inf, weights),
+    out = {"material": material(mu_inf, weights), "base": str(BASE.resolve()),
            "mu_inf": mu_inf, "slow_weights": [{"tau": tau, "a": w} for tau, w in weights[:a.slow]],
            "cost_before": float(log[0][0]), "status": int(fit.status), "message": str(fit.message), "nfev": int(fit.nfev),
            "cost": float(sum(v * v for v in res)), "before": before, "after": after}
