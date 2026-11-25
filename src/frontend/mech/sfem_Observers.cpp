@@ -706,7 +706,13 @@ namespace sfem {
 #ifdef SFEM_ENABLE_CUDA
                 device_now   = real_t(d_memory_in_use());
                 device_peak_ = std::max(device_peak_, device_now);
+#if defined(__HIP_PLATFORM_SPIRV__)
+                // No memory pools under chipStar (base/hip/sfem_gpu_runtime_spirv.hpp): no high-water
+                // mark to read, which is not a zero one.
+                pool_peak = std::numeric_limits<real_t>::quiet_NaN();
+#else
                 pool_peak    = real_t(d_memory_pool_peak() + cu_prony_work_pool_peak());
+#endif
 #endif
                 sums_.assign({rss, device_peak_, device_now, pool_peak});
                 if (account_) {

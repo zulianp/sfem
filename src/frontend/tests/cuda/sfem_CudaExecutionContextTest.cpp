@@ -105,7 +105,8 @@ int test_blas_runs_on_its_stream() {
 #if defined(__HIP_PLATFORM_SPIRV__)
     // chipStar (HIP on SPIR-V) does not complete another stream's copy while this stream waits on
     // a host function: the probe below would wait for the gate, which opens after it. Whether the
-    // work ran early is not observable there; its results are checked below.
+    // work ran early is not observable there: its results are checked below, and the test, whose
+    // point is the stream, reports itself skipped.
     int ran_early = 0;
     printf("  (chipStar: the early-run probe is not taken)\n");
 #else
@@ -144,7 +145,11 @@ int test_blas_runs_on_its_stream() {
     SFEM_TEST_ASSERT(ran_early == 0);
     SFEM_TEST_ASSERT(wrong == 0);
     SFEM_TEST_ASSERT(std::abs(rd - dot) <= 1e-12 * dot);
+#if defined(__HIP_PLATFORM_SPIRV__)
+    return SFEM_TEST_SKIPPED;
+#else
     return SFEM_TEST_SUCCESS;
+#endif
 }
 
 int test_dot_into_device_memory_is_captured() {

@@ -16,6 +16,14 @@
 
 #include <hip/hip_runtime.h>
 
+#if defined(__HIP_PLATFORM_SPIRV__)
+// chipStar: the calls that take no stream (hipMemcpy, hipStreamSynchronize(0), ...) onto the calling
+// thread's default stream, as in the HIP sources, which take this header by -include
+// (cmake/SFEMDependencies.cmake). The host sources built by the C++ compiler take it here, before
+// any of the calls below.
+#include "sfem_chipstar_spt.h"
+#endif
+
 #include "smesh_gpu_runtime.cuh"
 
 // The HIP runtime follows the CUDA 12 API: the branches written for older toolkits (pointer

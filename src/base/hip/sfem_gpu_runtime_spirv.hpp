@@ -9,6 +9,7 @@
 #include <hip/hip_runtime.h>
 
 #include <algorithm>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -17,12 +18,19 @@ namespace sfem {
         // The null stream is the calling thread's default stream (HIP_API_PER_THREAD_DEFAULT_STREAM).
         inline hipStream_t capture_key(const hipStream_t stream) { return stream ? stream : hipStreamPerThread; }
 
-        /// The streams the calling thread is capturing. chipStar does not report a capture's status
-        /// (hipStreamIsCapturing is not supported); SFEM begins and ends its captures through the two
-        /// functions below, on the thread that issues the captured work, and answers from this list.
+        /// The streams being captured, by any thread of the process. chipStar does not report a
+        /// capture's status (hipStreamIsCapturing is not supported); SFEM begins and ends its captures
+        /// through the two functions below and answers from this list. A capture begun around them
+        /// (chipStar's calls made directly, or through SCCD's or smesh's runtime headers) is not in it
+        /// and reads as none.
         inline std::vector<hipStream_t> &capturing_streams() {
-            thread_local std::vector<hipStream_t> streams;
+            static std::vector<hipStream_t> streams;
             return streams;
+        }
+
+        inline std::mutex &capturing_streams_mutex() {
+            static std::mutex mutex;
+            return mutex;
         }
 
         /// chipStar captures a created stream, but capturing the per-thread default stream crashes it
@@ -31,20 +39,27 @@ namespace sfem {
         inline hipError_t stream_begin_capture(const hipStream_t stream, const hipStreamCaptureMode mode) {
             if (capture_key(stream) == hipStreamPerThread) return hipErrorStreamCaptureUnsupported;
             const hipError_t err = hipStreamBeginCapture(stream, mode);
-            if (err == hipSuccess) capturing_streams().push_back(capture_key(stream));
+            if (err == hipSuccess) {
+                std::lock_guard<std::mutex> lock(capturing_streams_mutex());
+                capturing_streams().push_back(capture_key(stream));
+            }
             return err;
         }
 
         // The capture ends whether or not a graph comes out of it.
         inline hipError_t stream_end_capture(const hipStream_t stream, hipGraph_t *const graph) {
-            auto     &streams = capturing_streams();
-            const auto it      = std::find(streams.begin(), streams.end(), capture_key(stream));
-            if (it != streams.end()) streams.erase(it);
+            {
+                std::lock_guard<std::mutex> lock(capturing_streams_mutex());
+                auto      &streams = capturing_streams();
+                const auto it      = std::find(streams.begin(), streams.end(), capture_key(stream));
+                if (it != streams.end()) streams.erase(it);
+            }
             return hipStreamEndCapture(stream, graph);
         }
 
         inline hipError_t stream_is_capturing(const hipStream_t stream, hipStreamCaptureStatus *const status) {
-            const auto &streams = capturing_streams();
+            std::lock_guard<std::mutex> lock(capturing_streams_mutex());
+            const auto                 &streams = capturing_streams();
             *status = std::find(streams.begin(), streams.end(), capture_key(stream)) != streams.end() ? hipStreamCaptureStatusActive
                                                                                                     : hipStreamCaptureStatusNone;
             return hipSuccess;
@@ -77,16 +92,21 @@ namespace sfem {
 
         /// chipStar does not support hipFuncSetAttribute. The one attribute SFEM sets, the dynamic
         /// shared memory a launch may take, needs no opt-in there: any amount within the device's
-        /// shared memory per block can be launched.
+        /// shared memory per block can be launched. The limit is the larger of the two a caller reads
+        /// (base and opt-in, as frontend/ops/inexact/cuda/sfem_cuda_InexactSetup.cuh), so a request
+        /// within what the device reports is accepted. chipStar (main, 2714ed9) leaves the opt-in at
+        /// 0: it sets only sharedMemPerBlock, from Level Zero's maxSharedLocalMemory, and the callers
+        /// then stay within the base limit and do not ask.
         template <typename Kernel>
         inline hipError_t func_set_attribute(Kernel *const, const hipFuncAttribute attribute, const int value) {
             if (attribute != hipFuncAttributeMaxDynamicSharedMemorySize) return hipErrorNotSupported;
-            int device = 0, limit = 0;
+            int device = 0, limit = 0, optin = 0;
             if (hipGetDevice(&device) != hipSuccess ||
                 hipDeviceGetAttribute(&limit, hipDeviceAttributeMaxSharedMemoryPerBlock, device) != hipSuccess) {
                 return hipErrorInvalidDevice;
             }
-            return value >= 0 && value <= limit ? hipSuccess : hipErrorInvalidValue;
+            if (hipDeviceGetAttribute(&optin, hipDeviceAttributeSharedMemPerBlockOptin, device) != hipSuccess) optin = 0;
+            return value >= 0 && value <= std::max(limit, optin) ? hipSuccess : hipErrorInvalidValue;
         }
     }  // namespace spirv
 }  // namespace sfem
