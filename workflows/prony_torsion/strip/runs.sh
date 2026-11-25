@@ -29,10 +29,13 @@ strip_runs() {  # the main campaign's runs; DIAG=1: the diagnostics build's (los
 # LEGACY=1; a tagged folder needs the stamp written by hand (3f487e44 and 91244183 ran EXTRA without
 # one, 19e86144 wrote extra.txt with EXTRA's words only), e.g.
 #   printf 'TURNS=1\nEXTRA=--set\nEXTRA=material.C10=1e5\n' > runs/strip_soft/stamp.txt
-strip_check() {  # STRIP_TAG, TURNS (normalised: 1.0 is 1) and MESH, those set; 1 if one is wrong
+strip_tag_check() {  # STRIP_TAG; 1 if wrong
   case ${STRIP_TAG:-} in
     *[!A-Za-z0-9_-]*|_diag*) echo "STRIP_TAG=$STRIP_TAG: letters, digits, _ and - only, not _diag..."; return 1 ;;
   esac
+}
+strip_check() {  # STRIP_TAG, TURNS (normalised: 1.0 is 1) and MESH, those set; 1 if one is wrong
+  strip_tag_check || return 1
   if [ -n "${TURNS+set}" ]; then
     [[ $TURNS =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "TURNS=$TURNS: a number, as 1 or 1.5"; return 1; }
     TURNS=$(echo "$TURNS" | sed -E 's/^0+([0-9])/\1/; /\./s/0+$//; s/\.$//')
@@ -42,10 +45,11 @@ strip_check() {  # STRIP_TAG, TURNS (normalised: 1.0 is 1) and MESH, those set; 
     *) echo "MESH=$MESH: HEX8_60, HEX8_120, HEX27_30, HEX27_60, TET4_60 or TET10_60"; return 1 ;;
   esac
 }
-strip_stamp() {  # TURNS, EXTRA, STRIP_TAG: opts=(newton output, EXTRA's words), or 1 if refused
-  local tag=${STRIP_TAG:-} dir=$SFEM_RUNS/strip${STRIP_TAG:-} f words want n i a old tmp legacy=
+strip_stamp() {  # TURNS, EXTRA, STRIP_TAG: opts=(EXTRA's words), or 1 if refused
+  local tag=${STRIP_TAG:-} dir=$SFEM_RUNS/strip${STRIP_TAG:-} f words=0 want n i a old tmp legacy=
   f=$dir/stamp.txt
-  words=$($SFEM_PY -I -c 'import os, shlex, sys
+  if [[ ${EXTRA:-} = *[![:space:]]* ]]; then  # python only for an EXTRA with words
+    words=$($SFEM_PY -I -c 'import os, shlex, sys
 e = os.environ.get("EXTRA", "")
 if "\n" in e:
     sys.exit("EXTRA has a newline")
@@ -56,7 +60,8 @@ except ValueError as x:
 print(len(w))
 for a in w:
     print(a)') || return 1
-  opts=(--set solver.newton.verbose=true); want="TURNS=$TURNS"$'\n'
+  fi
+  opts=(); want="TURNS=$TURNS"$'\n'
   { read -r n; i=0; while [ "$i" -lt "$n" ]; do IFS= read -r a; opts+=("$a"); want="${want}EXTRA=$a"$'\n'; i=$((i+1)); done; } <<< "$words"
   mkdir -p "$dir" || return 1
   # runs from before the stamp: listed before the stamp is looked for, since a job makes runs only

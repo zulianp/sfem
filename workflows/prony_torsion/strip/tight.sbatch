@@ -39,7 +39,7 @@ go() {  # <run> <format>
   ln -s $SFEM_RUNS/strip/meshes/$src mesh; cp $D/workflows/prony_torsion/cases/epdm_strip_turns.yaml case.yaml
   SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_HOST $B/playground case.yaml --set execution_space=host \
       --set material.relaxation.iso.history_storage=$2 --set solver.newton.atol=1e-9 --set solver.newton.max_it=60 \
-      $extra "${opts[@]}" > run.log 2>&1
+      --set solver.newton.verbose=true $extra "${opts[@]}" > run.log 2>&1
   echo "$MESH $1_tight rc=$? failed=$(grep -c 'attempt failed' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }
 go full_a full &

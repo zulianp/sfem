@@ -60,7 +60,7 @@ go() {  # <run>: <format>[_sr][_plain][_s32] (runs.sh), qblock<k> quant_block at
   SMESH_TRACE_FILE=$W/smesh.trace.csv $SFEM_LAUNCH_HOST $B/playground case.yaml --set execution_space=host \
       --set constraints.0.angle=$(echo "$TURNS * 6.283185307179586" | bc -l) \
       --set material.relaxation.iso.history_storage=$fmt --set material.relaxation.iso.stress_storage=$stress $h $extra \
-      "${opts[@]}" > run.log 2>&1
+      --set solver.newton.verbose=true "${opts[@]}" > run.log 2>&1
   echo "$MESH $run rc=$? wall=$(echo "$(date +%s.%N) - $start" | bc)s failed=$(grep -c 'attempt failed' run.log)" \
        "projected=$(grep -c ' projected,' run.log) t=$(tail -1 results/history.csv | cut -d, -f2)"
 }

@@ -18,7 +18,7 @@ SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 PY=$SFEM_PY
 COL=$PAPER_PY/collect_prony.py
 . "$SFEM_ROOT/workflows/prony_torsion/strip/runs.sh"
-strip_check || exit 1
+strip_tag_check || exit 1
 S=$SFEM_RUNS/strip${STRIP_TAG:-}/stamp.txt
 if [ ! -e $S ] && { [ -n "${STRIP_TAG:-}" ] || [ ! -d $SFEM_RUNS/strip ]; }; then
   echo "collect: no $S (no campaign with this tag, or its runs are from before stamps: runs.sh)"; exit 1
