@@ -21,17 +21,17 @@ set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 D=$SFEM_ROOT
-MESH=${MESH:-TET10_60}
-case $MESH in HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60) ;; *) echo "tight: MESH=$MESH?"; exit 1 ;; esac
+MESH=${MESH:-TET10_60}; TURNS=1  # the case's one turn
+. "$D/workflows/prony_torsion/strip/runs.sh"
+strip_check || exit 1
 B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}
 [ -x $B/playground ] || { echo "tight: no $B/playground"; exit 1; }
 src=$MESH; extra=""
 [ $MESH = TET10_60 ] && { src=TET4_60; extra="--set mesh.promote_to_p2=true"; }
-. "$D/workflows/prony_torsion/strip/runs.sh"
 OUT=$SFEM_RUNS/strip${STRIP_TAG:-}/$MESH
 P=${P:-$SFEM_RUNS/paper_strip${STRIP_TAG:-}}
 [ -e $P/strip_tolerance_runs.csv ] && { echo "tight: $P/strip_tolerance_runs.csv exists; give a new P"; exit 1; }
-TURNS=1 strip_stamp || exit 1
+strip_stamp || exit 1
 go() {  # <run> <format>
   local W=$OUT/$1_tight
   [ -e $W ] && { echo "$MESH $1_tight: $W exists; kept"; return; }

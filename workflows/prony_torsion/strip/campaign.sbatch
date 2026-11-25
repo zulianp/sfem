@@ -33,12 +33,11 @@ set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 D=$SFEM_ROOT
-TURNS=${TURNS:-1}
-case ${MESH:-} in HEX8_60|HEX8_120|HEX27_30|HEX27_60|TET4_60|TET10_60) ;; *) echo "campaign: MESH=${MESH:-}?"; exit 1 ;; esac
-case $TURNS in ''|*[!0-9.]*) echo "campaign: TURNS=$TURNS?"; exit 1 ;; esac
+TURNS=${TURNS:-1}; MESH=${MESH:-}
+. "$D/workflows/prony_torsion/strip/runs.sh"
+strip_check || exit 1
 if [ "${DIAG:-0}" = 1 ]; then B=${BUILD:+$D/$BUILD}; B=${B:-$SFEM_DIAG_BUILD}; OUT=$SFEM_RUNS/strip_diag${STRIP_TAG:-}
 else B=${BUILD:+$D/$BUILD}; B=${B:-${SFEM_BUILD:-$D/build-x28}}; OUT=$SFEM_RUNS/strip${STRIP_TAG:-}; fi
-. "$D/workflows/prony_torsion/strip/runs.sh"
 [ -x $B/playground ] || { echo "campaign: no $B/playground"; exit 1; }
 strip_stamp || exit 1
 MESHES=$SFEM_RUNS/strip/meshes
