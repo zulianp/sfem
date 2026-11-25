@@ -27,11 +27,13 @@ import yaml
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 SIM2 = ROOT / "workflows/ldp_containment/transient/LDP24A/sim2.yaml"
+# Another material: SFEM_MATERIAL names a YAML file whose `material` block replaces simulation 2's.
+MATERIAL_FILE = os.environ.get("SFEM_MATERIAL")
 
 
 def material(terms):
-    """Simulation 2's material with its series truncated to the `terms` slowest, rescaled."""
-    m = yaml.safe_load(SIM2.read_text())["material"]
+    """Simulation 2's material (or SFEM_MATERIAL's) with its series truncated to the `terms` slowest, rescaled."""
+    m = yaml.safe_load((Path(MATERIAL_FILE) if MATERIAL_FILE else SIM2).read_text())["material"]
     # PyYAML reads 9.308e7 as a string (YAML 1.1 wants a sign in the exponent).
     series = sorted(({"g": float(p["g"]), "tau": float(p["tau"])} for p in m["relaxation"]["iso"]["prony"]),
                     key=lambda p: -p["tau"])
