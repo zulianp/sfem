@@ -29,15 +29,17 @@ verification:
     # The modal amplitude against Newmark with the material's recursion on the mode, every level.
     discrete_amplitude_max_relative_error: 1.0e-7
     # Against the mesh's mode exact in time (no spatial error): history, fitted frequency and
-    # decay at the finest step, and the rate over the three. The scheme's own history error at
-    # dt = 0.0025 is 1.81e-4 (linear) and 2.05e-4 (midpoint), so 4e-4 leaves a factor of two.
+    # decay at the finest step, and the rate over the three. The scheme's own errors at
+    # dt = 0.0025, worst of the variants: history 2.05e-4, frequency 2.4e-5, decay 1.6e-4; each
+    # tolerance is about 2-2.5 times that.
     amplitude_history_relative_l2: 4.0e-4
-    frequency_relative_error: 1.0e-3
-    decay_relative_error: 1.0e-3
+    frequency_relative_error: 6.0e-5
+    decay_relative_error: 4.0e-4
     temporal_rate_deficit: 0.0
-    # Against the continuum's mode (k = pi/L): the spatial error of the mesh, O(h^2).
-    continuum_frequency_relative_error: 1.0e-3
-    continuum_decay_relative_error: 2.0e-3
+    # Against the continuum's mode (k = pi/L): the spatial error of the mesh, O(h^2). At 64
+    # elements, worst of the variants: frequency 8.4e-5, decay 5.0e-5.
+    continuum_frequency_relative_error: 2.0e-4
+    continuum_decay_relative_error: 1.2e-4
     # The field stays the sine: axial residual and lateral motion over the whole displacement.
     off_mode_fraction_max: 1.0e-4
 
@@ -61,10 +63,11 @@ variants:
   - <<: *base
     id: hex8_midpoint
     resolution: {nx: 64, ny: 1, nz: 1, integrator: midpoint, prony_g: "0.3,0.2", prony_tau: "0.05,0.3"}
-  # Sixteen elements: the mesh's mode still exact, the continuum's 0.3 % away.
+  # Sixteen elements: the mesh's mode still exact, the continuum's frequency and decay both
+  # 1.7e-3 away.
   - <<: *base
     id: hex8_linear_nx16
     resolution: {nx: 16, ny: 1, nz: 1, integrator: linear, prony_g: "0.3,0.2", prony_tau: "0.05,0.3"}
     tolerances:
       continuum_frequency_relative_error: 5.0e-3
-      continuum_decay_relative_error: 1.0e-2
+      continuum_decay_relative_error: 4.0e-3

@@ -35,8 +35,9 @@ for path in (SUITE_DIR, CASE_DIR):
         sys.path.insert(0, str(path))
 
 from common.metrics import relative_l2_error  # noqa: E402
+from common.prony import parse_series  # noqa: E402
 from common.run_prony_relaxation import run_level  # noqa: E402
-from oracle import elastic_axial_reaction, parse_series, relaxation_factor  # noqa: E402
+from oracle import elastic_axial_reaction, relaxation_factor  # noqa: E402
 from verify import reaction_history  # noqa: E402
 
 FORMATS = ("full", "float32", "float16_scaled", "int16_scaled", "int8_scaled")

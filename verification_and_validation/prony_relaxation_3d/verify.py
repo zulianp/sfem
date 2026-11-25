@@ -13,10 +13,11 @@ if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
 from common.metrics import relative_l2_error
+from common.prony import parse_series
 from common.reporting import build_verification_report, make_check, write_verification_report
 from common.transient import TIME_LEVELS
 from common.run_prony_relaxation import temperature_label
-from oracle import elastic_axial_reaction, parse_series, relaxation_factor, wlf_shift
+from oracle import elastic_axial_reaction, relaxation_factor, wlf_shift
 
 
 def reaction_history(folder, expected_times):

@@ -9,7 +9,8 @@ import numpy as np
 SUITE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SUITE_DIR))
 
-from common.prony import step_weights  # noqa: E402
+from common.convergence import successive_rates  # noqa: E402
+from common.prony import REFERENCE_STEPS_PER_PERIOD, check_steps_per_period, step_weights  # noqa: E402
 
 
 def load_module(name, relative_path):
@@ -34,6 +35,28 @@ class StepWeightTests(unittest.TestCase):
             _, midpoint = step_weights(g, tau, dt, "midpoint")
             np.testing.assert_allclose(alpha, np.exp(-dt / tau), rtol=1.0e-15)
             np.testing.assert_allclose((linear - midpoint) / g, (dt / tau) ** 2 / 24.0, rtol=2.0 * x)
+
+
+class LevelTests(unittest.TestCase):
+    def test_rates_use_the_actual_level_ratio(self):
+        # Steps per period 64, 256, 1024 (a ratio of four) with a first-order error: rate 1, not 2.
+        levels = [64, 256, 1024]
+        period = 2.0 * np.pi / 10.0
+        dts = [period / n for n in levels]
+        errors = [3.0 * dt for dt in dts]
+        np.testing.assert_allclose(successive_rates(dts, errors), [1.0, 1.0], rtol=1.0e-12)
+        # log2 of the error ratio alone, which assumes the levels double, reads it as second order.
+        self.assertAlmostEqual(np.log2(errors[0] / errors[1]), 2.0)
+        # Halving steps with a second-order error: rate 2.
+        np.testing.assert_allclose(successive_rates([0.01, 0.005, 0.0025], [4.0e-4, 1.0e-4, 2.5e-5]),
+                                   [2.0, 2.0], rtol=1.0e-12)
+
+    def test_steps_per_period_must_divide_the_reference(self):
+        self.assertEqual(check_steps_per_period([64, 256, 1024]), [64, 256, 1024])
+        self.assertEqual(REFERENCE_STEPS_PER_PERIOD % 1024, 0)
+        for levels in ([64, 96, 128], [0, 64, 128], [-64, 128, 256]):
+            with self.assertRaises(ValueError):
+                check_steps_per_period(levels)
 
 
 class HarmonicOracleTests(unittest.TestCase):

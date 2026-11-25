@@ -1,4 +1,5 @@
-"""Prony-series helpers shared by the Prony V&V cases (prony_harmonic_3d, prony_bar_mode_3d).
+"""Prony-series helpers shared by the Prony V&V cases (prony_relaxation_3d, prony_harmonic_3d,
+prony_bar_mode_3d).
 
 A Prony series relaxes the isochoric stress of `GeneratedMooneyRivlinProny` as
 
@@ -20,6 +21,21 @@ written from the formulas above, not taken from SFEM's kernels.
 """
 
 import numpy as np
+
+# prony_harmonic_3d's continuum reference: the recursion replayed at this many steps per period,
+# an O(dt^2) error of about 5e-8 of the hereditary stress, far below every level's. Each level's
+# steps_per_period must divide it, so that every level's step lands on a reference step.
+REFERENCE_STEPS_PER_PERIOD = 8192
+
+
+def check_steps_per_period(levels):
+    """The harmonic case's steps per period as ints, each positive and dividing the reference's."""
+    levels = [int(value) for value in levels]
+    for steps_per_period in levels:
+        if steps_per_period <= 0 or REFERENCE_STEPS_PER_PERIOD % steps_per_period:
+            raise ValueError(f"steps_per_period {steps_per_period} does not divide the reference's "
+                             f"{REFERENCE_STEPS_PER_PERIOD}: the level's steps would not land on reference steps")
+    return levels
 
 
 def parse_series(values):

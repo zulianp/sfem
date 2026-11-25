@@ -17,7 +17,7 @@ if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
 from common import playground
-from common.prony import material_config
+from common.prony import check_steps_per_period, material_config
 from common.transient import TIME_LEVELS
 
 
@@ -63,7 +63,7 @@ def main():
 
     config = yaml.safe_load(args.case.read_text(encoding="utf-8"))
     omegas = [float(value) for value in config["loading"]["omegas"]]
-    levels = [int(value) for value in config["time"]["steps_per_period"]]
+    levels = check_steps_per_period(config["time"]["steps_per_period"])
     cycles = int(config["time"]["cycles"])
     if len(levels) != len(TIME_LEVELS):
         raise ValueError("the harmonic case requires exactly three step levels")

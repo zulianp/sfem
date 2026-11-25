@@ -11,8 +11,9 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
+from common.convergence import successive_rates
 from common.metrics import relative_l2_error
-from common.prony import check_series
+from common.prony import REFERENCE_STEPS_PER_PERIOD, check_series, check_steps_per_period
 from common.reporting import build_verification_report, make_check, write_verification_report
 from common.run_prony_harmonic import frequency_label
 from common.transient import TIME_LEVELS
@@ -23,12 +24,6 @@ from oracle import (
     discrete_complex_modulus,
     harmonic_fit,
 )
-
-# The continuum reference: the recursion replayed at this many steps per period, an O(dt^2)
-# error of about 5e-8 of the hereditary stress, far below every level's. Each level's
-# steps_per_period must divide it, so that every level's step lands on a reference step.
-REFERENCE_STEPS_PER_PERIOD = 8192
-
 
 def reaction_history(folder, expected_times):
     """The right face's axial reaction resultant at every step. generate_bar_mesh makes a unit
@@ -75,12 +70,8 @@ def main():
     integrator = str(resolution["integrator"])
     g, tau = check_series(str(resolution["prony_g"]), str(resolution["prony_tau"]))
     omegas = [float(value) for value in config["loading"]["omegas"]]
-    levels = [int(value) for value in config["time"]["steps_per_period"]]
+    levels = check_steps_per_period(config["time"]["steps_per_period"])
     cycles = int(config["time"]["cycles"])
-    for steps_per_period in levels:
-        if steps_per_period <= 0 or REFERENCE_STEPS_PER_PERIOD % steps_per_period:
-            raise ValueError(f"steps_per_period {steps_per_period} does not divide the reference's "
-                             f"{REFERENCE_STEPS_PER_PERIOD}: the level's steps would not land on reference steps")
     m_iso, m_vol = axial_modulus(c10, c01, K)
     # The continuum checks hold where the coarsest step resolves the fastest relaxation time.
     resolved = [2.0 * np.pi / omega / levels[0] <= float(np.min(tau)) * (1.0 + 1.0e-12) for omega in omegas]
@@ -134,7 +125,7 @@ def main():
                     loss_errors.append(abs(fit.imag - exact.imag) / abs(exact.imag))
             rows.append([omega, steps_per_period, int(resolved[index]), error, algorithmic_errors[-1], area, ref_area]
                         + ([fit.real, fit.imag] if fit is not None else [np.nan, np.nan]))
-        level_rates = [float(np.log2(level_errors[k] / level_errors[k + 1])) for k in range(len(level_errors) - 1)]
+        level_rates = successive_rates([period / n for n in levels], level_errors)
         all_rates[str(omega)] = level_rates
         if resolved[index]:
             rates.extend(level_rates)

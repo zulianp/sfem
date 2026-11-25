@@ -12,6 +12,7 @@ SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
+from common.convergence import successive_rates
 from common.mesh import read_mesh
 from common.metrics import relative_l2_error
 from common.prony import check_series
@@ -89,7 +90,7 @@ def main():
         history_errors.append(relative_l2_error(observed, exact))
         levels[name] = (times, observed, exact)
 
-    rates = [float(np.log2(history_errors[k] / history_errors[k + 1])) for k in range(len(history_errors) - 1)]
+    rates = successive_rates(time_steps, history_errors)
     times, observed, exact = levels[TIME_LEVELS[-1]]
     decay, omega = fit_mode(times, observed, mesh_mode["relaxation_rates"], mesh_mode)
     measured = {
