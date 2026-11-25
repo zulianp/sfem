@@ -31,7 +31,10 @@ namespace sfem {
         /// With Newton managing the tangent's projection (tangent_projection: on_failure), a QP on
         /// the tangent itself that qp_max_it stopped counts as negative curvature: the iteration is
         /// repeated on the projected tangent. MPRGP converges on a positive definite operator; on
-        /// an indefinite one it can stall without meeting a negative curvature direction.
+        /// an indefinite one it can stall without meeting a negative curvature direction. It comes
+        /// before qp_accept_capped, which then takes a capped QP on the projected tangent. Not in
+        /// the step that carries the boundary's increment, which Newton takes whole: there a capped
+        /// QP falls back as without this option.
         bool qp_capped_projects{false};
         /// The obstacle's curvature in the tangent.
         bool curvature{true};

@@ -182,6 +182,9 @@ namespace sfem {
         // there). `solved`: the step that led to x solved a linear problem.
         auto iterate = [&](bool solved) -> NonlinearReport::Status {
             bool known = false;
+            // The iteration is repeated from the same x (project_below_alpha), whose merit the
+            // nonmonotone window already holds.
+            bool repeated = false;
             for (int it = 0;; ++it) {
                 log.iteration = count;
 
@@ -233,8 +236,11 @@ namespace sfem {
                 if (merit) {
                     const real_t m0    = merit->at(x, r);
                     const real_t slope = merit->slope(x, r, dx, m0);
-                    recent.push_back(m0);
-                    if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    if (!repeated) {
+                        recent.push_back(m0);
+                        if ((int)recent.size() > std::max(1, opts.line_search.nonmonotone)) recent.erase(recent.begin());
+                    }
+                    repeated               = false;
                     const real_t reference = *std::max_element(recent.begin(), recent.end());
                     log.line_search        = line_search.search(*merit, x, dx, m0, slope, reference);
                 } else {
@@ -250,11 +256,14 @@ namespace sfem {
                         if (opts.tangent_projection == TangentProjection::ON_FAILURE && !projected &&
                             log.line_search.alpha < opts.project_below_alpha) {
                             // A direction the merit decreases along only for a tiny step: the
-                            // tangent is indefinite here, as for no decrease at all.
-                            projected = true;
+                            // tangent is indefinite here, as for no decrease at all. The step is
+                            // not taken: the next iterate's monitor shows x where it was.
+                            projected             = true;
                             ++report.projections;
                             impl.step->set_tangent_projection(true);
-                            known = false;
+                            known                 = false;
+                            repeated              = true;
+                            log.line_search.alpha = 0;
                             continue;
                         }
                         break;

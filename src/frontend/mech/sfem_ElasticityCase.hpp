@@ -84,7 +84,8 @@ namespace sfem {
     ///   qp: {max_it: 20000, rtol: 1e-10}
     ///                                        # node_sdf: accept_capped: true takes a QP its max_it
     ///                                        # stopped as the step; capped_projects: true (with
-    ///                                        # tangent_projection: on_failure) repeats it projected
+    ///                                        # tangent_projection: on_failure) repeats it projected,
+    ///                                        # before accept_capped
     ///   ssmgc: {penalty_param: 10, coarse_op_type: BSR}    # SSMGC's own keys, over the step's:
     ///                                        # atol gap/10, rtol newton.rtol, max_it 300, full precision,
     ///                                        # enable_nl_obstacle 0 (Newton re-linearises the obstacle)
@@ -102,8 +103,8 @@ namespace sfem {
     ///                                        # fixed_iterations: true ends the step after max_it
     ///                                        # iterations, its state accepted unconverged
     ///                                        # tangent_projection: none | on_failure | always;
-    ///                                        # project_below_alpha: 0.1 (on_failure) also projects
-    ///                                        # after a step shortened below 0.1
+    ///                                        # project_below_alpha: 0.1 (on_failure, in [0, 1))
+    ///                                        # also projects after a step shortened below 0.1
     ///   linear: {type: cg, format: BSR, preconditioner: jacobi, rtol: 1e-3, atol: 1e-14, max_it: 2000}
     ///                                        # storage_bytes: 4 stores the BSR tangent in single
     ///                                        # precision, node_sdf's too (8 by default; 2, half,

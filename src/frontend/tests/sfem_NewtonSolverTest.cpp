@@ -242,30 +242,63 @@ int test_cg_stops_on_negative_curvature() {
 }
 
 // tangent_projection: on_failure with project_below_alpha: a step the line search shortened below
-// the fraction repeats the iteration on the projected tangent; at 0 (the default) it is taken.
+// the fraction is not taken, and the iteration is repeated on the projected tangent; at 0 (the
+// default), or without on_failure, it is taken. Every step here is a quarter of the direction.
 int test_projects_below_alpha() {
-    auto p = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
-    const ptrdiff_t n = p.fs->n_dofs();
-    for (const real_t below : {real_t(0), real_t(0.5)}) {
-        auto step       = std::make_shared<ScriptedStep>(n);
+    const sfem::TangentProjection projections[] = {
+            sfem::TangentProjection::ON_FAILURE, sfem::TangentProjection::ON_FAILURE, sfem::TangentProjection::NONE};
+    const real_t below[] = {0, real_t(0.5), real_t(0.5)};
+    for (int c = 0; c < 3; ++c) {
+        auto p          = sfem::test::make_cube_problem("GeneratedNeoHookeanOgden", 2, real_t(0.1));
+        auto step       = std::make_shared<ScriptedStep>(p.fs->n_dofs());
         step->direction = -1e-3;  // a descent direction for the residual's merit, any step length
         sfem::NewtonOptions options;
-        options.tangent_projection  = sfem::TangentProjection::ON_FAILURE;
+        options.tangent_projection  = projections[c];
         options.line_search.steps   = {real_t(0.25)};
-        options.project_below_alpha = below;
+        options.project_below_alpha = below[c];
         options.max_it              = 3;
-        auto report                 = run(p, step, options);
-        printf("  project_below_alpha %g: %s, %d projections, min alpha %g\n",
-               double(below), sfem::to_string(report.status), report.projections, double(report.min_alpha));
-        if (below == 0) {
-            SFEM_TEST_ASSERT(report.projections == 0);
-            SFEM_TEST_ASSERT(!step->projected);
-        } else {
-            // Projected once, and kept: no step is taken whole.
+
+        sfem::NewtonSolver  newton(p.f, step, options);
+        std::vector<real_t> measures, alphas;
+        std::vector<int>    projected;
+        newton.add_monitor([&](const sfem::NewtonIteration &it) {
+            measures.push_back(it.measure.value);
+            alphas.push_back(it.line_search.alpha);
+            projected.push_back(it.projected);
+        });
+        auto report = newton.solve(sfem::StepContext(), p.x->data());
+        printf("  tangent_projection %s, project_below_alpha %g: %s after %d iterations, %d projections\n",
+               projections[c] == sfem::TangentProjection::NONE ? "none" : "on_failure",
+               double(below[c]),
+               sfem::to_string(report.status),
+               report.iterations,
+               report.projections);
+
+        // Three linear solves, the cap; the iterate measured before each and after the last.
+        SFEM_TEST_ASSERT(report.status == sfem::NonlinearReport::Status::MAX_IT);
+        SFEM_TEST_ASSERT(report.iterations == 3);
+        SFEM_TEST_ASSERT(measures.size() == 4);
+        SFEM_TEST_ASSERT(report.min_alpha == real_t(0.25));
+        if (c == 1) {
+            // Projected once, and kept (no step is taken whole). The first direction is not
+            // taken: the monitor shows x where it was, the step 0, then two projected steps.
             SFEM_TEST_ASSERT(report.projections == 1);
             SFEM_TEST_ASSERT(step->projected);
+            SFEM_TEST_ASSERT(measures[1] == measures[0]);
+            SFEM_TEST_ASSERT(alphas[1] == 0);
+            SFEM_TEST_ASSERT(!projected[1] && projected[2] && projected[3]);
+            SFEM_TEST_ASSERT(alphas[2] == real_t(0.25) && alphas[3] == real_t(0.25));
+            SFEM_TEST_ASSERT(measures[2] < measures[1]);
+        } else {
+            // Three steps taken on the tangent itself.
+            SFEM_TEST_ASSERT(report.projections == 0);
+            SFEM_TEST_ASSERT(!step->projected);
+            for (int k = 1; k < 4; ++k) {
+                SFEM_TEST_ASSERT(alphas[k] == real_t(0.25));
+                SFEM_TEST_ASSERT(!projected[k]);
+                SFEM_TEST_ASSERT(measures[k] < measures[k - 1]);
+            }
         }
-        SFEM_TEST_ASSERT(report.min_alpha == real_t(0.25));
     }
     return SFEM_TEST_SUCCESS;
 }
