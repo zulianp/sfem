@@ -9,13 +9,14 @@
 #SBATCH --view=default
 # The LDP paper's torsion data from the strip campaign (campaign.sbatch): per mesh every run against
 # full_a (strip_runs.csv, strip_series.csv, sets strip_<mesh>) and the diagnostics runs (strip_diag.csv),
-# with collect_prony.py, into runs/paper_strip. STRIP_TAG: the runs of campaign.sbatch with that tag.
+# with collect_prony.py, into OUT (default runs/paper_strip<tag>). STRIP_TAG: the runs of campaign.sbatch
+# with that tag.
 set -u
 SFEM_ROOT=${SFEM_ROOT:-/ritom/scratch/cscs/zulianp/sfem-prony-md}
 . "$SFEM_ROOT/workflows/ldp_containment/machine.sh"
 PY=$SFEM_PY
 COL=$PAPER_PY/collect_prony.py
-P=${OUT:-$SFEM_RUNS/paper_strip}
+P=${OUT:-$SFEM_RUNS/paper_strip${STRIP_TAG:-}}
 [ -e $P ] && { echo "collect: $P exists; give a new OUT"; exit 1; }
 mkdir -p $P
 . "$SFEM_ROOT/workflows/prony_torsion/strip/runs.sh"

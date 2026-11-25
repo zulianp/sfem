@@ -6,7 +6,10 @@
 
 The relaxation times stay those of the series in simulation 2's case file; so do the absolute weights
 mu_0 g_i of its fast terms (all but the --slow slowest); SFEM_MATERIAL (a YAML file with a
-`material` block, as stress_strain.py) gives another starting series. Free are mu_inf = mu_0 g_inf and the slow
+`material` block, as stress_strain.py) gives another starting series. Of that file only the relaxation
+times, the weights g_i and mu_0 = 2 (C10 + C01) are read: the type, K (nu = 0.4), C01/C10 = 4 and
+history_storage full are this script's, so the misfit before is that of the given material only if it
+has these. Free are mu_inf = mu_0 g_inf and the slow
 terms' absolute weights a_i = mu_0 g_i, fitted in log space by least squares (scipy) to
   - the uniaxial, equibiaxial and planar tests (measured_tests.py: one HEX8 element following each
     measured strain history, quasi-static), the stress at every measured instant over the test's
