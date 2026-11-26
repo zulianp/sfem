@@ -16,6 +16,14 @@
 
 #include <hip/hip_runtime.h>
 
+#if defined(__HIP_PLATFORM_SPIRV__)
+// chipStar: the calls that take no stream (hipMemcpy, hipStreamSynchronize(0), ...) onto the calling
+// thread's default stream, as in the HIP sources, which take this header by -include
+// (cmake/SFEMDependencies.cmake). The host sources built by the C++ compiler take it here, before
+// any of the calls below.
+#include "sfem_chipstar_spt.h"
+#endif
+
 #include "smesh_gpu_runtime.cuh"
 
 // The HIP runtime follows the CUDA 12 API: the branches written for older toolkits (pointer
@@ -44,9 +52,11 @@
 #define cudaMemPrefetchAsync hipMemPrefetchAsync
 #define cudaCpuDeviceId hipCpuDeviceId
 #define cudaMemPool_t hipMemPool_t
+#if !defined(__HIP_PLATFORM_SPIRV__)
 #define cudaDeviceGetDefaultMemPool hipDeviceGetDefaultMemPool
 #define cudaMemPoolGetAttribute hipMemPoolGetAttribute
 #define cudaMemPoolSetAttribute hipMemPoolSetAttribute
+#endif
 #define cudaMemPoolAttrReleaseThreshold hipMemPoolAttrReleaseThreshold
 #define cudaMemPoolAttrUsedMemHigh hipMemPoolAttrUsedMemHigh
 #define cudaMemPoolProps hipMemPoolProps
@@ -80,18 +90,24 @@ typedef unsigned int       cuuint32_t;
 
 #define cudaStreamCaptureStatus hipStreamCaptureStatus
 #define cudaStreamCaptureStatusNone hipStreamCaptureStatusNone
+#if !defined(__HIP_PLATFORM_SPIRV__)
 #define cudaStreamIsCapturing hipStreamIsCapturing
 #define cudaStreamBeginCapture hipStreamBeginCapture
 #define cudaStreamEndCapture hipStreamEndCapture
+#endif
 #define cudaStreamCaptureModeGlobal hipStreamCaptureModeGlobal
 #define cudaStreamCaptureModeThreadLocal hipStreamCaptureModeThreadLocal
 #define cudaStreamCaptureModeRelaxed hipStreamCaptureModeRelaxed
 #define cudaStreamCaptureMode hipStreamCaptureMode
+#if !defined(__HIP_PLATFORM_SPIRV__)
 #define cudaThreadExchangeStreamCaptureMode hipThreadExchangeStreamCaptureMode
+#endif
 #define cudaGraph_t hipGraph_t
 #define cudaGraphExec_t hipGraphExec_t
+#if !defined(__HIP_PLATFORM_SPIRV__)
 // CUDA 12's cudaGraphInstantiate(exec, graph, flags).
 #define cudaGraphInstantiate hipGraphInstantiateWithFlags
+#endif
 #define cudaGraphLaunch hipGraphLaunch
 #define cudaGraphExecDestroy hipGraphExecDestroy
 #define cudaGraphDestroy hipGraphDestroy
@@ -105,14 +121,21 @@ typedef unsigned int       cuuint32_t;
 #define cudaDevAttrMaxSharedMemoryPerBlock hipDeviceAttributeMaxSharedMemoryPerBlock
 #define cudaDevAttrMaxSharedMemoryPerBlockOptin hipDeviceAttributeSharedMemPerBlockOptin
 #define cudaOccupancyMaxActiveBlocksPerMultiprocessor hipOccupancyMaxActiveBlocksPerMultiprocessor
+#if !defined(__HIP_PLATFORM_SPIRV__)
 // CUDA's cudaFuncSetAttribute takes the kernel itself; HIP's takes its address as const void*.
 template <typename Kernel>
 inline hipError_t sfem_func_set_attribute(Kernel* const kernel, const hipFuncAttribute attribute, const int value) {
     return hipFuncSetAttribute(reinterpret_cast<const void*>(kernel), attribute, value);
 }
 #define cudaFuncSetAttribute sfem_func_set_attribute
+#endif
 #define cudaFuncAttributeMaxDynamicSharedMemorySize hipFuncAttributeMaxDynamicSharedMemorySize
 #define cudaLaunchCooperativeKernel hipLaunchCooperativeKernel
+
+#if defined(__HIP_PLATFORM_SPIRV__)
+// chipStar (Intel GPUs): its capture status and function attributes.
+#include "sfem_gpu_runtime_spirv.hpp"
+#endif
 
 #if defined(__HIPCC__)
 // SFEM's warp is 32 lanes (SFEM_WARP_SIZE), and an AMD wavefront 64. The shuffles keep CUDA's

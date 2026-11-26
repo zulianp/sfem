@@ -114,3 +114,39 @@ uenv run --view=default prgenv-gnu/24.11:v2 -- bash -c '
 
 `scripts/testing/test_CPU_configs.sh` and `test_CUDA_configs.sh` build (and with `RUN_TESTS=1`
 test) many option combinations; on Alps run them with `SFEM_USE_UENV=1`.
+
+## Aurora (ALCF): Intel GPUs with chipStar
+
+The device path (`SFEM_ENABLE_CUDA=ON`) is compiled as HIP (`SFEM_ENABLE_HIP=ON`) by chipStar, which
+targets SPIR-V and runs on Level Zero; `CMAKE_HIP_PLATFORM=spirv` selects it, for SFEM and the
+libraries built with it. It needs CMake 4.3 or later (Aurora's module is 3.31: use a Kitware
+release). Build on a login node; the host code is for the compute nodes' Sapphire Rapids:
+
+```sh
+module use /soft/modulefiles
+module load chipStar/llvm22/20260926-22/release gcc/14.3.0
+cmake -S . -B build-pvc -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+  -DCMAKE_HIP_PLATFORM=spirv -DCMAKE_HIP_COMPILER=$(hipconfig -l)/clang++ \
+  -DSFEM_ENABLE_CUDA=ON -DSFEM_ENABLE_HIP=ON -DSFEM_ENABLE_OPENMP=ON \
+  -DSCCD_ENABLE_NATIVE_ARCH=OFF -DCMAKE_CXX_FLAGS=-march=sapphirerapids -DCMAKE_C_FLAGS=-march=sapphirerapids
+cmake --build build-pvc -j 24
+```
+
+Run with `CHIP_BE=level0`. One MPI rank per GPU tile (12 a node) is
+`mpiexec -n 12 --ppn 12 gpu_tile_compact.sh <app>`, in the default `ZE_FLAT_DEVICE_HIERARCHY=COMPOSITE`;
+with `FLAT` instead, one process sees every tile as a device. MPI takes device buffers directly. There is no NCCL. Graphs are not captured on the per-thread default stream
+(chipStar replays a captured graph and gains nothing from it): the solvers run their iterations from
+the host there.
+
+The first launch of a large module compiles it for the GPU, which takes minutes; a module cache,
+`export CHIP_MODULE_CACHE_DIR=<a directory on /lus/flare>`, makes later runs start at once.
+
+Intel's driver on Aurora (compute-runtime 25.18) has a bug in kernels that spill registers to
+private memory: after an eviction under memory pressure it leaves their private memory unmapped, and
+the next launch dies with `Segmentation fault from GPU ... (NotPresent) ... (Write)`. Several
+processes on one tile (ctest, for instance) bring it out in the high-order (hex64) operators; one
+process per tile does not. The fix is in compute-runtime 26.35.39758.10
+([intel/compute-runtime#973](https://github.com/intel/compute-runtime/issues/973)). The driver's own
+workaround, `NEOReadDebugKeys=1 MakeEachAllocationResident=2`, removes the faults but makes most of
+SFEM's device tests run past their 15-minute limit, so it is no remedy.

@@ -14,16 +14,58 @@ if(SFEM_ENABLE_HIP)
     if(CMAKE_VERSION VERSION_LESS 3.21)
         message(FATAL_ERROR "SFEM_ENABLE_HIP needs CMake 3.21 or later (enable_language(HIP)); this is ${CMAKE_VERSION}")
     endif()
-    # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
-    # enable_language. SFEM_HIP_ARCHITECTURES is the one setting, for SFEM and its subprojects alike:
-    # a reconfigure with another value takes it.
-    foreach(arch IN LISTS SFEM_HIP_ARCHITECTURES)
-        if(NOT arch MATCHES "^gfx[0-9a-f]+(:.*)?$")
-            message(FATAL_ERROR "SFEM_HIP_ARCHITECTURES: '${arch}' is not an AMD GPU target (gfx...)")
+    # The platform as given (enable_language may detect it later, below).
+    set(_sfem_hip_platform_given "${CMAKE_HIP_PLATFORM}")
+    if(NOT CMAKE_HIP_PLATFORM)
+        # Not given: enable_language takes it from `hipconfig --platform`, run as here (CMake's
+        # CMakeDetermineHIPCompiler.cmake), which on chipStar reports spirv. Checked before the AMD
+        # set-up below forces SFEM_HIP_ARCHITECTURES (gfx...) into CMAKE_HIP_ARCHITECTURES, on which
+        # CMake's own compiler test would fail first.
+        execute_process(COMMAND hipconfig --platform
+            OUTPUT_VARIABLE _sfem_hipconfig_platform OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _sfem_hipconfig_result
+            ERROR_QUIET)
+        if(_sfem_hipconfig_result EQUAL 0 AND _sfem_hipconfig_platform STREQUAL "spirv")
+            message(FATAL_ERROR "The HIP installation is chipStar's (hipconfig --platform: spirv), but the platform "
+                                "was not given: configure with -DCMAKE_HIP_PLATFORM=spirv")
         endif()
-    endforeach()
-    set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures (from SFEM_HIP_ARCHITECTURES)" FORCE)
+    endif()
+    if(CMAKE_HIP_PLATFORM STREQUAL "spirv")
+        # chipStar (Intel GPUs, e.g. Aurora's PVC): HIP compiled to SPIR-V, one portable binary with
+        # no architecture list. CMake knows this platform from 4.3. smesh, SCCD, SSDF and sresample
+        # see the same CMAKE_HIP_PLATFORM.
+        if(CMAKE_VERSION VERSION_LESS 4.3)
+            message(FATAL_ERROR "CMAKE_HIP_PLATFORM=spirv (chipStar) needs CMake 4.3 or later; this is ${CMAKE_VERSION}")
+        endif()
+        if(CMAKE_HIP_ARCHITECTURES MATCHES "gfx")
+            message(FATAL_ERROR "CMAKE_HIP_ARCHITECTURES (${CMAKE_HIP_ARCHITECTURES}) are AMD targets, left in the cache by "
+                                "a configure for the AMD platform: configure a new build directory with -DCMAKE_HIP_PLATFORM=spirv")
+        endif()
+    else()
+        # The .cu sources are compiled as HIP (CMakeLists.txt); the architectures must be set before
+        # enable_language. SFEM_HIP_ARCHITECTURES is the one setting, for SFEM and its subprojects alike:
+        # a reconfigure with another value takes it.
+        foreach(arch IN LISTS SFEM_HIP_ARCHITECTURES)
+            if(NOT arch MATCHES "^gfx[0-9a-f]+(:.*)?$")
+                message(FATAL_ERROR "SFEM_HIP_ARCHITECTURES: '${arch}' is not an AMD GPU target (gfx...)")
+            endif()
+        endforeach()
+        set(CMAKE_HIP_ARCHITECTURES "${SFEM_HIP_ARCHITECTURES}" CACHE STRING "HIP architectures (from SFEM_HIP_ARCHITECTURES)" FORCE)
+    endif()
     enable_language(HIP)
+    if(CMAKE_HIP_PLATFORM STREQUAL "spirv" AND NOT _sfem_hip_platform_given STREQUAL "spirv")
+        # CMake detected spirv after the AMD set-up above had forced SFEM_HIP_ARCHITECTURES (gfx...)
+        # into CMAKE_HIP_ARCHITECTURES: the two do not mix. The hipconfig check above catches this
+        # first; this one stays for a CMake that detects the platform by other means.
+        message(FATAL_ERROR "The HIP compiler is chipStar's (CMAKE_HIP_PLATFORM detected as spirv), but the "
+                            "platform was not given: configure a new build directory with -DCMAKE_HIP_PLATFORM=spirv")
+    endif()
+    if(CMAKE_HIP_PLATFORM STREQUAL "spirv")
+        # CMake compiles HIP for chipStar with -nogpulib, which leaves chipStar's device library
+        # (lib/hip-device-lib: __syncthreads, atomics, shuffles) out of the device code: the kernels
+        # then fail to load ("Unresolved Symbol"). Without the flag clang links it, as hipcc does.
+        string(REPLACE " -nogpulib" "" CMAKE_HIP_COMPILE_OBJECT "${CMAKE_HIP_COMPILE_OBJECT}")
+    endif()
     if(NOT DEFINED CMAKE_HIP_STANDARD)
         set(CMAKE_HIP_STANDARD 17)
         set(CMAKE_HIP_STANDARD_REQUIRED ON)
@@ -40,6 +82,14 @@ if(SFEM_ENABLE_HIP)
     # (cudaMemcpyToSymbol in base/hip/sfem_gpu_runtime.hpp and SCCD's runtime header).
     string(APPEND CMAKE_HIP_FLAGS " -fgpu-default-stream=per-thread")
     add_compile_definitions(HIP_API_PER_THREAD_DEFAULT_STREAM)
+    if(CMAKE_HIP_PLATFORM STREQUAL "spirv")
+        # With the per-thread default stream clang lowers a launch to hipLaunchKernel_spt, which
+        # chipStar implements and declares in hip/spirv_spt.h, but no header of its includes that
+        # one: every HIP source, smesh's and the other subprojects' included, takes it here, with the
+        # default arguments its declarations leave out (src/base/hip/sfem_chipstar_spt.h). SFEM's
+        # host sources, built by the C++ compiler, include it through base/hip/sfem_gpu_runtime.hpp.
+        string(APPEND CMAKE_HIP_FLAGS " -include \"${CMAKE_CURRENT_LIST_DIR}/../src/base/hip/sfem_chipstar_spt.h\"")
+    endif()
 elseif(SFEM_ENABLE_CUDA)
     if(NOT DEFINED CMAKE_CUDA_HOST_COMPILER AND DEFINED CMAKE_CXX_COMPILER)
         set(CMAKE_CUDA_HOST_COMPILER "${CMAKE_CXX_COMPILER}" CACHE FILEPATH "CUDA host compiler")
@@ -227,10 +277,34 @@ if(SFEM_ENABLE_HIP)
     endif()
     list(APPEND SFEM_DEP_LIBRARIES hip::host)
     if(SFEM_ENABLE_CUSPARSE)
+        # On chipStar too: its hipSPARSE (CHIP-SPV/hipSPARSE, on rocSPARSE) exports roc::hipsparse.
         find_package(hipsparse REQUIRED)
         list(APPEND SFEM_DEP_LIBRARIES roc::hipsparse)
     endif()
-    if(SFEM_ENABLE_CUBLAS)
+    if(SFEM_ENABLE_CUBLAS AND CMAKE_HIP_PLATFORM STREQUAL "spirv")
+        # chipStar's hipBLAS is H4I's, on oneMKL, installed with chipStar (CMAKE_HIP_COMPILER_ROCM_ROOT,
+        # which CMake sets on this platform too, from clang, hipconfig or HIP_PATH) or under
+        # CMAKE_PREFIX_PATH: find_path searches each of its prefixes, the variable's and the
+        # environment's, under include/ and then as given, both with the suffixes below. Its package
+        # config includes a file it does not install (hipblas.cmake): the targets are read from
+        # hipblasTargets.cmake, after the MKLShim they need, installed next to it. The library is
+        # H4I::hipblas.
+        find_path(SFEM_CHIPSTAR_HIPBLAS_CMAKE_DIR
+            NAMES hipblas/hipblasTargets.cmake
+            HINTS "${CMAKE_HIP_COMPILER_ROCM_ROOT}"
+            PATH_SUFFIXES lib64/cmake lib/cmake
+            DOC "The directory holding H4I's hipblas/ and MKLShim/ CMake packages (chipStar)")
+        if(NOT SFEM_CHIPSTAR_HIPBLAS_CMAKE_DIR)
+            message(FATAL_ERROR "SFEM_ENABLE_CUBLAS on chipStar needs H4I-HipBLAS: hipblas/hipblasTargets.cmake was not "
+                                "found in lib64/cmake or lib/cmake under ${CMAKE_HIP_COMPILER_ROCM_ROOT} or a prefix of "
+                                "CMAKE_PREFIX_PATH; set SFEM_CHIPSTAR_HIPBLAS_CMAKE_DIR or SFEM_ENABLE_CUBLAS=OFF")
+        endif()
+        find_package(MKLShim REQUIRED PATHS "${SFEM_CHIPSTAR_HIPBLAS_CMAKE_DIR}/MKLShim" NO_DEFAULT_PATH)
+        if(NOT TARGET H4I::hipblas)
+            include("${SFEM_CHIPSTAR_HIPBLAS_CMAKE_DIR}/hipblas/hipblasTargets.cmake")
+        endif()
+        list(APPEND SFEM_DEP_LIBRARIES H4I::hipblas)
+    elseif(SFEM_ENABLE_CUBLAS)
         find_package(hipblas REQUIRED)
         list(APPEND SFEM_DEP_LIBRARIES roc::hipblas)
     endif()

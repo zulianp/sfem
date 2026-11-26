@@ -669,6 +669,13 @@ namespace sfem {
         cudaPointerAttributes attributes;
         cudaError_t           err = cudaPointerGetAttributes(&attributes, ptr);
 
+#if defined(__HIP_PLATFORM_SPIRV__)
+        // chipStar (HIP on SPIR-V) does not know memory it did not allocate, a plain host pointer: not device memory.
+        if (err == hipErrorInvalidValue) {
+            (void)hipGetLastError();
+            return false;
+        }
+#endif
         if (err != cudaSuccess) {
             SFEM_ERROR("cudaPointerGetAttributes failed: %s\n", cudaGetErrorString(err));
         }
